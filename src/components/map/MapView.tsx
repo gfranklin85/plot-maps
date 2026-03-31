@@ -1,12 +1,11 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import {
   APIProvider,
   Map,
-  AdvancedMarker,
+  useMap,
   InfoWindow,
-  Pin,
 } from "@vis.gl/react-google-maps";
 import { Lead, STATUS_COLORS } from "@/types";
 import { MAP_CENTER, MAP_ZOOM } from "@/lib/constants";
@@ -19,8 +18,87 @@ interface Props {
 
 const API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
 
-// Map style: muted/light theme similar to CartoDB Positron
-const MAP_ID = "DEMO_MAP_ID";
+// Light/muted map style
+const MAP_STYLES: google.maps.MapTypeStyle[] = [
+  {
+    featureType: "poi",
+    elementType: "labels",
+    stylers: [{ visibility: "off" }],
+  },
+  {
+    featureType: "transit",
+    stylers: [{ visibility: "off" }],
+  },
+  {
+    featureType: "water",
+    elementType: "geometry",
+    stylers: [{ color: "#c9d7e8" }],
+  },
+  {
+    featureType: "landscape",
+    elementType: "geometry",
+    stylers: [{ color: "#eef2f7" }],
+  },
+  {
+    featureType: "road",
+    elementType: "geometry",
+    stylers: [{ color: "#ffffff" }],
+  },
+  {
+    featureType: "road",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#8c9bab" }],
+  },
+];
+
+function LeadMarkers({
+  leads,
+  onMarkerClick,
+}: {
+  leads: Lead[];
+  onMarkerClick: (lead: Lead) => void;
+}) {
+  const map = useMap();
+  const markersRef = useRef<google.maps.Marker[]>([]);
+
+  useEffect(() => {
+    if (!map) return;
+
+    // Clear existing markers
+    markersRef.current.forEach((m) => m.setMap(null));
+    markersRef.current = [];
+
+    leads.forEach((lead) => {
+      if (lead.latitude == null || lead.longitude == null) return;
+
+      const color = STATUS_COLORS[lead.status] || "#6b7280";
+
+      const marker = new google.maps.Marker({
+        position: { lat: lead.latitude, lng: lead.longitude },
+        map,
+        title: lead.property_address || lead.name,
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 10,
+          fillColor: color,
+          fillOpacity: 1,
+          strokeColor: "#ffffff",
+          strokeWeight: 3,
+        },
+      });
+
+      marker.addListener("click", () => onMarkerClick(lead));
+      markersRef.current.push(marker);
+    });
+
+    return () => {
+      markersRef.current.forEach((m) => m.setMap(null));
+      markersRef.current = [];
+    };
+  }, [map, leads, onMarkerClick]);
+
+  return null;
+}
 
 export default function MapView({ leads, onLeadClick }: Props) {
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
@@ -42,7 +120,6 @@ export default function MapView({ leads, onLeadClick }: Props) {
       <Map
         defaultCenter={MAP_CENTER}
         defaultZoom={MAP_ZOOM}
-        mapId={MAP_ID}
         className="h-full w-full rounded-2xl"
         disableDefaultUI={false}
         zoomControl={true}
@@ -50,59 +127,9 @@ export default function MapView({ leads, onLeadClick }: Props) {
         streetViewControl={false}
         fullscreenControl={false}
         gestureHandling="greedy"
-        styles={[
-          {
-            featureType: "poi",
-            elementType: "labels",
-            stylers: [{ visibility: "off" }],
-          },
-          {
-            featureType: "transit",
-            stylers: [{ visibility: "off" }],
-          },
-          {
-            featureType: "water",
-            elementType: "geometry",
-            stylers: [{ color: "#c9d7e8" }],
-          },
-          {
-            featureType: "landscape",
-            elementType: "geometry",
-            stylers: [{ color: "#eef2f7" }],
-          },
-          {
-            featureType: "road",
-            elementType: "geometry",
-            stylers: [{ color: "#ffffff" }],
-          },
-          {
-            featureType: "road",
-            elementType: "labels.text.fill",
-            stylers: [{ color: "#8c9bab" }],
-          },
-        ]}
+        styles={MAP_STYLES}
       >
-        {leads.map((lead) => {
-          if (lead.latitude == null || lead.longitude == null) return null;
-
-          const color = STATUS_COLORS[lead.status] || "#6b7280";
-
-          return (
-            <AdvancedMarker
-              key={lead.id}
-              position={{ lat: lead.latitude, lng: lead.longitude }}
-              onClick={() => handleMarkerClick(lead)}
-              title={lead.property_address || lead.name}
-            >
-              <Pin
-                background={color}
-                glyphColor="#ffffff"
-                borderColor="#ffffff"
-                scale={1.1}
-              />
-            </AdvancedMarker>
-          );
-        })}
+        <LeadMarkers leads={leads} onMarkerClick={handleMarkerClick} />
 
         {selectedLead &&
           selectedLead.latitude != null &&
@@ -113,7 +140,7 @@ export default function MapView({ leads, onLeadClick }: Props) {
                 lng: selectedLead.longitude,
               }}
               onCloseClick={handleCloseInfo}
-              pixelOffset={[0, -40]}
+              pixelOffset={[0, -35]}
             >
               <PropertyPopup lead={selectedLead} />
             </InfoWindow>

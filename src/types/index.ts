@@ -8,6 +8,20 @@ export type LeadStatus =
   | "Do Not Call"
   | "Hot Lead";
 
+export type CallOutcome =
+  | "No Answer"
+  | "Left VM"
+  | "Spoke with Owner"
+  | "Not Interested"
+  | "Follow-Up"
+  | "DNC";
+
+export type Priority = "high" | "medium" | "low";
+
+export type ActivityType = "call" | "note" | "email" | "letter" | "status_change" | "import";
+
+export type CompType = "active" | "sold" | "pending";
+
 export interface Lead {
   id: string;
   created_at: string;
@@ -30,11 +44,87 @@ export interface Lead {
   status: LeadStatus;
   riley_conversation_id: string | null;
   notes: string | null;
-  // Added columns
+  // Geo columns
   latitude: number | null;
   longitude: number | null;
   geocoded_at: string | null;
   tags: string[] | null;
+  // New prospecting columns
+  owner_name: string | null;
+  phone_2: string | null;
+  phone_3: string | null;
+  mailing_address: string | null;
+  mailing_city: string | null;
+  mailing_state: string | null;
+  mailing_zip: string | null;
+  follow_up_date: string | null;
+  last_contact_date: string | null;
+  priority: Priority | null;
+  city: string | null;
+  state: string | null;
+  zip: string | null;
+}
+
+export interface Activity {
+  id: string;
+  lead_id: string | null;
+  type: ActivityType;
+  title: string;
+  description: string | null;
+  outcome: CallOutcome | null;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export interface MarketComp {
+  id: string;
+  lead_id: string | null;
+  address: string;
+  city: string | null;
+  state: string | null;
+  zip: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  sale_price: number | null;
+  list_price: number | null;
+  sale_date: string | null;
+  sqft: number | null;
+  beds: number | null;
+  baths: number | null;
+  year_built: number | null;
+  lot_size: string | null;
+  comp_type: CompType;
+  dom: number | null;
+  price_per_sqft: number | null;
+  notes: string | null;
+  source: string | null;
+  created_at: string;
+}
+
+export interface ImportTemplate {
+  id: string;
+  name: string;
+  source: string;
+  column_mapping: Record<string, string>;
+  field_defaults: Record<string, string> | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DailyTarget {
+  id: string;
+  target_date: string;
+  conversations_target: number;
+  conversations_actual: number;
+  followups_target: number;
+  followups_actual: number;
+  letters_target: number;
+  letters_actual: number;
+  new_contacts_target: number;
+  new_contacts_actual: number;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Contact {
@@ -70,7 +160,6 @@ export interface Task {
   created_by_profile_id: string | null;
   created_at: string;
   updated_at: string;
-  // Joined
   lead?: Lead;
 }
 
@@ -147,6 +236,18 @@ export interface MapMarker {
   source: string | null;
 }
 
+// AI Action List item
+export interface ActionItem {
+  leadId: string;
+  leadName: string;
+  address: string | null;
+  phone: string | null;
+  action: string;
+  reason: string;
+  suggestedOpener: string | null;
+  priority: Priority;
+}
+
 // Status color mapping
 export const STATUS_COLORS: Record<LeadStatus, string> = {
   "New": "#3b82f6",
@@ -168,4 +269,10 @@ export const STATUS_BG_COLORS: Record<LeadStatus, string> = {
   "Not Interested": "bg-rose-100 text-rose-700",
   "Do Not Call": "bg-red-100 text-red-700",
   "Hot Lead": "bg-green-100 text-green-700",
+};
+
+export const PRIORITY_COLORS: Record<Priority, string> = {
+  high: "bg-red-100 text-red-700",
+  medium: "bg-amber-100 text-amber-700",
+  low: "bg-slate-100 text-slate-500",
 };

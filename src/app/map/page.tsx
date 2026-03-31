@@ -5,7 +5,6 @@ import { supabase } from "@/lib/supabase";
 import { Lead, LeadStatus } from "@/types";
 import MapDynamic from "@/components/map/MapDynamic";
 import SearchInput from "@/components/ui/SearchInput";
-import MaterialIcon from "@/components/ui/MaterialIcon";
 
 const FILTER_TABS: { label: string; key: string; statuses: LeadStatus[] }[] = [
   { label: "All", key: "all", statuses: [] },
@@ -142,35 +141,9 @@ export default function MapPage() {
         </div>
       </div>
 
-      {/* Map or empty/loading state */}
+      {/* Map */}
       {loading ? (
         <div className="h-full w-full bg-surface-container animate-pulse rounded-2xl" />
-      ) : leads.length === 0 ? (
-        <div className="h-full w-full flex flex-col items-center justify-center bg-slate-50 rounded-2xl">
-          <MaterialIcon
-            icon="location_off"
-            className="text-[64px] text-slate-300 mb-4"
-          />
-          <p className="text-lg font-semibold text-slate-500">
-            No leads with coordinates
-          </p>
-          <p className="text-sm text-slate-400 mt-1">
-            Import leads with addresses to see them on the map.
-          </p>
-        </div>
-      ) : filteredLeads.length === 0 ? (
-        <div className="h-full w-full flex flex-col items-center justify-center bg-slate-50 rounded-2xl">
-          <MaterialIcon
-            icon="filter_alt_off"
-            className="text-[64px] text-slate-300 mb-4"
-          />
-          <p className="text-lg font-semibold text-slate-500">
-            No leads match your filters
-          </p>
-          <p className="text-sm text-slate-400 mt-1">
-            Try adjusting your search or filter selection.
-          </p>
-        </div>
       ) : (
         <MapDynamic leads={filteredLeads} />
       )}

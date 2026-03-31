@@ -2,8 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-@import "leaflet/dist/leaflet.css";
-
 :root {
   --primary: #0058be;
   --primary-container: #2170e4;
@@ -53,24 +51,13 @@ h1, h2, h3, h4, h5, h6 {
   scrollbar-width: none;
 }
 
-/* Leaflet overrides */
-.leaflet-container {
-  font-family: "Inter", sans-serif;
-  z-index: 1;
+/* Google Maps InfoWindow overrides */
+.gm-style-iw {
+  border-radius: 1rem !important;
+  padding: 0 !important;
 }
 
-.leaflet-popup-content-wrapper {
-  border-radius: 1rem;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
-  padding: 0;
-}
-
-.leaflet-popup-content {
-  margin: 0;
-  min-width: 280px;
-}
-
-.leaflet-popup-close-button {
-  top: 8px !important;
-  right: 8px !important;
+.gm-style-iw-d {
+  overflow: visible !important;
+  max-height: none !important;
 }

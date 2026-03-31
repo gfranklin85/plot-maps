@@ -36,6 +36,6 @@ export const TASK_TABS = [
   { label: "Recently Imported", key: "recently-imported" },
 ] as const;
 
-// Map default center (Beverly Hills / LA area)
-export const MAP_CENTER: [number, number] = [34.0736, -118.4004];
-export const MAP_ZOOM = 13;
+// Map default center (523 Puffin Lane, Lemoore CA 93245)
+export const MAP_CENTER: { lat: number; lng: number } = { lat: 36.2632, lng: -119.7988 };
+export const MAP_ZOOM = 14;

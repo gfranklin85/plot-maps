@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
 import { Lead, LeadStatus, Priority } from "@/types";
 import MapDynamic from "@/components/map/MapDynamic";
+import RouteOptimizer from "@/components/map/RouteOptimizer";
 import SearchInput from "@/components/ui/SearchInput";
 import { PRIORITIES } from "@/lib/constants";
 
@@ -44,6 +45,8 @@ export default function MapPage() {
   const [selectedPriority, setSelectedPriority] = useState<Priority | "">("");
   const [selectedSource, setSelectedSource] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [mapType, setMapType] = useState<'roadmap' | 'satellite' | 'hybrid'>('roadmap');
+  const [routePlannerOpen, setRoutePlannerOpen] = useState(false);
 
   useEffect(() => {
     async function fetchLeads() {
@@ -164,6 +167,32 @@ export default function MapPage() {
             className="shadow-lg"
           />
         </div>
+
+        {/* Map type toggle */}
+        <div className="inline-flex items-center gap-0.5 rounded-full glass-card p-1 shadow-lg">
+          {(["roadmap", "satellite", "hybrid"] as const).map((type) => (
+            <button
+              key={type}
+              onClick={() => setMapType(type)}
+              className={`rounded-full px-3 py-1.5 text-xs font-medium transition-all capitalize ${
+                mapType === type
+                  ? "bg-white font-bold text-blue-600 shadow-sm"
+                  : "text-slate-600 hover:text-slate-800"
+              }`}
+            >
+              {type === "roadmap" ? "Map" : type === "satellite" ? "Satellite" : "Hybrid"}
+            </button>
+          ))}
+        </div>
+
+        {/* Plan Route button */}
+        <button
+          onClick={() => setRoutePlannerOpen(true)}
+          className="flex items-center gap-1.5 rounded-full action-gradient px-3 py-2 text-xs font-medium text-on-primary shadow-lg transition-all hover:shadow-xl"
+        >
+          <span className="material-symbols-rounded text-[18px]">route</span>
+          Plan Route
+        </button>
 
         {/* Toggle filters button */}
         <button
@@ -391,7 +420,17 @@ export default function MapPage() {
       {loading ? (
         <div className="h-full w-full bg-surface-container animate-pulse rounded-2xl" />
       ) : (
-        <MapDynamic leads={filteredLeads} />
+        <MapDynamic leads={filteredLeads} mapType={mapType} />
+      )}
+
+      {/* Route Planner Panel */}
+      {routePlannerOpen && (
+        <div className="fixed top-0 right-0 z-50 h-full w-96 bg-white shadow-2xl overflow-y-auto">
+          <RouteOptimizer
+            leads={filteredLeads}
+            onClose={() => setRoutePlannerOpen(false)}
+          />
+        </div>
       )}
     </div>
   );

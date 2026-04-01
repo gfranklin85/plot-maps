@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Lead } from '@/types';
 import { cn } from '@/lib/utils';
 import MaterialIcon from '@/components/ui/MaterialIcon';
@@ -9,10 +9,13 @@ interface Props {
   lead: Lead;
 }
 
-type ViewMode = 'street' | 'map';
+type ViewMode = 'street' | 'map' | 'aerial';
 
 export default function StreetViewToggle({ lead }: Props) {
   const [mode, setMode] = useState<ViewMode>('street');
+  const [flyoverLoading, setFlyoverLoading] = useState(false);
+  const [flyoverUrl, setFlyoverUrl] = useState<string | null>(null);
+  const [flyoverError, setFlyoverError] = useState<string | null>(null);
 
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
   const hasCoords = lead.latitude !== null && lead.longitude !== null;
@@ -30,7 +33,40 @@ export default function StreetViewToggle({ lead }: Props) {
       ? `https://www.google.com/maps/embed/v1/place?q=${lead.latitude},${lead.longitude}&key=${apiKey}&zoom=16`
       : null;
 
-  const currentUrl = mode === 'street' ? streetViewUrl : mapUrl;
+  const aerialUrl =
+    hasCoords && apiKey
+      ? `https://www.google.com/maps/embed/v1/view?key=${apiKey}&center=${lead.latitude},${lead.longitude}&zoom=18&maptype=satellite`
+      : null;
+
+  const currentUrl = mode === 'street' ? streetViewUrl : mode === 'map' ? mapUrl : aerialUrl;
+
+  const fetchFlyover = useCallback(async () => {
+    if (!hasAddress) return;
+    setFlyoverLoading(true);
+    setFlyoverError(null);
+    setFlyoverUrl(null);
+    try {
+      const res = await fetch('/api/aerial-view', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ address: lead.property_address }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.videoUrl) {
+          setFlyoverUrl(data.videoUrl);
+        } else {
+          setFlyoverError('3D flyover not available for this location');
+        }
+      } else {
+        setFlyoverError('3D flyover not available for this location');
+      }
+    } catch {
+      setFlyoverError('3D flyover not available for this location');
+    } finally {
+      setFlyoverLoading(false);
+    }
+  }, [hasAddress, lead.property_address]);
 
   return (
     <div className="rounded-2xl bg-surface-container-lowest p-5 border border-slate-100">
@@ -39,13 +75,13 @@ export default function StreetViewToggle({ lead }: Props) {
         <div className="flex items-center gap-2">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-100">
             <MaterialIcon
-              icon={mode === 'street' ? 'streetview' : 'map'}
+              icon={mode === 'street' ? 'streetview' : mode === 'map' ? 'map' : 'satellite_alt'}
               className="text-[20px] text-blue-600"
               filled
             />
           </div>
           <h3 className="font-headline text-sm font-bold text-on-surface">
-            {mode === 'street' ? 'Street View' : 'Map View'}
+            {mode === 'street' ? 'Street View' : mode === 'map' ? 'Map View' : 'Aerial View'}
           </h3>
         </div>
 
@@ -74,6 +110,18 @@ export default function StreetViewToggle({ lead }: Props) {
             <MaterialIcon icon="map" className="text-[14px]" />
             Map
           </button>
+          <button
+            onClick={() => setMode('aerial')}
+            className={cn(
+              'flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all',
+              mode === 'aerial'
+                ? 'bg-white text-on-surface shadow-sm'
+                : 'text-secondary hover:text-on-surface'
+            )}
+          >
+            <MaterialIcon icon="satellite_alt" className="text-[14px]" />
+            Aerial
+          </button>
         </div>
       </div>
 
@@ -100,6 +148,44 @@ export default function StreetViewToggle({ lead }: Props) {
             <p className="text-xs mt-1">
               Try switching to Map view
             </p>
+          )}
+        </div>
+      )}
+
+      {/* Aerial mode: flyover controls */}
+      {mode === 'aerial' && (
+        <div className="mt-3">
+          {flyoverUrl ? (
+            <video
+              src={flyoverUrl}
+              controls
+              className="w-full rounded-xl"
+              autoPlay
+              muted
+            />
+          ) : flyoverError ? (
+            <p className="text-sm text-secondary text-center py-2">{flyoverError}</p>
+          ) : (
+            <button
+              onClick={fetchFlyover}
+              disabled={flyoverLoading || !hasAddress}
+              className={cn(
+                'flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-all',
+                'action-gradient text-on-primary hover:shadow-lg disabled:opacity-60'
+              )}
+            >
+              {flyoverLoading ? (
+                <>
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  Checking availability...
+                </>
+              ) : (
+                <>
+                  <MaterialIcon icon="flight" className="text-[18px]" />
+                  Get Flyover Video
+                </>
+              )}
+            </button>
           )}
         </div>
       )}

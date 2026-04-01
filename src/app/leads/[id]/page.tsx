@@ -17,6 +17,8 @@ import FollowUpScheduler from '@/components/leads/FollowUpScheduler';
 import EmailComposer from '@/components/leads/EmailComposer';
 import MarketComps from '@/components/leads/MarketComps';
 import StreetViewToggle from '@/components/leads/StreetViewToggle';
+import NearbyPlaces from '@/components/leads/NearbyPlaces';
+import DriveTimeCard from '@/components/leads/DriveTimeCard';
 
 interface CallGuidance {
   opener: string;
@@ -249,6 +251,9 @@ export default function LeadDetailPage() {
             <StreetViewToggle lead={lead} />
           </div>
 
+          {/* Drive Time Card */}
+          <DriveTimeCard lead={lead} />
+
           {/* Property Info Card */}
           <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-5 space-y-4">
             <h3 className="font-headline text-lg font-bold">Property Info</h3>
@@ -428,6 +433,9 @@ export default function LeadDetailPage() {
               </div>
             )}
           </div>
+
+          {/* Nearby Places */}
+          <NearbyPlaces lead={lead} />
 
           {/* Market Comps Card */}
           <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-5">

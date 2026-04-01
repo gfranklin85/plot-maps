@@ -15,6 +15,7 @@ import PropertyPopup from "./PropertyPopup";
 interface Props {
   leads: Lead[];
   onLeadClick?: (id: string) => void;
+  mapType?: string;
 }
 
 const API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
@@ -153,7 +154,8 @@ function LeadMarkers({
   return null;
 }
 
-export default function MapView({ leads, onLeadClick }: Props) {
+export default function MapView({ leads, onLeadClick, mapType }: Props) {
+  const isSatelliteType = mapType === 'satellite' || mapType === 'hybrid';
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
 
   const handleMarkerClick = useCallback(
@@ -180,7 +182,8 @@ export default function MapView({ leads, onLeadClick }: Props) {
         streetViewControl={false}
         fullscreenControl={false}
         gestureHandling="greedy"
-        styles={MAP_STYLES}
+        mapTypeId={mapType || 'roadmap'}
+        styles={isSatelliteType ? undefined : MAP_STYLES}
       >
         <LeadMarkers leads={leads} onMarkerClick={handleMarkerClick} />
 

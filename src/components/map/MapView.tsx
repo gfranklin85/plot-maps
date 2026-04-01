@@ -15,51 +15,26 @@ import PropertyPopup from "./PropertyPopup";
 interface Props {
   leads: Lead[];
   onLeadClick?: (id: string) => void;
-  mapType?: string;
+  mapType?: "roadmap" | "satellite" | "hybrid" | "terrain";
 }
 
 const API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
 
-// Light/muted map style
+// Light/muted map style for roadmap
 const MAP_STYLES: google.maps.MapTypeStyle[] = [
-  {
-    featureType: "poi",
-    elementType: "labels",
-    stylers: [{ visibility: "off" }],
-  },
-  {
-    featureType: "transit",
-    stylers: [{ visibility: "off" }],
-  },
-  {
-    featureType: "water",
-    elementType: "geometry",
-    stylers: [{ color: "#c9d7e8" }],
-  },
-  {
-    featureType: "landscape",
-    elementType: "geometry",
-    stylers: [{ color: "#eef2f7" }],
-  },
-  {
-    featureType: "road",
-    elementType: "geometry",
-    stylers: [{ color: "#ffffff" }],
-  },
-  {
-    featureType: "road",
-    elementType: "labels.text.fill",
-    stylers: [{ color: "#8c9bab" }],
-  },
+  { featureType: "poi", elementType: "labels", stylers: [{ visibility: "off" }] },
+  { featureType: "transit", stylers: [{ visibility: "off" }] },
+  { featureType: "water", elementType: "geometry", stylers: [{ color: "#c9d7e8" }] },
+  { featureType: "landscape", elementType: "geometry", stylers: [{ color: "#eef2f7" }] },
+  { featureType: "road", elementType: "geometry", stylers: [{ color: "#ffffff" }] },
+  { featureType: "road", elementType: "labels.text.fill", stylers: [{ color: "#8c9bab" }] },
 ];
 
-/** Custom cluster renderer: blue circle with white count text */
+/** Custom cluster renderer */
 class BlueCircleRenderer implements Renderer {
   render(cluster: Cluster, stats: { clusters: { markers: { max: number } } }): google.maps.Marker {
     const count = cluster.count;
     const position = cluster.position;
-
-    // Scale size based on cluster count relative to max
     const max = stats.clusters.markers.max;
     const size = Math.max(36, Math.min(60, 36 + (count / max) * 24));
 
@@ -73,7 +48,7 @@ class BlueCircleRenderer implements Renderer {
         </text>
       </svg>`;
 
-    const marker = new google.maps.Marker({
+    return new google.maps.Marker({
       position,
       icon: {
         url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
@@ -82,9 +57,18 @@ class BlueCircleRenderer implements Renderer {
       },
       zIndex: Number(google.maps.Marker.MAX_ZINDEX) + count,
     });
-
-    return marker;
   }
+}
+
+/** Syncs the mapType prop to the actual google map instance */
+function MapTypeSync({ mapType }: { mapType: string }) {
+  const map = useMap();
+  useEffect(() => {
+    if (map) {
+      map.setMapTypeId(mapType);
+    }
+  }, [map, mapType]);
+  return null;
 }
 
 function LeadMarkers({
@@ -101,7 +85,6 @@ function LeadMarkers({
   useEffect(() => {
     if (!map) return;
 
-    // Clear existing clusterer and markers
     if (clustererRef.current) {
       clustererRef.current.clearMarkers();
       clustererRef.current.setMap(null);
@@ -132,7 +115,6 @@ function LeadMarkers({
       markersRef.current.push(marker);
     });
 
-    // Create clusterer with all markers
     const clusterer = new MarkerClusterer({
       map,
       markers: markersRef.current,
@@ -154,8 +136,8 @@ function LeadMarkers({
   return null;
 }
 
-export default function MapView({ leads, onLeadClick, mapType }: Props) {
-  const isSatelliteType = mapType === 'satellite' || mapType === 'hybrid';
+export default function MapView({ leads, onLeadClick, mapType = "roadmap" }: Props) {
+  const isSatellite = mapType === "satellite" || mapType === "hybrid";
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
 
   const handleMarkerClick = useCallback(
@@ -175,16 +157,17 @@ export default function MapView({ leads, onLeadClick, mapType }: Props) {
       <Map
         defaultCenter={MAP_CENTER}
         defaultZoom={MAP_ZOOM}
-        className="h-full w-full rounded-2xl"
-        disableDefaultUI={false}
-        zoomControl={true}
+        mapId=""
+        className="h-full w-full"
+        disableDefaultUI
+        zoomControl
         mapTypeControl={false}
         streetViewControl={false}
         fullscreenControl={false}
         gestureHandling="greedy"
-        mapTypeId={mapType || 'roadmap'}
-        styles={isSatelliteType ? undefined : MAP_STYLES}
+        styles={isSatellite ? undefined : MAP_STYLES}
       >
+        <MapTypeSync mapType={mapType} />
         <LeadMarkers leads={leads} onMarkerClick={handleMarkerClick} />
 
         {selectedLead &&

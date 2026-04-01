@@ -7,6 +7,7 @@ import {
   useMap,
   InfoWindow,
 } from "@vis.gl/react-google-maps";
+import { MarkerClusterer, Renderer, Cluster } from "@googlemaps/markerclusterer";
 import { Lead, STATUS_COLORS } from "@/types";
 import { MAP_CENTER, MAP_ZOOM } from "@/lib/constants";
 import PropertyPopup from "./PropertyPopup";
@@ -51,6 +52,40 @@ const MAP_STYLES: google.maps.MapTypeStyle[] = [
   },
 ];
 
+/** Custom cluster renderer: blue circle with white count text */
+class BlueCircleRenderer implements Renderer {
+  render(cluster: Cluster, stats: { clusters: { markers: { max: number } } }): google.maps.Marker {
+    const count = cluster.count;
+    const position = cluster.position;
+
+    // Scale size based on cluster count relative to max
+    const max = stats.clusters.markers.max;
+    const size = Math.max(36, Math.min(60, 36 + (count / max) * 24));
+
+    const svg = `
+      <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="${size / 2}" cy="${size / 2}" r="${size / 2}" fill="#3b82f6" opacity="0.85"/>
+        <circle cx="${size / 2}" cy="${size / 2}" r="${size / 2 - 3}" fill="#3b82f6"/>
+        <text x="50%" y="50%" dominant-baseline="central" text-anchor="middle"
+              fill="white" font-size="${size > 44 ? 14 : 12}" font-weight="600" font-family="system-ui, sans-serif">
+          ${count}
+        </text>
+      </svg>`;
+
+    const marker = new google.maps.Marker({
+      position,
+      icon: {
+        url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
+        scaledSize: new google.maps.Size(size, size),
+        anchor: new google.maps.Point(size / 2, size / 2),
+      },
+      zIndex: Number(google.maps.Marker.MAX_ZINDEX) + count,
+    });
+
+    return marker;
+  }
+}
+
 function LeadMarkers({
   leads,
   onMarkerClick,
@@ -60,11 +95,17 @@ function LeadMarkers({
 }) {
   const map = useMap();
   const markersRef = useRef<google.maps.Marker[]>([]);
+  const clustererRef = useRef<MarkerClusterer | null>(null);
 
   useEffect(() => {
     if (!map) return;
 
-    // Clear existing markers
+    // Clear existing clusterer and markers
+    if (clustererRef.current) {
+      clustererRef.current.clearMarkers();
+      clustererRef.current.setMap(null);
+      clustererRef.current = null;
+    }
     markersRef.current.forEach((m) => m.setMap(null));
     markersRef.current = [];
 
@@ -75,7 +116,6 @@ function LeadMarkers({
 
       const marker = new google.maps.Marker({
         position: { lat: lead.latitude, lng: lead.longitude },
-        map,
         title: lead.property_address || lead.name,
         icon: {
           path: google.maps.SymbolPath.CIRCLE,
@@ -91,7 +131,20 @@ function LeadMarkers({
       markersRef.current.push(marker);
     });
 
+    // Create clusterer with all markers
+    const clusterer = new MarkerClusterer({
+      map,
+      markers: markersRef.current,
+      renderer: new BlueCircleRenderer(),
+    });
+    clustererRef.current = clusterer;
+
     return () => {
+      if (clustererRef.current) {
+        clustererRef.current.clearMarkers();
+        clustererRef.current.setMap(null);
+        clustererRef.current = null;
+      }
       markersRef.current.forEach((m) => m.setMap(null));
       markersRef.current = [];
     };

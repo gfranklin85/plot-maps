@@ -1,6 +1,11 @@
 'use client';
 
+import Link from 'next/link';
+import { useProfile } from '@/lib/profile-context';
+
 export default function TopBar() {
+  const { profile, initials } = useProfile();
+
   return (
     <header className="fixed top-0 right-0 w-[calc(100%-16rem)] h-16 bg-white/80 backdrop-blur-md flex justify-between items-center px-8 z-40 shadow-sm">
       {/* Search */}
@@ -32,15 +37,19 @@ export default function TopBar() {
         <div className="w-px h-8 bg-slate-200" />
 
         {/* User */}
-        <div className="flex items-center gap-3">
+        <Link href="/settings" className="flex items-center gap-3 group cursor-pointer">
           <div className="text-right">
-            <p className="text-sm font-semibold text-slate-800">Marcus Thorne</p>
-            <p className="text-xs text-slate-500">Senior Agent</p>
+            <p className="text-sm font-semibold text-slate-800 group-hover:text-blue-700 transition-colors">
+              {profile.fullName || 'Set up profile'}
+            </p>
+            <p className="text-xs text-slate-500">
+              {profile.title || 'Go to settings'}
+            </p>
           </div>
-          <div className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-bold">
-            MT
+          <div className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-bold group-hover:bg-blue-700 transition-colors">
+            {initials}
           </div>
-        </div>
+        </Link>
       </div>
     </header>
   );

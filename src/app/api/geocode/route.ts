@@ -79,12 +79,19 @@ export async function POST(request: Request) {
     }
 
     // Batch mode
-    const results: Array<{ address: string; result: GeocodedResult | null }> = [];
+    const results: Array<{ address: string; lat: number | null; lng: number | null; city: string | null; state: string | null; zip: string | null }> = [];
 
     for (let i = 0; i < addresses.length; i++) {
       const addr = addresses[i];
       const result = await geocodeAddress(addr);
-      results.push({ address: addr, result });
+      results.push({
+        address: addr,
+        lat: result?.lat ?? null,
+        lng: result?.lng ?? null,
+        city: result?.city ?? null,
+        state: result?.state ?? null,
+        zip: result?.zip ?? null,
+      });
 
       // Rate limit: 100ms delay between requests
       if (i < addresses.length - 1) {

@@ -12,7 +12,7 @@ export default function Sidebar() {
       {/* Logo */}
       <div className="px-6 mb-8">
         <h1 className="text-xl font-bold tracking-tight text-slate-900 font-headline">
-          Architectural Ledger
+          Plot Maps
         </h1>
         <p className="text-[10px] uppercase tracking-wider text-slate-500 font-label mt-1">
           ELITE REAL ESTATE CRM

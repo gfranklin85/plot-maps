@@ -2,9 +2,10 @@ import type { Metadata } from "next";
 import "./globals.css";
 import Sidebar from "@/components/layout/Sidebar";
 import TopBar from "@/components/layout/TopBar";
+import ClientProviders from "@/components/layout/ClientProviders";
 
 export const metadata: Metadata = {
-  title: "Architectural Ledger | Elite Real Estate CRM",
+  title: "Plot Maps | Elite Real Estate CRM",
   description: "Elite Real Estate CRM",
 };
 
@@ -28,11 +29,13 @@ export default function RootLayout({
         />
       </head>
       <body className="font-body antialiased bg-surface text-on-surface">
-        <Sidebar />
-        <TopBar />
-        <main className="ml-64 pt-16 min-h-screen">
-          {children}
-        </main>
+        <ClientProviders>
+          <Sidebar />
+          <TopBar />
+          <main className="ml-64 pt-16 min-h-screen">
+            {children}
+          </main>
+        </ClientProviders>
       </body>
     </html>
   );

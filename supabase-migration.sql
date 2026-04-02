@@ -115,3 +115,33 @@ DO $$ BEGIN
     CREATE POLICY "Allow all for leads" ON leads FOR ALL USING (true) WITH CHECK (true);
   END IF;
 END $$;
+
+-- ==========================================
+-- 7. Create call_scripts table (editable question checklists)
+-- ==========================================
+CREATE TABLE IF NOT EXISTS call_scripts (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  category text NOT NULL,
+  questions jsonb NOT NULL DEFAULT '[]',
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+
+ALTER TABLE call_scripts ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all for call_scripts" ON call_scripts FOR ALL USING (true) WITH CHECK (true);
+
+-- ==========================================
+-- 8. Create call_responses table (answers from calls)
+-- ==========================================
+CREATE TABLE IF NOT EXISTS call_responses (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  lead_id uuid REFERENCES leads(id) ON DELETE CASCADE,
+  script_id uuid REFERENCES call_scripts(id) ON DELETE SET NULL,
+  question text NOT NULL,
+  answer text,
+  call_date timestamptz DEFAULT now(),
+  created_at timestamptz DEFAULT now()
+);
+
+ALTER TABLE call_responses ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all for call_responses" ON call_responses FOR ALL USING (true) WITH CHECK (true);

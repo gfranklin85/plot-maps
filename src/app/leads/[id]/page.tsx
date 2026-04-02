@@ -27,6 +27,24 @@ interface CallGuidance {
   objection_responses: { objection: string; response: string }[];
 }
 
+interface ScriptQuestion {
+  question: string;
+  order: number;
+}
+
+interface CallScript {
+  id: string;
+  category: string;
+  questions: ScriptQuestion[];
+}
+
+interface CallResponse {
+  id: string;
+  question: string;
+  answer: string;
+  call_date: string;
+}
+
 export default function LeadDetailPage() {
   const params = useParams<{ id: string }>();
   const [lead, setLead] = useState<Lead | null>(null);
@@ -34,7 +52,7 @@ export default function LeadDetailPage() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
-  // View mode for the large map panel
+  // View mode for map panel
   const [viewMode, setViewMode] = useState<ViewMode>('street');
 
   // AI Call Guidance
@@ -42,12 +60,21 @@ export default function LeadDetailPage() {
   const [guidanceLoading, setGuidanceLoading] = useState(false);
   const [guidanceOpen, setGuidanceOpen] = useState(false);
 
+  // Call Scripts (editable checklists)
+  const [scripts, setScripts] = useState<CallScript[]>([]);
+  const [activeScript, setActiveScript] = useState<CallScript | null>(null);
+  const [checklistAnswers, setChecklistAnswers] = useState<Record<string, string>>({});
+  const [savingChecklist, setSavingChecklist] = useState(false);
+  const [previousResponses, setPreviousResponses] = useState<CallResponse[]>([]);
+
+  // Other properties by same owner
+  const [siblingProperties, setSiblingProperties] = useState<Pick<Lead, 'id' | 'property_address' | 'city' | 'status' | 'price_range'>[]>([]);
+
   // Collapsible sections
   const [emailOpen, setEmailOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
 
   // Scroll refs
-  const callPanelRef = useRef<HTMLDivElement>(null);
   const notesRef = useRef<HTMLDivElement>(null);
   const schedulerRef = useRef<HTMLDivElement>(null);
 
@@ -61,6 +88,45 @@ export default function LeadDetailPage() {
     setLead(leadRes.data);
     setActivities(activitiesRes.data ?? []);
     setLoading(false);
+
+    // Fetch sibling properties (same owner)
+    const ownerName = leadRes.data.owner_name || leadRes.data.name;
+    if (ownerName) {
+      const { data: siblings } = await supabase
+        .from('leads')
+        .select('id, property_address, city, status, price_range')
+        .eq('owner_name', ownerName)
+        .neq('id', params.id)
+        .limit(20);
+      setSiblingProperties(siblings || []);
+    }
+
+    // Fetch call scripts
+    const scriptsRes = await fetch('/api/call-scripts');
+    if (scriptsRes.ok) {
+      const allScripts = await scriptsRes.json();
+      setScripts(allScripts);
+      // Auto-select based on property type
+      const propType = leadRes.data.property_condition?.toLowerCase() || '';
+      let category = 'general';
+      if (propType.includes('multi-family') || propType.includes('apartment') || propType.includes('duplex') || propType.includes('triplex')) {
+        category = 'residential';
+      } else if (propType.includes('commercial') || propType.includes('industrial')) {
+        category = propType.includes('vacant') ? 'commercial_vacant' : 'commercial_occupied';
+      } else if (propType.includes('vacant') || propType.includes('land')) {
+        category = 'commercial_vacant';
+      } else if (propType.includes('residential')) {
+        category = 'residential';
+      }
+      const matched = allScripts.find((s: CallScript) => s.category === category) || allScripts[0];
+      setActiveScript(matched || null);
+    }
+
+    // Fetch previous call responses
+    const responsesRes = await fetch(`/api/call-responses?leadId=${params.id}`);
+    if (responsesRes.ok) {
+      setPreviousResponses(await responsesRes.json());
+    }
   }, [params.id]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
@@ -90,13 +156,28 @@ export default function LeadDetailPage() {
     } finally { setGuidanceLoading(false); }
   };
 
+  const saveChecklistAnswers = async () => {
+    if (!lead || !activeScript) return;
+    setSavingChecklist(true);
+    const responses = Object.entries(checklistAnswers).map(([question, answer]) => ({ question, answer }));
+    await fetch('/api/call-responses', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ leadId: lead.id, scriptId: activeScript.id, responses }),
+    });
+    setChecklistAnswers({});
+    setSavingChecklist(false);
+    // Refresh responses
+    const res = await fetch(`/api/call-responses?leadId=${lead.id}`);
+    if (res.ok) setPreviousResponses(await res.json());
+  };
+
   const scrollTo = (ref: React.RefObject<HTMLDivElement | null>) => {
     ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   const API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
 
-  // Build iframe URL based on view mode
   const getMapUrl = () => {
     if (!lead) return '';
     const hasCoords = lead.latitude != null && lead.longitude != null;
@@ -106,7 +187,7 @@ export default function LeadDetailPage() {
       case 'street':
         return hasCoords
           ? `https://www.google.com/maps/embed/v1/streetview?location=${lead.latitude},${lead.longitude}&key=${API_KEY}&heading=0&pitch=0&fov=90`
-          : '';
+          : addr ? `https://www.google.com/maps/embed/v1/streetview?location=${addr}&key=${API_KEY}&heading=0&pitch=0&fov=90` : '';
       case 'map':
         return hasCoords
           ? `https://www.google.com/maps/embed/v1/place?q=${lead.latitude},${lead.longitude}&key=${API_KEY}&zoom=17`
@@ -114,11 +195,11 @@ export default function LeadDetailPage() {
       case 'satellite':
         return hasCoords
           ? `https://www.google.com/maps/embed/v1/view?center=${lead.latitude},${lead.longitude}&key=${API_KEY}&zoom=19&maptype=satellite`
-          : '';
+          : addr ? `https://www.google.com/maps/embed/v1/place?q=${addr}&key=${API_KEY}&zoom=19&maptype=satellite` : '';
       case 'hybrid':
         return hasCoords
           ? `https://www.google.com/maps/embed/v1/view?center=${lead.latitude},${lead.longitude}&key=${API_KEY}&zoom=18&maptype=satellite`
-          : '';
+          : addr ? `https://www.google.com/maps/embed/v1/place?q=${addr}&key=${API_KEY}&zoom=18&maptype=satellite` : '';
     }
   };
 
@@ -127,10 +208,10 @@ export default function LeadDetailPage() {
   if (loading) {
     return (
       <div className="p-6">
-        <div className="h-[50vh] animate-pulse rounded-2xl bg-slate-100" />
-        <div className="mt-4 flex gap-6">
-          <div className="w-1/3 h-64 animate-pulse rounded-2xl bg-slate-100" />
-          <div className="w-2/3 h-64 animate-pulse rounded-2xl bg-slate-100" />
+        <div className="h-16 animate-pulse rounded-2xl bg-slate-100 mb-4" />
+        <div className="flex gap-4">
+          <div className="w-5/12 h-[60vh] animate-pulse rounded-2xl bg-slate-100" />
+          <div className="w-7/12 h-[60vh] animate-pulse rounded-2xl bg-slate-100" />
         </div>
       </div>
     );
@@ -178,7 +259,6 @@ export default function LeadDetailPage() {
 
         {/* Owner quick info + action buttons */}
         <div className="flex items-center gap-3">
-          {/* Owner name + phone */}
           <div className="text-right mr-2">
             <p className="text-sm font-bold">{lead.owner_name || lead.name}</p>
             {lead.phone && (
@@ -187,9 +267,6 @@ export default function LeadDetailPage() {
               </a>
             )}
           </div>
-          <button onClick={() => scrollTo(callPanelRef)} className="flex items-center gap-1.5 rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-2 text-sm font-medium text-on-surface hover:bg-surface-container transition-colors">
-            <MaterialIcon icon="phone" className="text-[18px]" /> Call
-          </button>
           <button onClick={() => scrollTo(notesRef)} className="flex items-center gap-1.5 rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-2 text-sm font-medium text-on-surface hover:bg-surface-container transition-colors">
             <MaterialIcon icon="note_add" className="text-[18px]" /> Note
           </button>
@@ -199,61 +276,50 @@ export default function LeadDetailPage() {
         </div>
       </div>
 
-      {/* ─── LARGE MAP / STREET VIEW PANEL (dominant visual) ─── */}
-      <div className="relative rounded-2xl overflow-hidden bg-slate-100" style={{ height: '50vh' }}>
-        {/* View mode switcher - top right overlay */}
-        <div className="absolute top-3 right-3 z-10 inline-flex items-center gap-0.5 rounded-full glass-card p-1 shadow-lg">
-          {([
-            { key: 'street', label: 'Street', icon: 'streetview' },
-            { key: 'map', label: 'Map', icon: 'map' },
-            { key: 'satellite', label: 'Satellite', icon: 'satellite_alt' },
-            { key: 'hybrid', label: 'Hybrid', icon: 'layers' },
-          ] as { key: ViewMode; label: string; icon: string }[]).map((v) => (
-            <button
-              key={v.key}
-              onClick={() => setViewMode(v.key)}
-              className={cn(
-                'flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-medium transition-all',
-                viewMode === v.key
-                  ? 'bg-white text-blue-600 font-bold shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900'
-              )}
-            >
-              <span className="material-symbols-outlined text-[16px]">{v.icon}</span>
-              {v.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Drive time overlay - bottom left */}
-        <div className="absolute bottom-3 left-3 z-10">
-          <DriveTimeCard lead={lead} />
-        </div>
-
-        {/* The map/streetview iframe */}
-        {mapUrl ? (
-          <iframe
-            src={mapUrl}
-            className="h-full w-full border-0"
-            loading="lazy"
-            referrerPolicy="no-referrer-when-downgrade"
-            allowFullScreen
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center text-secondary">
-            <div className="text-center">
-              <MaterialIcon icon="location_off" className="text-[48px] text-slate-300" />
-              <p className="mt-2 text-sm">No location data available</p>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* ─── BELOW MAP: Two-column layout ─── */}
-      <div className="mt-4 flex gap-4">
-        {/* ═══ Left Column: Contact + Call ═══ */}
+      {/* ─── TWO-COLUMN LAYOUT ─── */}
+      <div className="flex gap-4">
+        {/* ═══ Left Column: Map + Contact + Siblings ═══ */}
         <div className="w-5/12 space-y-4">
-          {/* Owner / Contact Card */}
+          {/* Map / Street View Panel */}
+          <div className="relative rounded-2xl overflow-hidden bg-slate-100" style={{ height: '30vh' }}>
+            <div className="absolute top-2 right-2 z-10 inline-flex items-center gap-0.5 rounded-full glass-card p-0.5 shadow-lg">
+              {([
+                { key: 'street', label: 'Street', icon: 'streetview' },
+                { key: 'map', label: 'Map', icon: 'map' },
+                { key: 'satellite', label: 'Sat', icon: 'satellite_alt' },
+                { key: 'hybrid', label: 'Hybrid', icon: 'layers' },
+              ] as { key: ViewMode; label: string; icon: string }[]).map((v) => (
+                <button
+                  key={v.key}
+                  onClick={() => setViewMode(v.key)}
+                  className={cn(
+                    'flex items-center gap-0.5 rounded-full px-2 py-1 text-[10px] font-medium transition-all',
+                    viewMode === v.key
+                      ? 'bg-white text-blue-600 font-bold shadow-sm'
+                      : 'text-slate-600 hover:text-slate-900'
+                  )}
+                >
+                  <span className="material-symbols-outlined text-[14px]">{v.icon}</span>
+                  {v.label}
+                </button>
+              ))}
+            </div>
+            <div className="absolute bottom-2 left-2 z-10">
+              <DriveTimeCard lead={lead} />
+            </div>
+            {mapUrl ? (
+              <iframe src={mapUrl} className="h-full w-full border-0" loading="lazy" referrerPolicy="no-referrer-when-downgrade" allowFullScreen />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center text-secondary">
+                <div className="text-center">
+                  <MaterialIcon icon="location_off" className="text-[48px] text-slate-300" />
+                  <p className="mt-2 text-sm">No location data available</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Contact Info Card */}
           <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-4 space-y-3">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100">
@@ -265,7 +331,7 @@ export default function LeadDetailPage() {
               </div>
             </div>
 
-            {/* All phone numbers */}
+            {/* Phone numbers */}
             <div className="space-y-1.5">
               {[
                 { label: 'Primary', value: lead.phone },
@@ -322,7 +388,6 @@ export default function LeadDetailPage() {
               </div>
             </div>
 
-            {/* Tags */}
             {lead.tags && lead.tags.length > 0 && (
               <div className="flex flex-wrap gap-1">
                 {lead.tags.map((tag) => <Tag key={tag} label={tag} />)}
@@ -330,21 +395,144 @@ export default function LeadDetailPage() {
             )}
           </div>
 
-          {/* Call Panel */}
-          <div ref={callPanelRef} className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-4">
-            <h3 className="mb-3 font-headline text-base font-bold flex items-center gap-2">
-              <MaterialIcon icon="phone_in_talk" className="text-[20px] text-blue-600" />
-              Call Panel
-            </h3>
-            <CallPanel lead={lead} onActivityLogged={refreshData} />
-          </div>
+          {/* Other Properties by this Owner */}
+          {siblingProperties.length > 0 && (
+            <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-4">
+              <h3 className="font-headline text-sm font-bold flex items-center gap-2 mb-2">
+                <MaterialIcon icon="apartment" className="text-[18px] text-violet-600" />
+                Other Properties by {lead.owner_name || lead.name}
+              </h3>
+              <div className="space-y-1.5">
+                {siblingProperties.map((s) => (
+                  <Link key={s.id} href={`/leads/${s.id}`}
+                    className="flex items-center justify-between rounded-lg px-3 py-2 text-xs hover:bg-surface-container transition-colors">
+                    <div>
+                      <p className="font-medium">{s.property_address?.split(',')[0]}</p>
+                      <p className="text-secondary">{s.city}</p>
+                    </div>
+                    <div className="text-right">
+                      <Badge status={s.status} />
+                      {s.price_range && <p className="text-[10px] text-secondary mt-0.5">{s.price_range}</p>}
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
 
-          {/* AI Call Guidance */}
+          {/* Property Details (collapsed) */}
+          <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-4">
+            <button onClick={() => setDetailsOpen(!detailsOpen)} className="flex w-full items-center justify-between">
+              <h3 className="font-headline text-sm font-bold flex items-center gap-2">
+                <MaterialIcon icon="info" className="text-[18px] text-slate-500" /> Property Details & Comps
+              </h3>
+              <MaterialIcon icon={detailsOpen ? 'expand_less' : 'expand_more'} className="text-[22px] text-secondary" />
+            </button>
+            {detailsOpen && (
+              <div className="mt-4 space-y-4">
+                <div className="space-y-2">
+                  {lead.property_condition && <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-600">{lead.property_condition}</span>}
+                  {lead.price_range && <p className="text-sm text-secondary"><MaterialIcon icon="payments" className="text-[14px]" /> Value: {lead.price_range}</p>}
+                </div>
+                <NearbyPlaces lead={lead} />
+                <div>
+                  <h4 className="font-headline text-sm font-bold mb-2">Market Comps</h4>
+                  <MarketComps leadId={lead.id} />
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ═══ Right Column: Checklist + Call + Notes + Timeline ═══ */}
+        <div className="w-7/12 space-y-4">
+          {/* Call Checklist */}
+          {activeScript && (
+            <div className="rounded-2xl border-2 border-blue-200 bg-blue-50/30 p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-headline text-base font-bold flex items-center gap-2">
+                  <MaterialIcon icon="checklist" className="text-[20px] text-blue-600" />
+                  Call Checklist
+                  <span className="text-[10px] font-medium text-blue-500 bg-blue-100 rounded-full px-2 py-0.5 uppercase">
+                    {activeScript.category.replace('_', ' ')}
+                  </span>
+                </h3>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={activeScript.id}
+                    onChange={(e) => {
+                      const s = scripts.find(s => s.id === e.target.value);
+                      if (s) setActiveScript(s);
+                    }}
+                    className="text-xs rounded-lg border border-blue-200 bg-white px-2 py-1 focus:outline-none"
+                  >
+                    {scripts.map(s => (
+                      <option key={s.id} value={s.id}>{s.category.replace('_', ' ')}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                {(activeScript.questions as ScriptQuestion[])
+                  .sort((a, b) => a.order - b.order)
+                  .map((q) => (
+                    <div key={q.question} className="flex items-start gap-3">
+                      <MaterialIcon
+                        icon={checklistAnswers[q.question] ? 'check_box' : 'check_box_outline_blank'}
+                        className={cn('text-[20px] mt-0.5', checklistAnswers[q.question] ? 'text-emerald-500' : 'text-slate-400')}
+                      />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-slate-800">{q.question}</p>
+                        <input
+                          type="text"
+                          value={checklistAnswers[q.question] || ''}
+                          onChange={(e) => setChecklistAnswers(prev => ({ ...prev, [q.question]: e.target.value }))}
+                          placeholder="Record answer..."
+                          className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                        />
+                      </div>
+                    </div>
+                  ))}
+              </div>
+
+              {Object.values(checklistAnswers).some(v => v.trim()) && (
+                <button
+                  onClick={saveChecklistAnswers}
+                  disabled={savingChecklist}
+                  className="mt-3 flex items-center gap-1.5 rounded-lg action-gradient px-4 py-2 text-sm font-medium text-on-primary hover:shadow-lg transition-shadow disabled:opacity-50"
+                >
+                  <MaterialIcon icon="save" className="text-[16px]" />
+                  {savingChecklist ? 'Saving...' : 'Save Answers'}
+                </button>
+              )}
+
+              {/* Show previous responses */}
+              {previousResponses.length > 0 && (
+                <div className="mt-3 border-t border-blue-200 pt-3">
+                  <p className="text-[10px] uppercase tracking-widest text-blue-600 font-bold mb-2">Previous Responses</p>
+                  <div className="space-y-1.5 max-h-32 overflow-y-auto">
+                    {previousResponses.slice(0, 10).map((r) => (
+                      <div key={r.id} className="flex items-start gap-2 text-xs">
+                        <MaterialIcon icon="chat_bubble_outline" className="text-[14px] text-slate-400 mt-0.5" />
+                        <div>
+                          <p className="text-slate-500">{r.question}</p>
+                          <p className="font-medium text-slate-800">{r.answer}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* AI Follow-Up Suggestions */}
           <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-4">
             <div className="flex items-center justify-between">
               <h3 className="font-headline text-base font-bold flex items-center gap-2">
                 <MaterialIcon icon="auto_awesome" className="text-[20px] text-amber-500" />
-                AI Script
+                AI Follow-Up
               </h3>
               <button onClick={guidance ? () => setGuidanceOpen(!guidanceOpen) : fetchGuidance} disabled={guidanceLoading}
                 className={cn('flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all',
@@ -382,10 +570,16 @@ export default function LeadDetailPage() {
               </div>
             )}
           </div>
-        </div>
 
-        {/* ═══ Right Column: Notes + Follow-up + Details ═══ */}
-        <div className="w-7/12 space-y-4">
+          {/* Call Panel */}
+          <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-4">
+            <h3 className="mb-3 font-headline text-base font-bold flex items-center gap-2">
+              <MaterialIcon icon="phone_in_talk" className="text-[20px] text-blue-600" />
+              Call Panel
+            </h3>
+            <CallPanel lead={lead} onActivityLogged={refreshData} />
+          </div>
+
           {/* Quick Notes */}
           <div ref={notesRef} className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-4">
             <h3 className="mb-3 font-headline text-base font-bold flex items-center gap-2">
@@ -404,7 +598,7 @@ export default function LeadDetailPage() {
             <FollowUpScheduler lead={lead} onScheduled={refreshData} />
           </div>
 
-          {/* Email Composer (collapsed) */}
+          {/* Email (collapsed) */}
           <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-4">
             <button onClick={() => setEmailOpen(!emailOpen)} className="flex w-full items-center justify-between">
               <h3 className="font-headline text-base font-bold flex items-center gap-2">
@@ -421,37 +615,6 @@ export default function LeadDetailPage() {
               <MaterialIcon icon="timeline" className="text-[20px] text-slate-500" /> Activity
             </h3>
             <ActivityTimeline activities={activities} />
-          </div>
-
-          {/* Property Details + Nearby + Comps (collapsed) */}
-          <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-4">
-            <button onClick={() => setDetailsOpen(!detailsOpen)} className="flex w-full items-center justify-between">
-              <h3 className="font-headline text-base font-bold flex items-center gap-2">
-                <MaterialIcon icon="info" className="text-[20px] text-slate-500" /> Property Details, Nearby & Comps
-              </h3>
-              <MaterialIcon icon={detailsOpen ? 'expand_less' : 'expand_more'} className="text-[22px] text-secondary" />
-            </button>
-            {detailsOpen && (
-              <div className="mt-4 space-y-4">
-                {/* Property info */}
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    {lead.type && <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-700">{lead.type}</span>}
-                    {lead.property_condition && <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-600">{lead.property_condition}</span>}
-                  </div>
-                  {lead.price_range && <p className="text-sm text-secondary"><MaterialIcon icon="payments" className="text-[14px]" /> Value: {lead.price_range}</p>}
-                </div>
-
-                {/* Nearby Places */}
-                <NearbyPlaces lead={lead} />
-
-                {/* Market Comps */}
-                <div>
-                  <h4 className="font-headline text-sm font-bold mb-2">Market Comps</h4>
-                  <MarketComps leadId={lead.id} />
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </div>

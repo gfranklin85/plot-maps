@@ -1,9 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useProfile, type UserProfile } from '@/lib/profile-context';
 import { supabase } from '@/lib/supabase';
 import MaterialIcon from '@/components/ui/MaterialIcon';
+
+interface ScriptQuestion { question: string; order: number }
+interface CallScript { id: string; category: string; questions: ScriptQuestion[] }
 
 export default function SettingsPage() {
   const { profile, initials, updateProfile } = useProfile();
@@ -13,6 +16,36 @@ export default function SettingsPage() {
 
   // Local form state
   const [form, setForm] = useState<UserProfile>({ ...profile });
+
+  // Call Scripts
+  const [callScripts, setCallScripts] = useState<CallScript[]>([]);
+  const [editingScript, setEditingScript] = useState<string | null>(null);
+  const [newQuestion, setNewQuestion] = useState('');
+
+  const fetchScripts = useCallback(async () => {
+    const res = await fetch('/api/call-scripts');
+    if (res.ok) setCallScripts(await res.json());
+  }, []);
+
+  useEffect(() => { fetchScripts(); }, [fetchScripts]);
+
+  async function addQuestion(scriptId: string) {
+    if (!newQuestion.trim()) return;
+    const script = callScripts.find(s => s.id === scriptId);
+    if (!script) return;
+    const questions = [...script.questions, { question: newQuestion.trim(), order: script.questions.length + 1 }];
+    await fetch('/api/call-scripts', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: scriptId, questions }) });
+    setNewQuestion('');
+    fetchScripts();
+  }
+
+  async function removeQuestion(scriptId: string, idx: number) {
+    const script = callScripts.find(s => s.id === scriptId);
+    if (!script) return;
+    const questions = script.questions.filter((_, i) => i !== idx).map((q, i) => ({ ...q, order: i + 1 }));
+    await fetch('/api/call-scripts', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: scriptId, questions }) });
+    fetchScripts();
+  }
 
   function handleChange(field: keyof UserProfile, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -232,6 +265,77 @@ export default function SettingsPage() {
             </button>
           </div>
         ))}
+      </section>
+
+      {/* Call Scripts */}
+      <section className="glass-card rounded-2xl p-6 space-y-4">
+        <div className="flex items-center gap-3 mb-2">
+          <MaterialIcon icon="checklist" className="text-blue-600" />
+          <h2 className="text-lg font-bold text-slate-900 font-headline">Call Scripts</h2>
+        </div>
+        <p className="text-xs text-slate-500">
+          Configure the questions shown on each lead&apos;s detail page during calls. Questions are grouped by property type.
+        </p>
+
+        {callScripts.map((script) => (
+          <div key={script.id} className="border border-slate-200 rounded-xl p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-bold text-slate-800 capitalize">
+                {script.category.replace('_', ' ')}
+              </h3>
+              <button
+                onClick={() => setEditingScript(editingScript === script.id ? null : script.id)}
+                className="text-xs text-blue-600 hover:underline"
+              >
+                {editingScript === script.id ? 'Done' : 'Edit'}
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              {(script.questions as ScriptQuestion[])
+                .sort((a, b) => a.order - b.order)
+                .map((q, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <span className="text-xs text-slate-400 w-5">{idx + 1}.</span>
+                    <span className="text-sm text-slate-700 flex-1">{q.question}</span>
+                    {editingScript === script.id && (
+                      <button
+                        onClick={() => removeQuestion(script.id, idx)}
+                        className="text-xs text-red-500 hover:text-red-700"
+                      >
+                        <MaterialIcon icon="close" className="text-[16px]" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+            </div>
+
+            {editingScript === script.id && (
+              <div className="flex gap-2 mt-3">
+                <input
+                  type="text"
+                  value={newQuestion}
+                  onChange={(e) => setNewQuestion(e.target.value)}
+                  placeholder="Add a question..."
+                  onKeyDown={(e) => e.key === 'Enter' && addQuestion(script.id)}
+                  className="flex-1 px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                />
+                <button
+                  onClick={() => addQuestion(script.id)}
+                  className="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700"
+                >
+                  Add
+                </button>
+              </div>
+            )}
+          </div>
+        ))}
+
+        {callScripts.length === 0 && (
+          <p className="text-sm text-slate-500 italic">
+            No call scripts configured yet. They will be created when the database tables are set up.
+          </p>
+        )}
       </section>
 
       {/* Data Management */}

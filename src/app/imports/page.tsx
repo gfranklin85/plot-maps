@@ -8,7 +8,7 @@ import type { ImportTemplate } from '@/types';
 import MaterialIcon from '@/components/ui/MaterialIcon';
 
 /* ---------- local types ---------- */
-type Tab = 'ai' | 'csv';
+type Tab = 'ai' | 'csv' | 'mls';
 type CsvStep = 'upload' | 'mapping' | 'preview' | 'import';
 type RowAction = 'create' | 'update' | 'skip';
 
@@ -696,6 +696,18 @@ export default function ImportsPage() {
         >
           <MaterialIcon icon="upload_file" className="text-[18px]" />
           CSV Upload
+        </button>
+        <button
+          onClick={() => setActiveTab('mls')}
+          className={cn(
+            'flex items-center gap-2 rounded-xl px-6 py-3 text-sm font-bold transition-all',
+            activeTab === 'mls'
+              ? 'bg-gradient-to-r from-green-600 to-emerald-500 text-white shadow-lg'
+              : 'border border-slate-200 bg-surface-container-lowest text-slate-600 hover:bg-slate-50'
+          )}
+        >
+          <MaterialIcon icon="real_estate_agent" className="text-[18px]" />
+          MLS Import
         </button>
       </div>
 
@@ -1718,6 +1730,287 @@ export default function ImportsPage() {
           )}
         </div>
       )}
+      {/* ============================== MLS TAB ============================== */}
+      {activeTab === 'mls' && <MlsImportTab />}
+    </div>
+  );
+}
+
+/* ============================================================
+   MLS IMPORT TAB — handles MLS CSV format (Status, Address, Listing Price, etc.)
+   ============================================================ */
+function MlsImportTab() {
+  const [file, setFile] = useState<File | null>(null);
+  const [rows, setRows] = useState<Record<string, string>[]>([]);
+  const [importing, setImporting] = useState(false);
+  const [result, setResult] = useState<{ updated: number; inserted: number; geocoded: number; errors: number } | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const STATUS_MAP: Record<string, string> = { S: 'Sold', A: 'Active', T: 'Pending' };
+
+  function parseDate(str: string): string | null {
+    if (!str) return null;
+    const parts = str.split('/');
+    if (parts.length !== 3) return null;
+    const [m, d, rawY] = parts.map(Number);
+    const y = rawY < 100 ? rawY + 2000 : rawY;
+    return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  }
+
+  function handleFile(f: File) {
+    setFile(f);
+    setResult(null);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target?.result as string;
+      const lines = text.split('\n');
+      if (lines.length < 2) return;
+      const headers = parseLine(lines[0]);
+      const parsed: Record<string, string>[] = [];
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+        const values = parseLine(line);
+        if (values.length === headers.length) {
+          const row: Record<string, string> = {};
+          headers.forEach((h, idx) => { row[h] = values[idx]; });
+          parsed.push(row);
+        }
+      }
+      setRows(parsed);
+    };
+    reader.readAsText(f);
+  }
+
+  function parseLine(line: string): string[] {
+    const result: string[] = [];
+    let current = '';
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') { if (inQuotes && line[i + 1] === '"') { current += '"'; i++; } else { inQuotes = !inQuotes; } }
+      else if (ch === ',' && !inQuotes) { result.push(current.trim()); current = ''; }
+      else { current += ch; }
+    }
+    result.push(current.trim());
+    return result;
+  }
+
+  function normalizeAddr(addr: string): string {
+    return addr.replace(/,\s*CA\s+\d{5}(-\d{4})?/i, '').replace(/\s+/g, ' ').trim().toUpperCase();
+  }
+
+  async function runImport() {
+    setImporting(true);
+    let updated = 0, inserted = 0, geocoded = 0, errors = 0;
+
+    // Get existing leads for matching
+    const { data: existingLeads } = await supabase.from('leads').select('id, property_address');
+    const addrMap = new Map<string, string>();
+    (existingLeads || []).forEach((l) => {
+      if (l.property_address) addrMap.set(normalizeAddr(l.property_address), l.id);
+    });
+
+    for (const row of rows) {
+      const address = row['Address'] || '';
+      if (!address) continue;
+
+      const parts = address.split(',').map((s: string) => s.trim());
+      const street = parts[0] || address;
+      const city = parts[1] || 'Lemoore';
+      const stateZip = (parts[2] || '').split(' ').filter(Boolean);
+      const state = stateZip[0] || 'CA';
+      const zip = stateZip[1]?.replace(/-\d+$/, '') || '';
+
+      const listingStatus = STATUS_MAP[row['Status']] || row['Status'] || null;
+      const listingPrice = Number(row['Listing Price']) || null;
+      const sellingPrice = Number(row['Selling Price']) || null;
+      const dom = Number(row['DOM']) || null;
+      const sqft = Number(row['Square Footage']) || null;
+      const lotAcres = Number(row['Lot Size - Acres']) || null;
+      const yearBuilt = Number(row['Year Built']) || null;
+
+      const mlsFields = {
+        listing_status: listingStatus,
+        listing_price: listingPrice,
+        selling_price: sellingPrice,
+        dom,
+        listing_date: parseDate(row['Listing Date'] || ''),
+        pending_date: parseDate(row['Pending Date'] || ''),
+        selling_date: parseDate(row['Selling Date'] || ''),
+        sqft,
+        lot_acres: lotAcres,
+        year_built: yearBuilt,
+      };
+
+      const normAddr = normalizeAddr(address);
+      const existingId = addrMap.get(normAddr);
+
+      if (existingId) {
+        const { error } = await supabase.from('leads').update(mlsFields).eq('id', existingId);
+        if (error) errors++; else updated++;
+      } else {
+        const { data, error } = await supabase.from('leads').insert({
+          property_address: address,
+          name: street,
+          city, state, zip,
+          source: 'MLS',
+          status: 'new' as const,
+          priority: 'medium',
+          price_range: sellingPrice ? `$${sellingPrice.toLocaleString()}` : (listingPrice ? `$${listingPrice.toLocaleString()}` : null),
+          ...mlsFields,
+        }).select('id, property_address');
+        if (error) { errors++; } else {
+          inserted++;
+          if (data?.[0]) addrMap.set(normAddr, data[0].id);
+          // Geocode
+          if (data?.[0]) {
+            try {
+              const geoRes = await fetch('/api/geocode', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ address }),
+              });
+              if (geoRes.ok) {
+                const geo = await geoRes.json();
+                if (geo.lat && geo.lng) {
+                  await supabase.from('leads').update({
+                    latitude: geo.lat, longitude: geo.lng, geocoded_at: new Date().toISOString(),
+                  }).eq('id', data[0].id);
+                  geocoded++;
+                }
+              }
+            } catch { /* non-fatal */ }
+          }
+        }
+      }
+    }
+
+    setResult({ updated, inserted, geocoded, errors });
+    setImporting(false);
+  }
+
+  const soldCount = rows.filter(r => r['Status'] === 'S').length;
+  const activeCount = rows.filter(r => r['Status'] === 'A').length;
+  const pendingCount = rows.filter(r => r['Status'] === 'T').length;
+
+  return (
+    <div className="mx-auto max-w-4xl space-y-6">
+      <div className="glass-card rounded-2xl p-6">
+        <h3 className="text-lg font-bold font-headline mb-2">MLS Listing Import</h3>
+        <p className="text-sm text-slate-500 mb-4">
+          Upload MLS export CSVs with columns: Status, Address, Listing Price, Selling Price, Year Built, Square Footage, Lot Size, Listing Date, Selling Date, DOM.
+          Matching addresses will be updated, new ones will be created and geocoded.
+        </p>
+
+        <input
+          ref={fileRef}
+          type="file"
+          accept=".csv"
+          className="hidden"
+          onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
+        />
+
+        {!file ? (
+          <button
+            onClick={() => fileRef.current?.click()}
+            className="w-full rounded-xl border-2 border-dashed border-slate-300 py-12 text-center hover:border-blue-400 hover:bg-blue-50/30 transition-all"
+          >
+            <MaterialIcon icon="upload_file" className="text-[48px] text-slate-300" />
+            <p className="mt-2 text-sm font-bold text-slate-500">Click to select MLS CSV file</p>
+          </button>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-bold">{file.name}</p>
+                <p className="text-xs text-slate-500">{rows.length} properties found</p>
+              </div>
+              <button onClick={() => { setFile(null); setRows([]); setResult(null); }}
+                className="text-xs text-red-500 hover:underline">Clear</button>
+            </div>
+
+            {/* Preview stats */}
+            <div className="flex gap-3">
+              <div className="flex-1 rounded-xl bg-green-50 border border-green-200 p-3 text-center">
+                <p className="text-2xl font-bold text-green-700">{soldCount}</p>
+                <p className="text-[10px] font-bold text-green-500 uppercase">Sold</p>
+              </div>
+              <div className="flex-1 rounded-xl bg-orange-50 border border-orange-200 p-3 text-center">
+                <p className="text-2xl font-bold text-orange-700">{activeCount}</p>
+                <p className="text-[10px] font-bold text-orange-500 uppercase">Active</p>
+              </div>
+              <div className="flex-1 rounded-xl bg-yellow-50 border border-yellow-200 p-3 text-center">
+                <p className="text-2xl font-bold text-yellow-700">{pendingCount}</p>
+                <p className="text-[10px] font-bold text-yellow-500 uppercase">Pending</p>
+              </div>
+            </div>
+
+            {/* Preview table */}
+            <div className="max-h-64 overflow-auto rounded-xl border border-slate-200">
+              <table className="w-full text-xs">
+                <thead className="bg-slate-50 sticky top-0">
+                  <tr>
+                    <th className="px-3 py-2 text-left font-bold">Status</th>
+                    <th className="px-3 py-2 text-left font-bold">Address</th>
+                    <th className="px-3 py-2 text-right font-bold">List $</th>
+                    <th className="px-3 py-2 text-right font-bold">Sold $</th>
+                    <th className="px-3 py-2 text-right font-bold">DOM</th>
+                    <th className="px-3 py-2 text-right font-bold">Sqft</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.slice(0, 50).map((r, i) => (
+                    <tr key={i} className="border-t border-slate-100">
+                      <td className="px-3 py-1.5">
+                        <span className={cn('inline-block rounded-full px-2 py-0.5 text-[9px] font-bold uppercase',
+                          r['Status'] === 'S' ? 'bg-green-100 text-green-700' :
+                          r['Status'] === 'A' ? 'bg-orange-100 text-orange-700' :
+                          'bg-yellow-100 text-yellow-700'
+                        )}>{STATUS_MAP[r['Status']] || r['Status']}</span>
+                      </td>
+                      <td className="px-3 py-1.5 font-medium">{r['Address']?.split(',')[0]}</td>
+                      <td className="px-3 py-1.5 text-right">${Number(r['Listing Price']).toLocaleString()}</td>
+                      <td className="px-3 py-1.5 text-right">{Number(r['Selling Price']) > 0 ? `$${Number(r['Selling Price']).toLocaleString()}` : '—'}</td>
+                      <td className="px-3 py-1.5 text-right">{r['DOM']}</td>
+                      <td className="px-3 py-1.5 text-right">{Number(r['Square Footage']).toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {!result ? (
+              <button
+                onClick={runImport}
+                disabled={importing}
+                className="w-full rounded-xl bg-gradient-to-r from-green-600 to-emerald-500 text-white py-3 font-bold text-sm hover:shadow-lg transition-all disabled:opacity-50"
+              >
+                {importing ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <span className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Importing & Geocoding...
+                  </span>
+                ) : (
+                  `Import ${rows.length} MLS Entries`
+                )}
+              </button>
+            ) : (
+              <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-4">
+                <p className="font-bold text-emerald-800">Import Complete</p>
+                <div className="flex gap-4 mt-2 text-sm">
+                  <span className="text-emerald-700"><strong>{result.updated}</strong> updated</span>
+                  <span className="text-blue-700"><strong>{result.inserted}</strong> new</span>
+                  <span className="text-violet-700"><strong>{result.geocoded}</strong> geocoded</span>
+                  {result.errors > 0 && <span className="text-red-600"><strong>{result.errors}</strong> errors</span>}
+                </div>
+                <button onClick={() => { setFile(null); setRows([]); setResult(null); }}
+                  className="mt-3 text-xs font-bold text-emerald-600 hover:underline">Import Another</button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

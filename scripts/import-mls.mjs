@@ -183,6 +183,7 @@ async function main() {
 
         const newLead = {
           property_address: address,
+          name: street,  // name is NOT NULL — use street as fallback
           city,
           state,
           zip,

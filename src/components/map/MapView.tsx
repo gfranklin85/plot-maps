@@ -15,6 +15,7 @@ import PropertyPopup from "./PropertyPopup";
 interface Props {
   leads: Lead[];
   onLeadClick?: (id: string) => void;
+  onDataChanged?: () => void;
   mapType?: "roadmap" | "satellite" | "hybrid" | "terrain";
 }
 
@@ -136,7 +137,7 @@ function LeadMarkers({
   return null;
 }
 
-export default function MapView({ leads, onLeadClick, mapType = "roadmap" }: Props) {
+export default function MapView({ leads, onLeadClick, onDataChanged, mapType = "roadmap" }: Props) {
   const isSatellite = mapType === "satellite" || mapType === "hybrid";
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
 
@@ -157,7 +158,6 @@ export default function MapView({ leads, onLeadClick, mapType = "roadmap" }: Pro
       <Map
         defaultCenter={MAP_CENTER}
         defaultZoom={MAP_ZOOM}
-        mapId=""
         className="h-full w-full"
         disableDefaultUI
         zoomControl
@@ -165,6 +165,8 @@ export default function MapView({ leads, onLeadClick, mapType = "roadmap" }: Pro
         streetViewControl={false}
         fullscreenControl={false}
         gestureHandling="greedy"
+        tilt={0}
+        heading={0}
         styles={isSatellite ? undefined : MAP_STYLES}
       >
         <MapTypeSync mapType={mapType} />
@@ -181,7 +183,7 @@ export default function MapView({ leads, onLeadClick, mapType = "roadmap" }: Pro
               onCloseClick={handleCloseInfo}
               pixelOffset={[0, -35]}
             >
-              <PropertyPopup lead={selectedLead} />
+              <PropertyPopup lead={selectedLead} onUpdate={onDataChanged} />
             </InfoWindow>
           )}
       </Map>

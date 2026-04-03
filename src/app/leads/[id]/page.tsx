@@ -13,6 +13,7 @@ import FollowUpScheduler from '@/components/leads/FollowUpScheduler';
 import EmailComposer from '@/components/leads/EmailComposer';
 import MarketComps from '@/components/leads/MarketComps';
 import NearbyPlaces from '@/components/leads/NearbyPlaces';
+import LeadMap from '@/components/leads/LeadMap';
 
 const GROUPS = [
   'Appointment Set', 'BUYERS', 'Dead Lead', 'Future Follow Up',
@@ -255,7 +256,6 @@ export default function LeadDetailPage() {
   }
 
   const mapUrl = getMapUrl();
-  const isMapTab = ['Street View', 'Map', 'Satellite'].includes(activeTab);
 
   return (
     <div className="h-[calc(100vh-4rem)] flex flex-col overflow-hidden">
@@ -457,7 +457,8 @@ export default function LeadDetailPage() {
 
           {/* Tab Content */}
           <div className="flex-1 overflow-auto p-4">
-            {isMapTab && (
+            {/* Street View — iframe */}
+            {activeTab === 'Street View' && (
               <div className="h-full relative bg-gray-100 rounded-xl overflow-hidden border border-gray-200 shadow-inner">
                 {mapUrl ? (
                   <iframe src={mapUrl} className="h-full w-full border-0" loading="lazy" referrerPolicy="no-referrer-when-downgrade" allowFullScreen />
@@ -469,7 +470,6 @@ export default function LeadDetailPage() {
                     </div>
                   </div>
                 )}
-                {/* Address overlay */}
                 {mapUrl && (
                   <div className="absolute top-3 left-3 bg-black/70 text-white p-2.5 rounded shadow-xl backdrop-blur-md border border-white/10 max-w-[240px]">
                     <div className="flex items-start gap-2">
@@ -478,6 +478,26 @@ export default function LeadDetailPage() {
                         <p className="text-xs font-bold leading-tight">{lead.property_address?.split(',')[0]}</p>
                         <p className="text-[9px] opacity-70 mt-0.5">{lead.property_address?.split(',').slice(1).join(',')}</p>
                       </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Map / Satellite / Hybrid — interactive 3D with right-click tilt */}
+            {(activeTab === 'Map' || activeTab === 'Satellite') && (
+              <div className="h-full relative rounded-xl overflow-hidden border border-gray-200 shadow-inner">
+                {lead.latitude != null && lead.longitude != null ? (
+                  <LeadMap
+                    lat={lead.latitude}
+                    lng={lead.longitude}
+                    mapType={activeTab === 'Satellite' ? 'satellite' : 'roadmap'}
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-gray-400 bg-gray-100">
+                    <div className="text-center">
+                      <MaterialIcon icon="location_off" className="text-[48px] text-gray-300" />
+                      <p className="mt-2 text-sm">No coordinates — right-click drag to tilt when geocoded</p>
                     </div>
                   </div>
                 )}

@@ -102,7 +102,7 @@ function mapRow(row) {
     price_range: row['Estimated Value'] ? `$${Number(row['Estimated Value']).toLocaleString()}` : null,
     property_condition: [row['Property Type'], row['Property Use']].filter(Boolean).join(' - ') || null,
     source: 'PropWire',
-    status: 'New',
+    status: 'new',
     priority: 'medium',
     notes: [
       row['Living Square Feet'] ? `Sqft: ${row['Living Square Feet']}` : '',

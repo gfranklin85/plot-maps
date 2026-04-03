@@ -11,6 +11,7 @@ import { useProfile } from "@/lib/profile-context";
 interface Props {
   lead: Lead;
   onUpdate?: () => void;
+  walkMode?: boolean;
 }
 
 const OUTCOME_STATUS: Partial<Record<CallOutcome, LeadStatus>> = {
@@ -107,7 +108,7 @@ function generateTalkingPoints(lead: Lead): string[] {
   return points;
 }
 
-export default function PropertyPopup({ lead, onUpdate }: Props) {
+export default function PropertyPopup({ lead, onUpdate, walkMode = false }: Props) {
   const { profile } = useProfile();
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
@@ -159,8 +160,8 @@ export default function PropertyPopup({ lead, onUpdate }: Props) {
 
   return (
     <div className="bg-white rounded-2xl min-w-[360px] max-w-[400px] overflow-hidden">
-      {/* ─── STREET VIEW THUMBNAIL ─── */}
-      {streetViewUrl && (
+      {/* ─── STREET VIEW THUMBNAIL (hidden in walk mode — you're already looking at it) ─── */}
+      {streetViewUrl && !walkMode && (
         <div className="relative h-[140px] bg-gray-200 overflow-hidden">
           <img
             src={streetViewUrl}

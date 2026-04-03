@@ -109,7 +109,7 @@ function StreetViewInner({ leads, startPosition, onDataChanged }: Props) {
         const root = createRoot(div);
         popupRootRef.current = root;
         root.render(
-          <PopupWrapper lead={lead} onUpdate={onDataChanged} />
+          <PopupWrapper lead={lead} onUpdate={onDataChanged} walkMode />
         );
 
         infoWindow.setContent(div);
@@ -128,10 +128,10 @@ function StreetViewInner({ leads, startPosition, onDataChanged }: Props) {
 // Wrapper to provide profile context inside the InfoWindow (rendered outside React tree)
 import { ProfileProvider } from "@/lib/profile-context";
 
-function PopupWrapper({ lead, onUpdate }: { lead: Lead; onUpdate?: () => void }) {
+function PopupWrapper({ lead, onUpdate, walkMode }: { lead: Lead; onUpdate?: () => void; walkMode?: boolean }) {
   return (
     <ProfileProvider>
-      <PropertyPopup lead={lead} onUpdate={onUpdate} />
+      <PropertyPopup lead={lead} onUpdate={onUpdate} walkMode={walkMode} />
     </ProfileProvider>
   );
 }

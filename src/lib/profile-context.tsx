@@ -9,6 +9,7 @@ export interface UserProfile {
   phone: string;
   company: string;
   defaultMapType: 'roadmap' | 'satellite' | 'hybrid';
+  openingScript: string;
   notifications: {
     email: boolean;
     push: boolean;
@@ -25,6 +26,7 @@ const defaultProfile: UserProfile = {
   phone: '',
   company: '',
   defaultMapType: 'roadmap',
+  openingScript: `Hi, is this {name}?\n\nHey {name} — this is Greg Franklin here in Lemoore. I'm reaching out because a home over on {street} just sold around {value}, and I've been touching base with nearby homeowners since there's been a little more movement in the market.\n\n"I'm just curious — are you guys planning to stay there long term, or do you see yourselves making a move at some point down the road?"\n\n"If you ever did move, what would the next place look like for you?"\n• "Would that be somewhere here locally or somewhere else?"\n• "What would the next house need to have that this one doesn't?"`,
   notifications: {
     email: true,
     push: true,

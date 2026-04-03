@@ -6,6 +6,7 @@ import { Lead, STATUS_BG_COLORS, CallOutcome, LeadStatus } from "@/types";
 import MaterialIcon from "@/components/ui/MaterialIcon";
 import { cn, formatPhone } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
+import { useProfile } from "@/lib/profile-context";
 
 interface Props {
   lead: Lead;
@@ -21,9 +22,19 @@ const OUTCOME_STATUS: Partial<Record<CallOutcome, LeadStatus>> = {
   'DNC': 'Do Not Call',
 };
 
-const OPENING_LINE = "Hi, this is Greg with Plot Solutions. I'm reaching out to property owners in the area — do you have a quick minute?";
+function fillScript(template: string, lead: Lead): string {
+  const name = lead.owner_name || lead.name || 'there';
+  const firstName = name.split(' ')[0];
+  const street = lead.property_address?.split(',')[0] || 'your street';
+  const value = lead.price_range || '$XXX,XXX';
+  return template
+    .replace(/\{name\}/g, firstName)
+    .replace(/\{street\}/g, street)
+    .replace(/\{value\}/g, value);
+}
 
 export default function PropertyPopup({ lead, onUpdate }: Props) {
+  const { profile } = useProfile();
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -97,13 +108,15 @@ export default function PropertyPopup({ lead, onUpdate }: Props) {
         </div>
       )}
 
-      {/* Opening Line */}
-      <div className="px-4 pb-2">
-        <div className="rounded-lg bg-blue-50 border border-blue-100 p-2">
-          <p className="text-[10px] font-bold text-blue-500 uppercase tracking-widest mb-0.5">Opening Line</p>
-          <p className="text-[11px] text-blue-900 leading-snug italic">{OPENING_LINE}</p>
+      {/* Opening Script */}
+      {profile.openingScript && (
+        <div className="px-4 pb-2">
+          <div className="rounded-lg bg-blue-50 border border-blue-100 p-2 max-h-32 overflow-y-auto">
+            <p className="text-[10px] font-bold text-blue-500 uppercase tracking-widest mb-0.5">Script</p>
+            <p className="text-[11px] text-blue-900 leading-snug whitespace-pre-line">{fillScript(profile.openingScript, lead)}</p>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Notes Input */}
       <div className="px-4 pb-2">

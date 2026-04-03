@@ -234,6 +234,23 @@ export default function SettingsPage() {
         </div>
       </section>
 
+      {/* Opening Script */}
+      <section className="glass-card rounded-2xl p-6 space-y-4">
+        <div className="flex items-center gap-3 mb-2">
+          <MaterialIcon icon="record_voice_over" className="text-blue-600" />
+          <h2 className="text-lg font-bold text-slate-900 font-headline">Opening Script</h2>
+        </div>
+        <p className="text-xs text-slate-500">
+          This script appears on map popups and lead pages. Use placeholders: <code className="bg-slate-100 px-1 rounded">{'{name}'}</code> for owner name, <code className="bg-slate-100 px-1 rounded">{'{street}'}</code> for street address, <code className="bg-slate-100 px-1 rounded">{'{value}'}</code> for estimated value.
+        </p>
+        <textarea
+          value={form.openingScript}
+          onChange={(e) => setForm((prev) => ({ ...prev, openingScript: e.target.value }))}
+          rows={10}
+          className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 font-mono leading-relaxed"
+        />
+      </section>
+
       {/* Notifications */}
       <section className="glass-card rounded-2xl p-6 space-y-4">
         <div className="flex items-center gap-3 mb-2">

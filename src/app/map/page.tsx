@@ -50,6 +50,7 @@ export default function MapPage() {
   const [routePlannerOpen, setRoutePlannerOpen] = useState(false);
   const [listingFilter, setListingFilter] = useState<string>('all');
   const [walkMode, setWalkMode] = useState(false);
+  const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(null);
 
   useEffect(() => {
     async function fetchLeads() {
@@ -470,14 +471,10 @@ export default function MapPage() {
       ) : walkMode ? (
         <StreetViewProspecting
           leads={filteredLeads}
-          startPosition={
-            filteredLeads[0]?.latitude && filteredLeads[0]?.longitude
-              ? { lat: filteredLeads[0].latitude, lng: filteredLeads[0].longitude }
-              : undefined
-          }
+          startPosition={mapCenter || undefined}
         />
       ) : (
-        <MapDynamic leads={filteredLeads} mapType={mapType} />
+        <MapDynamic leads={filteredLeads} mapType={mapType} onCenterChanged={setMapCenter} />
       )}
 
       {/* Route Planner Panel */}

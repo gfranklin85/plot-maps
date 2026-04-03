@@ -16,6 +16,7 @@ interface Props {
   leads: Lead[];
   onLeadClick?: (id: string) => void;
   onDataChanged?: () => void;
+  onCenterChanged?: (center: { lat: number; lng: number }) => void;
   mapType?: "roadmap" | "satellite" | "hybrid" | "terrain";
 }
 
@@ -69,6 +70,22 @@ function MapTypeSync({ mapType }: { mapType: string }) {
       map.setMapTypeId(mapType);
     }
   }, [map, mapType]);
+  return null;
+}
+
+/** Reports map center changes to parent */
+function CenterTracker({ onCenterChanged }: { onCenterChanged?: (c: { lat: number; lng: number }) => void }) {
+  const map = useMap();
+  useEffect(() => {
+    if (!map || !onCenterChanged) return;
+    const listener = map.addListener("idle", () => {
+      const center = map.getCenter();
+      if (center) {
+        onCenterChanged({ lat: center.lat(), lng: center.lng() });
+      }
+    });
+    return () => google.maps.event.removeListener(listener);
+  }, [map, onCenterChanged]);
   return null;
 }
 
@@ -150,7 +167,7 @@ function LeadMarkers({
   return null;
 }
 
-export default function MapView({ leads, onLeadClick, onDataChanged, mapType = "roadmap" }: Props) {
+export default function MapView({ leads, onLeadClick, onDataChanged, onCenterChanged, mapType = "roadmap" }: Props) {
   const isSatellite = mapType === "satellite" || mapType === "hybrid";
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
 
@@ -183,6 +200,7 @@ export default function MapView({ leads, onLeadClick, onDataChanged, mapType = "
         styles={isSatellite ? undefined : MAP_STYLES}
       >
         <MapTypeSync mapType={mapType} />
+        <CenterTracker onCenterChanged={onCenterChanged} />
         <LeadMarkers leads={leads} onMarkerClick={handleMarkerClick} />
 
         {selectedLead &&

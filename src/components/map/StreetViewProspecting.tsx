@@ -113,6 +113,7 @@ function StreetViewInner({ leads, startPosition, onDataChanged }: Props) {
         );
 
         infoWindow.setContent(div);
+        infoWindow.setOptions({ pixelOffset: new google.maps.Size(0, 20) }); // push below marker
         infoWindow.open(panorama, marker);
       });
 

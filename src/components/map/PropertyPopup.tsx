@@ -114,7 +114,7 @@ export default function PropertyPopup({ lead, onUpdate, walkMode = false }: Prop
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [outcomeLogged, setOutcomeLogged] = useState<string | null>(null);
-  const [scriptOpen, setScriptOpen] = useState(!lead.listing_status); // collapsed for MLS, open for prospects
+  const [scriptOpen, setScriptOpen] = useState(false); // always collapsed by default
   const [editingScript, setEditingScript] = useState(false);
   const [localScript, setLocalScript] = useState('');
 
@@ -159,7 +159,7 @@ export default function PropertyPopup({ lead, onUpdate, walkMode = false }: Prop
   }
 
   return (
-    <div className="bg-white rounded-2xl min-w-[360px] max-w-[400px] overflow-hidden">
+    <div className={cn("bg-white rounded-2xl overflow-hidden", walkMode ? "min-w-[280px] max-w-[320px]" : "min-w-[360px] max-w-[400px]")}>
       {/* ─── STREET VIEW THUMBNAIL (hidden in walk mode — you're already looking at it) ─── */}
       {streetViewUrl && !walkMode && (
         <div className="relative h-[140px] bg-gray-200 overflow-hidden">

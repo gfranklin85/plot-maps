@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Lead, STATUS_BG_COLORS, CallOutcome, LeadStatus } from "@/types";
+import { Lead, STATUS_BG_COLORS, LISTING_STATUS_BG, CallOutcome, LeadStatus } from "@/types";
 import MaterialIcon from "@/components/ui/MaterialIcon";
 import { cn, formatPhone } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
@@ -41,6 +41,7 @@ export default function PropertyPopup({ lead, onUpdate }: Props) {
   const [outcomeLogged, setOutcomeLogged] = useState<string | null>(null);
 
   const phones = [lead.phone, lead.phone_2, lead.phone_3].filter(Boolean) as string[];
+  const isMLS = !!lead.listing_status;
 
   async function saveNote() {
     if (!note.trim()) return;
@@ -80,20 +81,41 @@ export default function PropertyPopup({ lead, onUpdate }: Props) {
 
   return (
     <div className="bg-white rounded-2xl min-w-[340px] max-w-[380px]">
-      {/* Header: status + address */}
+      {/* Header */}
       <div className="px-4 pt-4 pb-2">
         <div className="flex items-center justify-between mb-1">
-          <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide", STATUS_BG_COLORS[lead.status])}>
-            {lead.status}
-          </span>
-          {lead.price_range && (
+          {isMLS ? (
+            <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide", LISTING_STATUS_BG[lead.listing_status!] || 'bg-gray-100 text-gray-600')}>
+              {lead.listing_status}
+            </span>
+          ) : (
+            <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide", STATUS_BG_COLORS[lead.status])}>
+              {lead.status}
+            </span>
+          )}
+          {(lead.selling_price || lead.listing_price || lead.price_range) && (
             <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 rounded-full px-2 py-0.5">
-              {lead.price_range}
+              {lead.selling_price ? `Sold $${lead.selling_price.toLocaleString()}` : lead.listing_price ? `$${lead.listing_price.toLocaleString()}` : lead.price_range}
             </span>
           )}
         </div>
         <p className="text-sm font-bold text-gray-900 leading-snug">{lead.property_address || 'No address'}</p>
-        <p className="text-xs text-gray-600 font-medium">{lead.owner_name || lead.name}</p>
+        {isMLS ? (
+          <div className="flex items-center gap-3 mt-1 text-[11px] text-gray-500">
+            {lead.dom != null && <span><strong>{lead.dom}</strong> DOM</span>}
+            {lead.sqft && <span>{lead.sqft.toLocaleString()} sqft</span>}
+            {lead.year_built && <span>Built {lead.year_built}</span>}
+            {lead.lot_acres && <span>{lead.lot_acres} ac</span>}
+          </div>
+        ) : (
+          <p className="text-xs text-gray-600 font-medium">{lead.owner_name || lead.name}</p>
+        )}
+        {isMLS && lead.listing_price && lead.selling_price && lead.selling_price > 0 && (
+          <p className="text-[11px] text-gray-500 mt-0.5">
+            Listed ${lead.listing_price.toLocaleString()} → Sold ${lead.selling_price.toLocaleString()}
+            {lead.selling_date && <span className="ml-1">({lead.selling_date})</span>}
+          </p>
+        )}
       </div>
 
       {/* Phones */}

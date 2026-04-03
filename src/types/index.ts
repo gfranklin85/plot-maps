@@ -63,6 +63,17 @@ export interface Lead {
   city: string | null;
   state: string | null;
   zip: string | null;
+  // MLS listing data
+  listing_status: string | null;
+  listing_price: number | null;
+  selling_price: number | null;
+  dom: number | null;
+  listing_date: string | null;
+  pending_date: string | null;
+  selling_date: string | null;
+  sqft: number | null;
+  lot_acres: number | null;
+  year_built: number | null;
 }
 
 export interface Activity {
@@ -247,6 +258,21 @@ export interface ActionItem {
   suggestedOpener: string | null;
   priority: Priority;
 }
+
+// MLS listing status colors (for map markers)
+export type ListingStatus = 'Sold' | 'Active' | 'Pending';
+
+export const LISTING_STATUS_COLORS: Record<string, string> = {
+  'Sold': '#16a34a',
+  'Active': '#f97316',
+  'Pending': '#eab308',
+};
+
+export const LISTING_STATUS_BG: Record<string, string> = {
+  'Sold': 'bg-green-100 text-green-700',
+  'Active': 'bg-orange-100 text-orange-700',
+  'Pending': 'bg-yellow-100 text-yellow-700',
+};
 
 // Status color mapping
 export const STATUS_COLORS: Record<LeadStatus, string> = {

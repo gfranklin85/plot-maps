@@ -8,7 +8,7 @@ import {
   InfoWindow,
 } from "@vis.gl/react-google-maps";
 import { MarkerClusterer, Renderer, Cluster } from "@googlemaps/markerclusterer";
-import { Lead, STATUS_COLORS } from "@/types";
+import { Lead, STATUS_COLORS, LISTING_STATUS_COLORS } from "@/types";
 import { MAP_CENTER, MAP_ZOOM } from "@/lib/constants";
 import PropertyPopup from "./PropertyPopup";
 
@@ -97,19 +97,32 @@ function LeadMarkers({
     leads.forEach((lead) => {
       if (lead.latitude == null || lead.longitude == null) return;
 
-      const color = STATUS_COLORS[lead.status] || "#6b7280";
+      const isMLS = !!lead.listing_status;
+      const color = isMLS
+        ? (LISTING_STATUS_COLORS[lead.listing_status!] || "#6b7280")
+        : (STATUS_COLORS[lead.status] || "#6b7280");
 
+      // MLS entries get a diamond shape, prospects get a circle
       const marker = new google.maps.Marker({
         position: { lat: lead.latitude, lng: lead.longitude },
         title: lead.property_address || lead.name,
-        icon: {
-          path: google.maps.SymbolPath.CIRCLE,
-          scale: 10,
-          fillColor: color,
-          fillOpacity: 1,
-          strokeColor: "#ffffff",
-          strokeWeight: 3,
-        },
+        icon: isMLS
+          ? {
+              path: "M 0,-12 L 8,0 L 0,12 L -8,0 Z", // diamond
+              scale: 1,
+              fillColor: color,
+              fillOpacity: 1,
+              strokeColor: "#ffffff",
+              strokeWeight: 2,
+            }
+          : {
+              path: google.maps.SymbolPath.CIRCLE,
+              scale: 10,
+              fillColor: color,
+              fillOpacity: 1,
+              strokeColor: "#ffffff",
+              strokeWeight: 3,
+            },
       });
 
       marker.addListener("click", () => onMarkerClick(lead));

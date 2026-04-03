@@ -47,6 +47,7 @@ export default function MapPage() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [mapType, setMapType] = useState<'roadmap' | 'satellite' | 'hybrid'>('roadmap');
   const [routePlannerOpen, setRoutePlannerOpen] = useState(false);
+  const [listingFilter, setListingFilter] = useState<string>('all'); // 'all' | 'prospects' | 'Sold' | 'Active' | 'Pending'
 
   useEffect(() => {
     async function fetchLeads() {
@@ -148,8 +149,15 @@ export default function MapPage() {
       result = result.filter((l) => l.source === selectedSource);
     }
 
+    // Filter by listing status
+    if (listingFilter === 'prospects') {
+      result = result.filter((l) => !l.listing_status);
+    } else if (listingFilter === 'Sold' || listingFilter === 'Active' || listingFilter === 'Pending') {
+      result = result.filter((l) => l.listing_status === listingFilter);
+    }
+
     return result;
-  }, [leads, activeTab, search, selectedTags, selectedCity, selectedPriority, selectedSource]);
+  }, [leads, activeTab, search, selectedTags, selectedCity, selectedPriority, selectedSource, listingFilter]);
 
   // Compute summary counts
   const newCount = leads.filter((l) => l.status === "New").length;
@@ -181,6 +189,29 @@ export default function MapPage() {
               }`}
             >
               {type === "roadmap" ? "Map" : type === "satellite" ? "Satellite" : "Hybrid"}
+            </button>
+          ))}
+        </div>
+
+        {/* Listing status filter */}
+        <div className="inline-flex items-center gap-0.5 rounded-full glass-card p-1 shadow-lg">
+          {[
+            { key: 'all', label: 'All' },
+            { key: 'prospects', label: 'Prospects' },
+            { key: 'Sold', label: '● Sold', color: 'text-green-600' },
+            { key: 'Active', label: '◆ Active', color: 'text-orange-500' },
+            { key: 'Pending', label: '◆ Pending', color: 'text-yellow-600' },
+          ].map((f) => (
+            <button
+              key={f.key}
+              onClick={() => setListingFilter(f.key)}
+              className={`rounded-full px-3 py-1.5 text-xs font-medium transition-all ${
+                listingFilter === f.key
+                  ? 'bg-white font-bold text-blue-600 shadow-sm'
+                  : `${f.color || 'text-slate-600'} hover:text-slate-800`
+              }`}
+            >
+              {f.label}
             </button>
           ))}
         </div>

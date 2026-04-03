@@ -145,3 +145,17 @@ CREATE TABLE IF NOT EXISTS call_responses (
 
 ALTER TABLE call_responses ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow all for call_responses" ON call_responses FOR ALL USING (true) WITH CHECK (true);
+
+-- ==========================================
+-- 9. Add MLS listing fields to leads table
+-- ==========================================
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS listing_status text;
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS listing_price numeric;
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS selling_price numeric;
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS dom integer;
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS listing_date date;
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS pending_date date;
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS selling_date date;
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS sqft integer;
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS lot_acres numeric;
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS year_built integer;

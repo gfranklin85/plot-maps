@@ -159,3 +159,82 @@ ALTER TABLE leads ADD COLUMN IF NOT EXISTS selling_date date;
 ALTER TABLE leads ADD COLUMN IF NOT EXISTS sqft integer;
 ALTER TABLE leads ADD COLUMN IF NOT EXISTS lot_acres numeric;
 ALTER TABLE leads ADD COLUMN IF NOT EXISTS year_built integer;
+
+-- ==========================================
+-- 10. Multi-tenant: profiles table
+-- ==========================================
+CREATE TABLE IF NOT EXISTS profiles (
+  id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  tenant_id uuid DEFAULT gen_random_uuid(),
+  full_name text,
+  email text,
+  phone text,
+  title text,
+  company text,
+  avatar_url text,
+  role text DEFAULT 'owner',
+  opening_script text,
+  default_map_type text DEFAULT 'roadmap',
+  notification_email boolean DEFAULT true,
+  notification_push boolean DEFAULT true,
+  notification_sms boolean DEFAULT false,
+  stripe_customer_id text,
+  subscription_status text DEFAULT 'trialing',
+  subscription_id text,
+  trial_ends_at timestamptz DEFAULT (now() + interval '14 days'),
+  settings jsonb DEFAULT '{}',
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+
+ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users manage own profile" ON profiles
+  FOR ALL USING (auth.uid() = id) WITH CHECK (auth.uid() = id);
+
+-- Auto-create profile on signup
+CREATE OR REPLACE FUNCTION handle_new_user()
+RETURNS trigger AS $$
+BEGIN
+  INSERT INTO profiles (id, email, full_name)
+  VALUES (
+    NEW.id,
+    NEW.email,
+    COALESCE(NEW.raw_user_meta_data->>'full_name', '')
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION handle_new_user();
+
+-- ==========================================
+-- 11. Multi-tenant: add user_id to all data tables
+-- ==========================================
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS user_id uuid REFERENCES auth.users(id);
+ALTER TABLE activities ADD COLUMN IF NOT EXISTS user_id uuid REFERENCES auth.users(id);
+ALTER TABLE market_comps ADD COLUMN IF NOT EXISTS user_id uuid REFERENCES auth.users(id);
+ALTER TABLE daily_targets ADD COLUMN IF NOT EXISTS user_id uuid REFERENCES auth.users(id);
+ALTER TABLE import_templates ADD COLUMN IF NOT EXISTS user_id uuid REFERENCES auth.users(id);
+ALTER TABLE call_scripts ADD COLUMN IF NOT EXISTS user_id uuid REFERENCES auth.users(id);
+ALTER TABLE call_responses ADD COLUMN IF NOT EXISTS user_id uuid REFERENCES auth.users(id);
+
+-- Indexes for performance
+CREATE INDEX IF NOT EXISTS idx_leads_user_id ON leads(user_id);
+CREATE INDEX IF NOT EXISTS idx_activities_user_id ON activities(user_id);
+CREATE INDEX IF NOT EXISTS idx_daily_targets_user_id ON daily_targets(user_id);
+CREATE INDEX IF NOT EXISTS idx_call_scripts_user_id ON call_scripts(user_id);
+CREATE INDEX IF NOT EXISTS idx_call_responses_user_id ON call_responses(user_id);
+CREATE INDEX IF NOT EXISTS idx_market_comps_user_id ON market_comps(user_id);
+CREATE INDEX IF NOT EXISTS idx_import_templates_user_id ON import_templates(user_id);
+
+-- Default user_id to auth.uid() for client-side inserts
+ALTER TABLE leads ALTER COLUMN user_id SET DEFAULT auth.uid();
+ALTER TABLE activities ALTER COLUMN user_id SET DEFAULT auth.uid();
+ALTER TABLE market_comps ALTER COLUMN user_id SET DEFAULT auth.uid();
+ALTER TABLE daily_targets ALTER COLUMN user_id SET DEFAULT auth.uid();
+ALTER TABLE import_templates ALTER COLUMN user_id SET DEFAULT auth.uid();
+ALTER TABLE call_scripts ALTER COLUMN user_id SET DEFAULT auth.uid();
+ALTER TABLE call_responses ALTER COLUMN user_id SET DEFAULT auth.uid();

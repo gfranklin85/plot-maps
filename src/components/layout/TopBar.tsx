@@ -2,9 +2,11 @@
 
 import Link from 'next/link';
 import { useProfile } from '@/lib/profile-context';
+import { useAuth } from '@/lib/auth-context';
 
 export default function TopBar() {
   const { profile, initials } = useProfile();
+  const { signOut } = useAuth();
 
   return (
     <header className="fixed top-0 right-0 w-[calc(100%-16rem)] h-16 bg-white/80 backdrop-blur-md flex justify-between items-center px-8 z-40 shadow-sm">
@@ -50,6 +52,15 @@ export default function TopBar() {
             {initials}
           </div>
         </Link>
+
+        {/* Sign Out */}
+        <button
+          onClick={signOut}
+          className="p-2 text-slate-400 hover:text-red-500 transition-colors"
+          title="Sign out"
+        >
+          <span className="material-symbols-outlined text-[20px]">logout</span>
+        </button>
       </div>
     </header>
   );

@@ -11,6 +11,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.81.0",
     "@googlemaps/markerclusterer": "^2.6.2",
+    "@supabase/ssr": "^0.10.0",
     "@supabase/supabase-js": "^2.101.0",
     "@vis.gl/react-google-maps": "^1.8.1",
     "clsx": "^2.1.1",
@@ -20,6 +21,7 @@
     "react-dom": "^18",
     "react-leaflet": "^4.2.1",
     "resend": "^6.10.0",
+    "stripe": "^22.0.0",
     "twilio": "^5.13.1"
   },
   "devDependencies": {

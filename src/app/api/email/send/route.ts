@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { supabaseAdmin } from '@/lib/supabase-server';
+import { getAuthUser } from '@/lib/auth';
 
 const resend = new Resend(process.env.RESEND_API_KEY!);
 
@@ -8,6 +9,9 @@ const FROM_EMAIL = process.env.FROM_EMAIL || 'greg@plot.solutions';
 
 export async function POST(request: Request) {
   try {
+    const user = await getAuthUser();
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
     const { to, subject, body, leadId } = await request.json();
 
     if (!to || !subject || !body) {

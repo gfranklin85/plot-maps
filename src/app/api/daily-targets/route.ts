@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-server';
+import { getAuthUser } from '@/lib/auth';
 
 const DEFAULT_TARGETS = {
   conversations_target: 10,
@@ -15,12 +16,16 @@ const DEFAULT_TARGETS = {
 
 export async function GET() {
   try {
+    const user = await getAuthUser();
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
     const today = new Date().toISOString().split('T')[0];
 
     // Try to fetch today's targets
     const { data, error } = await supabaseAdmin
       .from('daily_targets')
       .select('*')
+      .eq('user_id', user.id)
       .eq('target_date', today)
       .single();
 
@@ -32,7 +37,7 @@ export async function GET() {
     if (error?.code === 'PGRST116') {
       const { data: newTarget, error: insertError } = await supabaseAdmin
         .from('daily_targets')
-        .insert({ target_date: today, ...DEFAULT_TARGETS })
+        .insert({ target_date: today, user_id: user.id, ...DEFAULT_TARGETS })
         .select()
         .single();
 
@@ -60,6 +65,9 @@ export async function GET() {
 
 export async function PATCH(request: Request) {
   try {
+    const user = await getAuthUser();
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
     const today = new Date().toISOString().split('T')[0];
     const updates = await request.json();
 
@@ -86,6 +94,7 @@ export async function PATCH(request: Request) {
     const { data, error } = await supabaseAdmin
       .from('daily_targets')
       .update(sanitized)
+      .eq('user_id', user.id)
       .eq('target_date', today)
       .select()
       .single();

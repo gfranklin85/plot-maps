@@ -1,11 +1,15 @@
 import { NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { supabaseAdmin } from '@/lib/supabase-server';
+import { getAuthUser } from '@/lib/auth';
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
 
 export async function POST() {
   try {
+    const user = await getAuthUser();
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
     const today = new Date().toISOString().split('T')[0];
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
@@ -13,21 +17,25 @@ export async function POST() {
     const { data: followUpLeads } = await supabaseAdmin
       .from('leads')
       .select('*')
+      .eq('user_id', user.id)
       .eq('follow_up_date', today);
 
     const { data: hotLeads } = await supabaseAdmin
       .from('leads')
       .select('*')
+      .eq('user_id', user.id)
       .in('status', ['Follow-Up', 'Hot Lead']);
 
     const { data: highPriorityLeads } = await supabaseAdmin
       .from('leads')
       .select('*')
+      .eq('user_id', user.id)
       .eq('priority', 'high');
 
     const { data: recentNewLeads } = await supabaseAdmin
       .from('leads')
       .select('*')
+      .eq('user_id', user.id)
       .eq('status', 'New')
       .gte('created_at', sevenDaysAgo);
 

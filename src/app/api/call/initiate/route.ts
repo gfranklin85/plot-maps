@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import twilio from 'twilio';
 import { supabaseAdmin } from '@/lib/supabase-server';
+import { getAuthUser } from '@/lib/auth';
 
 const client = twilio(
   process.env.TWILIO_ACCOUNT_SID!,
@@ -12,6 +13,9 @@ const TWILIO_PHONE_NUMBER = process.env.TWILIO_PHONE_NUMBER || USER_PHONE;
 
 export async function POST(request: Request) {
   try {
+    const user = await getAuthUser();
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
     const { leadId, phoneNumber, leadName } = await request.json();
 
     if (!leadId || !phoneNumber) {

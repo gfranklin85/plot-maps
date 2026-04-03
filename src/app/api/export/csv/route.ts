@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-server';
+import { getAuthUser } from '@/lib/auth';
 
 const FORMAT_COLUMNS: Record<string, string[]> = {
   'phone-list': ['owner_name', 'name', 'phone', 'phone_2', 'property_address'],
@@ -30,6 +31,9 @@ function escapeCsvValue(value: unknown): string {
 
 export async function POST(request: NextRequest) {
   try {
+    const user = await getAuthUser();
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
     const body = await request.json();
     const { leadIds, format, columns: customColumns } = body as {
       leadIds: string[];
@@ -44,6 +48,7 @@ export async function POST(request: NextRequest) {
     const { data: leads, error } = await supabaseAdmin
       .from('leads')
       .select('*')
+      .eq('user_id', user.id)
       .in('id', leadIds);
 
     if (error) {

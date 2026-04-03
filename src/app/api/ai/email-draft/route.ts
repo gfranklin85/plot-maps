@@ -1,11 +1,15 @@
 import { NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { supabaseAdmin } from '@/lib/supabase-server';
+import { getAuthUser } from '@/lib/auth';
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
 
 export async function POST(request: Request) {
   try {
+    const user = await getAuthUser();
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
     const { leadId, context, tone = 'professional' } = await request.json();
 
     if (!leadId) {
@@ -16,6 +20,7 @@ export async function POST(request: Request) {
     const { data: lead, error: leadError } = await supabaseAdmin
       .from('leads')
       .select('*')
+      .eq('user_id', user.id)
       .eq('id', leadId)
       .single();
 

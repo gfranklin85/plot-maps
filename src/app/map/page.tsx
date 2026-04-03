@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { Lead, LeadStatus, Priority } from "@/types";
 import MapDynamic from "@/components/map/MapDynamic";
 import RouteOptimizer from "@/components/map/RouteOptimizer";
+import StreetViewProspecting from "@/components/map/StreetViewProspecting";
 import SearchInput from "@/components/ui/SearchInput";
 import { PRIORITIES } from "@/lib/constants";
 
@@ -47,7 +48,8 @@ export default function MapPage() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [mapType, setMapType] = useState<'roadmap' | 'satellite' | 'hybrid'>('roadmap');
   const [routePlannerOpen, setRoutePlannerOpen] = useState(false);
-  const [listingFilter, setListingFilter] = useState<string>('all'); // 'all' | 'prospects' | 'Sold' | 'Active' | 'Pending'
+  const [listingFilter, setListingFilter] = useState<string>('all');
+  const [walkMode, setWalkMode] = useState(false);
 
   useEffect(() => {
     async function fetchLeads() {
@@ -215,6 +217,21 @@ export default function MapPage() {
             </button>
           ))}
         </div>
+
+        {/* Walk Mode toggle */}
+        <button
+          onClick={() => setWalkMode(!walkMode)}
+          className={`flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-bold shadow-lg transition-all ${
+            walkMode
+              ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+              : 'glass-card text-slate-700 hover:shadow-xl'
+          }`}
+        >
+          <span className="material-symbols-rounded text-[18px]">
+            {walkMode ? 'map' : 'streetview'}
+          </span>
+          {walkMode ? 'Back to Map' : 'Walk Mode'}
+        </button>
 
         {/* Plan Route button */}
         <button
@@ -447,9 +464,18 @@ export default function MapPage() {
         </div>
       </div>
 
-      {/* Map */}
+      {/* Map or Walk Mode */}
       {loading ? (
         <div className="h-full w-full bg-surface-container animate-pulse rounded-2xl" />
+      ) : walkMode ? (
+        <StreetViewProspecting
+          leads={filteredLeads}
+          startPosition={
+            filteredLeads[0]?.latitude && filteredLeads[0]?.longitude
+              ? { lat: filteredLeads[0].latitude, lng: filteredLeads[0].longitude }
+              : undefined
+          }
+        />
       ) : (
         <MapDynamic leads={filteredLeads} mapType={mapType} />
       )}

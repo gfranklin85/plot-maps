@@ -13,7 +13,8 @@ interface Props {
 }
 
 const API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
-const MAX_DISTANCE_METERS = 150;
+const MAX_DISTANCE = 120; // meters
+const FOV_HALF = 90; // degrees — show pins within ±90° of camera heading
 
 function haversine(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371000;
@@ -23,6 +24,69 @@ function haversine(lat1: number, lng1: number, lat2: number, lng2: number): numb
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+function bearing(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const y = Math.sin(dLng) * Math.cos((lat2 * Math.PI) / 180);
+  const x = Math.cos((lat1 * Math.PI) / 180) * Math.sin((lat2 * Math.PI) / 180) -
+    Math.sin((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.cos(dLng);
+  return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
+}
+
+function angleDiff(a: number, b: number): number {
+  let d = ((a - b + 180) % 360) - 180;
+  if (d < -180) d += 360;
+  return Math.abs(d);
+}
+
+// Generate a floating name tag SVG as a data URI
+function makeNameTagIcon(label: string, color: string): google.maps.Icon {
+  const textLen = label.length;
+  const width = Math.max(60, textLen * 8 + 20);
+  const height = 32;
+  const arrow = 8;
+
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height + arrow}">
+      <defs>
+        <filter id="s" x="-20%" y="-20%" width="140%" height="140%">
+          <feDropShadow dx="0" dy="2" stdDeviation="3" flood-opacity="0.3"/>
+        </filter>
+      </defs>
+      <rect x="2" y="2" width="${width - 4}" height="${height - 4}" rx="8" fill="${color}" filter="url(#s)" stroke="white" stroke-width="2"/>
+      <polygon points="${width / 2 - arrow},${height - 2} ${width / 2},${height + arrow - 2} ${width / 2 + arrow},${height - 2}" fill="${color}" stroke="white" stroke-width="2"/>
+      <rect x="${width / 2 - arrow}" y="${height - 6}" width="${arrow * 2}" height="6" fill="${color}"/>
+      <text x="${width / 2}" y="${height / 2 + 1}" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui, sans-serif" font-size="11" font-weight="700" fill="white">${escapeXml(label)}</text>
+    </svg>`;
+
+  return {
+    url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
+    scaledSize: new google.maps.Size(width, height + arrow),
+    anchor: new google.maps.Point(width / 2, height + arrow),
+  };
+}
+
+function escapeXml(str: string): string {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function getLabel(lead: Lead): string {
+  const isMLS = !!lead.listing_status;
+  if (isMLS) {
+    if (lead.listing_status === 'Sold' && lead.selling_price) {
+      return `SOLD $${Math.round(lead.selling_price / 1000)}K`;
+    }
+    if (lead.listing_status === 'Active' && lead.listing_price) {
+      return `$${Math.round(lead.listing_price / 1000)}K`;
+    }
+    return lead.listing_status?.toUpperCase() || 'MLS';
+  }
+  // Prospect — show first name
+  const name = lead.owner_name || lead.name || '';
+  const firstName = name.split(' ')[0];
+  return firstName.length > 12 ? firstName.slice(0, 10) + '..' : firstName || '•';
+}
+
 function StreetViewInner({ leads, startPosition, onDataChanged, onPositionChanged }: Props) {
   const apiLoaded = useApiIsLoaded();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -30,16 +94,14 @@ function StreetViewInner({ leads, startPosition, onDataChanged, onPositionChange
   const markersRef = useRef<google.maps.Marker[]>([]);
   const leadsRef = useRef<Lead[]>([]);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
-  const [popupPos, setPopupPos] = useState({ x: 16, y: 16 }); // top-right default
+  const [popupPos, setPopupPos] = useState({ x: 16, y: 80 });
   const [posLocked, setPosLocked] = useState(false);
   const posLockedRef = useRef(false);
   const [dragging, setDragging] = useState(false);
   const dragOffset = useRef({ x: 0, y: 0 });
 
-  // Keep leads ref in sync
   leadsRef.current = leads;
 
-  // Initialize panorama once
   useEffect(() => {
     if (!apiLoaded || !containerRef.current || panoramaRef.current) return;
 
@@ -58,22 +120,19 @@ function StreetViewInner({ leads, startPosition, onDataChanged, onPositionChange
 
     panoramaRef.current = panorama;
 
-    // On every position change, update which markers are visible
-    panorama.addListener("position_changed", () => {
+    const refresh = () => {
       const p = panorama.getPosition();
       if (!p) return;
-      const camLat = p.lat();
-      const camLng = p.lng();
+      const heading = panorama.getPov()?.heading || 0;
+      onPositionChanged?.({ lat: p.lat(), lng: p.lng() });
+      refreshMarkers(panorama, p.lat(), p.lng(), heading);
+    };
 
-      onPositionChanged?.({ lat: camLat, lng: camLng });
-      refreshMarkers(panorama, camLat, camLng);
-    });
+    // Refresh on walk AND on pan/turn
+    panorama.addListener("position_changed", refresh);
+    panorama.addListener("pov_changed", refresh);
 
-    // Initial marker placement after panorama loads
-    setTimeout(() => {
-      const p = panorama.getPosition();
-      if (p) refreshMarkers(panorama, p.lat(), p.lng());
-    }, 1000);
+    setTimeout(refresh, 1000);
 
     return () => {
       markersRef.current.forEach((m) => m.setMap(null));
@@ -83,52 +142,45 @@ function StreetViewInner({ leads, startPosition, onDataChanged, onPositionChange
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [apiLoaded]);
 
-  // When leads change, refresh markers at current position
   useEffect(() => {
     const panorama = panoramaRef.current;
     if (!panorama) return;
     const p = panorama.getPosition();
-    if (p) refreshMarkers(panorama, p.lat(), p.lng());
+    if (p) {
+      const heading = panorama.getPov()?.heading || 0;
+      refreshMarkers(panorama, p.lat(), p.lng(), heading);
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [leads]);
 
-  function refreshMarkers(panorama: google.maps.StreetViewPanorama, camLat: number, camLng: number) {
-    // Remove old markers
+  function refreshMarkers(panorama: google.maps.StreetViewPanorama, camLat: number, camLng: number, camHeading: number) {
     markersRef.current.forEach((m) => m.setMap(null));
     markersRef.current = [];
 
-    // Add nearby leads as markers
     leadsRef.current.forEach((lead) => {
       if (lead.latitude == null || lead.longitude == null) return;
 
+      // Distance filter
       const dist = haversine(camLat, camLng, lead.latitude, lead.longitude);
-      if (dist > MAX_DISTANCE_METERS) return;
+      if (dist > MAX_DISTANCE) return;
+
+      // Heading filter — only show pins in front of the camera
+      const pinBearing = bearing(camLat, camLng, lead.latitude, lead.longitude);
+      if (angleDiff(camHeading, pinBearing) > FOV_HALF) return;
 
       const isMLS = !!lead.listing_status;
       const color = isMLS
         ? (LISTING_STATUS_COLORS[lead.listing_status!] || "#6b7280")
         : (STATUS_COLORS[lead.status] || "#3b82f6");
 
+      const label = getLabel(lead);
+      const icon = makeNameTagIcon(label, color);
+
       const marker = new google.maps.Marker({
         position: { lat: lead.latitude, lng: lead.longitude },
         map: panorama,
         title: lead.property_address || lead.name || '',
-        icon: {
-          path: isMLS
-            ? "M -18,-10 L 18,-10 L 18,10 L -18,10 Z"
-            : google.maps.SymbolPath.CIRCLE,
-          scale: isMLS ? 1 : 14,
-          fillColor: color,
-          fillOpacity: 0.95,
-          strokeColor: "#ffffff",
-          strokeWeight: 3,
-        },
-        label: isMLS ? {
-          text: lead.listing_status === 'Sold' ? '$ SOLD' : lead.listing_status === 'Active' ? 'FOR SALE' : 'PENDING',
-          color: '#ffffff',
-          fontSize: '9px',
-          fontWeight: 'bold',
-        } : undefined,
+        icon,
       });
 
       marker.addListener("click", () => {
@@ -148,27 +200,19 @@ function StreetViewInner({ leads, startPosition, onDataChanged, onPositionChange
           className="fixed z-50 w-[340px] max-h-[80vh] overflow-y-auto rounded-2xl shadow-2xl border border-gray-200 select-none"
           style={{ right: `${popupPos.x}px`, top: `${popupPos.y}px` }}
           onMouseDown={(e) => {
-            // Only drag from the header area (first 32px)
             const rect = e.currentTarget.getBoundingClientRect();
             if (e.clientY - rect.top > 36) return;
             setDragging(true);
-            dragOffset.current = {
-              x: e.clientX + popupPos.x, // right-based
-              y: e.clientY - popupPos.y,
-            };
+            dragOffset.current = { x: e.clientX + popupPos.x, y: e.clientY - popupPos.y };
             e.preventDefault();
           }}
           onMouseMove={(e) => {
             if (!dragging) return;
-            setPopupPos({
-              x: dragOffset.current.x - e.clientX,
-              y: e.clientY - dragOffset.current.y,
-            });
+            setPopupPos({ x: dragOffset.current.x - e.clientX, y: e.clientY - dragOffset.current.y });
           }}
           onMouseUp={() => setDragging(false)}
           onMouseLeave={() => setDragging(false)}
         >
-          {/* Drag handle + controls */}
           <div className={`flex items-center justify-between px-3 py-1.5 bg-gray-100 rounded-t-2xl cursor-move ${dragging ? 'bg-blue-100' : ''}`}>
             <div className="flex items-center gap-1 text-[10px] text-gray-400">
               <span className="material-symbols-outlined text-[14px]">drag_indicator</span>
@@ -178,7 +222,7 @@ function StreetViewInner({ leads, startPosition, onDataChanged, onPositionChange
               <button
                 onClick={() => { const next = !posLocked; setPosLocked(next); posLockedRef.current = next; }}
                 className={`w-6 h-6 flex items-center justify-center rounded-full transition-all ${posLocked ? 'bg-blue-100 text-blue-600' : 'text-gray-400 hover:bg-gray-200'}`}
-                title={posLocked ? 'Position locked — new pins open here' : 'Lock position'}
+                title={posLocked ? 'Position locked' : 'Lock position'}
               >
                 <span className="material-symbols-outlined text-[14px]">{posLocked ? 'lock' : 'lock_open'}</span>
               </button>

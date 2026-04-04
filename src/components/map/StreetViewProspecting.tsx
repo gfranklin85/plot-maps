@@ -13,7 +13,7 @@ interface Props {
 }
 
 const API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
-const VISIBILITY_RADIUS_METERS = 80; // Only show pins within this distance
+const VISIBILITY_RADIUS_METERS = 150; // Only show pins within this distance
 
 function getDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371000;
@@ -61,6 +61,10 @@ function StreetViewInner({ leads, startPosition, onDataChanged, onPositionChange
     };
   }, [apiLoaded, startPosition]);
 
+  // Stable ref for the callback to avoid re-creating markers
+  const onPositionChangedRef = useRef(onPositionChanged);
+  onPositionChangedRef.current = onPositionChanged;
+
   // Update marker visibility based on camera position
   const updateMarkerVisibility = useCallback(() => {
     const panorama = panoramaRef.current;
@@ -83,8 +87,8 @@ function StreetViewInner({ leads, startPosition, onDataChanged, onPositionChange
     });
 
     // Report position back so map can center here when exiting walk mode
-    onPositionChanged?.({ lat: camLat, lng: camLng });
-  }, [onPositionChanged]);
+    onPositionChangedRef.current?.({ lat: camLat, lng: camLng });
+  }, []);
 
   // Place markers for leads
   useEffect(() => {
@@ -135,8 +139,8 @@ function StreetViewInner({ leads, startPosition, onDataChanged, onPositionChange
       markersRef.current.push({ marker, lead });
     });
 
-    // Initial visibility check
-    updateMarkerVisibility();
+    // Initial visibility check (slight delay for panorama to settle)
+    setTimeout(updateMarkerVisibility, 500);
 
     // Listen for position changes (walking)
     const listener = panorama.addListener("position_changed", updateMarkerVisibility);

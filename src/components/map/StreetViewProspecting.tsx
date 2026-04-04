@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState } from "react";
 import { APIProvider, useApiIsLoaded } from "@vis.gl/react-google-maps";
 import { Lead, STATUS_COLORS, LISTING_STATUS_COLORS } from "@/types";
 import PropertyPopup from "./PropertyPopup";
@@ -13,16 +13,13 @@ interface Props {
 }
 
 const API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
-const VISIBILITY_RADIUS_METERS = 150; // Only show pins within this distance
+const MAX_DISTANCE_METERS = 150;
 
-function getDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
+function haversine(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371000;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
   const dLng = ((lng2 - lng1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) *
-    Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
@@ -30,18 +27,21 @@ function StreetViewInner({ leads, startPosition, onDataChanged, onPositionChange
   const apiLoaded = useApiIsLoaded();
   const containerRef = useRef<HTMLDivElement>(null);
   const panoramaRef = useRef<google.maps.StreetViewPanorama | null>(null);
-  const markersRef = useRef<{ marker: google.maps.Marker; lead: Lead }[]>([]);
-  const [ready, setReady] = useState(false);
+  const markersRef = useRef<google.maps.Marker[]>([]);
+  const leadsRef = useRef<Lead[]>([]);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
 
-  // Initialize panorama
-  useEffect(() => {
-    if (!apiLoaded || !containerRef.current) return;
+  // Keep leads ref in sync
+  leadsRef.current = leads;
 
-    const defaultPos = startPosition || { lat: 36.3008, lng: -119.7828 };
+  // Initialize panorama once
+  useEffect(() => {
+    if (!apiLoaded || !containerRef.current || panoramaRef.current) return;
+
+    const pos = startPosition || { lat: 36.3008, lng: -119.7828 };
 
     const panorama = new google.maps.StreetViewPanorama(containerRef.current, {
-      position: defaultPos,
+      position: pos,
       pov: { heading: 0, pitch: 0 },
       zoom: 1,
       addressControl: true,
@@ -49,123 +49,101 @@ function StreetViewInner({ leads, startPosition, onDataChanged, onPositionChange
       panControl: true,
       enableCloseButton: false,
       fullscreenControl: true,
-      motionTracking: false,
     });
 
     panoramaRef.current = panorama;
-    setReady(true);
 
-    return () => {
-      markersRef.current.forEach((m) => m.marker.setMap(null));
-      markersRef.current = [];
-    };
-  }, [apiLoaded, startPosition]);
+    // On every position change, update which markers are visible
+    panorama.addListener("position_changed", () => {
+      const p = panorama.getPosition();
+      if (!p) return;
+      const camLat = p.lat();
+      const camLng = p.lng();
 
-  // Stable ref for the callback to avoid re-creating markers
-  const onPositionChangedRef = useRef(onPositionChanged);
-  onPositionChangedRef.current = onPositionChanged;
-
-  // Update marker visibility based on camera position
-  const updateMarkerVisibility = useCallback(() => {
-    const panorama = panoramaRef.current;
-    if (!panorama) return;
-
-    const pos = panorama.getPosition();
-    if (!pos) return;
-    const camLat = pos.lat();
-    const camLng = pos.lng();
-
-    markersRef.current.forEach(({ marker, lead }) => {
-      if (lead.latitude == null || lead.longitude == null) return;
-      const dist = getDistance(camLat, camLng, lead.latitude, lead.longitude);
-      const shouldShow = dist <= VISIBILITY_RADIUS_METERS;
-      if (shouldShow && !marker.getMap()) {
-        marker.setMap(panorama);
-      } else if (!shouldShow && marker.getMap()) {
-        marker.setMap(null);
-      }
+      onPositionChanged?.({ lat: camLat, lng: camLng });
+      refreshMarkers(panorama, camLat, camLng);
     });
 
-    // Report position back so map can center here when exiting walk mode
-    onPositionChangedRef.current?.({ lat: camLat, lng: camLng });
-  }, []);
+    // Initial marker placement after panorama loads
+    setTimeout(() => {
+      const p = panorama.getPosition();
+      if (p) refreshMarkers(panorama, p.lat(), p.lng());
+    }, 1000);
 
-  // Place markers for leads
+    return () => {
+      markersRef.current.forEach((m) => m.setMap(null));
+      markersRef.current = [];
+      panoramaRef.current = null;
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [apiLoaded]);
+
+  // When leads change, refresh markers at current position
   useEffect(() => {
-    if (!ready || !panoramaRef.current) return;
+    const panorama = panoramaRef.current;
+    if (!panorama) return;
+    const p = panorama.getPosition();
+    if (p) refreshMarkers(panorama, p.lat(), p.lng());
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leads]);
 
-    markersRef.current.forEach((m) => m.marker.setMap(null));
+  function refreshMarkers(panorama: google.maps.StreetViewPanorama, camLat: number, camLng: number) {
+    // Remove old markers
+    markersRef.current.forEach((m) => m.setMap(null));
     markersRef.current = [];
 
-    const panorama = panoramaRef.current;
-
-    leads.forEach((lead) => {
+    // Add nearby leads as markers
+    leadsRef.current.forEach((lead) => {
       if (lead.latitude == null || lead.longitude == null) return;
+
+      const dist = haversine(camLat, camLng, lead.latitude, lead.longitude);
+      if (dist > MAX_DISTANCE_METERS) return;
 
       const isMLS = !!lead.listing_status;
       const color = isMLS
         ? (LISTING_STATUS_COLORS[lead.listing_status!] || "#6b7280")
         : (STATUS_COLORS[lead.status] || "#3b82f6");
 
-      // Larger, more visible markers for street view
       const marker = new google.maps.Marker({
         position: { lat: lead.latitude, lng: lead.longitude },
-        title: lead.property_address || lead.name,
-        label: {
-          text: isMLS
-            ? (lead.listing_status === 'Sold' ? '$ SOLD' : lead.listing_status === 'Active' ? 'FOR SALE' : 'PENDING')
-            : '●',
-          color: '#ffffff',
-          fontSize: isMLS ? '10px' : '14px',
-          fontWeight: 'bold',
-        },
+        map: panorama,
+        title: lead.property_address || lead.name || '',
         icon: {
           path: isMLS
-            ? "M -20,-12 L 20,-12 L 20,12 L -20,12 Z" // rectangle for MLS
+            ? "M -18,-10 L 18,-10 L 18,10 L -18,10 Z"
             : google.maps.SymbolPath.CIRCLE,
-          scale: isMLS ? 1 : 16,
+          scale: isMLS ? 1 : 14,
           fillColor: color,
           fillOpacity: 0.95,
           strokeColor: "#ffffff",
           strokeWeight: 3,
-          labelOrigin: isMLS ? new google.maps.Point(0, 0) : new google.maps.Point(0, 0),
         },
+        label: isMLS ? {
+          text: lead.listing_status === 'Sold' ? '$ SOLD' : lead.listing_status === 'Active' ? 'FOR SALE' : 'PENDING',
+          color: '#ffffff',
+          fontSize: '9px',
+          fontWeight: 'bold',
+        } : undefined,
       });
 
-      marker.addListener("click", () => {
-        setSelectedLead(lead);
-      });
-
-      markersRef.current.push({ marker, lead });
+      marker.addListener("click", () => setSelectedLead(lead));
+      markersRef.current.push(marker);
     });
-
-    // Initial visibility check (slight delay for panorama to settle)
-    setTimeout(updateMarkerVisibility, 500);
-
-    // Listen for position changes (walking)
-    const listener = panorama.addListener("position_changed", updateMarkerVisibility);
-
-    return () => {
-      google.maps.event.removeListener(listener);
-    };
-  }, [ready, leads, updateMarkerVisibility]);
+  }
 
   return (
     <div className="relative h-full w-full">
-      {/* Street View */}
       <div ref={containerRef} className="h-full w-full" />
 
-      {/* Fixed sidebar popup panel */}
       {selectedLead && (
         <div className="absolute top-4 right-4 z-50 w-[340px] max-h-[calc(100%-2rem)] overflow-y-auto rounded-2xl shadow-2xl border border-gray-200">
-          {/* Close button */}
           <button
             onClick={() => setSelectedLead(null)}
             className="absolute top-2 right-2 z-10 w-7 h-7 flex items-center justify-center rounded-full bg-white/90 text-gray-500 hover:text-red-500 hover:bg-white shadow-md transition-all"
           >
             <span className="material-symbols-outlined text-[16px]">close</span>
           </button>
-          <PropertyPopup lead={selectedLead} onUpdate={() => { onDataChanged?.(); }} walkMode />
+          <PropertyPopup lead={selectedLead} onUpdate={() => onDataChanged?.()} walkMode />
         </div>
       )}
     </div>

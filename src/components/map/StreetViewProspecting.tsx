@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { APIProvider, useApiIsLoaded } from "@vis.gl/react-google-maps";
 import { Lead, STATUS_COLORS, LISTING_STATUS_COLORS } from "@/types";
 import PropertyPopup from "./PropertyPopup";
-import { createRoot } from "react-dom/client";
 
 interface Props {
   leads: Lead[];
@@ -13,21 +12,32 @@ interface Props {
 }
 
 const API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
+const VISIBILITY_RADIUS_METERS = 80; // Only show pins within this distance
+
+function getDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371000;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) *
+    Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
 
 function StreetViewInner({ leads, startPosition, onDataChanged }: Props) {
   const apiLoaded = useApiIsLoaded();
   const containerRef = useRef<HTMLDivElement>(null);
   const panoramaRef = useRef<google.maps.StreetViewPanorama | null>(null);
-  const markersRef = useRef<google.maps.Marker[]>([]);
-  const infoWindowRef = useRef<google.maps.InfoWindow | null>(null);
-  const popupRootRef = useRef<ReturnType<typeof createRoot> | null>(null);
+  const markersRef = useRef<{ marker: google.maps.Marker; lead: Lead }[]>([]);
   const [ready, setReady] = useState(false);
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
 
   // Initialize panorama
   useEffect(() => {
     if (!apiLoaded || !containerRef.current) return;
 
-    const defaultPos = startPosition || { lat: 36.3008, lng: -119.7828 }; // Lemoore center
+    const defaultPos = startPosition || { lat: 36.3008, lng: -119.7828 };
 
     const panorama = new google.maps.StreetViewPanorama(containerRef.current, {
       position: defaultPos,
@@ -42,27 +52,44 @@ function StreetViewInner({ leads, startPosition, onDataChanged }: Props) {
     });
 
     panoramaRef.current = panorama;
-    infoWindowRef.current = new google.maps.InfoWindow();
     setReady(true);
 
     return () => {
-      // Cleanup
-      markersRef.current.forEach((m) => m.setMap(null));
+      markersRef.current.forEach((m) => m.marker.setMap(null));
       markersRef.current = [];
-      infoWindowRef.current?.close();
     };
   }, [apiLoaded, startPosition]);
+
+  // Update marker visibility based on camera position
+  const updateMarkerVisibility = useCallback(() => {
+    const panorama = panoramaRef.current;
+    if (!panorama) return;
+
+    const pos = panorama.getPosition();
+    if (!pos) return;
+    const camLat = pos.lat();
+    const camLng = pos.lng();
+
+    markersRef.current.forEach(({ marker, lead }) => {
+      if (lead.latitude == null || lead.longitude == null) return;
+      const dist = getDistance(camLat, camLng, lead.latitude, lead.longitude);
+      const shouldShow = dist <= VISIBILITY_RADIUS_METERS;
+      if (shouldShow && !marker.getMap()) {
+        marker.setMap(panorama);
+      } else if (!shouldShow && marker.getMap()) {
+        marker.setMap(null);
+      }
+    });
+  }, []);
 
   // Place markers for leads
   useEffect(() => {
     if (!ready || !panoramaRef.current) return;
 
-    // Clear old markers
-    markersRef.current.forEach((m) => m.setMap(null));
+    markersRef.current.forEach((m) => m.marker.setMap(null));
     markersRef.current = [];
 
     const panorama = panoramaRef.current;
-    const infoWindow = infoWindowRef.current!;
 
     leads.forEach((lead) => {
       if (lead.latitude == null || lead.longitude == null) return;
@@ -74,7 +101,7 @@ function StreetViewInner({ leads, startPosition, onDataChanged }: Props) {
 
       const marker = new google.maps.Marker({
         position: { lat: lead.latitude, lng: lead.longitude },
-        map: panorama,
+        // Don't set map yet — updateMarkerVisibility will handle it
         title: lead.property_address || lead.name,
         icon: isMLS
           ? {
@@ -96,44 +123,42 @@ function StreetViewInner({ leads, startPosition, onDataChanged }: Props) {
       });
 
       marker.addListener("click", () => {
-        // Create popup content
-        const div = document.createElement("div");
-        div.style.maxHeight = "500px";
-        div.style.overflowY = "auto";
-
-        // Clean up previous root
-        if (popupRootRef.current) {
-          popupRootRef.current.unmount();
-        }
-
-        const root = createRoot(div);
-        popupRootRef.current = root;
-        root.render(
-          <PopupWrapper lead={lead} onUpdate={onDataChanged} walkMode />
-        );
-
-        infoWindow.setContent(div);
-        infoWindow.setOptions({ pixelOffset: new google.maps.Size(0, 20) }); // push below marker
-        infoWindow.open(panorama, marker);
+        setSelectedLead(lead);
       });
 
-      markersRef.current.push(marker);
+      markersRef.current.push({ marker, lead });
     });
-  }, [ready, leads, onDataChanged]);
+
+    // Initial visibility check
+    updateMarkerVisibility();
+
+    // Listen for position changes (walking)
+    const listener = panorama.addListener("position_changed", updateMarkerVisibility);
+
+    return () => {
+      google.maps.event.removeListener(listener);
+    };
+  }, [ready, leads, updateMarkerVisibility]);
 
   return (
-    <div ref={containerRef} className="h-full w-full" />
-  );
-}
+    <div className="relative h-full w-full">
+      {/* Street View */}
+      <div ref={containerRef} className="h-full w-full" />
 
-// Wrapper to provide profile context inside the InfoWindow (rendered outside React tree)
-import { ProfileProvider } from "@/lib/profile-context";
-
-function PopupWrapper({ lead, onUpdate, walkMode }: { lead: Lead; onUpdate?: () => void; walkMode?: boolean }) {
-  return (
-    <ProfileProvider>
-      <PropertyPopup lead={lead} onUpdate={onUpdate} walkMode={walkMode} />
-    </ProfileProvider>
+      {/* Fixed sidebar popup panel */}
+      {selectedLead && (
+        <div className="absolute top-4 right-4 z-50 w-[340px] max-h-[calc(100%-2rem)] overflow-y-auto rounded-2xl shadow-2xl border border-gray-200">
+          {/* Close button */}
+          <button
+            onClick={() => setSelectedLead(null)}
+            className="absolute top-2 right-2 z-10 w-7 h-7 flex items-center justify-center rounded-full bg-white/90 text-gray-500 hover:text-red-500 hover:bg-white shadow-md transition-all"
+          >
+            <span className="material-symbols-outlined text-[16px]">close</span>
+          </button>
+          <PropertyPopup lead={selectedLead} onUpdate={() => { onDataChanged?.(); }} walkMode />
+        </div>
+      )}
+    </div>
   );
 }
 

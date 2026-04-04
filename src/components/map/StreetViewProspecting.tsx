@@ -30,6 +30,11 @@ function StreetViewInner({ leads, startPosition, onDataChanged, onPositionChange
   const markersRef = useRef<google.maps.Marker[]>([]);
   const leadsRef = useRef<Lead[]>([]);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [popupPos, setPopupPos] = useState({ x: 16, y: 16 }); // top-right default
+  const [posLocked, setPosLocked] = useState(false);
+  const posLockedRef = useRef(false);
+  const [dragging, setDragging] = useState(false);
+  const dragOffset = useRef({ x: 0, y: 0 });
 
   // Keep leads ref in sync
   leadsRef.current = leads;
@@ -126,7 +131,10 @@ function StreetViewInner({ leads, startPosition, onDataChanged, onPositionChange
         } : undefined,
       });
 
-      marker.addListener("click", () => setSelectedLead(lead));
+      marker.addListener("click", () => {
+        setSelectedLead(lead);
+        if (!posLockedRef.current) setPopupPos({ x: 16, y: 80 });
+      });
       markersRef.current.push(marker);
     });
   }
@@ -136,13 +144,52 @@ function StreetViewInner({ leads, startPosition, onDataChanged, onPositionChange
       <div ref={containerRef} className="h-full w-full" />
 
       {selectedLead && (
-        <div className="absolute top-4 right-4 z-50 w-[340px] max-h-[calc(100%-2rem)] overflow-y-auto rounded-2xl shadow-2xl border border-gray-200">
-          <button
-            onClick={() => setSelectedLead(null)}
-            className="absolute top-2 right-2 z-10 w-7 h-7 flex items-center justify-center rounded-full bg-white/90 text-gray-500 hover:text-red-500 hover:bg-white shadow-md transition-all"
-          >
-            <span className="material-symbols-outlined text-[16px]">close</span>
-          </button>
+        <div
+          className="fixed z-50 w-[340px] max-h-[80vh] overflow-y-auto rounded-2xl shadow-2xl border border-gray-200 select-none"
+          style={{ right: `${popupPos.x}px`, top: `${popupPos.y}px` }}
+          onMouseDown={(e) => {
+            // Only drag from the header area (first 32px)
+            const rect = e.currentTarget.getBoundingClientRect();
+            if (e.clientY - rect.top > 36) return;
+            setDragging(true);
+            dragOffset.current = {
+              x: e.clientX + popupPos.x, // right-based
+              y: e.clientY - popupPos.y,
+            };
+            e.preventDefault();
+          }}
+          onMouseMove={(e) => {
+            if (!dragging) return;
+            setPopupPos({
+              x: dragOffset.current.x - e.clientX,
+              y: e.clientY - dragOffset.current.y,
+            });
+          }}
+          onMouseUp={() => setDragging(false)}
+          onMouseLeave={() => setDragging(false)}
+        >
+          {/* Drag handle + controls */}
+          <div className={`flex items-center justify-between px-3 py-1.5 bg-gray-100 rounded-t-2xl cursor-move ${dragging ? 'bg-blue-100' : ''}`}>
+            <div className="flex items-center gap-1 text-[10px] text-gray-400">
+              <span className="material-symbols-outlined text-[14px]">drag_indicator</span>
+              drag to move
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => { const next = !posLocked; setPosLocked(next); posLockedRef.current = next; }}
+                className={`w-6 h-6 flex items-center justify-center rounded-full transition-all ${posLocked ? 'bg-blue-100 text-blue-600' : 'text-gray-400 hover:bg-gray-200'}`}
+                title={posLocked ? 'Position locked — new pins open here' : 'Lock position'}
+              >
+                <span className="material-symbols-outlined text-[14px]">{posLocked ? 'lock' : 'lock_open'}</span>
+              </button>
+              <button
+                onClick={() => setSelectedLead(null)}
+                className="w-6 h-6 flex items-center justify-center rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all"
+              >
+                <span className="material-symbols-outlined text-[14px]">close</span>
+              </button>
+            </div>
+          </div>
           <PropertyPopup lead={selectedLead} onUpdate={() => onDataChanged?.()} walkMode />
         </div>
       )}

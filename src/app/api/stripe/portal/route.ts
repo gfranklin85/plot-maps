@@ -17,7 +17,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'No billing account found' }, { status: 400 });
   }
 
-  const origin = request.headers.get('origin') || 'https://plot-maps.vercel.app';
+  const origin = request.headers.get('origin') || 'https://app.plot.solutions';
 
   const session = await stripe.billingPortal.sessions.create({
     customer: profile.stripe_customer_id,

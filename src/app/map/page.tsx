@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
 import { Lead, LeadStatus, Priority } from "@/types";
 import MapDynamic from "@/components/map/MapDynamic";
-import RouteOptimizer from "@/components/map/RouteOptimizer";
+// RouteOptimizer removed — Walk Mode replaces route planning
 import StreetViewProspecting from "@/components/map/StreetViewProspecting";
 import PlacesSearch from "@/components/map/PlacesSearch";
 import { PRIORITIES } from "@/lib/constants";
@@ -47,7 +47,7 @@ export default function MapPage() {
   const [selectedSource, setSelectedSource] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [mapType, setMapType] = useState<'roadmap' | 'satellite' | 'hybrid'>('hybrid');
-  const [routePlannerOpen, setRoutePlannerOpen] = useState(false);
+  // Route planner removed — Walk Mode replaces it
   const [listingFilter, setListingFilter] = useState<string>('all');
   const [walkMode, setWalkMode] = useState(false);
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(null);
@@ -236,14 +236,7 @@ export default function MapPage() {
           {walkMode ? 'Back to Map' : 'Walk Mode'}
         </button>
 
-        {/* Plan Route button */}
-        <button
-          onClick={() => setRoutePlannerOpen(true)}
-          className="flex items-center gap-1.5 rounded-full action-gradient px-3 py-2 text-xs font-medium text-on-primary shadow-lg transition-all hover:shadow-xl"
-        >
-          <span className="material-symbols-rounded text-[18px]">route</span>
-          Plan Route
-        </button>
+        {/* Plan Route removed — Walk Mode replaces it */}
 
         {/* Toggle filters button */}
         <button
@@ -498,18 +491,21 @@ export default function MapPage() {
           onPositionChanged={setMapCenter}
         />
       ) : (
-        <MapDynamic leads={filteredLeads} mapType={mapType} onCenterChanged={setMapCenter} center={mapCenter} />
+        <MapDynamic
+          leads={filteredLeads}
+          mapType={mapType}
+          onCenterChanged={setMapCenter}
+          center={mapCenter}
+          onWalkHere={(lead) => {
+            if (lead.latitude && lead.longitude) {
+              setMapCenter({ lat: lead.latitude, lng: lead.longitude });
+              setWalkMode(true);
+            }
+          }}
+        />
       )}
 
-      {/* Route Planner Panel */}
-      {routePlannerOpen && (
-        <div className="fixed top-0 right-0 z-50 h-full w-96 bg-white shadow-2xl overflow-y-auto">
-          <RouteOptimizer
-            leads={filteredLeads}
-            onClose={() => setRoutePlannerOpen(false)}
-          />
-        </div>
-      )}
+      {/* Route Planner removed */}
     </div>
   );
 }

@@ -7,41 +7,26 @@ interface Props {
   className?: string;
 }
 
-const API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
-
 export default function PlacesSearch({ onPlaceSelected, className }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
-  const [loaded, setLoaded] = useState(false);
+  const [retries, setRetries] = useState(0);
 
-  // Load Google Places library
   useEffect(() => {
-    if (typeof google !== 'undefined' && google.maps?.places) {
-      setLoaded(true);
+    if (!inputRef.current || autocompleteRef.current) return;
+
+    // Google Maps API may not be loaded yet (loaded by MapView)
+    // Retry until it's available
+    if (!window.google?.maps?.places) {
+      if (retries < 20) {
+        const timer = setTimeout(() => setRetries(r => r + 1), 500);
+        return () => clearTimeout(timer);
+      }
       return;
     }
-
-    // Check if script already exists
-    const existing = document.querySelector(`script[src*="maps.googleapis.com/maps/api/js"]`);
-    if (existing) {
-      existing.addEventListener('load', () => setLoaded(true));
-      if ((window as unknown as Record<string, unknown>).google) setLoaded(true);
-      return;
-    }
-
-    const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${API_KEY}&libraries=places`;
-    script.async = true;
-    script.onload = () => setLoaded(true);
-    document.head.appendChild(script);
-  }, []);
-
-  // Initialize autocomplete
-  useEffect(() => {
-    if (!loaded || !inputRef.current || autocompleteRef.current) return;
 
     const autocomplete = new google.maps.places.Autocomplete(inputRef.current, {
-      types: ['address', 'geocode'],
+      types: ['geocode'],
       componentRestrictions: { country: 'us' },
       fields: ['geometry', 'formatted_address'],
     });
@@ -59,7 +44,7 @@ export default function PlacesSearch({ onPlaceSelected, className }: Props) {
     });
 
     autocompleteRef.current = autocomplete;
-  }, [loaded, onPlaceSelected]);
+  }, [retries, onPlaceSelected]);
 
   return (
     <div className={`relative ${className || ''}`}>

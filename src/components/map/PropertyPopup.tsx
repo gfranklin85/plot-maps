@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Lead, STATUS_BG_COLORS, CallOutcome, LeadStatus } from "@/types";
+import { Lead, CallOutcome, LeadStatus } from "@/types";
 import MaterialIcon from "@/components/ui/MaterialIcon";
 import { cn, formatPhone } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
@@ -12,6 +12,7 @@ interface Props {
   lead: Lead;
   onUpdate?: () => void;
   walkMode?: boolean;
+  onWalkHere?: (lead: Lead) => void;
 }
 
 const OUTCOME_STATUS: Partial<Record<CallOutcome, LeadStatus>> = {
@@ -23,7 +24,7 @@ const OUTCOME_STATUS: Partial<Record<CallOutcome, LeadStatus>> = {
   'DNC': 'Do Not Call',
 };
 
-const API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
+// Street View Static API removed — using Walk Here button instead
 
 function fillScript(template: string, lead: Lead): string {
   const name = lead.owner_name || lead.name || 'there';
@@ -108,7 +109,7 @@ function generateTalkingPoints(lead: Lead): string[] {
   return points;
 }
 
-export default function PropertyPopup({ lead, onUpdate, walkMode = false }: Props) {
+export default function PropertyPopup({ lead, onUpdate, walkMode = false, onWalkHere }: Props) {
   const { profile } = useProfile();
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
@@ -123,10 +124,6 @@ export default function PropertyPopup({ lead, onUpdate, walkMode = false }: Prop
   const isSold = lead.listing_status === 'Sold';
   const isActive = lead.listing_status === 'Active';
   const isPending = lead.listing_status === 'Pending';
-
-  const streetViewUrl = lead.property_address
-    ? `https://maps.googleapis.com/maps/api/streetview?size=400x180&location=${encodeURIComponent(lead.property_address)}&key=${API_KEY}`
-    : '';
 
   const talkingPoints = isMLS ? generateTalkingPoints(lead) : [];
 
@@ -160,40 +157,16 @@ export default function PropertyPopup({ lead, onUpdate, walkMode = false }: Prop
 
   return (
     <div className={cn("bg-white rounded-2xl overflow-hidden", walkMode ? "min-w-[280px] max-w-[320px]" : "min-w-[360px] max-w-[400px]")}>
-      {/* ─── STREET VIEW THUMBNAIL (hidden in walk mode — you're already looking at it) ─── */}
-      {streetViewUrl && !walkMode && (
-        <div className="relative h-[140px] bg-gray-200 overflow-hidden">
-          <img
-            src={streetViewUrl}
-            alt="Street view"
-            className="w-full h-full object-cover"
-            loading="eager"
-          />
-          {/* Status badge overlay */}
-          <div className="absolute top-2 left-2">
-            {isMLS ? (
-              <span className={cn("inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-black uppercase tracking-wide shadow-lg",
-                isSold ? 'bg-green-600 text-white' : isActive ? 'bg-orange-500 text-white' : 'bg-yellow-500 text-white'
-              )}>
-                {lead.listing_status}
-              </span>
-            ) : (
-              <span className={cn("inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-black uppercase tracking-wide shadow-lg", STATUS_BG_COLORS[lead.status])}>
-                {lead.status}
-              </span>
-            )}
-          </div>
-          {/* Price overlay */}
-          {isSold && lead.selling_price && (
-            <div className="absolute top-2 right-2 bg-green-600 text-white rounded-full px-2.5 py-1 text-[11px] font-black shadow-lg">
-              Sold ${lead.selling_price.toLocaleString()}
-            </div>
-          )}
-          {isActive && lead.listing_price && (
-            <div className="absolute top-2 right-2 bg-orange-500 text-white rounded-full px-2.5 py-1 text-[11px] font-black shadow-lg">
-              ${lead.listing_price.toLocaleString()}
-            </div>
-          )}
+      {/* ─── Walk Here button (aerial mode only) ─── */}
+      {!walkMode && onWalkHere && lead.latitude != null && lead.longitude != null && (
+        <div className="px-4 pt-3 pb-1">
+          <button
+            onClick={() => onWalkHere(lead)}
+            className="w-full flex items-center justify-center gap-2 py-2 rounded-lg bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 transition-colors"
+          >
+            <span className="material-symbols-outlined text-[16px]">streetview</span>
+            Walk Here
+          </button>
         </div>
       )}
 

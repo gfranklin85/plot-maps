@@ -1,16 +1,18 @@
+'use client';
+
 import Link from 'next/link';
 
 export default function LandingPage() {
   return (
-    <div className="bg-[#0c1324] text-[#dce1fb] min-h-screen font-body selection:bg-indigo-500/30">
+    <div className="bg-[#0c1324] text-[#dce1fb] min-h-screen font-body selection:bg-indigo-500/30 scroll-smooth">
       {/* Top Navigation */}
       <header className="fixed top-0 w-full z-50 bg-[#0c1324]/80 backdrop-blur-xl shadow-[0_8px_30px_rgb(0,0,0,0.12)]">
         <nav className="flex justify-between items-center px-8 py-4 max-w-screen-2xl mx-auto">
           <div className="text-2xl font-black tracking-tighter text-indigo-100 font-headline">Plot Maps</div>
           <div className="hidden md:flex items-center gap-8">
-            <a className="text-indigo-400 font-semibold border-b-2 border-indigo-500 pb-1 font-headline" href="#features">Features</a>
-            <a className="text-slate-400 font-medium hover:text-indigo-200 transition-colors font-headline" href="#pricing">Pricing</a>
-            <a className="text-slate-400 font-medium hover:text-indigo-200 transition-colors font-headline" href="#use-cases">Use Cases</a>
+            <button onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })} className="text-indigo-400 font-semibold border-b-2 border-indigo-500 pb-1 font-headline">Features</button>
+            <Link className="text-slate-400 font-medium hover:text-indigo-200 transition-colors font-headline" href="/subscribe">Pricing</Link>
+            <button onClick={() => document.getElementById('use-cases')?.scrollIntoView({ behavior: 'smooth' })} className="text-slate-400 font-medium hover:text-indigo-200 transition-colors font-headline">Use Cases</button>
             <Link className="text-slate-400 font-medium hover:text-indigo-200 transition-colors font-headline" href="/login">Sign In</Link>
           </div>
           <Link href="/signup" className="bg-gradient-to-br from-indigo-400 to-indigo-600 text-white px-6 py-2.5 rounded-lg font-bold font-headline scale-95 hover:scale-100 transition-all duration-300">

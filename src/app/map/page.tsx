@@ -6,7 +6,7 @@ import { Lead, LeadStatus, Priority } from "@/types";
 import MapDynamic from "@/components/map/MapDynamic";
 import RouteOptimizer from "@/components/map/RouteOptimizer";
 import StreetViewProspecting from "@/components/map/StreetViewProspecting";
-import SearchInput from "@/components/ui/SearchInput";
+import PlacesSearch from "@/components/map/PlacesSearch";
 import { PRIORITIES } from "@/lib/constants";
 
 const FILTER_TABS: { label: string; key: string; statuses: LeadStatus[] }[] = [
@@ -172,9 +172,11 @@ export default function MapPage() {
       {/* Search overlay */}
       <div className="absolute top-4 left-4 right-4 z-10 flex items-center gap-3">
         <div className="flex-1 max-w-md">
-          <SearchInput
-            placeholder="Search area or address..."
-            onChange={setSearch}
+          <PlacesSearch
+            onPlaceSelected={(place) => {
+              setMapCenter({ lat: place.lat, lng: place.lng });
+              setSearch(place.address);
+            }}
             className="shadow-lg"
           />
         </div>
@@ -422,6 +424,27 @@ export default function MapPage() {
                 })}
               </div>
             )}
+          </div>
+
+          {/* Property Type filter */}
+          <div>
+            <label className="text-[10px] uppercase tracking-widest text-slate-500 mb-1 block">
+              Property Type
+            </label>
+            <select
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+            >
+              <option value="">All Types</option>
+              <option value="Multi-Family">Multi-Family</option>
+              <option value="Apartment">Apartments</option>
+              <option value="Duplex">Duplex</option>
+              <option value="Triplex">Triplex</option>
+              <option value="Land">Vacant Land</option>
+              <option value="Residential">Residential</option>
+              <option value="Commercial">Commercial</option>
+            </select>
           </div>
 
           {/* Reset inside panel */}

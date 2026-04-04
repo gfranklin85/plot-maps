@@ -160,6 +160,31 @@ export default function Dashboard() {
   // Avg calls per day (total calls / 5 workdays as rough estimate)
   const avgCallsDay = callsToday > 0 ? callsToday : 0;
 
+  // New user onboarding — no leads yet
+  if (!loading && totalLeads === 0) {
+    return (
+      <div className="p-8 flex flex-col items-center justify-center min-h-[60vh]">
+        <div className="max-w-lg text-center">
+          <MaterialIcon icon="rocket_launch" className="text-[72px] text-blue-500 mb-4" />
+          <h2 className="font-headline text-3xl font-extrabold text-on-surface mb-3">Welcome to Plot Maps!</h2>
+          <p className="text-secondary text-lg mb-8">
+            Get started by importing your property list. Upload a CSV from PropWire, BatchLeads, MLS, or any source with addresses.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <a href="/imports" className="flex items-center justify-center gap-2 rounded-xl action-gradient px-8 py-4 text-lg font-bold text-white hover:shadow-lg transition-shadow">
+              <MaterialIcon icon="upload_file" className="text-[22px]" />
+              Import Your First List
+            </a>
+            <a href="/map" className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-8 py-4 text-lg font-bold text-slate-700 hover:bg-slate-50 transition-colors">
+              <MaterialIcon icon="map" className="text-[22px]" />
+              Explore the Map
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-8">
       {/* Page header */}

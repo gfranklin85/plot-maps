@@ -78,12 +78,29 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <p className="text-sm text-slate-500 text-center mt-6">
-            Don&apos;t have an account?{' '}
-            <Link href="/signup" className="text-blue-600 font-bold hover:underline">
-              Start free trial
-            </Link>
-          </p>
+          <div className="text-center mt-6 space-y-2">
+            <p className="text-sm text-slate-500">
+              Don&apos;t have an account?{' '}
+              <Link href="/signup" className="text-blue-600 font-bold hover:underline">
+                Start free trial
+              </Link>
+            </p>
+            <button
+              type="button"
+              onClick={async () => {
+                if (!email) { setError('Enter your email first'); return; }
+                const { error } = await supabase.auth.resetPasswordForEmail(email, {
+                  redirectTo: `${window.location.origin}/auth/callback?next=/settings`,
+                });
+                if (error) setError(error.message);
+                else setError('');
+                alert('If that email exists, a password reset link has been sent.');
+              }}
+              className="text-xs text-slate-400 hover:text-blue-500 transition-colors"
+            >
+              Forgot your password?
+            </button>
+          </div>
         </div>
       </div>
     </div>

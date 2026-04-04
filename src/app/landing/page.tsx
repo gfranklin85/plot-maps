@@ -11,7 +11,7 @@ export default function LandingPage() {
           <div className="text-2xl font-black tracking-tighter text-indigo-100 font-headline">Plot Maps</div>
           <div className="hidden md:flex items-center gap-8">
             <button onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })} className="text-indigo-400 font-semibold border-b-2 border-indigo-500 pb-1 font-headline">Features</button>
-            <Link className="text-slate-400 font-medium hover:text-indigo-200 transition-colors font-headline" href="/subscribe">Pricing</Link>
+            <button onClick={() => document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' })} className="text-slate-400 font-medium hover:text-indigo-200 transition-colors font-headline">Pricing</button>
             <button onClick={() => document.getElementById('use-cases')?.scrollIntoView({ behavior: 'smooth' })} className="text-slate-400 font-medium hover:text-indigo-200 transition-colors font-headline">Use Cases</button>
             <Link className="text-slate-400 font-medium hover:text-indigo-200 transition-colors font-headline" href="/login">Sign In</Link>
           </div>
@@ -220,6 +220,80 @@ export default function LandingPage() {
                   <p className="text-sm text-slate-400">{item.desc}</p>
                 </div>
               ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Pricing */}
+        <section id="pricing" className="py-24 bg-[#151b2d]">
+          <div className="max-w-5xl mx-auto px-8">
+            <div className="text-center mb-16">
+              <h2 className="text-3xl lg:text-5xl font-headline font-extrabold mb-4">Simple pricing. No surprises.</h2>
+              <p className="text-slate-400 text-lg">14-day free trial. No credit card required.</p>
+            </div>
+            <div className="grid md:grid-cols-2 gap-8">
+              {/* Starter */}
+              <div className="bg-[#0c1324] rounded-2xl p-8 border border-slate-700/10">
+                <h3 className="text-2xl font-bold">Starter</h3>
+                <div className="mt-4 flex items-baseline gap-1">
+                  <span className="text-5xl font-extrabold">$49</span>
+                  <span className="text-slate-500">/month</span>
+                </div>
+                <ul className="mt-8 space-y-4">
+                  {[
+                    'Interactive 3D Map View',
+                    'Walk Mode — Street View Prospecting',
+                    'Import your own property lists',
+                    'MLS data overlay (Sold / Active / Pending)',
+                    'Call scripts & notes',
+                    'AI follow-up suggestions',
+                    'Manual dialing (use your phone)',
+                    '500 geocodes / month',
+                  ].map((f) => (
+                    <li key={f} className="flex items-start gap-3 text-sm">
+                      <span className="material-symbols-outlined text-emerald-400 text-[16px] mt-0.5 shrink-0">check_circle</span>
+                      <span className="text-slate-300">{f}</span>
+                    </li>
+                  ))}
+                </ul>
+                <Link href="/signup" className="block w-full text-center mt-8 py-3 rounded-xl bg-[#23293c] text-white font-bold hover:bg-[#2e3447] transition-colors">
+                  Start Free Trial
+                </Link>
+              </div>
+              {/* Pro */}
+              <div className="bg-[#0c1324] rounded-2xl p-8 border-2 border-indigo-500 relative">
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-indigo-600 text-white text-xs font-bold px-4 py-1 rounded-full">
+                  Most Popular
+                </div>
+                <h3 className="text-2xl font-bold">Pro</h3>
+                <div className="mt-4 flex items-baseline gap-1">
+                  <span className="text-5xl font-extrabold">$79</span>
+                  <span className="text-slate-500">/month</span>
+                </div>
+                <ul className="mt-8 space-y-4">
+                  {[
+                    'Everything in Starter, plus:',
+                    'Browser Dialer — click to call from the app',
+                    'Local phone number included',
+                    'Call recording',
+                    'Full call analytics dashboard',
+                    '1,000 calling minutes / month',
+                    '2,000 geocodes / month',
+                    'Unlimited street view loads',
+                    'Priority support',
+                  ].map((f, i) => (
+                    <li key={f} className="flex items-start gap-3 text-sm">
+                      <span className={`material-symbols-outlined text-[16px] mt-0.5 shrink-0 ${i === 0 ? 'text-indigo-400' : 'text-emerald-400'}`}>
+                        {i === 0 ? 'star' : 'check_circle'}
+                      </span>
+                      <span className={i === 0 ? 'text-white font-bold' : 'text-slate-300'}>{f}</span>
+                    </li>
+                  ))}
+                </ul>
+                <Link href="/signup" className="block w-full text-center mt-8 py-3 rounded-xl bg-gradient-to-br from-indigo-400 to-indigo-600 text-white font-bold hover:shadow-[0_0_20px_rgba(195,192,255,0.3)] transition-all">
+                  Start Free Trial
+                </Link>
+              </div>
             </div>
           </div>
         </section>

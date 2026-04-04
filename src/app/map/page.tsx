@@ -46,7 +46,7 @@ export default function MapPage() {
   const [selectedPriority, setSelectedPriority] = useState<Priority | "">("");
   const [selectedSource, setSelectedSource] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [mapType, setMapType] = useState<'roadmap' | 'satellite' | 'hybrid'>('roadmap');
+  const [mapType, setMapType] = useState<'roadmap' | 'satellite' | 'hybrid'>('hybrid');
   const [routePlannerOpen, setRoutePlannerOpen] = useState(false);
   const [listingFilter, setListingFilter] = useState<string>('all');
   const [walkMode, setWalkMode] = useState(false);
@@ -472,9 +472,10 @@ export default function MapPage() {
         <StreetViewProspecting
           leads={filteredLeads}
           startPosition={mapCenter || undefined}
+          onPositionChanged={setMapCenter}
         />
       ) : (
-        <MapDynamic leads={filteredLeads} mapType={mapType} onCenterChanged={setMapCenter} />
+        <MapDynamic leads={filteredLeads} mapType={mapType} onCenterChanged={setMapCenter} center={mapCenter} />
       )}
 
       {/* Route Planner Panel */}

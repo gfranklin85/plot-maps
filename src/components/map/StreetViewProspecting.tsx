@@ -9,6 +9,7 @@ interface Props {
   leads: Lead[];
   startPosition?: { lat: number; lng: number };
   onDataChanged?: () => void;
+  onPositionChanged?: (pos: { lat: number; lng: number }) => void;
 }
 
 const API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
@@ -25,7 +26,7 @@ function getDistance(lat1: number, lng1: number, lat2: number, lng2: number): nu
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-function StreetViewInner({ leads, startPosition, onDataChanged }: Props) {
+function StreetViewInner({ leads, startPosition, onDataChanged, onPositionChanged }: Props) {
   const apiLoaded = useApiIsLoaded();
   const containerRef = useRef<HTMLDivElement>(null);
   const panoramaRef = useRef<google.maps.StreetViewPanorama | null>(null);
@@ -80,7 +81,10 @@ function StreetViewInner({ leads, startPosition, onDataChanged }: Props) {
         marker.setMap(null);
       }
     });
-  }, []);
+
+    // Report position back so map can center here when exiting walk mode
+    onPositionChanged?.({ lat: camLat, lng: camLng });
+  }, [onPositionChanged]);
 
   // Place markers for leads
   useEffect(() => {
@@ -99,27 +103,29 @@ function StreetViewInner({ leads, startPosition, onDataChanged }: Props) {
         ? (LISTING_STATUS_COLORS[lead.listing_status!] || "#6b7280")
         : (STATUS_COLORS[lead.status] || "#3b82f6");
 
+      // Larger, more visible markers for street view
       const marker = new google.maps.Marker({
         position: { lat: lead.latitude, lng: lead.longitude },
-        // Don't set map yet — updateMarkerVisibility will handle it
         title: lead.property_address || lead.name,
-        icon: isMLS
-          ? {
-              path: "M 0,-14 L 10,0 L 0,14 L -10,0 Z",
-              scale: 1,
-              fillColor: color,
-              fillOpacity: 1,
-              strokeColor: "#ffffff",
-              strokeWeight: 2,
-            }
-          : {
-              path: google.maps.SymbolPath.CIRCLE,
-              scale: 12,
-              fillColor: color,
-              fillOpacity: 1,
-              strokeColor: "#ffffff",
-              strokeWeight: 3,
-            },
+        label: {
+          text: isMLS
+            ? (lead.listing_status === 'Sold' ? '$ SOLD' : lead.listing_status === 'Active' ? 'FOR SALE' : 'PENDING')
+            : '●',
+          color: '#ffffff',
+          fontSize: isMLS ? '10px' : '14px',
+          fontWeight: 'bold',
+        },
+        icon: {
+          path: isMLS
+            ? "M -20,-12 L 20,-12 L 20,12 L -20,12 Z" // rectangle for MLS
+            : google.maps.SymbolPath.CIRCLE,
+          scale: isMLS ? 1 : 16,
+          fillColor: color,
+          fillOpacity: 0.95,
+          strokeColor: "#ffffff",
+          strokeWeight: 3,
+          labelOrigin: isMLS ? new google.maps.Point(0, 0) : new google.maps.Point(0, 0),
+        },
       });
 
       marker.addListener("click", () => {
@@ -162,10 +168,10 @@ function StreetViewInner({ leads, startPosition, onDataChanged }: Props) {
   );
 }
 
-export default function StreetViewProspecting({ leads, startPosition, onDataChanged }: Props) {
+export default function StreetViewProspecting({ leads, startPosition, onDataChanged, onPositionChanged }: Props) {
   return (
     <APIProvider apiKey={API_KEY}>
-      <StreetViewInner leads={leads} startPosition={startPosition} onDataChanged={onDataChanged} />
+      <StreetViewInner leads={leads} startPosition={startPosition} onDataChanged={onDataChanged} onPositionChanged={onPositionChanged} />
     </APIProvider>
   );
 }

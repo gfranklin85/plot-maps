@@ -17,6 +17,7 @@ interface Props {
   onLeadClick?: (id: string) => void;
   onDataChanged?: () => void;
   onCenterChanged?: (center: { lat: number; lng: number }) => void;
+  center?: { lat: number; lng: number } | null;
   mapType?: "roadmap" | "satellite" | "hybrid" | "terrain";
 }
 
@@ -167,7 +168,7 @@ function LeadMarkers({
   return null;
 }
 
-export default function MapView({ leads, onLeadClick, onDataChanged, onCenterChanged, mapType = "roadmap" }: Props) {
+export default function MapView({ leads, onLeadClick, onDataChanged, onCenterChanged, center, mapType = "roadmap" }: Props) {
   const isSatellite = mapType === "satellite" || mapType === "hybrid";
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
 
@@ -186,8 +187,8 @@ export default function MapView({ leads, onLeadClick, onDataChanged, onCenterCha
   return (
     <APIProvider apiKey={API_KEY}>
       <Map
-        defaultCenter={MAP_CENTER}
-        defaultZoom={MAP_ZOOM}
+        defaultCenter={center || MAP_CENTER}
+        defaultZoom={center ? 18 : MAP_ZOOM}
         className="h-full w-full"
         disableDefaultUI
         zoomControl

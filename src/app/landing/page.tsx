@@ -44,41 +44,7 @@ export default function LandingPage() {
             </div>
             <div className="relative">
               <div className="bg-[#151b2d] rounded-xl p-2 border border-slate-700/10 shadow-2xl relative overflow-hidden aspect-[4/3]">
-                <img className="w-full h-full object-cover rounded-lg opacity-80" alt="Modern dark mode satellite map interface" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCcKIQjj7ghvniz3cy8nS2X4rxK-aMqfkYOCNqXxyx327e29uoENFt8aMKWcmlA4em7rbYtzAcHHAHGPgpgkV2QBq2eX1YeFCbw4k_zuXfmc16uk2_0fXYAoqInbUCJtTFQrPZhrJOQ80alkw3y7zcrIDsEg71faWsBH8fFlfIybzoExGmnlJPvOLIaAZi1Lc7wF_r3wkxHzbFjwb2BzK7w4ALD1zxKCDgKPVbtt4O4gQLm8JInK4N67u5MB3HMP5NEyuYagpgyWtY" />
-                {/* Floating Call Cockpit */}
-                <div className="absolute top-8 right-8 w-64 backdrop-blur-xl bg-[#2e3447]/40 rounded-xl p-4 border border-slate-700/20 shadow-2xl">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center">
-                      <span className="material-symbols-outlined text-white" style={{ fontVariationSettings: "'FILL' 1" }}>call</span>
-                    </div>
-                    <div>
-                      <div className="text-xs font-bold text-indigo-400 uppercase tracking-widest">Active Call</div>
-                      <div className="text-sm font-semibold">Robert J. Smith</div>
-                    </div>
-                  </div>
-                  <div className="space-y-2 mb-4">
-                    <div className="h-2 w-full bg-[#2e3447] rounded-full overflow-hidden">
-                      <div className="h-full w-2/3 bg-indigo-400"></div>
-                    </div>
-                    <div className="text-[10px] text-slate-500">02:45 • Intro Script Active</div>
-                  </div>
-                  <button className="w-full py-2 bg-red-900 text-white rounded-lg text-xs font-bold">End Prospecting</button>
-                </div>
-                {/* Info Lens */}
-                <div className="absolute bottom-8 left-8 backdrop-blur-xl bg-[#2e3447]/40 rounded-xl p-5 border border-slate-700/20 shadow-2xl max-w-[280px]">
-                  <h4 className="font-headline font-bold mb-1">1248 Oak Creek Dr.</h4>
-                  <p className="text-xs text-slate-500 mb-4">Potential Flip • Vacant 2 years</p>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <div className="text-[10px] uppercase tracking-tighter text-slate-500">Est. Value</div>
-                      <div className="text-sm font-bold text-indigo-400">$842k</div>
-                    </div>
-                    <div>
-                      <div className="text-[10px] uppercase tracking-tighter text-slate-500">Equity</div>
-                      <div className="text-sm font-bold text-orange-400">64%</div>
-                    </div>
-                  </div>
-                </div>
+                <img className="w-full h-full object-cover rounded-lg" alt="Plot Maps Street View prospecting with property popup" src="/hero-streetview.jpg" />
               </div>
             </div>
           </div>
@@ -165,7 +131,7 @@ export default function LandingPage() {
                   <p className="text-slate-400">Every property becomes a clickable pin. Track your entire pipeline geographically. See patterns others miss.</p>
                 </div>
                 <div className="mt-8 overflow-hidden rounded-xl h-48 bg-[#0c1324]">
-                  <img className="w-full h-full object-cover opacity-60" alt="Map-based CRM visualization" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCsX_Oti1jlPIPvBJJYXj_YkCVbsUKucFNR_XiQN13TjWEN-3IZ6ZPliC4Nh_wpoeHqjxQckSZi08SoM9YoVFpQNRXbgfvwk79j-w2nRwRv76cXeeZRWsExoxNZShKThbclheqNtuGQbPdGOD9-XMkpCGppJ79VXgGlwqOh9J-Ce1CB29C4zwxY33C2YP-pemiNJWuysT2u3q9aCTe1f76ygy4hNQbnjNHGAfVTZW7fp0gZ8MEZVv_iXwJ_aSb9bUjAnImoEbKKoew" />
+                  <img className="w-full h-full object-cover" alt="Plot Maps aerial view with 941 property pins" src="/hero-map.jpg" />
                 </div>
               </div>
               <div className="md:col-span-3 bg-[#23293c] rounded-2xl p-8 flex flex-col border border-slate-700/5">
@@ -174,21 +140,17 @@ export default function LandingPage() {
                   <h3 className="text-2xl font-bold mt-4 mb-4">Call Cockpit</h3>
                   <p className="text-slate-400">Integrated dialer with dynamic scripts and rapid-fire logging. Never lose your place in a neighborhood again.</p>
                 </div>
-                <div className="mt-8 flex gap-4">
-                  <div className="flex-1 h-32 bg-[#0c1324] rounded-lg flex items-center justify-center border border-indigo-500/20">
-                    <span className="material-symbols-outlined text-indigo-400 text-4xl">mic</span>
-                  </div>
-                  <div className="flex-[2] h-32 bg-[#0c1324] rounded-lg p-4 space-y-2 border border-slate-700/10">
-                    <div className="h-2 w-full bg-[#2e3447] rounded"></div>
-                    <div className="h-2 w-3/4 bg-[#2e3447] rounded"></div>
-                    <div className="h-2 w-1/2 bg-[#2e3447] rounded"></div>
-                  </div>
+                <div className="mt-8 overflow-hidden rounded-xl h-48 bg-[#0c1324]">
+                  <img className="w-full h-full object-cover" alt="Plot Maps Walk Here popup with property data" src="/hero-walkhere.png" />
                 </div>
               </div>
-              <div className="md:col-span-2 bg-gradient-to-br from-indigo-600/40 to-[#23293c] rounded-2xl p-8 border border-indigo-500/10">
+              <div className="md:col-span-2 bg-gradient-to-br from-indigo-600/40 to-[#23293c] rounded-2xl p-8 border border-indigo-500/10 flex flex-col">
                 <span className="bg-white/10 text-white px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest">The Game Changer</span>
                 <h3 className="text-2xl font-bold mt-4 mb-4">Walk Mode</h3>
-                <p className="text-slate-400">Virtually walk neighborhoods with Street View. Call while you &quot;stroll&quot; to add visual detail to every pitch.</p>
+                <p className="text-slate-400 mb-4">Virtually walk neighborhoods with Street View. Call while you &quot;stroll&quot; to add visual detail to every pitch.</p>
+                <div className="mt-auto overflow-hidden rounded-xl h-36 bg-[#0c1324]">
+                  <img className="w-full h-full object-cover object-top" alt="Plot Maps Dashboard" src="/hero-dashboard.png" />
+                </div>
               </div>
               <div className="md:col-span-2 bg-[#23293c] rounded-2xl p-8 border border-slate-700/5">
                 <h3 className="text-xl font-bold mb-4">Market Intelligence</h3>
@@ -301,7 +263,7 @@ export default function LandingPage() {
         {/* Final CTA */}
         <section className="py-32 bg-gradient-to-t from-[#070d1f] to-[#0c1324] relative overflow-hidden">
           <div className="absolute inset-0 opacity-10">
-            <img className="w-full h-full object-cover" alt="" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB5I3lYfnCULeCN9GFjMBOcaM3snY2PG5mjaiuN4rU8NskTS84BajR3318zBNaFlvMNjqvEl1pAspymPMJEOznDLiINM8JhnEn7pA9k1jK4bsFEqUfFW-xjBC-S7T6LQLqVDM-YJYT5Pr2vi234KSsC2YJJ62UcOLDhAudpyP6ODZmftSZHKnQEqNCppU3B_TtdUj5b28rR7bbAn70aUgqsMn1zJK9f_xRic84n_bFUpZ7Rb-Ac7I27erVbZVjlcqNg3r7be0RYXHk" />
+            <img className="w-full h-full object-cover" alt="" src="/hero-map.jpg" />
           </div>
           <div className="max-w-4xl mx-auto px-8 relative z-10 text-center">
             <h2 className="text-4xl lg:text-6xl font-headline font-extrabold mb-6">Stop prospecting blind.</h2>

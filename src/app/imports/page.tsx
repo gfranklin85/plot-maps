@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import { IMPORT_SYSTEM_FIELDS, LEAD_STATUSES } from '@/lib/constants';
 import type { ImportTemplate } from '@/types';
 import MaterialIcon from '@/components/ui/MaterialIcon';
+import ImportProgress from '@/components/ui/ImportProgress';
 
 /* ---------- local types ---------- */
 type Tab = 'ai' | 'csv' | 'mls';
@@ -864,55 +865,11 @@ export default function ImportsPage() {
 
           {/* AI Import Progress */}
           {aiImporting && (
-            <div className="glass-card rounded-2xl p-6">
-              <h3 className="font-headline text-lg font-bold text-on-surface mb-4">
-                Importing...
-              </h3>
-
-              <div className="mb-4">
-                <div className="mb-1 flex justify-between text-sm">
-                  <span className="text-slate-600">
-                    Importing... {aiImportProgress}/{aiImportTotal}
-                  </span>
-                  <span className="font-semibold text-blue-600">
-                    {aiImportTotal > 0
-                      ? Math.round((aiImportProgress / aiImportTotal) * 100)
-                      : 0}
-                    %
-                  </span>
-                </div>
-                <div className="h-3 overflow-hidden rounded-full bg-slate-200">
-                  <div
-                    className="h-full rounded-full bg-gradient-to-r from-blue-500 to-blue-400 transition-all duration-300"
-                    style={{
-                      width: `${aiImportTotal > 0 ? (aiImportProgress / aiImportTotal) * 100 : 0}%`,
-                    }}
-                  />
-                </div>
-              </div>
-
-              {aiGeocodeTotal > 0 && (
-                <div>
-                  <div className="mb-1 flex justify-between text-sm">
-                    <span className="text-slate-600">
-                      Geocoding... {aiGeocodeProgress}/{aiGeocodeTotal}
-                    </span>
-                    <span className="font-semibold text-emerald-600">
-                      {Math.round(
-                        (aiGeocodeProgress / aiGeocodeTotal) * 100
-                      )}
-                      %
-                    </span>
-                  </div>
-                  <div className="h-3 overflow-hidden rounded-full bg-slate-200">
-                    <div
-                      className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-400 transition-all duration-300"
-                      style={{
-                        width: `${(aiGeocodeProgress / aiGeocodeTotal) * 100}%`,
-                      }}
-                    />
-                  </div>
-                </div>
+            <div className="space-y-4">
+              {aiGeocodeTotal > 0 ? (
+                <ImportProgress current={aiGeocodeProgress} total={aiGeocodeTotal} phase="geocoding" label="Pinpointing properties on the map..." />
+              ) : (
+                <ImportProgress current={aiImportProgress} total={aiImportTotal} phase="processing" label="AI is parsing your data..." />
               )}
             </div>
           )}
@@ -1586,57 +1543,11 @@ export default function ImportsPage() {
           {csvStep === 'import' && (
             <div className="mx-auto max-w-2xl space-y-6">
               {csvImporting && (
-                <div className="glass-card rounded-2xl p-6">
-                  <h3 className="font-headline text-lg font-bold text-on-surface mb-6">
-                    Importing &amp; Geocoding
-                  </h3>
-
-                  <div className="mb-6">
-                    <div className="mb-1 flex justify-between text-sm">
-                      <span className="text-slate-600">
-                        Importing... {csvImportProgress}/{csvImportTotal}
-                      </span>
-                      <span className="font-semibold text-blue-600">
-                        {csvImportTotal > 0
-                          ? Math.round(
-                              (csvImportProgress / csvImportTotal) * 100
-                            )
-                          : 0}
-                        %
-                      </span>
-                    </div>
-                    <div className="h-3 overflow-hidden rounded-full bg-slate-200">
-                      <div
-                        className="h-full rounded-full bg-gradient-to-r from-blue-500 to-blue-400 transition-all duration-300"
-                        style={{
-                          width: `${csvImportTotal > 0 ? (csvImportProgress / csvImportTotal) * 100 : 0}%`,
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  {csvGeocodeTotal > 0 && (
-                    <div>
-                      <div className="mb-1 flex justify-between text-sm">
-                        <span className="text-slate-600">
-                          Geocoding... {csvGeocodeProgress}/{csvGeocodeTotal}
-                        </span>
-                        <span className="font-semibold text-emerald-600">
-                          {Math.round(
-                            (csvGeocodeProgress / csvGeocodeTotal) * 100
-                          )}
-                          %
-                        </span>
-                      </div>
-                      <div className="h-3 overflow-hidden rounded-full bg-slate-200">
-                        <div
-                          className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-400 transition-all duration-300"
-                          style={{
-                            width: `${(csvGeocodeProgress / csvGeocodeTotal) * 100}%`,
-                          }}
-                        />
-                      </div>
-                    </div>
+                <div className="space-y-4">
+                  {csvGeocodeTotal > 0 ? (
+                    <ImportProgress current={csvGeocodeProgress} total={csvGeocodeTotal} phase="geocoding" label="Pinpointing properties on the map..." />
+                  ) : (
+                    <ImportProgress current={csvImportProgress} total={csvImportTotal} phase="importing" label="Importing your property list..." />
                   )}
                 </div>
               )}
@@ -1743,6 +1654,7 @@ function MlsImportTab() {
   const [file, setFile] = useState<File | null>(null);
   const [rows, setRows] = useState<Record<string, string>[]>([]);
   const [importing, setImporting] = useState(false);
+  const [progress, setProgress] = useState(0);
   const [result, setResult] = useState<{ updated: number; inserted: number; geocoded: number; errors: number } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -1803,6 +1715,7 @@ function MlsImportTab() {
   async function runImport() {
     setImporting(true);
     let updated = 0, inserted = 0, geocoded = 0, errors = 0;
+    setProgress(0);
 
     // Get existing leads for matching
     const { data: existingLeads } = await supabase.from('leads').select('id, property_address');
@@ -1849,6 +1762,7 @@ function MlsImportTab() {
       if (existingId) {
         const { error } = await supabase.from('leads').update(mlsFields).eq('id', existingId);
         if (error) errors++; else updated++;
+        setProgress(p => p + 1);
       } else {
         const { data, error } = await supabase.from('leads').insert({
           property_address: address,
@@ -1860,8 +1774,9 @@ function MlsImportTab() {
           price_range: sellingPrice ? `$${sellingPrice.toLocaleString()}` : (listingPrice ? `$${listingPrice.toLocaleString()}` : null),
           ...mlsFields,
         }).select('id, property_address');
-        if (error) { errors++; } else {
+        if (error) { errors++; setProgress(p => p + 1); } else {
           inserted++;
+          setProgress(p => p + 1);
           if (data?.[0]) addrMap.set(normAddr, data[0].id);
           // Geocode
           if (data?.[0]) {
@@ -1981,20 +1896,16 @@ function MlsImportTab() {
             </div>
 
             {!result ? (
-              <button
-                onClick={runImport}
-                disabled={importing}
-                className="w-full rounded-xl bg-gradient-to-r from-green-600 to-emerald-500 text-white py-3 font-bold text-sm hover:shadow-lg transition-all disabled:opacity-50"
-              >
-                {importing ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <span className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Importing & Geocoding...
-                  </span>
-                ) : (
-                  `Import ${rows.length} MLS Entries`
-                )}
-              </button>
+              importing ? (
+                <ImportProgress current={progress} total={rows.length} phase="importing" label="Importing MLS data & geocoding..." />
+              ) : (
+                <button
+                  onClick={runImport}
+                  className="w-full rounded-xl bg-gradient-to-r from-green-600 to-emerald-500 text-white py-3 font-bold text-sm hover:shadow-lg transition-all"
+                >
+                  Import {rows.length} MLS Entries
+                </button>
+              )
             ) : (
               <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-4">
                 <p className="font-bold text-emerald-800">Import Complete</p>

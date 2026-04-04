@@ -238,7 +238,7 @@ export default function PropertyPopup({ lead, onUpdate, walkMode = false, onWalk
       {phones.length > 0 && (
         <div className="px-4 pb-2 flex flex-wrap gap-2">
           {phones.map((phone, idx) => (
-            <a key={idx} href={`tel:${phone}`} className="flex items-center gap-1 text-[11px] font-bold text-red-600 hover:underline">
+            <a key={idx} href={`tel:${phone}`} className="flex items-center gap-1 text-[11px] font-bold text-emerald-600 hover:underline">
               <MaterialIcon icon="call" className="text-[12px] text-green-600" />
               {formatPhone(phone)}
             </a>

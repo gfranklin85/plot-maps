@@ -347,7 +347,7 @@ export default function LeadDetailPage() {
                   <div className="space-y-1">
                     {[lead.phone, lead.phone_2, lead.phone_3].filter(Boolean).map((phone, idx) => (
                       <div key={idx} className="flex items-center gap-2">
-                        <a href={`tel:${phone}`} className="text-xs font-bold text-red-600 font-mono hover:underline">{formatPhone(phone!)}</a>
+                        <a href={`tel:${phone}`} className="text-xs font-bold text-emerald-600 font-mono hover:underline">{formatPhone(phone!)}</a>
                         <MaterialIcon icon="call" className="text-[14px] text-green-600 cursor-pointer hover:scale-110 transition-transform" />
                       </div>
                     ))}

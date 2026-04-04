@@ -44,7 +44,7 @@ export default function LandingPage() {
             </div>
             <div className="relative">
               <div className="bg-[#151b2d] rounded-xl p-2 border border-slate-700/10 shadow-2xl relative overflow-hidden aspect-[4/3]">
-                <img className="w-full h-full object-cover rounded-lg" alt="Plot Maps Street View prospecting with property popup" src="/hero-streetview.jpg" />
+                <img className="w-full h-full object-cover rounded-lg" alt="Plot Maps Walk Mode with name tags on houses" src="/hero-walkmode-nametags.png" />
               </div>
             </div>
           </div>
@@ -131,7 +131,7 @@ export default function LandingPage() {
                   <p className="text-slate-400">Every property becomes a clickable pin. Track your entire pipeline geographically. See patterns others miss.</p>
                 </div>
                 <div className="mt-8 overflow-hidden rounded-xl h-48 bg-[#0c1324]">
-                  <img className="w-full h-full object-cover" alt="Plot Maps aerial view with 941 property pins" src="/hero-map.jpg" />
+                  <img className="w-full h-full object-cover" alt="Plot Maps aerial map with property popup and script" src="/feature-aerial-popup.png" />
                 </div>
               </div>
               <div className="md:col-span-3 bg-[#23293c] rounded-2xl p-8 flex flex-col border border-slate-700/5">
@@ -141,7 +141,7 @@ export default function LandingPage() {
                   <p className="text-slate-400">Integrated dialer with dynamic scripts and rapid-fire logging. Never lose your place in a neighborhood again.</p>
                 </div>
                 <div className="mt-8 overflow-hidden rounded-xl h-48 bg-[#0c1324]">
-                  <img className="w-full h-full object-cover" alt="Plot Maps Walk Here popup with property data" src="/hero-walkhere.png" />
+                  <img className="w-full h-full object-cover" alt="Plot Maps sold property popup with talking points" src="/feature-sold-popup.png" />
                 </div>
               </div>
               <div className="md:col-span-2 bg-gradient-to-br from-indigo-600/40 to-[#23293c] rounded-2xl p-8 border border-indigo-500/10 flex flex-col">
@@ -149,12 +149,15 @@ export default function LandingPage() {
                 <h3 className="text-2xl font-bold mt-4 mb-4">Walk Mode</h3>
                 <p className="text-slate-400 mb-4">Virtually walk neighborhoods with Street View. Call while you &quot;stroll&quot; to add visual detail to every pitch.</p>
                 <div className="mt-auto overflow-hidden rounded-xl h-36 bg-[#0c1324]">
-                  <img className="w-full h-full object-cover object-top" alt="Plot Maps Dashboard" src="/hero-dashboard.png" />
+                  <img className="w-full h-full object-cover object-center" alt="Plot Maps Walk Mode on Eagle Street" src="/hero-walkmode-eagle.png" />
                 </div>
               </div>
-              <div className="md:col-span-2 bg-[#23293c] rounded-2xl p-8 border border-slate-700/5">
+              <div className="md:col-span-2 bg-[#23293c] rounded-2xl p-8 border border-slate-700/5 flex flex-col">
                 <h3 className="text-xl font-bold mb-4">Market Intelligence</h3>
-                <p className="text-slate-400 text-sm">See nearby solds and actives instantly. Be the expert on every block without checking Zillow.</p>
+                <p className="text-slate-400 text-sm mb-4">See nearby solds and actives instantly. Be the expert on every block without checking Zillow.</p>
+                <div className="mt-auto overflow-hidden rounded-xl h-36 bg-[#0c1324]">
+                  <img className="w-full h-full object-cover object-top" alt="Plot Maps aerial sold property data" src="/feature-aerial-sold.png" />
+                </div>
               </div>
               <div className="md:col-span-2 bg-[#23293c] rounded-2xl p-8 border border-slate-700/5">
                 <h3 className="text-xl font-bold mb-4">AI Follow-Up</h3>

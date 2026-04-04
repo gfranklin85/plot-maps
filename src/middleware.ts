@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createMiddlewareClient } from '@/lib/supabase-middleware';
 
-const PUBLIC_PATHS = ['/login', '/signup', '/auth', '/subscribe'];
+const PUBLIC_PATHS = ['/login', '/signup', '/auth', '/subscribe', '/landing'];
 
 export async function middleware(request: NextRequest) {
   const { supabase, response } = createMiddlewareClient(request);
@@ -11,15 +11,25 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isPublicPath = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
 
-  // Not logged in → redirect to login (except public pages)
+  // Root path: show landing page if not logged in, dashboard if logged in
+  if (pathname === '/') {
+    if (!user) {
+      const landingUrl = request.nextUrl.clone();
+      landingUrl.pathname = '/landing';
+      return NextResponse.rewrite(landingUrl);
+    }
+    return response;
+  }
+
+  // Not logged in on protected page → redirect to login
   if (!user && !isPublicPath) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = '/login';
     return NextResponse.redirect(loginUrl);
   }
 
-  // Logged in on public page → redirect home (except /subscribe which needs auth)
-  if (user && (pathname === '/login' || pathname === '/signup')) {
+  // Logged in on auth pages → redirect home
+  if (user && (pathname === '/login' || pathname === '/signup' || pathname === '/landing')) {
     const homeUrl = request.nextUrl.clone();
     homeUrl.pathname = '/';
     return NextResponse.redirect(homeUrl);

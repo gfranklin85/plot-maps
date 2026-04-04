@@ -5,7 +5,7 @@ import Sidebar from './Sidebar';
 import TopBar from './TopBar';
 import type { ReactNode } from 'react';
 
-const AUTH_PAGES = ['/login', '/signup', '/auth', '/subscribe'];
+const AUTH_PAGES = ['/login', '/signup', '/auth', '/subscribe', '/landing'];
 
 export default function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();

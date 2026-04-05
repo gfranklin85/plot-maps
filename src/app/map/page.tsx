@@ -171,8 +171,8 @@ export default function MapPage() {
     <div className="relative h-[calc(100vh-5rem)] w-full">
       {/* ═══ CONTROLS — different for Walk Mode vs Map Mode ═══ */}
       {walkMode ? (
-        /* WALK MODE: minimal controls */
-        <div className="absolute top-4 right-4 z-10 flex items-center gap-3">
+        /* WALK MODE: minimal controls — positioned to not cover Google's fullscreen button */
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-3">
           <button
             onClick={() => setWalkMode(false)}
             className="flex items-center gap-1.5 rounded-full bg-blue-600 text-white px-4 py-2 text-xs font-bold shadow-lg hover:bg-blue-700 transition-all"

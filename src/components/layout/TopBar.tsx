@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useProfile } from '@/lib/profile-context';
 import { useAuth } from '@/lib/auth-context';
+import { useSidebar } from '@/lib/sidebar-context';
 import { supabase } from '@/lib/supabase';
 
 interface SearchResult {
@@ -18,6 +19,7 @@ interface SearchResult {
 export default function TopBar() {
   const { profile, initials } = useProfile();
   const { signOut } = useAuth();
+  const { collapsed } = useSidebar();
   const router = useRouter();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -52,7 +54,7 @@ export default function TopBar() {
   }, []);
 
   return (
-    <header className="fixed top-0 right-0 w-[calc(100%-16rem)] h-16 bg-white/80 backdrop-blur-md flex justify-between items-center px-8 z-40 shadow-sm">
+    <header className={`fixed top-0 right-0 h-16 bg-white/80 backdrop-blur-md flex justify-between items-center px-8 z-40 shadow-sm transition-all duration-300 ${collapsed ? 'w-[calc(100%-4rem)]' : 'w-[calc(100%-16rem)]'}`}>
       {/* Search */}
       <div className="relative w-1/3" ref={searchRef}>
         <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[20px]">

@@ -231,6 +231,10 @@ CREATE INDEX IF NOT EXISTS idx_market_comps_user_id ON market_comps(user_id);
 CREATE INDEX IF NOT EXISTS idx_import_templates_user_id ON import_templates(user_id);
 
 -- Default user_id to auth.uid() for client-side inserts
+-- Twilio fields for per-user phone numbers
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS twilio_phone_number text;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS twilio_phone_sid text;
+
 ALTER TABLE leads ALTER COLUMN user_id SET DEFAULT auth.uid();
 ALTER TABLE activities ALTER COLUMN user_id SET DEFAULT auth.uid();
 ALTER TABLE market_comps ALTER COLUMN user_id SET DEFAULT auth.uid();

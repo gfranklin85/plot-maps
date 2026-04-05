@@ -5,9 +5,10 @@ import { useAuth } from '@/lib/auth-context';
 import { useSidebar } from '@/lib/sidebar-context';
 import Sidebar from './Sidebar';
 import TopBar from './TopBar';
+import CallBar from '@/components/call/CallBar';
 import type { ReactNode } from 'react';
 
-const AUTH_PAGES = ['/login', '/signup', '/auth', '/subscribe', '/landing'];
+const AUTH_PAGES = ['/login', '/signup', '/auth', '/subscribe', '/landing', '/setup-number'];
 
 export default function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -34,6 +35,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
       <main className={`pt-16 min-h-screen transition-all duration-300 ${collapsed ? 'ml-16' : 'ml-64'}`}>
         {children}
       </main>
+      <CallBar />
     </>
   );
 }

@@ -3,7 +3,6 @@ export const NAV_ITEMS = [
   { label: "Map", href: "/map", icon: "map" },
   { label: "Leads", href: "/leads", icon: "group" },
   { label: "Imports", href: "/imports", icon: "upload_file" },
-  { label: "Tasks", href: "/tasks", icon: "assignment" },
 ] as const;
 
 export const LEAD_STATUSES = [

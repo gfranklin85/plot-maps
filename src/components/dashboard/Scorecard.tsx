@@ -14,7 +14,7 @@ const ACTIVITY_CONFIG: { type: string; label: string; icon: string; color: strin
   { type: 'call', label: 'Calls', icon: 'call', color: 'text-blue-600' },
   { type: 'note', label: 'Notes', icon: 'edit_note', color: 'text-slate-600' },
   { type: 'email', label: 'Emails', icon: 'email', color: 'text-violet-600' },
-  { type: 'letter', label: 'Letters', icon: 'mail', color: 'text-emerald-600' },
+  // Letters removed
 ];
 
 const STATUS_ORDER: LeadStatus[] = [
@@ -32,12 +32,12 @@ function getMotivationalText(targets: DailyTarget): string {
   const totalActual =
     targets.conversations_actual +
     targets.followups_actual +
-    targets.letters_actual +
+    0 +
     targets.new_contacts_actual;
   const totalTarget =
     targets.conversations_target +
     targets.followups_target +
-    targets.letters_target +
+    0 +
     targets.new_contacts_target;
 
   if (totalTarget === 0) return 'Set your daily targets to start tracking progress.';

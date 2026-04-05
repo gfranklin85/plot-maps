@@ -36,14 +36,7 @@ const BARS: BarConfig[] = [
     bgColor: 'bg-amber-100',
     icon: 'replay',
   },
-  {
-    label: 'Letters',
-    actualKey: 'letters_actual',
-    targetKey: 'letters_target',
-    color: 'bg-emerald-500',
-    bgColor: 'bg-emerald-100',
-    icon: 'mail',
-  },
+  // Letters removed — no letter feature in product
   {
     label: 'New Contacts',
     actualKey: 'new_contacts_actual',

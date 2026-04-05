@@ -15,7 +15,7 @@ export default function Sidebar() {
           Plot Maps
         </h1>
         <p className="text-[10px] uppercase tracking-wider text-slate-500 font-label mt-1">
-          ELITE REAL ESTATE CRM
+          VISUAL PROSPECTING CRM
         </p>
       </div>
 
@@ -48,9 +48,9 @@ export default function Sidebar() {
 
       {/* New Lead Button */}
       <div className="px-4 mb-6">
-        <button className="w-full action-gradient text-white py-3 rounded-xl font-bold shadow-lg shadow-blue-500/20">
-          + New Lead
-        </button>
+        <Link href="/imports" className="block w-full text-center action-gradient text-white py-3 rounded-xl font-bold shadow-lg shadow-blue-500/20">
+          + Import Leads
+        </Link>
       </div>
 
       {/* Footer */}

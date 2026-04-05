@@ -231,6 +231,22 @@ CREATE INDEX IF NOT EXISTS idx_market_comps_user_id ON market_comps(user_id);
 CREATE INDEX IF NOT EXISTS idx_import_templates_user_id ON import_templates(user_id);
 
 -- Default user_id to auth.uid() for client-side inserts
+-- Usage tracking
+CREATE TABLE IF NOT EXISTS usage_tracking (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid REFERENCES auth.users(id) NOT NULL,
+  month text NOT NULL,
+  geocodes_used integer DEFAULT 0,
+  geocodes_limit integer DEFAULT 500,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now(),
+  UNIQUE(user_id, month)
+);
+
+ALTER TABLE usage_tracking ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users see own usage" ON usage_tracking
+  FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+
 -- Twilio fields for per-user phone numbers
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS twilio_phone_number text;
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS twilio_phone_sid text;

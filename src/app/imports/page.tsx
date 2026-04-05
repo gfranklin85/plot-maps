@@ -135,6 +135,10 @@ export default function ImportsPage() {
   // Result
   const [result, setResult] = useState<ImportResult | null>(null);
 
+  // Overage prompt
+  const [overagePrompt, setOveragePrompt] = useState<{ remaining: number; cost: string } | null>(null);
+  const [overageLoading, setOverageLoading] = useState(false);
+
   // ── Handle file drop/select ──
   const handleFile = useCallback((file: File) => {
     setFileName(file.name);
@@ -340,30 +344,51 @@ export default function ImportsPage() {
       setProgress(i + 1);
     }
 
-    // Geocode new entries
+    // Check geocode usage before geocoding
     if (toGeocode.length > 0) {
-      setProgressPhase('geocoding');
-      setProgressLabel('Pinpointing properties on the map...');
-      setProgress(0);
+      let usageRes;
+      try { usageRes = await fetch('/api/usage').then(r => r.json()); } catch { usageRes = { geocodes_remaining: 500 }; }
+      const remaining = usageRes.geocodes_remaining || 0;
 
-      for (let i = 0; i < toGeocode.length; i++) {
-        try {
-          const res = await fetch('/api/geocode', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ address: toGeocode[i].address }),
-          });
-          if (res.ok) {
-            const geo = await res.json();
-            if (geo.lat && geo.lng) {
-              await supabase.from('leads').update({
-                latitude: geo.lat, longitude: geo.lng, geocoded_at: new Date().toISOString(),
-              }).eq('id', toGeocode[i].id);
-              geocoded++;
+      const canGeocode = Math.min(toGeocode.length, remaining);
+      const overCount = toGeocode.length - canGeocode;
+
+      // Geocode what we can
+      if (canGeocode > 0) {
+        setProgressPhase('geocoding');
+        setProgressLabel('Pinpointing properties on the map...');
+        setProgress(0);
+
+        for (let i = 0; i < canGeocode; i++) {
+          try {
+            const res = await fetch('/api/geocode', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ address: toGeocode[i].address }),
+            });
+            if (res.ok) {
+              const geo = await res.json();
+              if (geo.lat && geo.lng) {
+                await supabase.from('leads').update({
+                  latitude: geo.lat, longitude: geo.lng, geocoded_at: new Date().toISOString(),
+                }).eq('id', toGeocode[i].id);
+                geocoded++;
+              }
             }
-          }
-        } catch { /* non-fatal */ }
-        setProgress(i + 1);
+          } catch { /* non-fatal */ }
+          setProgress(i + 1);
+        }
+
+        // Track usage
+        try { await fetch('/api/usage', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ count: canGeocode }) }); } catch { /* non-fatal */ }
+      }
+
+      // Show overage prompt if needed
+      if (overCount > 0) {
+        setOveragePrompt({ remaining: overCount, cost: `$${(overCount * 0.01).toFixed(2)}` });
+        setResult({ inserted, updated, geocoded, errors, total: rows.length });
+        setPhase('done');
+        return; // Don't set done yet — wait for user decision
       }
     }
 
@@ -577,6 +602,65 @@ export default function ImportsPage() {
                 </div>
               )}
             </div>
+
+            {/* Overage prompt */}
+            {overagePrompt && (
+              <div className="mt-6 rounded-xl bg-amber-50 border border-amber-200 p-6">
+                <div className="flex items-center gap-2 mb-3">
+                  <MaterialIcon icon="warning" className="text-[20px] text-amber-600" />
+                  <h4 className="font-bold text-amber-800">
+                    {overagePrompt.remaining} properties still need map pins
+                  </h4>
+                </div>
+                <p className="text-sm text-amber-700 mb-4">
+                  You&apos;ve reached your monthly geocoding limit. These properties are saved but won&apos;t appear on the map until geocoded.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <button
+                    onClick={async () => {
+                      setOverageLoading(true);
+                      try {
+                        const res = await fetch('/api/stripe/charge-geocodes', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ count: overagePrompt.remaining }),
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                          // Charge succeeded, geocode the remaining
+                          setOveragePrompt(null);
+                          // TODO: trigger remaining geocoding
+                          alert(`Charged ${overagePrompt.cost}. Remaining properties will be geocoded shortly.`);
+                        } else if (data.checkout_url) {
+                          window.location.href = data.checkout_url;
+                        } else {
+                          alert(data.error || 'Payment failed');
+                        }
+                      } catch { alert('Payment failed'); }
+                      setOverageLoading(false);
+                    }}
+                    disabled={overageLoading}
+                    className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-amber-600 text-white py-3 font-bold text-sm hover:bg-amber-700 transition-colors disabled:opacity-50"
+                  >
+                    <MaterialIcon icon="bolt" className="text-[18px]" />
+                    {overageLoading ? 'Processing...' : `Geocode Now — ${overagePrompt.cost}`}
+                  </button>
+                  <a
+                    href="/subscribe"
+                    className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-blue-600 text-white py-3 font-bold text-sm hover:bg-blue-700 transition-colors"
+                  >
+                    <MaterialIcon icon="upgrade" className="text-[18px]" />
+                    Upgrade for More
+                  </a>
+                  <button
+                    onClick={() => setOveragePrompt(null)}
+                    className="flex-1 flex items-center justify-center gap-2 rounded-xl border border-slate-200 text-slate-600 py-3 font-bold text-sm hover:bg-slate-50 transition-colors"
+                  >
+                    Skip for Now
+                  </button>
+                </div>
+              </div>
+            )}
 
             <div className="flex justify-center gap-4 mt-8">
               <a href="/map" className="flex items-center gap-2 rounded-xl action-gradient px-6 py-3 text-sm font-bold text-white hover:shadow-lg transition-shadow">

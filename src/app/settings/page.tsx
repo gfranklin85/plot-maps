@@ -251,6 +251,9 @@ export default function SettingsPage() {
         />
       </section>
 
+      {/* Usage */}
+      <UsageMeter />
+
       {/* Phone Number */}
       <PhoneNumberSection />
 
@@ -599,6 +602,57 @@ function PhoneNumberSection() {
               )}
             </div>
           )}
+        </div>
+      )}
+    </section>
+  );
+}
+
+/* ── Usage Meter Section ── */
+function UsageMeter() {
+  const [usage, setUsage] = useState<{ geocodes_used: number; geocodes_limit: number; geocodes_remaining: number } | null>(null);
+
+  useEffect(() => {
+    fetch('/api/usage').then(r => r.json()).then(setUsage).catch(() => {});
+  }, []);
+
+  if (!usage) return null;
+
+  const percent = usage.geocodes_limit > 0 ? Math.round((usage.geocodes_used / usage.geocodes_limit) * 100) : 0;
+  const isNearLimit = percent > 80;
+
+  return (
+    <section className="glass-card rounded-2xl p-6 space-y-4">
+      <div className="flex items-center gap-3 mb-2">
+        <MaterialIcon icon="speed" className="text-blue-600" />
+        <h2 className="text-lg font-bold text-slate-900 font-headline">Usage This Month</h2>
+      </div>
+
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-sm font-medium text-slate-700">Geocodes</span>
+          <span className={`text-sm font-bold ${isNearLimit ? 'text-amber-600' : 'text-slate-600'}`}>
+            {usage.geocodes_used} / {usage.geocodes_limit}
+          </span>
+        </div>
+        <div className="h-3 w-full bg-slate-200 rounded-full overflow-hidden">
+          <div
+            className={`h-full rounded-full transition-all ${
+              isNearLimit ? 'bg-amber-500' : 'bg-blue-500'
+            }`}
+            style={{ width: `${Math.min(100, percent)}%` }}
+          />
+        </div>
+        <p className="text-xs text-slate-500 mt-1">
+          {usage.geocodes_remaining} remaining · Resets monthly
+        </p>
+      </div>
+
+      {isNearLimit && (
+        <div className="rounded-lg bg-amber-50 border border-amber-200 p-3">
+          <p className="text-xs text-amber-700">
+            Running low on geocodes. Overage geocodes are $0.01 each, or upgrade for a higher limit.
+          </p>
         </div>
       )}
     </section>

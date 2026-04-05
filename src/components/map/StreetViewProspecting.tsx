@@ -38,12 +38,15 @@ function angleDiff(a: number, b: number): number {
   return Math.abs(d);
 }
 
-// Generate a floating name tag SVG as a data URI
-function makeNameTagIcon(label: string, color: string): google.maps.Icon {
+// Generate a floating name tag SVG — scale increases for closer properties
+function makeNameTagIcon(label: string, color: string, scale: number = 1): google.maps.Icon {
   const textLen = label.length;
-  const width = Math.max(60, textLen * 8 + 20);
-  const height = 32;
-  const arrow = 8;
+  const baseWidth = Math.max(70, textLen * 9 + 24);
+  const baseHeight = 36;
+  const width = Math.round(baseWidth * scale);
+  const height = Math.round(baseHeight * scale);
+  const arrow = Math.round(9 * scale);
+  const fontSize = Math.round(12 * scale);
 
   const svg = `
     <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height + arrow}">
@@ -56,7 +59,7 @@ function makeNameTagIcon(label: string, color: string): google.maps.Icon {
       <polygon points="${width / 2 - arrow},${height - 2} ${width / 2},${height + arrow - 2} ${width / 2 + arrow},${height - 2}" fill="${color}" stroke="white" stroke-width="2"/>
       <rect x="${width / 2 - arrow}" y="${height - 6}" width="${arrow * 2}" height="6" fill="${color}"/>
       <text x="${width / 2}" y="${height / 2 + 1}" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui, sans-serif" font-size="11" font-weight="700" fill="white">${escapeXml(label)}</text>
+        font-family="system-ui, sans-serif" font-size="${fontSize}" font-weight="700" fill="white">${escapeXml(label)}</text>
     </svg>`;
 
   return {
@@ -174,7 +177,9 @@ function StreetViewInner({ leads, startPosition, onDataChanged, onPositionChange
         : (STATUS_COLORS[lead.status] || "#3b82f6");
 
       const label = getLabel(lead);
-      const icon = makeNameTagIcon(label, color);
+      // Scale: 1.4x for closest (< 30m), 1.2x for near (< 60m), 1.0x for far
+      const scale = dist < 30 ? 1.4 : dist < 60 ? 1.2 : 1.0;
+      const icon = makeNameTagIcon(label, color, scale);
 
       const marker = new google.maps.Marker({
         position: { lat: lead.latitude, lng: lead.longitude },

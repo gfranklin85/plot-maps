@@ -169,100 +169,98 @@ export default function MapPage() {
 
   return (
     <div className="relative h-[calc(100vh-5rem)] w-full">
-      {/* Search overlay */}
-      <div className="absolute top-4 left-4 right-4 z-10 flex items-center gap-3">
-        <div className="flex-1 max-w-md">
-          <PlacesSearch
-            onPlaceSelected={(place) => {
-              setMapCenter({ lat: place.lat, lng: place.lng });
-              setSearch(place.address);
-            }}
-            className="shadow-lg"
-          />
+      {/* ═══ CONTROLS — different for Walk Mode vs Map Mode ═══ */}
+      {walkMode ? (
+        /* WALK MODE: minimal controls */
+        <div className="absolute top-4 right-4 z-10 flex items-center gap-3">
+          <button
+            onClick={() => setWalkMode(false)}
+            className="flex items-center gap-1.5 rounded-full bg-blue-600 text-white px-4 py-2 text-xs font-bold shadow-lg hover:bg-blue-700 transition-all"
+          >
+            <span className="material-symbols-rounded text-[18px]">map</span>
+            Map View
+          </button>
         </div>
+      ) : (
+        /* MAP MODE: full controls */
+        <div className="absolute top-4 left-4 right-4 z-10 flex items-center gap-3">
+          <div className="flex-1 max-w-md">
+            <PlacesSearch
+              onPlaceSelected={(place) => {
+                setMapCenter({ lat: place.lat, lng: place.lng });
+                setSearch(place.address);
+              }}
+              className="shadow-lg"
+            />
+          </div>
 
-        {/* Map type toggle */}
-        <div className="inline-flex items-center gap-0.5 rounded-full glass-card p-1 shadow-lg">
-          {(["roadmap", "satellite", "hybrid"] as const).map((type) => (
-            <button
-              key={type}
-              onClick={() => setMapType(type)}
-              className={`rounded-full px-3 py-1.5 text-xs font-medium transition-all capitalize ${
-                mapType === type
-                  ? "bg-white font-bold text-blue-600 shadow-sm"
-                  : "text-slate-600 hover:text-slate-800"
-              }`}
-            >
-              {type === "roadmap" ? "Map" : type === "satellite" ? "Satellite" : "Hybrid"}
-            </button>
-          ))}
+          {/* Map type toggle */}
+          <div className="inline-flex items-center gap-0.5 rounded-full glass-card p-1 shadow-lg">
+            {(["roadmap", "satellite", "hybrid"] as const).map((type) => (
+              <button
+                key={type}
+                onClick={() => setMapType(type)}
+                className={`rounded-full px-3 py-1.5 text-xs font-medium transition-all capitalize ${
+                  mapType === type
+                    ? "bg-white font-bold text-blue-600 shadow-sm"
+                    : "text-slate-600 hover:text-slate-800"
+                }`}
+              >
+                {type === "roadmap" ? "Map" : type === "satellite" ? "Satellite" : "Hybrid"}
+              </button>
+            ))}
+          </div>
+
+          {/* Listing status filter */}
+          <div className="inline-flex items-center gap-0.5 rounded-full glass-card p-1 shadow-lg">
+            {[
+              { key: 'all', label: 'All' },
+              { key: 'prospects', label: 'Prospects' },
+              { key: 'Sold', label: '● Sold', color: 'text-green-600' },
+              { key: 'Active', label: '◆ Active', color: 'text-orange-500' },
+              { key: 'Pending', label: '◆ Pending', color: 'text-yellow-600' },
+            ].map((f) => (
+              <button
+                key={f.key}
+                onClick={() => setListingFilter(f.key)}
+                className={`rounded-full px-3 py-1.5 text-xs font-medium transition-all ${
+                  listingFilter === f.key
+                    ? 'bg-white font-bold text-blue-600 shadow-sm'
+                    : `${f.color || 'text-slate-600'} hover:text-slate-800`
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Walk Mode toggle */}
+          <button
+            onClick={() => setWalkMode(true)}
+            className="flex items-center gap-1.5 rounded-full glass-card text-slate-700 px-3 py-2 text-xs font-bold shadow-lg hover:shadow-xl transition-all"
+          >
+            <span className="material-symbols-rounded text-[18px]">streetview</span>
+            Walk Mode
+          </button>
+
+          {/* Toggle filters button */}
+          <button
+            onClick={() => setFiltersOpen((o) => !o)}
+            className={`flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-medium shadow-lg transition-all ${
+              filtersOpen || hasActiveFilters
+                ? "bg-blue-600 text-white"
+                : "glass-card text-slate-600 hover:text-slate-800"
+            }`}
+          >
+            <span className="material-symbols-rounded text-[18px]">tune</span>
+            Filters
+          </button>
         </div>
-
-        {/* Listing status filter */}
-        <div className="inline-flex items-center gap-0.5 rounded-full glass-card p-1 shadow-lg">
-          {[
-            { key: 'all', label: 'All' },
-            { key: 'prospects', label: 'Prospects' },
-            { key: 'Sold', label: '● Sold', color: 'text-green-600' },
-            { key: 'Active', label: '◆ Active', color: 'text-orange-500' },
-            { key: 'Pending', label: '◆ Pending', color: 'text-yellow-600' },
-          ].map((f) => (
-            <button
-              key={f.key}
-              onClick={() => setListingFilter(f.key)}
-              className={`rounded-full px-3 py-1.5 text-xs font-medium transition-all ${
-                listingFilter === f.key
-                  ? 'bg-white font-bold text-blue-600 shadow-sm'
-                  : `${f.color || 'text-slate-600'} hover:text-slate-800`
-              }`}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Walk Mode toggle */}
-        <button
-          onClick={() => setWalkMode(!walkMode)}
-          className={`flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-bold shadow-lg transition-all ${
-            walkMode
-              ? 'bg-emerald-600 text-white hover:bg-emerald-700'
-              : 'glass-card text-slate-700 hover:shadow-xl'
-          }`}
-        >
-          <span className="material-symbols-rounded text-[18px]">
-            {walkMode ? 'map' : 'streetview'}
-          </span>
-          {walkMode ? 'Back to Map' : 'Walk Mode'}
-        </button>
-
-        {/* Plan Route removed — Walk Mode replaces it */}
-
-        {/* Toggle filters button */}
-        <button
-          onClick={() => setFiltersOpen((o) => !o)}
-          className={`flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-medium shadow-lg transition-all ${
-            filtersOpen || hasActiveFilters
-              ? "bg-blue-600 text-white"
-              : "glass-card text-slate-600 hover:text-slate-800"
-          }`}
-        >
-          <span className="material-symbols-rounded text-[18px]">tune</span>
-          Filters
-          {hasActiveFilters && (
-            <span className="ml-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-white/20 text-[10px] font-bold">
-              {
-                [selectedTags.length > 0, selectedCity, selectedPriority, selectedSource].filter(
-                  Boolean
-                ).length
-              }
-            </span>
-          )}
-        </button>
-      </div>
+      )}
 
       {/* Filter tabs overlay */}
-      <div className="absolute top-16 left-4 z-10">
+      {/* Filter tabs + stats — hidden in walk mode */}
+      {!walkMode && <div className="absolute top-16 left-4 z-10">
         <div className="inline-flex items-center gap-1 rounded-full glass-card p-1 shadow-lg">
           {FILTER_TABS.map((tab) => {
             const isActive = tab.key === activeTab;
@@ -309,7 +307,7 @@ export default function MapPage() {
             </button>
           )}
         </div>
-      </div>
+      </div>}
 
       {/* Collapsible filter panel */}
       {filtersOpen && (
@@ -452,8 +450,8 @@ export default function MapPage() {
         </div>
       )}
 
-      {/* Stat card overlay */}
-      <div className="absolute top-28 left-4 z-10 mt-8">
+      {/* Stat card overlay — hidden in walk mode */}
+      {!walkMode && <div className="absolute top-28 left-4 z-10 mt-8">
         <div className="glass-card rounded-2xl p-4 shadow-lg min-w-[180px]">
           <p className="text-[10px] uppercase tracking-widest text-slate-500 mb-1">
             Today&apos;s Potential
@@ -479,7 +477,7 @@ export default function MapPage() {
             )}
           </div>
         </div>
-      </div>
+      </div>}
 
       {/* Map or Walk Mode */}
       {loading ? (

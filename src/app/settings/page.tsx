@@ -251,6 +251,9 @@ export default function SettingsPage() {
         />
       </section>
 
+      {/* Phone Number */}
+      <PhoneNumberSection />
+
       {/* Notifications */}
       <section className="glass-card rounded-2xl p-6 space-y-4">
         <div className="flex items-center gap-3 mb-2">
@@ -435,5 +438,169 @@ export default function SettingsPage() {
         )}
       </div>
     </div>
+  );
+}
+
+/* ── Phone Number Management Section ── */
+function PhoneNumberSection() {
+  const [twilioNumber, setTwilioNumber] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [areaCode, setAreaCode] = useState('');
+  const [searching, setSearching] = useState(false);
+  const [availableNumbers, setAvailableNumbers] = useState<{ phoneNumber: string; locality: string; region: string }[]>([]);
+  const [selected, setSelected] = useState('');
+  const [provisioning, setProvisioning] = useState(false);
+  const [error, setError] = useState('');
+  const [showSearch, setShowSearch] = useState(false);
+
+  useEffect(() => {
+    async function fetchNumber() {
+      const { data } = await supabase.from('profiles').select('twilio_phone_number').limit(1).single();
+      setTwilioNumber(data?.twilio_phone_number || null);
+      setLoading(false);
+    }
+    fetchNumber();
+  }, []);
+
+  async function searchNumbers() {
+    if (areaCode.length < 3) return;
+    setSearching(true);
+    setError('');
+    try {
+      const res = await fetch(`/api/twilio/provision?areaCode=${areaCode}`);
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setAvailableNumbers(data.numbers || []);
+      if (data.numbers?.length > 0) setSelected(data.numbers[0].phoneNumber);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Search failed');
+    } finally {
+      setSearching(false);
+    }
+  }
+
+  async function claimNumber() {
+    if (!selected) return;
+    setProvisioning(true);
+    setError('');
+    try {
+      const res = await fetch('/api/twilio/provision', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phoneNumber: selected }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setTwilioNumber(data.phoneNumber);
+      setShowSearch(false);
+      setAvailableNumbers([]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Provisioning failed');
+    } finally {
+      setProvisioning(false);
+    }
+  }
+
+  function formatPhone(num: string): string {
+    const cleaned = num.replace(/\D/g, '');
+    if (cleaned.length === 11 && cleaned[0] === '1') {
+      return `(${cleaned.slice(1, 4)}) ${cleaned.slice(4, 7)}-${cleaned.slice(7)}`;
+    }
+    return num;
+  }
+
+  if (loading) return null;
+
+  return (
+    <section className="glass-card rounded-2xl p-6 space-y-4">
+      <div className="flex items-center gap-3 mb-2">
+        <MaterialIcon icon="phone_in_talk" className="text-blue-600" />
+        <h2 className="text-lg font-bold text-slate-900 font-headline">Phone Number</h2>
+      </div>
+
+      {twilioNumber ? (
+        <div className="flex items-center justify-between py-3">
+          <div>
+            <p className="text-sm font-medium text-slate-800">Your calling number</p>
+            <p className="text-2xl font-bold text-emerald-600 font-mono mt-1">{formatPhone(twilioNumber)}</p>
+            <p className="text-xs text-slate-500 mt-1">This number shows as your caller ID when you call from the app</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
+              <span className="w-2 h-2 bg-emerald-500 rounded-full" />
+              Active
+            </span>
+          </div>
+        </div>
+      ) : (
+        <div>
+          <p className="text-sm text-slate-500 mb-4">
+            Get a local phone number so property owners see a familiar area code when you call. Your number is used as caller ID for all outbound calls from the browser.
+          </p>
+          {!showSearch ? (
+            <button
+              onClick={() => setShowSearch(true)}
+              className="flex items-center gap-2 rounded-xl action-gradient px-6 py-3 text-sm font-bold text-white hover:shadow-lg transition-shadow"
+            >
+              <MaterialIcon icon="add" className="text-[18px]" />
+              Get a Number
+            </button>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex gap-3">
+                <input
+                  type="text"
+                  value={areaCode}
+                  onChange={(e) => setAreaCode(e.target.value.replace(/\D/g, '').slice(0, 3))}
+                  maxLength={3}
+                  placeholder="Area code (e.g. 559)"
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                />
+                <button
+                  onClick={searchNumbers}
+                  disabled={searching || areaCode.length < 3}
+                  className="px-4 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-bold disabled:opacity-50"
+                >
+                  {searching ? 'Searching...' : 'Search'}
+                </button>
+              </div>
+
+              {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
+
+              {availableNumbers.length > 0 && (
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {availableNumbers.map((n) => (
+                    <label
+                      key={n.phoneNumber}
+                      className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-colors ${
+                        selected === n.phoneNumber ? 'bg-blue-50 border border-blue-200' : 'bg-slate-50 border border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="number"
+                        value={n.phoneNumber}
+                        checked={selected === n.phoneNumber}
+                        onChange={() => setSelected(n.phoneNumber)}
+                        className="w-4 h-4 text-blue-600"
+                      />
+                      <span className="font-mono font-bold text-sm">{formatPhone(n.phoneNumber)}</span>
+                      {n.locality && <span className="text-xs text-slate-400">{n.locality}, {n.region}</span>}
+                    </label>
+                  ))}
+                  <button
+                    onClick={claimNumber}
+                    disabled={!selected || provisioning}
+                    className="w-full rounded-xl action-gradient text-white py-3 font-bold text-sm disabled:opacity-50"
+                  >
+                    {provisioning ? 'Provisioning...' : 'Claim This Number'}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </section>
   );
 }

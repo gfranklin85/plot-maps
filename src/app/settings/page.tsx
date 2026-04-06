@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useProfile, type UserProfile } from '@/lib/profile-context';
 import { supabase } from '@/lib/supabase';
 import MaterialIcon from '@/components/ui/MaterialIcon';
@@ -56,24 +56,6 @@ export default function SettingsPage() {
     updateProfile(form);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
-  }
-
-  async function geocodeMapCenter() {
-    if (!mapCenterAddress.trim()) return;
-    try {
-      const res = await fetch('/api/geocode', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ address: mapCenterAddress.trim() }),
-      });
-      if (res.ok) {
-        const result = await res.json();
-        if (result?.lat && result?.lng) {
-          setForm((prev) => ({ ...prev, defaultMapCenter: { lat: result.lat, lng: result.lng } }));
-          setMapCenterAddress('');
-        }
-      }
-    } catch { /* ignore */ }
   }
 
   function handleNotificationToggle(key: keyof UserProfile['notifications']) {
@@ -255,32 +237,22 @@ export default function SettingsPage() {
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-2">Default Map Center</label>
           <p className="text-xs text-slate-500 mb-2">
-            Enter an address or city to set where the map opens by default.
+            Search for a city or address to set where the map opens by default.
           </p>
-          <div className="flex gap-3">
-            <input
-              type="text"
-              value={mapCenterAddress}
-              onChange={(e) => setMapCenterAddress(e.target.value)}
-              placeholder={form.defaultMapCenter ? 'Update location...' : 'e.g. Hanford, CA'}
-              onKeyDown={(e) => e.key === 'Enter' && geocodeMapCenter()}
-              className="flex-1 px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
-            />
-            <button
-              onClick={geocodeMapCenter}
-              disabled={!mapCenterAddress.trim()}
-              className="px-4 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-bold disabled:opacity-50 hover:bg-blue-700 transition-colors"
-            >
-              Set
-            </button>
-          </div>
+          <MapCenterAutocomplete
+            onPlaceSelected={(lat, lng, address) => {
+              setForm((prev) => ({ ...prev, defaultMapCenter: { lat, lng } }));
+              setMapCenterAddress(address);
+            }}
+            currentCenter={form.defaultMapCenter}
+          />
           {form.defaultMapCenter && (
             <div className="flex items-center gap-2 mt-2">
               <span className="text-xs text-slate-500">
-                Current: {form.defaultMapCenter.lat.toFixed(4)}, {form.defaultMapCenter.lng.toFixed(4)}
+                Current: {mapCenterAddress || `${form.defaultMapCenter.lat.toFixed(4)}, ${form.defaultMapCenter.lng.toFixed(4)}`}
               </span>
               <button
-                onClick={() => setForm((prev) => ({ ...prev, defaultMapCenter: null }))}
+                onClick={() => { setForm((prev) => ({ ...prev, defaultMapCenter: null })); setMapCenterAddress(''); }}
                 className="text-xs text-red-500 hover:text-red-700"
               >
                 Reset to default
@@ -714,5 +686,63 @@ function UsageMeter() {
         </div>
       )}
     </section>
+  );
+}
+
+/* ── Map Center Autocomplete ── */
+function MapCenterAutocomplete({ onPlaceSelected, currentCenter }: {
+  onPlaceSelected: (lat: number, lng: number, address: string) => void;
+  currentCenter: { lat: number; lng: number } | null;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
+  const [retries, setRetries] = useState(0);
+
+  useEffect(() => {
+    if (!inputRef.current || autocompleteRef.current) return;
+    if (typeof google === 'undefined' || !google?.maps?.places) {
+      // Load Google Maps API with Places
+      const existing = document.querySelector('script[src*="maps.googleapis.com"]');
+      if (!existing) {
+        const script = document.createElement('script');
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places`;
+        script.async = true;
+        script.onload = () => setRetries(r => r + 1);
+        document.head.appendChild(script);
+      } else if (retries < 20) {
+        const timer = setTimeout(() => setRetries(r => r + 1), 500);
+        return () => clearTimeout(timer);
+      }
+      return;
+    }
+
+    const autocomplete = new google.maps.places.Autocomplete(inputRef.current, {
+      types: ['geocode'],
+      componentRestrictions: { country: 'us' },
+      fields: ['geometry', 'formatted_address'],
+    });
+
+    autocomplete.addListener('place_changed', () => {
+      const place = autocomplete.getPlace();
+      if (place.geometry?.location) {
+        onPlaceSelected(
+          place.geometry.location.lat(),
+          place.geometry.location.lng(),
+          place.formatted_address || ''
+        );
+        if (inputRef.current) inputRef.current.value = place.formatted_address || '';
+      }
+    });
+
+    autocompleteRef.current = autocomplete;
+  }, [retries, onPlaceSelected]);
+
+  return (
+    <input
+      ref={inputRef}
+      type="text"
+      placeholder={currentCenter ? 'Update location...' : 'e.g. Hanford, CA or 523 Puffin Ln'}
+      className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
+    />
   );
 }

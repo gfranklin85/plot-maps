@@ -136,7 +136,7 @@ export default function ImportsPage() {
   const [result, setResult] = useState<ImportResult | null>(null);
 
   // Overage prompt
-  const [overagePrompt, setOveragePrompt] = useState<{ remaining: number; cost: string } | null>(null);
+  const [overagePrompt, setOveragePrompt] = useState<{ remaining: number; cost: string; isFree: boolean } | null>(null);
   const [overageLoading, setOverageLoading] = useState(false);
 
   // ── Handle file drop/select ──
@@ -347,8 +347,9 @@ export default function ImportsPage() {
     // Check geocode usage before geocoding
     if (toGeocode.length > 0) {
       let usageRes;
-      try { usageRes = await fetch('/api/usage').then(r => r.json()); } catch { usageRes = { geocodes_remaining: 500 }; }
+      try { usageRes = await fetch('/api/usage').then(r => r.json()); } catch { usageRes = { geocodes_remaining: 500, is_free: false }; }
       const remaining = usageRes.geocodes_remaining || 0;
+      const isFreeUser = usageRes.is_free || false;
 
       const canGeocode = Math.min(toGeocode.length, remaining);
       const overCount = toGeocode.length - canGeocode;
@@ -383,12 +384,12 @@ export default function ImportsPage() {
         try { await fetch('/api/usage', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ count: canGeocode }) }); } catch { /* non-fatal */ }
       }
 
-      // Show overage prompt if needed
+      // Show overage/upgrade prompt if needed
       if (overCount > 0) {
-        setOveragePrompt({ remaining: overCount, cost: `$${(overCount * 0.01).toFixed(2)}` });
+        setOveragePrompt({ remaining: overCount, cost: `$${(overCount * 0.01).toFixed(2)}`, isFree: isFreeUser });
         setResult({ inserted, updated, geocoded, errors, total: rows.length });
         setPhase('done');
-        return; // Don't set done yet — wait for user decision
+        return;
       }
     }
 
@@ -603,7 +604,7 @@ export default function ImportsPage() {
               )}
             </div>
 
-            {/* Overage prompt */}
+            {/* Overage / Upgrade prompt */}
             {overagePrompt && (
               <div className="mt-6 rounded-xl bg-amber-50 border border-amber-200 p-6">
                 <div className="flex items-center gap-2 mb-3">
@@ -613,44 +614,47 @@ export default function ImportsPage() {
                   </h4>
                 </div>
                 <p className="text-sm text-amber-700 mb-4">
-                  You&apos;ve reached your monthly geocoding limit. These properties are saved but won&apos;t appear on the map until geocoded.
+                  {overagePrompt.isFree
+                    ? "You\u2019ve used all 50 free geocodes. Subscribe to a plan to unlock more geocodes and keep pinpointing properties."
+                    : "You\u2019ve reached your monthly geocoding limit. These properties are saved but won\u2019t appear on the map until geocoded."
+                  }
                 </p>
                 <div className="flex flex-col sm:flex-row gap-3">
-                  <button
-                    onClick={async () => {
-                      setOverageLoading(true);
-                      try {
-                        const res = await fetch('/api/stripe/charge-geocodes', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ count: overagePrompt.remaining }),
-                        });
-                        const data = await res.json();
-                        if (data.success) {
-                          // Charge succeeded, geocode the remaining
-                          setOveragePrompt(null);
-                          // TODO: trigger remaining geocoding
-                          alert(`Charged ${overagePrompt.cost}. Remaining properties will be geocoded shortly.`);
-                        } else if (data.checkout_url) {
-                          window.location.href = data.checkout_url;
-                        } else {
-                          alert(data.error || 'Payment failed');
-                        }
-                      } catch { alert('Payment failed'); }
-                      setOverageLoading(false);
-                    }}
-                    disabled={overageLoading}
-                    className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-amber-600 text-white py-3 font-bold text-sm hover:bg-amber-700 transition-colors disabled:opacity-50"
-                  >
-                    <MaterialIcon icon="bolt" className="text-[18px]" />
-                    {overageLoading ? 'Processing...' : `Geocode Now — ${overagePrompt.cost}`}
-                  </button>
+                  {!overagePrompt.isFree && (
+                    <button
+                      onClick={async () => {
+                        setOverageLoading(true);
+                        try {
+                          const res = await fetch('/api/stripe/charge-geocodes', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ count: overagePrompt.remaining }),
+                          });
+                          const data = await res.json();
+                          if (data.success) {
+                            setOveragePrompt(null);
+                            alert(`Charged ${overagePrompt.cost}. Remaining properties will be geocoded shortly.`);
+                          } else if (data.checkout_url) {
+                            window.location.href = data.checkout_url;
+                          } else {
+                            alert(data.error || 'Payment failed');
+                          }
+                        } catch { alert('Payment failed'); }
+                        setOverageLoading(false);
+                      }}
+                      disabled={overageLoading}
+                      className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-amber-600 text-white py-3 font-bold text-sm hover:bg-amber-700 transition-colors disabled:opacity-50"
+                    >
+                      <MaterialIcon icon="bolt" className="text-[18px]" />
+                      {overageLoading ? 'Processing...' : `Geocode Now — ${overagePrompt.cost}`}
+                    </button>
+                  )}
                   <a
                     href="/subscribe"
                     className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-blue-600 text-white py-3 font-bold text-sm hover:bg-blue-700 transition-colors"
                   >
                     <MaterialIcon icon="upgrade" className="text-[18px]" />
-                    Upgrade for More
+                    {overagePrompt.isFree ? 'Subscribe Now' : 'Upgrade for More'}
                   </a>
                   <button
                     onClick={() => setOveragePrompt(null)}

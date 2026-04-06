@@ -194,7 +194,7 @@ export default function LandingPage() {
           <div className="max-w-5xl mx-auto px-8">
             <div className="text-center mb-16">
               <h2 className="text-3xl lg:text-5xl font-headline font-extrabold mb-4">Simple pricing. No surprises.</h2>
-              <p className="text-slate-400 text-lg">14-day free trial. No credit card required.</p>
+              <p className="text-slate-400 text-lg">Start free with 50 geocodes. No credit card required.</p>
             </div>
             <div className="grid md:grid-cols-2 gap-8">
               {/* Starter */}
@@ -214,6 +214,8 @@ export default function LandingPage() {
                     'AI follow-up suggestions',
                     'Manual dialing (use your phone)',
                     '500 geocodes / month',
+                    '1,000 street view loads / month',
+                    '$0.01/geocode overage available',
                   ].map((f) => (
                     <li key={f} className="flex items-start gap-3 text-sm">
                       <span className="material-symbols-outlined text-emerald-400 text-[16px] mt-0.5 shrink-0">check_circle</span>
@@ -222,7 +224,7 @@ export default function LandingPage() {
                   ))}
                 </ul>
                 <Link href="/signup" className="block w-full text-center mt-8 py-3 rounded-xl bg-[#23293c] text-white font-bold hover:bg-[#2e3447] transition-colors">
-                  Start Free Trial
+                  Get Started Free
                 </Link>
               </div>
               {/* Pro */}
@@ -256,7 +258,7 @@ export default function LandingPage() {
                   ))}
                 </ul>
                 <Link href="/signup" className="block w-full text-center mt-8 py-3 rounded-xl bg-gradient-to-br from-indigo-400 to-indigo-600 text-white font-bold hover:shadow-[0_0_20px_rgba(195,192,255,0.3)] transition-all">
-                  Start Free Trial
+                  Get Started Free
                 </Link>
               </div>
             </div>

@@ -28,12 +28,17 @@ export async function POST(request: Request) {
     case 'checkout.session.completed': {
       const session = event.data.object as Stripe.Checkout.Session;
       if (session.customer && session.subscription) {
+        // Look up the subscription to get the price ID (Starter vs Pro)
+        const sub = await stripe.subscriptions.retrieve(session.subscription as string);
+        const priceId = sub.items.data[0]?.price?.id || null;
+
         await supabaseAdmin
           .from('profiles')
           .update({
             subscription_status: 'active',
             subscription_id: session.subscription as string,
             stripe_customer_id: session.customer as string,
+            stripe_price_id: priceId,
           })
           .eq('stripe_customer_id', session.customer as string);
       }
@@ -46,10 +51,11 @@ export async function POST(request: Request) {
         : subscription.status === 'trialing' ? 'trialing'
         : subscription.status === 'past_due' ? 'past_due'
         : 'canceled';
+      const priceId = subscription.items.data[0]?.price?.id || null;
 
       await supabaseAdmin
         .from('profiles')
-        .update({ subscription_status: status })
+        .update({ subscription_status: status, stripe_price_id: priceId })
         .eq('stripe_customer_id', subscription.customer as string);
       break;
     }

@@ -16,12 +16,19 @@ export async function POST(request: Request) {
 
   const amountCents = count * COST_PER_GEOCODE_CENTS;
 
-  // Get or create Stripe customer
+  // Check subscription — overages only for paying subscribers
   const { data: profile } = await supabaseAdmin
     .from('profiles')
-    .select('stripe_customer_id, email')
+    .select('stripe_customer_id, email, subscription_status')
     .eq('id', user.id)
     .single();
+
+  if (profile?.subscription_status !== 'active') {
+    return NextResponse.json(
+      { error: 'Subscribe to a plan to purchase additional geocodes', require_subscription: true },
+      { status: 403 }
+    );
+  }
 
   let customerId = profile?.stripe_customer_id;
 

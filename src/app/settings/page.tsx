@@ -208,6 +208,9 @@ export default function SettingsPage() {
         </div>
       </section>
 
+      {/* Billing & Subscription */}
+      <BillingSection />
+
       {/* Map Preferences */}
       <section className="glass-card rounded-2xl p-6 space-y-4">
         <div className="flex items-center gap-3 mb-2">
@@ -685,6 +688,94 @@ function UsageMeter() {
           </p>
         </div>
       )}
+    </section>
+  );
+}
+
+/* ── Billing & Subscription ── */
+function BillingSection() {
+  const { profile } = useProfile();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const status = profile.subscriptionStatus || '';
+  const isSubscribed = status === 'active';
+
+  const statusConfig: Record<string, { label: string; color: string }> = {
+    active: { label: 'Active', color: 'bg-emerald-50 text-emerald-700' },
+    past_due: { label: 'Past Due', color: 'bg-amber-50 text-amber-700' },
+    canceled: { label: 'Canceled', color: 'bg-red-50 text-red-700' },
+  };
+
+  const { label: statusLabel, color: statusColor } = statusConfig[status] || {
+    label: 'Free',
+    color: 'bg-slate-100 text-slate-600',
+  };
+
+  async function handleManageBilling() {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch('/api/stripe/portal', { method: 'POST' });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      if (data.url) window.location.href = data.url;
+    } catch {
+      setError('No billing account found. Subscribe to a plan first.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <section className="glass-card rounded-2xl p-6 space-y-4">
+      <div className="flex items-center gap-3 mb-2">
+        <MaterialIcon icon="credit_card" className="text-blue-600" />
+        <h2 className="text-lg font-bold text-slate-900 font-headline">Billing & Subscription</h2>
+      </div>
+
+      <div className="flex items-center gap-4">
+        <div>
+          <p className="text-sm text-slate-500">Current Plan</p>
+          <div className="flex items-center gap-2 mt-1">
+            <span className="text-lg font-bold text-slate-900">
+              {isSubscribed ? 'Subscribed' : 'Free'}
+            </span>
+            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${statusColor}`}>
+              {statusLabel}
+            </span>
+          </div>
+          {!isSubscribed && (
+            <p className="text-xs text-slate-400 mt-1">50 free geocodes included</p>
+          )}
+        </div>
+      </div>
+
+      {error && (
+        <p className="text-sm text-red-600">{error}</p>
+      )}
+
+      <div className="flex gap-3">
+        {isSubscribed && (
+          <button
+            onClick={handleManageBilling}
+            disabled={loading}
+            className="flex items-center gap-2 action-gradient text-white px-6 py-2.5 rounded-xl font-bold text-sm hover:shadow-lg transition-shadow disabled:opacity-50"
+          >
+            <MaterialIcon icon="open_in_new" className="text-[16px]" />
+            {loading ? 'Loading...' : 'Manage Billing'}
+          </button>
+        )}
+        {!isSubscribed && (
+          <a
+            href="/subscribe"
+            className="flex items-center gap-2 action-gradient text-white px-6 py-2.5 rounded-xl font-bold text-sm hover:shadow-lg transition-shadow"
+          >
+            <MaterialIcon icon="upgrade" className="text-[16px]" />
+            Upgrade Plan
+          </a>
+        )}
+      </div>
     </section>
   );
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import MaterialIcon from '@/components/ui/MaterialIcon';
 
 const PLANS = [
@@ -18,6 +18,7 @@ const PLANS = [
       'Manual dialing (use your phone)',
       '500 geocodes/month',
       '1,000 street view loads/month',
+      '$0.01/geocode overage available',
     ],
     highlighted: false,
   },
@@ -42,6 +43,14 @@ const PLANS = [
 
 export default function SubscribePage() {
   const [loading, setLoading] = useState<string | null>(null);
+  const [showCancelBanner, setShowCancelBanner] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('checkout') === 'canceled') {
+      setShowCancelBanner(true);
+    }
+  }, []);
 
   async function handleSubscribe(priceId: string) {
     if (!priceId) {
@@ -73,10 +82,26 @@ export default function SubscribePage() {
             Plot Maps
           </h1>
           <p className="text-lg text-slate-500 mt-2">
-            Visual Prospecting CRM — Start your 14-day free trial
+            Visual Prospecting CRM — Upgrade for more geocodes and features
           </p>
-          <p className="text-sm text-slate-400 mt-1">No credit card required to start</p>
+          <p className="text-sm text-slate-400 mt-1">
+            You have 50 free geocodes to try the platform. Subscribe for more.
+          </p>
         </div>
+
+        {showCancelBanner && (
+          <div className="mb-6 bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center justify-between">
+            <p className="text-sm text-amber-800">
+              Checkout was canceled. No worries — upgrade whenever you&apos;re ready.
+            </p>
+            <button
+              onClick={() => setShowCancelBanner(false)}
+              className="text-amber-600 hover:text-amber-800 ml-4"
+            >
+              <MaterialIcon icon="close" className="text-[18px]" />
+            </button>
+          </div>
+        )}
 
         <div className="grid md:grid-cols-2 gap-6">
           {PLANS.map((plan) => (
@@ -125,7 +150,7 @@ export default function SubscribePage() {
                     : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                 }`}
               >
-                {loading === plan.priceId ? 'Redirecting...' : 'Start 14-Day Free Trial'}
+                {loading === plan.priceId ? 'Redirecting...' : `Subscribe — $${plan.price}/mo`}
               </button>
             </div>
           ))}

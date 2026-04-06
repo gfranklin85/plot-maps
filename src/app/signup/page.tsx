@@ -59,7 +59,7 @@ export default function SignupPage() {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-extrabold text-slate-900 font-headline tracking-tight">Plot Maps</h1>
-          <p className="text-sm text-slate-500 mt-1">Start your 14-day free trial</p>
+          <p className="text-sm text-slate-500 mt-1">Create your free account — 50 geocodes included</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-8">
@@ -112,11 +112,11 @@ export default function SignupPage() {
               disabled={loading}
               className="w-full py-3 rounded-xl bg-blue-600 text-white font-bold text-sm hover:bg-blue-700 transition-colors disabled:opacity-50"
             >
-              {loading ? 'Creating account...' : 'Start Free Trial'}
+              {loading ? 'Creating account...' : 'Create Free Account'}
             </button>
 
             <p className="text-[11px] text-slate-400 text-center">
-              14-day free trial. No credit card required.
+              Free to start. No credit card required.
             </p>
           </form>
 

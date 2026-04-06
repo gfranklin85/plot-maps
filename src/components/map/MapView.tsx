@@ -91,6 +91,9 @@ function CenterTracker({ onCenterChanged }: { onCenterChanged?: (c: { lat: numbe
   return null;
 }
 
+const MAX_ANIMATED_MARKERS = 80;
+const DROP_STAGGER_MS = 40;
+
 function LeadMarkers({
   leads,
   onMarkerClick,
@@ -101,10 +104,14 @@ function LeadMarkers({
   const map = useMap();
   const markersRef = useRef<google.maps.Marker[]>([]);
   const clustererRef = useRef<MarkerClusterer | null>(null);
+  const animationTimeoutsRef = useRef<number[]>([]);
 
   useEffect(() => {
     if (!map) return;
 
+    // Clear previous
+    animationTimeoutsRef.current.forEach(clearTimeout);
+    animationTimeoutsRef.current = [];
     if (clustererRef.current) {
       clustererRef.current.clearMarkers();
       clustererRef.current.setMap(null);
@@ -112,6 +119,11 @@ function LeadMarkers({
     }
     markersRef.current.forEach((m) => m.setMap(null));
     markersRef.current = [];
+
+    // Build all markers, split into viewport vs off-viewport
+    const bounds = map.getBounds();
+    const viewportMarkers: google.maps.Marker[] = [];
+    const offViewportMarkers: google.maps.Marker[] = [];
 
     leads.forEach((lead) => {
       if (lead.latitude == null || lead.longitude == null) return;
@@ -121,13 +133,14 @@ function LeadMarkers({
         ? (LISTING_STATUS_COLORS[lead.listing_status!] || "#6b7280")
         : (STATUS_COLORS[lead.status] || "#6b7280");
 
-      // MLS entries get a diamond shape, prospects get a circle
+      const position = { lat: lead.latitude, lng: lead.longitude };
+
       const marker = new google.maps.Marker({
-        position: { lat: lead.latitude, lng: lead.longitude },
+        position,
         title: lead.property_address || lead.name,
         icon: isMLS
           ? {
-              path: "M 0,-12 L 8,0 L 0,12 L -8,0 Z", // diamond
+              path: "M 0,-12 L 8,0 L 0,12 L -8,0 Z",
               scale: 1,
               fillColor: color,
               fillOpacity: 1,
@@ -146,16 +159,45 @@ function LeadMarkers({
 
       marker.addListener("click", () => onMarkerClick(lead));
       markersRef.current.push(marker);
+
+      const inViewport = bounds && bounds.contains(position);
+      if (inViewport && viewportMarkers.length < MAX_ANIMATED_MARKERS) {
+        viewportMarkers.push(marker);
+      } else {
+        offViewportMarkers.push(marker);
+      }
     });
 
+    // Create clusterer with no initial markers
     const clusterer = new MarkerClusterer({
       map,
-      markers: markersRef.current,
+      markers: [],
       renderer: new BlueCircleRenderer(),
     });
     clustererRef.current = clusterer;
 
+    // Add off-viewport markers instantly
+    if (offViewportMarkers.length > 0) {
+      clusterer.addMarkers(offViewportMarkers, true);
+    }
+
+    // Stagger viewport markers with drop animation
+    viewportMarkers.forEach((marker, i) => {
+      const timeoutId = window.setTimeout(() => {
+        marker.setAnimation(google.maps.Animation.DROP);
+        clusterer.addMarker(marker, false);
+      }, i * DROP_STAGGER_MS);
+      animationTimeoutsRef.current.push(timeoutId);
+    });
+
+    // If no viewport markers, render the clusterer now
+    if (viewportMarkers.length === 0 && offViewportMarkers.length > 0) {
+      clusterer.render();
+    }
+
     return () => {
+      animationTimeoutsRef.current.forEach(clearTimeout);
+      animationTimeoutsRef.current = [];
       if (clustererRef.current) {
         clustererRef.current.clearMarkers();
         clustererRef.current.setMap(null);

@@ -96,6 +96,7 @@ function StreetViewInner({ leads, startPosition, onDataChanged, onPositionChange
   const panoramaRef = useRef<google.maps.StreetViewPanorama | null>(null);
   const markersRef = useRef<google.maps.Marker[]>([]);
   const leadsRef = useRef<Lead[]>([]);
+  const visibleLeadIdsRef = useRef<Set<string>>(new Set());
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [popupPos, setPopupPos] = useState({ x: 16, y: 80 });
   const [posLocked, setPosLocked] = useState(false);
@@ -160,6 +161,8 @@ function StreetViewInner({ leads, startPosition, onDataChanged, onPositionChange
     markersRef.current.forEach((m) => m.setMap(null));
     markersRef.current = [];
 
+    const currentlyVisible = new Set<string>();
+
     leadsRef.current.forEach((lead) => {
       if (lead.latitude == null || lead.longitude == null) return;
 
@@ -170,6 +173,9 @@ function StreetViewInner({ leads, startPosition, onDataChanged, onPositionChange
       // Heading filter — only show pins in front of the camera
       const pinBearing = bearing(camLat, camLng, lead.latitude, lead.longitude);
       if (angleDiff(camHeading, pinBearing) > FOV_HALF) return;
+
+      currentlyVisible.add(lead.id);
+      const isNewlyVisible = !visibleLeadIdsRef.current.has(lead.id);
 
       const isMLS = !!lead.listing_status;
       const color = isMLS
@@ -186,6 +192,7 @@ function StreetViewInner({ leads, startPosition, onDataChanged, onPositionChange
         map: panorama,
         title: lead.property_address || lead.name || '',
         icon,
+        animation: isNewlyVisible ? google.maps.Animation.DROP : undefined,
       });
 
       marker.addListener("click", () => {
@@ -194,6 +201,8 @@ function StreetViewInner({ leads, startPosition, onDataChanged, onPositionChange
       });
       markersRef.current.push(marker);
     });
+
+    visibleLeadIdsRef.current = currentlyVisible;
   }
 
   return (

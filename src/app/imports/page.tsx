@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
 import MaterialIcon from '@/components/ui/MaterialIcon';
 import ImportProgress from '@/components/ui/ImportProgress';
+import ImportMiniMap from '@/components/map/ImportMiniMapDynamic';
 
 /* ================================================================
    UNIFIED IMPORT PAGE
@@ -134,6 +135,9 @@ export default function ImportsPage() {
 
   // Result
   const [result, setResult] = useState<ImportResult | null>(null);
+
+  // Live geocode map
+  const [geocodedPins, setGeocodedPins] = useState<{ lat: number; lng: number; color: string }[]>([]);
 
   // Overage prompt
   const [overagePrompt, setOveragePrompt] = useState<{ remaining: number; cost: string; isFree: boolean } | null>(null);
@@ -374,6 +378,7 @@ export default function ImportsPage() {
                   latitude: geo.lat, longitude: geo.lng, geocoded_at: new Date().toISOString(),
                 }).eq('id', toGeocode[i].id);
                 geocoded++;
+                setGeocodedPins(prev => [...prev, { lat: geo.lat, lng: geo.lng, color: '#3b82f6' }]);
               }
             }
           } catch { /* non-fatal */ }
@@ -407,6 +412,7 @@ export default function ImportsPage() {
     setResult(null);
     setProgress(0);
     setPasteText('');
+    setGeocodedPins([]);
   }
 
   // ── Derived stats ──
@@ -564,12 +570,22 @@ export default function ImportsPage() {
             phase={progressPhase}
             label={progressLabel}
           />
+          {phase === 'geocoding' && geocodedPins.length > 0 && (
+            <div className="rounded-2xl overflow-hidden border border-slate-200 h-[400px]">
+              <ImportMiniMap pins={geocodedPins} />
+            </div>
+          )}
         </div>
       )}
 
       {/* ═══ DONE: Results ═══ */}
       {phase === 'done' && result && (
         <div className="space-y-6">
+          {geocodedPins.length > 0 && (
+            <div className="rounded-2xl overflow-hidden border border-slate-200 h-[350px]">
+              <ImportMiniMap pins={geocodedPins} />
+            </div>
+          )}
           <div className="glass-card rounded-2xl p-8 text-center">
             <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-emerald-100">
               <MaterialIcon icon="check_circle" className="text-[48px] text-emerald-500" />

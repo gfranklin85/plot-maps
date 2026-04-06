@@ -459,9 +459,13 @@ export default function LeadsPage() {
               {!loading && leads.length === 0 && (
                 <tr>
                   <td colSpan={10} className="px-4 py-16 text-center text-secondary">
-                    <MaterialIcon icon="search_off" className="text-[40px] text-slate-300" />
-                    <p className="mt-2 text-lg font-medium">No leads found</p>
-                    <p className="text-sm">Try adjusting your search or filters</p>
+                    <MaterialIcon icon="upload_file" className="text-[40px] text-slate-300" />
+                    <p className="mt-2 text-lg font-medium">No properties yet</p>
+                    <p className="text-sm mb-4">Import your first list to get started.</p>
+                    <a href="/imports" className="inline-flex items-center gap-2 action-gradient text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:shadow-lg transition-shadow">
+                      <MaterialIcon icon="upload_file" className="text-[16px]" />
+                      Import a List
+                    </a>
                   </td>
                 </tr>
               )}

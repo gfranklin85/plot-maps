@@ -97,6 +97,13 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         });
       }
 
+      // Backfill full_name from Google OAuth metadata if missing
+      if (data && !data.full_name && user!.user_metadata?.full_name) {
+        const oauthName = user!.user_metadata.full_name as string;
+        await supabase.from('profiles').update({ full_name: oauthName }).eq('id', user!.id);
+        setProfile((prev) => ({ ...prev, fullName: oauthName }));
+      }
+
       // Migrate from localStorage if DB profile is empty
       const localData = localStorage.getItem('plot-maps-profile');
       if (localData && data && !data.full_name) {

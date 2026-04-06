@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import MaterialIcon from '@/components/ui/MaterialIcon';
+import { supabase } from '@/lib/supabase';
 
 const PLANS = [
   {
@@ -57,6 +58,14 @@ export default function SubscribePage() {
       alert('Pricing not configured yet. Contact support.');
       return;
     }
+
+    // Check if user is logged in before hitting Stripe
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      window.location.href = '/signup?next=/subscribe';
+      return;
+    }
+
     setLoading(priceId);
     try {
       const res = await fetch('/api/stripe/create-checkout', {

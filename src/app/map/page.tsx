@@ -9,6 +9,7 @@ import StreetViewProspecting from "@/components/map/StreetViewProspecting";
 import PlacesSearch from "@/components/map/PlacesSearch";
 import { PRIORITIES } from "@/lib/constants";
 import { useProfile } from "@/lib/profile-context";
+import MaterialIcon from "@/components/ui/MaterialIcon";
 
 const FILTER_TABS: { label: string; key: string; statuses: LeadStatus[] }[] = [
   { label: "All", key: "all", statuses: [] },
@@ -490,30 +491,44 @@ export default function MapPage() {
       </div>}
 
       {/* Map or Walk Mode */}
-      {loading ? (
-        <div className="h-full w-full bg-surface-container animate-pulse rounded-2xl" />
-      ) : walkMode ? (
-        <StreetViewProspecting
-          leads={filteredLeads}
-          startPosition={mapCenter || undefined}
-          onPositionChanged={setMapCenter}
-        />
-      ) : (
-        <MapDynamic
-          leads={filteredLeads}
-          mapType={mapType}
-          onCenterChanged={(c) => { setMapCenter(c); setHasUserPanned(true); }}
-          center={mapCenter}
-          onWalkHere={(lead) => {
-            if (lead.latitude && lead.longitude) {
-              setMapCenter({ lat: lead.latitude, lng: lead.longitude });
-              setWalkMode(true);
-            }
-          }}
-        />
-      )}
+      <div className="relative h-full w-full">
+        {loading ? (
+          <div className="h-full w-full bg-surface-container animate-pulse rounded-2xl" />
+        ) : walkMode ? (
+          <StreetViewProspecting
+            leads={filteredLeads}
+            startPosition={mapCenter || undefined}
+            onPositionChanged={setMapCenter}
+          />
+        ) : (
+          <MapDynamic
+            leads={filteredLeads}
+            mapType={mapType}
+            onCenterChanged={(c) => { setMapCenter(c); setHasUserPanned(true); }}
+            center={mapCenter}
+            onWalkHere={(lead) => {
+              if (lead.latitude && lead.longitude) {
+                setMapCenter({ lat: lead.latitude, lng: lead.longitude });
+                setWalkMode(true);
+              }
+            }}
+          />
+        )}
 
-      {/* Route Planner removed */}
+        {!loading && leads.length === 0 && (
+          <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
+            <div className="glass-card rounded-2xl p-8 text-center max-w-sm pointer-events-auto shadow-xl">
+              <MaterialIcon icon="add_location_alt" className="text-[48px] text-blue-500 mb-3" />
+              <h3 className="font-headline text-xl font-extrabold text-slate-900 mb-2">No properties yet</h3>
+              <p className="text-sm text-slate-500 mb-6">Import your first list to see pins on the map.</p>
+              <a href="/imports" className="inline-flex items-center gap-2 action-gradient text-white px-6 py-3 rounded-xl font-bold text-sm hover:shadow-lg transition-shadow">
+                <MaterialIcon icon="upload_file" className="text-[18px]" />
+                Import a List
+              </a>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

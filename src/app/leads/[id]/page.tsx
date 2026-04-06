@@ -14,6 +14,7 @@ import EmailComposer from '@/components/leads/EmailComposer';
 import MarketComps from '@/components/leads/MarketComps';
 import NearbyPlaces from '@/components/leads/NearbyPlaces';
 import LeadMap from '@/components/leads/LeadMap';
+import { usePhone } from '@/lib/phone-context';
 
 const GROUPS = [
   'Appointment Set', 'BUYERS', 'Dead Lead', 'Future Follow Up',
@@ -47,6 +48,7 @@ const OUTCOME_STATUS_MAP: Partial<Record<CallOutcome, LeadStatus>> = {
 export default function LeadDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
+  const { makeCall, isDesktop } = usePhone();
   const [lead, setLead] = useState<Lead | null>(null);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
@@ -347,7 +349,10 @@ export default function LeadDetailPage() {
                   <div className="space-y-1">
                     {[lead.phone, lead.phone_2, lead.phone_3].filter(Boolean).map((phone, idx) => (
                       <div key={idx} className="flex items-center gap-2">
-                        <a href={`tel:${phone}`} className="text-xs font-bold text-emerald-600 font-mono hover:underline">{formatPhone(phone!)}</a>
+                        <button onClick={() => {
+                          if (isDesktop) { makeCall(phone!, lead.owner_name || lead.name || 'Unknown', lead.id); }
+                          else { window.location.href = `tel:${phone}`; }
+                        }} className="text-xs font-bold text-emerald-600 font-mono hover:underline cursor-pointer">{formatPhone(phone!)}</button>
                         <MaterialIcon icon="call" className="text-[14px] text-green-600 cursor-pointer hover:scale-110 transition-transform" />
                       </div>
                     ))}

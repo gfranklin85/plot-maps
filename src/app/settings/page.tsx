@@ -12,6 +12,7 @@ export default function SettingsPage() {
   const { profile, initials, updateProfile } = useProfile();
   const [saved, setSaved] = useState(false);
   const [geocoding, setGeocoding] = useState(false);
+  const [mapCenterAddress, setMapCenterAddress] = useState('');
   const [geocodeResult, setGeocodeResult] = useState<{ total: number; geocoded: number } | null>(null);
 
   // Local form state
@@ -55,6 +56,24 @@ export default function SettingsPage() {
     updateProfile(form);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
+  }
+
+  async function geocodeMapCenter() {
+    if (!mapCenterAddress.trim()) return;
+    try {
+      const res = await fetch('/api/geocode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ address: mapCenterAddress.trim() }),
+      });
+      if (res.ok) {
+        const result = await res.json();
+        if (result?.lat && result?.lng) {
+          setForm((prev) => ({ ...prev, defaultMapCenter: { lat: result.lat, lng: result.lng } }));
+          setMapCenterAddress('');
+        }
+      }
+    } catch { /* ignore */ }
   }
 
   function handleNotificationToggle(key: keyof UserProfile['notifications']) {
@@ -231,6 +250,43 @@ export default function SettingsPage() {
               </button>
             ))}
           </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-2">Default Map Center</label>
+          <p className="text-xs text-slate-500 mb-2">
+            Enter an address or city to set where the map opens by default.
+          </p>
+          <div className="flex gap-3">
+            <input
+              type="text"
+              value={mapCenterAddress}
+              onChange={(e) => setMapCenterAddress(e.target.value)}
+              placeholder={form.defaultMapCenter ? 'Update location...' : 'e.g. Hanford, CA'}
+              onKeyDown={(e) => e.key === 'Enter' && geocodeMapCenter()}
+              className="flex-1 px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
+            />
+            <button
+              onClick={geocodeMapCenter}
+              disabled={!mapCenterAddress.trim()}
+              className="px-4 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-bold disabled:opacity-50 hover:bg-blue-700 transition-colors"
+            >
+              Set
+            </button>
+          </div>
+          {form.defaultMapCenter && (
+            <div className="flex items-center gap-2 mt-2">
+              <span className="text-xs text-slate-500">
+                Current: {form.defaultMapCenter.lat.toFixed(4)}, {form.defaultMapCenter.lng.toFixed(4)}
+              </span>
+              <button
+                onClick={() => setForm((prev) => ({ ...prev, defaultMapCenter: null }))}
+                className="text-xs text-red-500 hover:text-red-700"
+              >
+                Reset to default
+              </button>
+            </div>
+          )}
         </div>
       </section>
 
@@ -571,34 +627,36 @@ function PhoneNumberSection() {
               {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
 
               {availableNumbers.length > 0 && (
-                <div className="space-y-2 max-h-48 overflow-y-auto">
-                  {availableNumbers.map((n) => (
-                    <label
-                      key={n.phoneNumber}
-                      className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-colors ${
-                        selected === n.phoneNumber ? 'bg-blue-50 border border-blue-200' : 'bg-slate-50 border border-slate-200 hover:bg-slate-100'
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="number"
-                        value={n.phoneNumber}
-                        checked={selected === n.phoneNumber}
-                        onChange={() => setSelected(n.phoneNumber)}
-                        className="w-4 h-4 text-blue-600"
-                      />
-                      <span className="font-mono font-bold text-sm">{formatPhone(n.phoneNumber)}</span>
-                      {n.locality && <span className="text-xs text-slate-400">{n.locality}, {n.region}</span>}
-                    </label>
-                  ))}
+                <>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {availableNumbers.map((n) => (
+                      <label
+                        key={n.phoneNumber}
+                        className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-colors ${
+                          selected === n.phoneNumber ? 'bg-blue-50 border border-blue-200' : 'bg-slate-50 border border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="number"
+                          value={n.phoneNumber}
+                          checked={selected === n.phoneNumber}
+                          onChange={() => setSelected(n.phoneNumber)}
+                          className="w-4 h-4 text-blue-600"
+                        />
+                        <span className="font-mono font-bold text-sm">{formatPhone(n.phoneNumber)}</span>
+                        {n.locality && <span className="text-xs text-slate-400">{n.locality}, {n.region}</span>}
+                      </label>
+                    ))}
+                  </div>
                   <button
                     onClick={claimNumber}
                     disabled={!selected || provisioning}
-                    className="w-full rounded-xl action-gradient text-white py-3 font-bold text-sm disabled:opacity-50"
+                    className="w-full rounded-xl action-gradient text-white py-3 font-bold text-sm disabled:opacity-50 mt-3"
                   >
                     {provisioning ? 'Provisioning...' : 'Claim This Number'}
                   </button>
-                </div>
+                </>
               )}
             </div>
           )}

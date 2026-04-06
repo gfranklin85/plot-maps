@@ -8,6 +8,7 @@ import MapDynamic from "@/components/map/MapDynamic";
 import StreetViewProspecting from "@/components/map/StreetViewProspecting";
 import PlacesSearch from "@/components/map/PlacesSearch";
 import { PRIORITIES } from "@/lib/constants";
+import { useProfile } from "@/lib/profile-context";
 
 const FILTER_TABS: { label: string; key: string; statuses: LeadStatus[] }[] = [
   { label: "All", key: "all", statuses: [] },
@@ -35,6 +36,7 @@ const PRIORITY_BTN_STYLES: Record<Priority, { active: string; inactive: string }
 };
 
 export default function MapPage() {
+  const { profile } = useProfile();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("all");
@@ -50,7 +52,15 @@ export default function MapPage() {
   // Route planner removed — Walk Mode replaces it
   const [listingFilter, setListingFilter] = useState<string>('all');
   const [walkMode, setWalkMode] = useState(false);
-  const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(null);
+  const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(profile.defaultMapCenter);
+  const [hasUserPanned, setHasUserPanned] = useState(false);
+
+  // Sync profile default center when it loads (async)
+  useEffect(() => {
+    if (profile.defaultMapCenter && !hasUserPanned) {
+      setMapCenter(profile.defaultMapCenter);
+    }
+  }, [profile.defaultMapCenter, hasUserPanned]);
 
   useEffect(() => {
     async function fetchLeads() {
@@ -492,7 +502,7 @@ export default function MapPage() {
         <MapDynamic
           leads={filteredLeads}
           mapType={mapType}
-          onCenterChanged={setMapCenter}
+          onCenterChanged={(c) => { setMapCenter(c); setHasUserPanned(true); }}
           center={mapCenter}
           onWalkHere={(lead) => {
             if (lead.latitude && lead.longitude) {

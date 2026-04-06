@@ -7,6 +7,7 @@ import MaterialIcon from "@/components/ui/MaterialIcon";
 import { cn, formatPhone } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 import { useProfile } from "@/lib/profile-context";
+import { usePhone } from "@/lib/phone-context";
 
 interface Props {
   lead: Lead;
@@ -111,6 +112,7 @@ function generateTalkingPoints(lead: Lead): string[] {
 
 export default function PropertyPopup({ lead, onUpdate, walkMode = false, onWalkHere }: Props) {
   const { profile } = useProfile();
+  const { makeCall, isDesktop } = usePhone();
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -238,10 +240,20 @@ export default function PropertyPopup({ lead, onUpdate, walkMode = false, onWalk
       {phones.length > 0 && (
         <div className="px-4 pb-2 flex flex-wrap gap-2">
           {phones.map((phone, idx) => (
-            <a key={idx} href={`tel:${phone}`} className="flex items-center gap-1 text-[11px] font-bold text-emerald-600 hover:underline">
+            <button
+              key={idx}
+              onClick={() => {
+                if (isDesktop) {
+                  makeCall(phone, lead.owner_name || lead.name || 'Unknown', lead.id);
+                } else {
+                  window.location.href = `tel:${phone}`;
+                }
+              }}
+              className="flex items-center gap-1 text-[11px] font-bold text-emerald-600 hover:underline cursor-pointer"
+            >
               <MaterialIcon icon="call" className="text-[12px] text-green-600" />
               {formatPhone(phone)}
-            </a>
+            </button>
           ))}
         </div>
       )}

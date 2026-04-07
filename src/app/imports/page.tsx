@@ -4,7 +4,6 @@ import { useState, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
 import MaterialIcon from '@/components/ui/MaterialIcon';
-import ImportProgress from '@/components/ui/ImportProgress';
 import ImportMiniMap from '@/components/map/ImportMiniMapDynamic';
 import { useAuth } from '@/lib/auth-context';
 
@@ -119,7 +118,7 @@ export default function ImportsPage() {
   const [dragActive, setDragActive] = useState(false);
 
   // Detected data
-  const [fileName, setFileName] = useState('');
+  const [, setFileName] = useState('');
   const [format, setFormat] = useState<'mls' | 'propwire' | 'generic'>('generic');
   // Headers tracked internally, not rendered directly
   const [, setHeaders] = useState<string[]>([]);
@@ -132,8 +131,8 @@ export default function ImportsPage() {
 
   // Progress
   const [progress, setProgress] = useState(0);
-  const [progressPhase, setProgressPhase] = useState<'importing' | 'geocoding' | 'processing'>('importing');
-  const [progressLabel, setProgressLabel] = useState('');
+  const [, setProgressPhase] = useState<'importing' | 'geocoding' | 'processing'>('importing');
+  const [, setProgressLabel] = useState('');
 
   // Result
   const [result, setResult] = useState<ImportResult | null>(null);
@@ -422,20 +421,21 @@ export default function ImportsPage() {
   const formatLabel = format === 'mls' ? 'MLS Listing Data' : format === 'propwire' ? 'Property List (PropWire format)' : 'Property Data';
 
   return (
-    <div className="p-8 max-w-4xl mx-auto">
-      <div className="mb-8">
-        <h1 className="font-headline text-3xl font-extrabold">Import Leads</h1>
-        <p className="text-slate-500 mt-1">Drop any list. We figure out the rest.</p>
+    <div className="max-w-5xl mx-auto px-10 py-12 space-y-16">
+      {/* Header */}
+      <div className="max-w-2xl">
+        <h1 className="text-4xl font-headline font-extrabold tracking-tight mb-3">Import Property Leads</h1>
+        <p className="text-slate-400 text-lg leading-relaxed">Turn your CSV or property lists into geolocated pins in seconds. Our AI handles the mapping.</p>
       </div>
 
       {/* ═══ IDLE: Drop zone + paste ═══ */}
       {phase === 'idle' && (
-        <div className="space-y-6">
-          {/* Drop zone */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Drop Zone */}
           <div
             className={cn(
-              'rounded-2xl border-2 border-dashed p-12 text-center transition-all cursor-pointer',
-              dragActive ? 'border-blue-500 bg-blue-50' : 'border-slate-300 hover:border-blue-400 hover:bg-blue-50/30'
+              'group relative flex flex-col items-center justify-center border-2 border-dashed rounded-2xl p-12 transition-all cursor-pointer',
+              dragActive ? 'border-indigo-500 bg-indigo-500/5' : 'border-slate-600/30 hover:border-indigo-400/50 bg-slate-800/20'
             )}
             onClick={() => fileRef.current?.click()}
             onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
@@ -451,37 +451,39 @@ export default function ImportsPage() {
               const file = e.target.files?.[0];
               if (file) handleFile(file);
             }} />
-            <MaterialIcon icon="cloud_upload" className="text-[56px] text-blue-400 mb-4" />
-            <p className="text-lg font-bold text-slate-700">Drop your CSV file here</p>
-            <p className="text-sm text-slate-400 mt-1">PropWire, BatchLeads, MLS exports, county records — any format</p>
-            <p className="text-xs text-slate-400 mt-4">or click to browse</p>
+            <div className="w-16 h-16 rounded-full bg-slate-700/50 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+              <MaterialIcon icon="cloud_upload" className="text-[32px] text-indigo-400" />
+            </div>
+            <p className="text-xl font-semibold text-slate-200 mb-2">Drop CSV or Excel</p>
+            <p className="text-sm text-slate-500 mb-6">PropWire, BatchLeads, MLS exports, county records</p>
+            <button className="bg-slate-700/50 text-slate-200 px-6 py-2 rounded-lg font-medium border border-white/10 hover:bg-slate-600/50 transition-colors text-sm">
+              Select File
+            </button>
           </div>
 
-          {/* Divider */}
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-200" /></div>
-            <div className="relative flex justify-center"><span className="bg-white px-4 text-sm text-slate-400 font-medium">or paste text</span></div>
-          </div>
-
-          {/* Paste area */}
-          <div className="glass-card rounded-2xl p-6">
+          {/* Smart Paste */}
+          <div className="flex flex-col bg-slate-800/30 rounded-2xl p-8 border border-white/5">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-2">
+                <MaterialIcon icon="auto_awesome" className="text-[20px] text-orange-400" />
+                <h3 className="text-sm font-bold uppercase tracking-widest text-slate-300">Smart Paste</h3>
+              </div>
+              <span className="text-[10px] bg-orange-500/10 text-orange-400 px-2 py-0.5 rounded font-bold">AI</span>
+            </div>
             <textarea
               value={pasteText}
               onChange={(e) => setPasteText(e.target.value)}
-              rows={6}
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 resize-none"
-              placeholder="Paste MLS data, RPR reports, property lists, or any text with property information..."
+              rows={8}
+              className="flex-1 bg-slate-900/50 border-none rounded-lg p-4 font-mono text-xs text-slate-300 focus:ring-1 focus:ring-indigo-500 resize-none placeholder:text-slate-600"
+              placeholder={"Paste address chunks, MLS snippets, or unstructured text...\n\n123 Alpine Way, Boulder CO $1.2M\n09/12/23 - New listing: 455 Sunset Blvd, LA..."}
             />
-            <div className="flex justify-end mt-3">
-              <button
-                onClick={handlePaste}
-                disabled={!pasteText.trim() || aiParsing}
-                className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-violet-500 px-6 py-2.5 text-sm font-bold text-white hover:shadow-lg transition-all disabled:opacity-50"
-              >
-                <MaterialIcon icon="auto_awesome" className="text-[18px]" />
-                {aiParsing ? 'Analyzing...' : 'Smart Import'}
-              </button>
-            </div>
+            <button
+              onClick={handlePaste}
+              disabled={!pasteText.trim() || aiParsing}
+              className="mt-4 text-indigo-400 text-xs font-bold flex items-center gap-1 hover:gap-2 transition-all disabled:opacity-50"
+            >
+              {aiParsing ? 'ANALYZING...' : 'PARSE SNIPPET'} <MaterialIcon icon="arrow_forward" className="text-xs" />
+            </button>
           </div>
         </div>
       )}
@@ -489,54 +491,60 @@ export default function ImportsPage() {
       {/* ═══ DETECTING: Loading ═══ */}
       {phase === 'detecting' && (
         <div className="flex flex-col items-center justify-center py-20">
-          <div className="h-12 w-12 animate-spin rounded-full border-4 border-blue-600 border-t-transparent mb-4" />
-          <p className="text-lg font-bold text-slate-700">Analyzing your data...</p>
-          <p className="text-sm text-slate-400 mt-1">Auto-detecting columns and format</p>
+          <div className="h-12 w-12 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent mb-4" />
+          <p className="text-lg font-bold text-slate-200">Analyzing your data...</p>
+          <p className="text-sm text-slate-500 mt-1">Auto-detecting columns and format</p>
         </div>
       )}
 
-      {/* ═══ PREVIEW: Show what we found ═══ */}
+      {/* ═══ PREVIEW: Data Mapping ═══ */}
       {phase === 'preview' && (
-        <div className="space-y-6">
-          {/* Summary card */}
-          <div className="glass-card rounded-2xl p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <div className="flex items-center gap-3 mb-1">
-                  <MaterialIcon icon="check_circle" className="text-[24px] text-emerald-500" />
-                  <h3 className="text-xl font-bold text-slate-900">Ready to Import</h3>
-                </div>
-                <p className="text-sm text-slate-500 ml-9">{fileName} · {rows.length} properties detected · <span className="font-medium text-blue-600">{formatLabel}</span></p>
-              </div>
-              <button onClick={reset} className="text-xs text-slate-400 hover:text-red-500 transition-colors">Clear</button>
+        <div className="space-y-8">
+          {/* Ready bar */}
+          <div className="flex items-end justify-between">
+            <div className="space-y-1">
+              <span className="text-[10px] font-bold text-indigo-400 tracking-[0.2em] uppercase">Data Preview</span>
+              <h2 className="text-3xl font-headline font-bold text-slate-100">Ready to Import</h2>
             </div>
-
-            {/* What we detected */}
-            <div className="bg-slate-50 rounded-xl p-4 mb-4">
-              <p className="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-2">Auto-detected {mappedFields.length} fields</p>
-              <div className="flex flex-wrap gap-2">
-                {mappedFields.map((f) => (
-                  <span key={f.systemField} className="inline-flex items-center gap-1 rounded-full bg-white border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700">
-                    <MaterialIcon icon="check" className="text-[12px] text-emerald-500" />
-                    {f.systemField.replace(/_/g, ' ')}
-                  </span>
-                ))}
+            <div className="bg-slate-800/60 border border-indigo-500/20 px-6 py-3 rounded-full flex items-center gap-6">
+              <div className="flex items-center gap-2">
+                <MaterialIcon icon="check_circle" className="text-[16px] text-indigo-400" />
+                <span className="text-sm font-semibold text-slate-200">{rows.length} Rows Detected</span>
               </div>
+              <div className="h-4 w-px bg-slate-600" />
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-500 uppercase tracking-wider">Format:</span>
+                <span className="text-xs font-bold text-slate-200 uppercase">{formatLabel}</span>
+              </div>
+              <button onClick={reset} className="text-xs text-slate-500 hover:text-red-400 transition-colors ml-2">Clear</button>
             </div>
+          </div>
 
-            {/* Preview table */}
-            <div className="max-h-64 overflow-auto rounded-xl border border-slate-200">
-              <table className="w-full text-xs">
-                <thead className="bg-slate-50 sticky top-0">
-                  <tr>
+          {/* Field grid */}
+          <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+            {mappedFields.map((f) => (
+              <div key={f.systemField} className="bg-slate-900/50 p-4 rounded-xl border border-white/5 flex flex-col gap-2">
+                <MaterialIcon icon="task_alt" className="text-[14px] text-indigo-400" />
+                <span className="text-[10px] font-bold text-slate-500 uppercase">{f.systemField.replace(/_/g, ' ')}</span>
+                <span className="text-xs text-slate-300 truncate">{f.sampleValue || '—'}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Preview table */}
+          <div className="bg-slate-900/50 rounded-2xl border border-white/5 overflow-hidden">
+            <div className="overflow-x-auto max-h-64">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-800/50 border-b border-white/5">
                     {mappedFields.slice(0, 6).map((f) => (
-                      <th key={f.systemField} className="px-3 py-2 text-left font-bold text-slate-600">{f.systemField.replace(/_/g, ' ')}</th>
+                      <th key={f.systemField} className="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">{f.systemField.replace(/_/g, ' ')}</th>
                     ))}
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-white/5">
                   {rows.slice(0, 10).map((row, i) => (
-                    <tr key={i} className="border-t border-slate-100">
+                    <tr key={i} className="hover:bg-slate-800/30 transition-colors">
                       {mappedFields.slice(0, 6).map((f) => {
                         let val = '';
                         if (f.csvHeader.includes(' + ')) {
@@ -544,7 +552,7 @@ export default function ImportsPage() {
                         } else {
                           val = row[f.csvHeader] || '';
                         }
-                        return <td key={f.systemField} className="px-3 py-1.5 truncate max-w-[150px]">{val}</td>;
+                        return <td key={f.systemField} className="px-6 py-3 text-xs text-slate-300 truncate max-w-[150px]">{val}</td>;
                       })}
                     </tr>
                   ))}
@@ -556,7 +564,7 @@ export default function ImportsPage() {
           {/* Import button */}
           <button
             onClick={runImport}
-            className="w-full rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 text-white py-4 font-bold text-base hover:shadow-lg transition-all flex items-center justify-center gap-2"
+            className="w-full rounded-xl bg-gradient-to-r from-indigo-500 to-indigo-600 text-white py-4 font-bold text-base hover:shadow-xl shadow-lg shadow-indigo-500/20 transition-all flex items-center justify-center gap-2"
           >
             <MaterialIcon icon="rocket_launch" className="text-[20px]" />
             Import {rows.length} Properties
@@ -566,16 +574,37 @@ export default function ImportsPage() {
 
       {/* ═══ IMPORTING / GEOCODING: Progress ═══ */}
       {(phase === 'importing' || phase === 'geocoding') && (
-        <div className="space-y-6">
-          <ImportProgress
-            current={progress}
-            total={phase === 'geocoding' ? (result ? 0 : rows.filter(() => true).length) : rows.length}
-            phase={progressPhase}
-            label={progressLabel}
-          />
+        <div className="space-y-8">
+          <div className="space-y-4">
+            <div className="flex justify-between items-end">
+              <div className="space-y-1">
+                <span className="text-[10px] font-bold text-orange-400 tracking-[0.2em] uppercase">Live Processing</span>
+                <h2 className="text-3xl font-headline font-bold text-slate-100">
+                  {phase === 'geocoding' ? 'Geocoding & Mapping' : 'Importing Data'}
+                </h2>
+              </div>
+              <span className="text-sm font-bold text-indigo-400">
+                {progress} / {phase === 'geocoding' ? rows.length : rows.length} Properties
+              </span>
+            </div>
+            <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-indigo-500 to-indigo-400 transition-all duration-300"
+                style={{ width: `${rows.length > 0 ? (progress / rows.length) * 100 : 0}%` }}
+              />
+            </div>
+          </div>
+
           {phase === 'geocoding' && geocodedPins.length > 0 && (
-            <div className="rounded-2xl overflow-hidden border border-slate-200 h-[400px]">
+            <div className="relative h-[400px] rounded-3xl overflow-hidden border border-white/5">
               <ImportMiniMap pins={geocodedPins} />
+              <div className="absolute top-4 left-4 bg-slate-900/80 backdrop-blur p-3 rounded-xl border border-white/10">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse" />
+                  <span className="text-xs font-bold text-slate-200 uppercase tracking-wider">Live Geocoding</span>
+                </div>
+                <p className="text-[10px] text-slate-500 mt-1 font-mono">{geocodedPins.length} pins placed</p>
+              </div>
             </div>
           )}
         </div>
@@ -583,80 +612,124 @@ export default function ImportsPage() {
 
       {/* ═══ DONE: Results ═══ */}
       {phase === 'done' && result && (
-        <div className="space-y-6">
-          {geocodedPins.length > 0 && (
-            <div className="rounded-2xl overflow-hidden border border-slate-200 h-[350px]">
-              <ImportMiniMap pins={geocodedPins} />
-            </div>
-          )}
-          <div className="glass-card rounded-2xl p-8 text-center">
-            <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-emerald-100">
-              <MaterialIcon icon="check_circle" className="text-[48px] text-emerald-500" />
-            </div>
-            <h3 className="font-headline text-2xl font-extrabold text-slate-900">Import Complete!</h3>
-            <p className="text-slate-500 mt-2">{result.total} properties processed</p>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          {/* Left: Map */}
+          <div className="lg:col-span-7">
+            {geocodedPins.length > 0 && (
+              <div className="relative h-[400px] rounded-3xl overflow-hidden border border-white/5">
+                <ImportMiniMap pins={geocodedPins} />
+              </div>
+            )}
+          </div>
 
-            <div className="flex justify-center gap-8 mt-6">
-              {result.inserted > 0 && (
-                <div className="text-center">
-                  <p className="text-2xl font-extrabold text-blue-600">{result.inserted}</p>
-                  <p className="text-xs text-slate-400">New</p>
-                </div>
-              )}
-              {result.updated > 0 && (
-                <div className="text-center">
-                  <p className="text-2xl font-extrabold text-violet-600">{result.updated}</p>
-                  <p className="text-xs text-slate-400">Updated</p>
-                </div>
-              )}
-              {result.geocoded > 0 && (
-                <div className="text-center">
-                  <p className="text-2xl font-extrabold text-emerald-600">{result.geocoded}</p>
-                  <p className="text-xs text-slate-400">Pinpointed</p>
-                </div>
-              )}
-              {result.errors > 0 && (
-                <div className="text-center">
-                  <p className="text-2xl font-extrabold text-red-500">{result.errors}</p>
-                  <p className="text-xs text-slate-400">Errors</p>
-                </div>
-              )}
+          {/* Right: Summary */}
+          <div className="lg:col-span-5">
+            <div className="bg-slate-800/30 p-8 rounded-3xl border border-white/5">
+              <h3 className="text-lg font-bold text-slate-100 mb-8">Import Summary</h3>
+              <div className="space-y-6">
+                {result.inserted > 0 && (
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-full bg-indigo-500/10 flex items-center justify-center">
+                        <MaterialIcon icon="add" className="text-[20px] text-indigo-400" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-slate-200">New Records</p>
+                        <p className="text-[10px] text-slate-500">Inserted into database</p>
+                      </div>
+                    </div>
+                    <span className="text-xl font-headline font-extrabold text-slate-100">{result.inserted}</span>
+                  </div>
+                )}
+                {result.updated > 0 && (
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-full bg-violet-500/10 flex items-center justify-center">
+                        <MaterialIcon icon="update" className="text-[20px] text-violet-400" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-slate-200">Updated</p>
+                        <p className="text-[10px] text-slate-500">Existing records enriched</p>
+                      </div>
+                    </div>
+                    <span className="text-xl font-headline font-extrabold text-slate-100">{result.updated}</span>
+                  </div>
+                )}
+                {result.geocoded > 0 && (
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-full bg-orange-500/10 flex items-center justify-center">
+                        <MaterialIcon icon="location_on" className="text-[20px] text-orange-400" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-slate-200">Pinpointed</p>
+                        <p className="text-[10px] text-slate-500">High-confidence geocode</p>
+                      </div>
+                    </div>
+                    <span className="text-xl font-headline font-extrabold text-slate-100">{result.geocoded}</span>
+                  </div>
+                )}
+                {result.errors > 0 && (
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center">
+                        <MaterialIcon icon="error" className="text-[20px] text-red-400" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-slate-200">Errors</p>
+                        <p className="text-[10px] text-slate-500">Could not process</p>
+                      </div>
+                    </div>
+                    <span className="text-xl font-headline font-extrabold text-slate-100">{result.errors}</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-10 pt-8 border-t border-white/5 space-y-3">
+                <a href="/map" className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-500 to-indigo-600 text-white py-3 rounded-xl font-bold text-sm shadow-lg shadow-indigo-500/20 hover:shadow-xl transition-all">
+                  <MaterialIcon icon="map" className="text-[18px]" />
+                  Finish &amp; View Map
+                </a>
+                <button onClick={reset} className="w-full text-slate-500 py-3 rounded-xl font-bold text-sm hover:text-slate-300 transition-colors">
+                  Import Another
+                </button>
+              </div>
             </div>
 
             {/* Overage / Upgrade prompt */}
             {overagePrompt && overagePrompt.isFree && (
-              <div className="mt-6 rounded-xl bg-gradient-to-br from-indigo-50 to-blue-50 border-2 border-indigo-200 p-8 text-center">
-                <MaterialIcon icon="lock_open" className="text-[40px] text-indigo-500 mb-3" />
-                <h4 className="font-headline text-xl font-extrabold text-slate-900 mb-2">
+              <div className="mt-6 rounded-2xl bg-gradient-to-br from-indigo-900/50 to-blue-900/50 border border-indigo-500/30 p-8 text-center">
+                <MaterialIcon icon="lock_open" className="text-[40px] text-indigo-400 mb-3" />
+                <h4 className="font-headline text-xl font-extrabold text-slate-100 mb-2">
                   You&apos;ve used your 50 free geocodes
                 </h4>
-                <p className="text-sm text-slate-600 mb-2">
-                  {overagePrompt.remaining} properties were imported but can&apos;t be placed on the map yet.
+                <p className="text-sm text-slate-400 mb-2">
+                  {overagePrompt.remaining} properties imported but not yet mapped.
                 </p>
                 <p className="text-sm text-slate-500 mb-6">
-                  Subscribe to unlock 500+ geocodes/month, walk mode, and more.
+                  Subscribe to unlock 500+ geocodes/month and more.
                 </p>
                 <a
                   href="/subscribe"
                   className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-500 to-blue-600 text-white px-8 py-4 font-bold text-base hover:shadow-xl shadow-lg shadow-indigo-500/20 transition-all"
                 >
                   <MaterialIcon icon="upgrade" className="text-[20px]" />
-                  Subscribe — Starting at $49/mo
+                  Subscribe — $49/mo
                 </a>
-                <p className="text-xs text-slate-400 mt-3">Cancel anytime. Your imported data is saved.</p>
+                <p className="text-xs text-slate-600 mt-3">Cancel anytime. Your data is saved.</p>
               </div>
             )}
 
             {overagePrompt && !overagePrompt.isFree && (
-              <div className="mt-6 rounded-xl bg-amber-50 border border-amber-200 p-6">
+              <div className="mt-6 rounded-2xl bg-amber-900/20 border border-amber-500/30 p-6">
                 <div className="flex items-center gap-2 mb-3">
-                  <MaterialIcon icon="warning" className="text-[20px] text-amber-600" />
-                  <h4 className="font-bold text-amber-800">
-                    {overagePrompt.remaining} properties still need map pins
+                  <MaterialIcon icon="warning" className="text-[20px] text-amber-400" />
+                  <h4 className="font-bold text-amber-200">
+                    {overagePrompt.remaining} properties need map pins
                   </h4>
                 </div>
-                <p className="text-sm text-amber-700 mb-4">
-                  You&apos;ve reached your monthly geocoding limit. These properties are saved but won&apos;t appear on the map until geocoded.
+                <p className="text-sm text-amber-300/70 mb-4">
+                  Monthly limit reached. Properties saved but not mapped.
                 </p>
                 <div className="flex flex-col sm:flex-row gap-3">
                   <button
@@ -671,7 +744,7 @@ export default function ImportsPage() {
                         const data = await res.json();
                         if (data.success) {
                           setOveragePrompt(null);
-                          alert(`Charged ${overagePrompt.cost}. Remaining properties will be geocoded shortly.`);
+                          alert(`Charged ${overagePrompt.cost}. Properties will be geocoded.`);
                         } else if (data.checkout_url) {
                           window.location.href = data.checkout_url;
                         } else {
@@ -684,29 +757,18 @@ export default function ImportsPage() {
                     className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-amber-600 text-white py-3 font-bold text-sm hover:bg-amber-700 transition-colors disabled:opacity-50"
                   >
                     <MaterialIcon icon="bolt" className="text-[18px]" />
-                    {overageLoading ? 'Processing...' : `Geocode Now — ${overagePrompt.cost}`}
+                    {overageLoading ? 'Processing...' : `Geocode — ${overagePrompt.cost}`}
                   </button>
                   <a
                     href="/subscribe"
-                    className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-blue-600 text-white py-3 font-bold text-sm hover:bg-blue-700 transition-colors"
+                    className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-indigo-600 text-white py-3 font-bold text-sm hover:bg-indigo-700 transition-colors"
                   >
                     <MaterialIcon icon="upgrade" className="text-[18px]" />
-                    Upgrade for More
+                    Upgrade
                   </a>
                 </div>
               </div>
             )}
-
-            <div className="flex justify-center gap-4 mt-8">
-              <a href="/map" className="flex items-center gap-2 rounded-xl action-gradient px-6 py-3 text-sm font-bold text-white hover:shadow-lg transition-shadow">
-                <MaterialIcon icon="map" className="text-[18px]" />
-                View on Map
-              </a>
-              <button onClick={reset} className="flex items-center gap-2 rounded-xl border border-slate-200 px-6 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors">
-                <MaterialIcon icon="upload_file" className="text-[18px]" />
-                Import Another
-              </button>
-            </div>
           </div>
         </div>
       )}

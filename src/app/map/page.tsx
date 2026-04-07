@@ -20,26 +20,6 @@ const FILTER_TABS: { label: string; key: string; statuses: LeadStatus[] }[] = [
   { label: "Not Contacted", key: "not-contacted", statuses: ["Not Contacted"] },
 ];
 
-const PRIORITY_BTN_STYLES: Record<Priority, { active: string; inactive: string }> = {
-  high: {
-    active: "bg-red-100 text-red-700 ring-1 ring-red-300",
-    inactive: "text-red-600 hover:bg-red-50",
-  },
-  medium: {
-    active: "bg-amber-100 text-amber-700 ring-1 ring-amber-300",
-    inactive: "text-amber-600 hover:bg-amber-50",
-  },
-  low: {
-    active: "bg-slate-200 text-slate-700 ring-1 ring-slate-300",
-    inactive: "text-slate-500 hover:bg-slate-50",
-  },
-};
-
-const MAP_TYPE_ICONS: Record<string, string> = {
-  roadmap: "map",
-  satellite: "satellite_alt",
-  hybrid: "layers",
-};
 
 export default function MapPage() {
   const { profile } = useProfile();
@@ -157,113 +137,116 @@ export default function MapPage() {
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10">
           <button
             onClick={() => setWalkMode(false)}
-            className="flex items-center gap-1.5 rounded-full bg-blue-600/90 backdrop-blur text-white px-4 py-2 text-xs font-bold shadow-lg hover:bg-blue-700 transition-all"
+            className="group flex items-center gap-2 bg-[#0c1324]/90 backdrop-blur-xl text-white px-5 py-2.5 rounded-full shadow-2xl border border-white/10 hover:bg-indigo-500/20 transition-all"
           >
-            <span className="material-symbols-rounded text-[18px]">map</span>
-            Back to Map
+            <span className="material-symbols-rounded text-[18px] text-indigo-400">map</span>
+            <span className="text-xs font-bold uppercase tracking-widest">Back to Map</span>
           </button>
         </div>
       ) : (
-        <div className="absolute top-4 left-4 right-4 z-10 flex items-center gap-2">
-          {/* Search */}
-          <div className="flex-1 max-w-md">
-            <PlacesSearch
-              onPlaceSelected={(place) => {
-                setMapCenter({ lat: place.lat, lng: place.lng });
-                setSearch(place.address);
-              }}
-              className="shadow-lg"
-            />
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 w-full max-w-3xl px-4">
+          <div className="flex items-center gap-2 bg-[#0c1324]/80 backdrop-blur-xl p-2 rounded-2xl shadow-2xl border border-white/10">
+            {/* Search */}
+            <div className="flex-1">
+              <PlacesSearch
+                onPlaceSelected={(place) => {
+                  setMapCenter({ lat: place.lat, lng: place.lng });
+                  setSearch(place.address);
+                }}
+                className="!bg-[#070d1f]/60 !border-white/10 !text-white !placeholder-slate-500 !rounded-xl !shadow-none"
+              />
+            </div>
+
+            {/* Map type toggle */}
+            <div className="flex gap-0.5 bg-[#070d1f]/80 p-1 rounded-xl">
+              {(["roadmap", "satellite", "hybrid"] as const).map((type) => (
+                <button
+                  key={type}
+                  onClick={() => setMapType(type)}
+                  className={`px-3 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all ${
+                    mapType === type
+                      ? "bg-indigo-600 text-white"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  {type === "roadmap" ? "Map" : type === "satellite" ? "Sat" : "Hybrid"}
+                </button>
+              ))}
+            </div>
+
+            {/* Walk Mode */}
+            <button
+              onClick={() => setWalkMode(true)}
+              title="Walk Mode"
+              className="w-10 h-10 flex items-center justify-center rounded-xl bg-[#070d1f]/80 text-slate-400 hover:text-indigo-400 hover:bg-indigo-500/10 transition-all border border-white/5"
+            >
+              <span className="material-symbols-rounded text-[20px]">directions_walk</span>
+            </button>
+
+            {/* Filters */}
+            <button
+              onClick={() => setFiltersOpen((o) => !o)}
+              title="Filters"
+              className={`w-10 h-10 flex items-center justify-center rounded-xl transition-all border ${
+                filtersOpen || hasActiveFilters
+                  ? "bg-indigo-600 text-white border-indigo-500"
+                  : "bg-[#070d1f]/80 text-slate-400 hover:text-indigo-400 border-white/5"
+              }`}
+            >
+              <span className="material-symbols-rounded text-[20px]">tune</span>
+            </button>
           </div>
 
-          {/* Map type — icon-only toggle */}
-          <div className="inline-flex items-center gap-0.5 rounded-full glass-card/80 backdrop-blur p-1 shadow-lg">
-            {(["roadmap", "satellite", "hybrid"] as const).map((type) => (
-              <button
-                key={type}
-                onClick={() => setMapType(type)}
-                title={type === "roadmap" ? "Map" : type === "satellite" ? "Satellite" : "Hybrid"}
-                className={`rounded-full w-8 h-8 flex items-center justify-center transition-all ${
-                  mapType === type
-                    ? "bg-white text-blue-600 shadow-sm"
-                    : "text-slate-500 hover:text-slate-700"
-                }`}
-              >
-                <span className="material-symbols-rounded text-[18px]">{MAP_TYPE_ICONS[type]}</span>
-              </button>
-            ))}
-          </div>
-
-          {/* Listing filter */}
-          <div className="inline-flex items-center gap-0.5 rounded-full glass-card/80 backdrop-blur p-1 shadow-lg">
+          {/* Listing filter pills — below the search bar */}
+          <div className="flex justify-center gap-2 mt-3">
             {[
-              { key: 'all', label: 'All' },
-              { key: 'prospects', label: 'Prospects' },
-              { key: 'Sold', label: '● Sold', color: 'text-green-600' },
-              { key: 'Active', label: '◆ Active', color: 'text-orange-500' },
-              { key: 'Pending', label: '◆ Pending', color: 'text-yellow-600' },
+              { key: 'all', label: 'All', color: 'bg-indigo-500' },
+              { key: 'prospects', label: 'Prospects', color: 'bg-orange-400' },
+              { key: 'Sold', label: 'Sold', color: 'bg-green-500' },
+              { key: 'Active', label: 'Active', color: 'bg-blue-500' },
+              { key: 'Pending', label: 'Pending', color: 'bg-yellow-500' },
             ].map((f) => (
               <button
                 key={f.key}
                 onClick={() => setListingFilter(f.key)}
-                className={`rounded-full px-3 py-1.5 text-xs font-medium transition-all ${
+                className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-semibold transition-all ${
                   listingFilter === f.key
-                    ? 'bg-white font-bold text-blue-600 shadow-sm'
-                    : `${f.color || 'text-slate-500'} hover:text-slate-700`
+                    ? 'bg-indigo-500/20 border border-indigo-500/40 text-indigo-300'
+                    : 'bg-[#0c1324]/70 backdrop-blur-md border border-white/10 text-slate-300 hover:bg-[#23293c] hover:text-white'
                 }`}
               >
+                <span className={`w-2 h-2 rounded-full ${f.color}`} />
                 {f.label}
               </button>
             ))}
           </div>
-
-          {/* Walk Mode — icon only */}
-          <button
-            onClick={() => setWalkMode(true)}
-            title="Walk Mode"
-            className="rounded-full w-9 h-9 flex items-center justify-center glass-card/80 backdrop-blur text-slate-600 shadow-lg hover:text-blue-600 hover:shadow-xl transition-all"
-          >
-            <span className="material-symbols-rounded text-[20px]">streetview</span>
-          </button>
-
-          {/* Filters — icon only */}
-          <button
-            onClick={() => setFiltersOpen((o) => !o)}
-            title="Filters"
-            className={`rounded-full w-9 h-9 flex items-center justify-center shadow-lg transition-all ${
-              filtersOpen || hasActiveFilters
-                ? "bg-blue-600/90 backdrop-blur text-white"
-                : "glass-card/80 backdrop-blur text-slate-600 hover:text-blue-600"
-            }`}
-          >
-            <span className="material-symbols-rounded text-[20px]">tune</span>
-          </button>
         </div>
       )}
 
       {/* Collapsible filter panel */}
       {filtersOpen && !walkMode && (
-        <div className="absolute top-16 right-4 z-10 w-72 glass-card/90 backdrop-blur rounded-2xl p-4 shadow-lg space-y-4">
+        <div className="absolute top-32 right-4 z-10 w-72 bg-[#0c1324]/90 backdrop-blur-xl rounded-2xl p-5 shadow-2xl border border-white/10 space-y-5">
           <div className="flex items-center justify-between">
-            <h3 className="text-xs font-bold uppercase tracking-widest text-slate-500">Filters</h3>
-            <button onClick={() => setFiltersOpen(false)} className="text-slate-400 hover:text-slate-600">
+            <h3 className="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-500">Refine Map</h3>
+            <button onClick={() => setFiltersOpen(false)} className="text-slate-500 hover:text-indigo-400 transition-colors">
               <span className="material-symbols-rounded text-[18px]">close</span>
             </button>
           </div>
 
           {/* Priority */}
           <div>
-            <label className="text-[10px] uppercase tracking-widest text-slate-500 mb-1 block">Priority</label>
+            <label className="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-500 mb-2 block">Priority</label>
             <div className="flex gap-1">
               {PRIORITIES.map((p) => {
                 const isActive = selectedPriority === p;
-                const styles = PRIORITY_BTN_STYLES[p];
                 return (
                   <button
                     key={p}
                     onClick={() => setSelectedPriority(isActive ? "" : p)}
-                    className={`flex-1 rounded-full px-2 py-1 text-xs font-medium capitalize transition-all ${
-                      isActive ? styles.active : styles.inactive
+                    className={`flex-1 py-2 rounded-xl text-xs font-bold capitalize transition-all ${
+                      isActive
+                        ? "bg-indigo-600 text-white"
+                        : "bg-[#23293c]/50 text-slate-400 border border-white/5 hover:border-indigo-500/30 hover:text-white"
                     }`}
                   >
                     {p}
@@ -275,11 +258,11 @@ export default function MapPage() {
 
           {/* City */}
           <div>
-            <label className="text-[10px] uppercase tracking-widest text-slate-500 mb-1 block">City</label>
+            <label className="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-500 mb-2 block">City</label>
             <select
               value={selectedCity}
               onChange={(e) => setSelectedCity(e.target.value)}
-              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+              className="w-full rounded-xl bg-[#070d1f]/60 border border-white/10 px-3 py-2.5 text-xs text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
             >
               <option value="">All Cities</option>
               {distinctCities.map((c) => <option key={c} value={c}>{c}</option>)}
@@ -288,11 +271,11 @@ export default function MapPage() {
 
           {/* Source */}
           <div>
-            <label className="text-[10px] uppercase tracking-widest text-slate-500 mb-1 block">Source</label>
+            <label className="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-500 mb-2 block">Source</label>
             <select
               value={selectedSource}
               onChange={(e) => setSelectedSource(e.target.value)}
-              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+              className="w-full rounded-xl bg-[#070d1f]/60 border border-white/10 px-3 py-2.5 text-xs text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
             >
               <option value="">All Sources</option>
               {distinctSources.map((s) => <option key={s} value={s}>{s}</option>)}
@@ -301,19 +284,19 @@ export default function MapPage() {
 
           {/* Tags */}
           <div>
-            <label className="text-[10px] uppercase tracking-widest text-slate-500 mb-1 block">Tags</label>
+            <label className="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-500 mb-2 block">Tags</label>
             {distinctTags.length === 0 ? (
-              <p className="text-xs text-slate-400 italic">No tags found</p>
+              <p className="text-xs text-slate-500 italic">No tags yet</p>
             ) : (
-              <div className="flex flex-wrap gap-1 max-h-28 overflow-y-auto">
+              <div className="flex flex-wrap gap-2 max-h-28 overflow-y-auto">
                 {distinctTags.map((tag) => (
                   <button
                     key={tag}
                     onClick={() => toggleTag(tag)}
-                    className={`rounded-full px-2 py-0.5 text-[11px] font-medium transition-all ${
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
                       selectedTags.includes(tag)
-                        ? "bg-blue-600 text-white"
-                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                        ? "bg-indigo-500/20 text-indigo-200 border-indigo-500/30"
+                        : "bg-[#23293c]/50 text-slate-400 border-white/5 hover:border-indigo-500/20 hover:text-white"
                     }`}
                   >
                     {tag}
@@ -325,11 +308,11 @@ export default function MapPage() {
 
           {/* Property Type */}
           <div>
-            <label className="text-[10px] uppercase tracking-widest text-slate-500 mb-1 block">Property Type</label>
+            <label className="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-500 mb-2 block">Property Type</label>
             <select
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+              className="w-full rounded-xl bg-[#070d1f]/60 border border-white/10 px-3 py-2.5 text-xs text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
             >
               <option value="">All Types</option>
               <option value="Multi-Family">Multi-Family</option>
@@ -345,9 +328,9 @@ export default function MapPage() {
           {hasActiveFilters && (
             <button
               onClick={resetFilters}
-              className="w-full rounded-lg bg-slate-100 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-200 transition-colors"
+              className="w-full py-3 bg-gradient-to-br from-indigo-400 to-indigo-600 text-white font-bold rounded-xl shadow-lg shadow-indigo-600/20 hover:opacity-90 transition-all text-xs uppercase tracking-widest"
             >
-              Reset All Filters
+              Reset Filters
             </button>
           )}
         </div>
@@ -378,21 +361,20 @@ export default function MapPage() {
           />
         )}
 
-        {/* Empty state — bottom left, translucent, out of the way */}
+        {/* Empty state — bottom center */}
         {!loading && leads.length === 0 && !walkMode && (
-          <div className="absolute bottom-6 left-6 z-10">
-            <div className="glass-card/80 backdrop-blur rounded-2xl p-5 shadow-lg max-w-xs">
-              <div className="flex items-start gap-3">
-                <MaterialIcon icon="add_location_alt" className="text-[28px] text-blue-500 shrink-0 mt-0.5" />
-                <div>
-                  <h3 className="font-bold text-slate-900 text-sm mb-1">Import your first list</h3>
-                  <p className="text-xs text-slate-500 mb-3">Drop a CSV to see pins appear on the map.</p>
-                  <a href="/imports" className="inline-flex items-center gap-1.5 action-gradient text-white px-4 py-2 rounded-lg font-bold text-xs hover:shadow-lg transition-shadow">
-                    <MaterialIcon icon="upload_file" className="text-[14px]" />
-                    Import
-                  </a>
-                </div>
+          <div className="absolute left-1/2 -translate-x-1/2 bottom-6 w-full max-w-md z-10 px-6">
+            <div className="bg-[#0c1324]/80 backdrop-blur-xl rounded-2xl border border-white/10 p-5 flex items-center gap-4 shadow-2xl">
+              <div className="w-12 h-12 rounded-xl bg-[#23293c]/50 flex items-center justify-center border border-white/5 shrink-0">
+                <MaterialIcon icon="add_location_alt" className="text-[24px] text-indigo-400" />
               </div>
+              <div className="flex-1">
+                <h3 className="text-slate-200 font-bold text-sm">Import your first list</h3>
+                <p className="text-slate-500 text-xs leading-relaxed">Drop a CSV to see pins appear on the map.</p>
+              </div>
+              <a href="/imports" className="px-4 py-2.5 bg-gradient-to-br from-indigo-400 to-indigo-600 text-white font-bold text-xs rounded-xl shadow-lg shadow-indigo-600/20 hover:opacity-90 transition-all whitespace-nowrap">
+                Import
+              </a>
             </div>
           </div>
         )}

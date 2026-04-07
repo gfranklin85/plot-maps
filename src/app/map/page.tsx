@@ -137,99 +137,97 @@ export default function MapPage() {
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10">
           <button
             onClick={() => setWalkMode(false)}
-            className="group flex items-center gap-2 bg-[#0c1324]/90 backdrop-blur-xl text-white px-5 py-2.5 rounded-full shadow-2xl border border-white/10 hover:bg-indigo-500/20 transition-all"
+            className="group flex items-center gap-2 bg-[#0c1324] text-white px-5 py-2.5 rounded-full shadow-2xl border border-white/10 hover:bg-indigo-500/20 transition-all"
           >
-            <span className="material-symbols-rounded text-[18px] text-indigo-400">map</span>
+            <MaterialIcon icon="map" className="text-[18px] text-indigo-400" />
             <span className="text-xs font-bold uppercase tracking-widest">Back to Map</span>
           </button>
         </div>
       ) : (
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 w-full max-w-3xl px-4">
-          <div className="flex items-center gap-2 bg-[#0c1324]/80 backdrop-blur-xl p-2 rounded-2xl shadow-2xl border border-white/10">
-            {/* Search */}
-            <div className="flex-1">
-              <PlacesSearch
-                onPlaceSelected={(place) => {
-                  setMapCenter({ lat: place.lat, lng: place.lng });
-                  setSearch(place.address);
-                }}
-                className="!bg-[#070d1f]/60 !border-white/10 !text-white !placeholder-slate-500 !rounded-xl !shadow-none"
-              />
-            </div>
-
-            {/* Map type toggle */}
-            <div className="flex gap-0.5 bg-[#070d1f]/80 p-1 rounded-xl">
-              {(["roadmap", "satellite", "hybrid"] as const).map((type) => (
-                <button
-                  key={type}
-                  onClick={() => setMapType(type)}
-                  className={`px-3 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all ${
-                    mapType === type
-                      ? "bg-indigo-600 text-white"
-                      : "text-slate-400 hover:text-white"
-                  }`}
-                >
-                  {type === "roadmap" ? "Map" : type === "satellite" ? "Sat" : "Hybrid"}
-                </button>
-              ))}
-            </div>
-
-            {/* Walk Mode */}
-            <button
-              onClick={() => setWalkMode(true)}
-              title="Walk Mode"
-              className="w-10 h-10 flex items-center justify-center rounded-xl bg-[#070d1f]/80 text-slate-400 hover:text-indigo-400 hover:bg-indigo-500/10 transition-all border border-white/5"
-            >
-              <span className="material-symbols-rounded text-[20px]">directions_walk</span>
-            </button>
-
-            {/* Filters */}
-            <button
-              onClick={() => setFiltersOpen((o) => !o)}
-              title="Filters"
-              className={`w-10 h-10 flex items-center justify-center rounded-xl transition-all border ${
-                filtersOpen || hasActiveFilters
-                  ? "bg-indigo-600 text-white border-indigo-500"
-                  : "bg-[#070d1f]/80 text-slate-400 hover:text-indigo-400 border-white/5"
-              }`}
-            >
-              <span className="material-symbols-rounded text-[20px]">tune</span>
-            </button>
+        <div className="absolute top-4 left-4 right-4 z-10 flex items-center gap-2">
+          {/* Search */}
+          <div className="flex-1 max-w-sm">
+            <PlacesSearch
+              onPlaceSelected={(place) => {
+                setMapCenter({ lat: place.lat, lng: place.lng });
+                setSearch(place.address);
+              }}
+              className="shadow-lg"
+            />
           </div>
 
-          {/* Listing filter pills — below the search bar */}
-          <div className="flex justify-center gap-2 mt-3">
+          {/* Map type toggle */}
+          <div className="flex gap-0.5 bg-[#0c1324] p-1 rounded-xl shadow-lg">
+            {(["roadmap", "satellite", "hybrid"] as const).map((type) => (
+              <button
+                key={type}
+                onClick={() => setMapType(type)}
+                className={`px-3 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all ${
+                  mapType === type
+                    ? "bg-indigo-600 text-white"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                {type === "roadmap" ? "Map" : type === "satellite" ? "Sat" : "Hybrid"}
+              </button>
+            ))}
+          </div>
+
+          {/* Listing filter */}
+          <div className="flex gap-0.5 bg-[#0c1324] p-1 rounded-xl shadow-lg">
             {[
-              { key: 'all', label: 'All', color: 'bg-indigo-500' },
-              { key: 'prospects', label: 'Prospects', color: 'bg-orange-400' },
-              { key: 'Sold', label: 'Sold', color: 'bg-green-500' },
-              { key: 'Active', label: 'Active', color: 'bg-blue-500' },
-              { key: 'Pending', label: 'Pending', color: 'bg-yellow-500' },
+              { key: 'all', label: 'All', dot: 'bg-indigo-500' },
+              { key: 'prospects', label: 'Prospects', dot: 'bg-orange-400' },
+              { key: 'Sold', label: 'Sold', dot: 'bg-green-500' },
+              { key: 'Active', label: 'Active', dot: 'bg-blue-500' },
+              { key: 'Pending', label: 'Pending', dot: 'bg-yellow-500' },
             ].map((f) => (
               <button
                 key={f.key}
                 onClick={() => setListingFilter(f.key)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-semibold transition-all ${
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all ${
                   listingFilter === f.key
-                    ? 'bg-indigo-500/20 border border-indigo-500/40 text-indigo-300'
-                    : 'bg-[#0c1324]/70 backdrop-blur-md border border-white/10 text-slate-300 hover:bg-[#23293c] hover:text-white'
+                    ? 'bg-[#23293c] text-white'
+                    : 'text-slate-400 hover:text-white'
                 }`}
               >
-                <span className={`w-2 h-2 rounded-full ${f.color}`} />
+                <span className={`w-1.5 h-1.5 rounded-full ${f.dot}`} />
                 {f.label}
               </button>
             ))}
           </div>
+
+          {/* Walk Mode */}
+          <button
+            onClick={() => setWalkMode(true)}
+            title="Walk Mode"
+            className="w-10 h-10 flex items-center justify-center rounded-xl bg-[#0c1324] text-slate-400 shadow-lg hover:text-indigo-400 transition-all"
+          >
+            <MaterialIcon icon="directions_walk" className="text-[20px]" />
+          </button>
+
+          {/* Filters */}
+          <button
+            onClick={() => setFiltersOpen((o) => !o)}
+            title="Filters"
+            className={`w-10 h-10 flex items-center justify-center rounded-xl shadow-lg transition-all ${
+              filtersOpen || hasActiveFilters
+                ? "bg-indigo-600 text-white"
+                : "bg-[#0c1324] text-slate-400 hover:text-indigo-400"
+            }`}
+          >
+            <MaterialIcon icon="tune" className="text-[20px]" />
+          </button>
         </div>
       )}
 
       {/* Collapsible filter panel */}
       {filtersOpen && !walkMode && (
-        <div className="absolute top-32 right-4 z-10 w-72 bg-[#0c1324]/90 backdrop-blur-xl rounded-2xl p-5 shadow-2xl border border-white/10 space-y-5">
+        <div className="absolute top-16 right-4 z-10 w-72 bg-[#0c1324] rounded-2xl p-5 shadow-2xl border border-white/10 space-y-5">
           <div className="flex items-center justify-between">
             <h3 className="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-500">Refine Map</h3>
             <button onClick={() => setFiltersOpen(false)} className="text-slate-500 hover:text-indigo-400 transition-colors">
-              <span className="material-symbols-rounded text-[18px]">close</span>
+              <MaterialIcon icon="close" className="text-[18px]" />
             </button>
           </div>
 

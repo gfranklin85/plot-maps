@@ -72,13 +72,35 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     }
 
     async function fetchProfile() {
-      const { data } = await supabase
+      let { data } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', user!.id)
         .single();
 
+      // If profile doesn't exist (trigger failed or race condition), create it
+      if (!data) {
+        const oauthName = (user!.user_metadata?.full_name || user!.user_metadata?.name || '') as string;
+        const { data: created } = await supabase
+          .from('profiles')
+          .upsert({
+            id: user!.id,
+            email: user!.email || '',
+            full_name: oauthName,
+          })
+          .select()
+          .single();
+        data = created;
+      }
+
       if (data) {
+        // Backfill full_name from Google OAuth metadata if missing
+        if (!data.full_name && user!.user_metadata?.full_name) {
+          const oauthName = user!.user_metadata.full_name as string;
+          await supabase.from('profiles').update({ full_name: oauthName }).eq('id', user!.id);
+          data.full_name = oauthName;
+        }
+
         setProfile({
           fullName: data.full_name || '',
           title: data.title || '',
@@ -95,13 +117,6 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
             sms: data.notification_sms ?? false,
           },
         });
-      }
-
-      // Backfill full_name from Google OAuth metadata if missing
-      if (data && !data.full_name && user!.user_metadata?.full_name) {
-        const oauthName = user!.user_metadata.full_name as string;
-        await supabase.from('profiles').update({ full_name: oauthName }).eq('id', user!.id);
-        setProfile((prev) => ({ ...prev, fullName: oauthName }));
       }
 
       // Migrate from localStorage if DB profile is empty

@@ -5,6 +5,8 @@ import { Lead } from '@/types';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
 import MaterialIcon from '@/components/ui/MaterialIcon';
+import { useProfile } from '@/lib/profile-context';
+import UpgradeGate from '@/components/ui/UpgradeGate';
 
 interface Props {
   lead: Lead;
@@ -12,6 +14,9 @@ interface Props {
 }
 
 export default function EmailComposer({ lead, onEmailSent }: Props) {
+  const { profile } = useProfile();
+  const [showGate, setShowGate] = useState(false);
+  const isSubscribed = profile.subscriptionStatus === 'active';
   const [to, setTo] = useState(lead.email || '');
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
@@ -21,6 +26,7 @@ export default function EmailComposer({ lead, onEmailSent }: Props) {
   const [success, setSuccess] = useState(false);
 
   async function handleAiDraft() {
+    if (!isSubscribed) { setShowGate(true); return; }
     setDrafting(true);
     setError(null);
     try {
@@ -50,6 +56,7 @@ export default function EmailComposer({ lead, onEmailSent }: Props) {
 
   async function handleSend() {
     if (!to.trim() || !subject.trim() || !body.trim()) return;
+    if (!isSubscribed) { setShowGate(true); return; }
 
     setSending(true);
     setError(null);
@@ -204,6 +211,8 @@ export default function EmailComposer({ lead, onEmailSent }: Props) {
           {error}
         </div>
       )}
+
+      <UpgradeGate feature="email" show={showGate} onClose={() => setShowGate(false)} />
     </div>
   );
 }

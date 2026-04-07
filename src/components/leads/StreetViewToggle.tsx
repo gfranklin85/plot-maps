@@ -4,6 +4,8 @@ import { useState, useCallback } from 'react';
 import { Lead } from '@/types';
 import { cn } from '@/lib/utils';
 import MaterialIcon from '@/components/ui/MaterialIcon';
+import { useProfile } from '@/lib/profile-context';
+import UpgradeGate from '@/components/ui/UpgradeGate';
 
 interface Props {
   lead: Lead;
@@ -12,6 +14,9 @@ interface Props {
 type ViewMode = 'street' | 'map' | 'aerial';
 
 export default function StreetViewToggle({ lead }: Props) {
+  const { profile } = useProfile();
+  const [showGate, setShowGate] = useState(false);
+  const isSubscribed = profile.subscriptionStatus === 'active';
   const [mode, setMode] = useState<ViewMode>('street');
   const [flyoverLoading, setFlyoverLoading] = useState(false);
   const [flyoverUrl, setFlyoverUrl] = useState<string | null>(null);
@@ -42,6 +47,7 @@ export default function StreetViewToggle({ lead }: Props) {
 
   const fetchFlyover = useCallback(async () => {
     if (!hasAddress) return;
+    if (!isSubscribed) { setShowGate(true); return; }
     setFlyoverLoading(true);
     setFlyoverError(null);
     setFlyoverUrl(null);
@@ -66,7 +72,7 @@ export default function StreetViewToggle({ lead }: Props) {
     } finally {
       setFlyoverLoading(false);
     }
-  }, [hasAddress, lead.property_address]);
+  }, [hasAddress, isSubscribed, lead.property_address]);
 
   return (
     <div className="rounded-2xl bg-surface-container-lowest p-5 border border-slate-100">
@@ -189,6 +195,8 @@ export default function StreetViewToggle({ lead }: Props) {
           )}
         </div>
       )}
+
+      <UpgradeGate feature="aerial" show={showGate} onClose={() => setShowGate(false)} />
     </div>
   );
 }

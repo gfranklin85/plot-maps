@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
-import { getAuthUser } from '@/lib/auth';
+import { getAuthUser, isSubscribed } from '@/lib/auth';
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
 
@@ -28,6 +28,10 @@ export async function POST(request: Request) {
   try {
     const user = await getAuthUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    if (!await isSubscribed(user.id)) {
+      return NextResponse.json({ error: 'Subscription required' }, { status: 403 });
+    }
 
     const { text, source } = await request.json();
 

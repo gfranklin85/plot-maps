@@ -10,13 +10,10 @@ const PLANS = [
     price: 49,
     priceId: process.env.NEXT_PUBLIC_STRIPE_STARTER_PRICE_ID || '',
     features: [
-      'Interactive 3D Map View',
       'Walk Mode — Street View Prospecting',
-      'Import your own property lists',
-      'MLS data overlay (Sold/Active/Pending)',
-      'Call scripts & notes',
-      'AI follow-up suggestions',
-      'Manual dialing (use your phone)',
+      'AI-powered action lists & call guidance',
+      'AI email drafts & outreach',
+      'Nearby places & drive time analysis',
       '500 geocodes/month',
       '1,000 street view loads/month',
       '$0.01/geocode overage available',
@@ -31,8 +28,7 @@ const PLANS = [
       'Everything in Starter, plus:',
       'Browser Dialer — click to call from the app',
       'Local phone number included',
-      'Call recording',
-      'Full call analytics dashboard',
+      'Call recording & analytics',
       '1,000 calling minutes/month',
       '2,000 geocodes/month',
       'Unlimited street view loads',
@@ -59,7 +55,6 @@ export default function SubscribePage() {
       return;
     }
 
-    // Check if user is logged in before hitting Stripe
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       window.location.href = '/signup?next=/subscribe';
@@ -84,66 +79,66 @@ export default function SubscribePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center p-8">
-      <div className="max-w-4xl w-full">
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-extrabold text-slate-900 font-headline tracking-tight">
-            Plot Maps
+    <div className="min-h-screen bg-[#0c1324] relative overflow-hidden">
+      {/* Ambient background */}
+      <div className="absolute inset-0 opacity-40" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, rgba(79,70,229,0.05) 1px, transparent 0)', backgroundSize: '40px 40px' }} />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-indigo-600/5 rounded-full blur-[120px]" />
+
+      <main className="relative z-10 max-w-5xl mx-auto px-6 py-20">
+        {/* Hero */}
+        <section className="text-center mb-16">
+          <h1 className="text-5xl md:text-6xl font-extrabold tracking-tight text-white mb-6 font-headline">
+            Free to Map. <span className="text-indigo-400 italic">Paid to Move.</span>
           </h1>
-          <p className="text-lg text-slate-500 mt-2">
-            Visual Prospecting CRM — Upgrade for more geocodes and features
+          <p className="text-slate-400 text-lg md:text-xl max-w-2xl mx-auto leading-relaxed">
+            Visualize your properties for free. Unlock Walk Mode, AI tools, and advanced analytics when you&apos;re ready to close deals.
           </p>
-          <p className="text-sm text-slate-400 mt-1">
-            You have 50 free geocodes to try the platform. Subscribe for more.
-          </p>
-        </div>
+        </section>
 
         {showCancelBanner && (
-          <div className="mb-6 bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center justify-between">
-            <p className="text-sm text-amber-800">
+          <div className="mb-8 bg-amber-900/20 border border-amber-500/30 rounded-xl p-4 flex items-center justify-between max-w-2xl mx-auto">
+            <p className="text-sm text-amber-200">
               Checkout was canceled. No worries — upgrade whenever you&apos;re ready.
             </p>
-            <button
-              onClick={() => setShowCancelBanner(false)}
-              className="text-amber-600 hover:text-amber-800 ml-4"
-            >
+            <button onClick={() => setShowCancelBanner(false)} className="text-amber-400 hover:text-amber-200 ml-4">
               <MaterialIcon icon="close" className="text-[18px]" />
             </button>
           </div>
         )}
 
-        <div className="grid md:grid-cols-2 gap-6">
+        {/* Pricing Cards */}
+        <div className="grid md:grid-cols-2 gap-8 mb-16">
           {PLANS.map((plan) => (
             <div
               key={plan.name}
-              className={`rounded-2xl p-8 ${
+              className={`rounded-2xl p-8 flex flex-col ${
                 plan.highlighted
-                  ? 'bg-white border-2 border-blue-500 shadow-xl shadow-blue-500/10 relative'
-                  : 'bg-white border border-slate-200 shadow-lg'
+                  ? 'bg-[#23293c] border-2 border-indigo-500/40 shadow-2xl shadow-indigo-900/20 relative'
+                  : 'bg-[#151b2d] border border-white/5'
               }`}
             >
               {plan.highlighted && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-xs font-bold px-4 py-1 rounded-full">
-                  Most Popular
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest px-4 py-1 rounded-full">
+                  Recommended
                 </div>
               )}
 
-              <h2 className="text-2xl font-bold text-slate-900">{plan.name}</h2>
-              <div className="mt-2 flex items-baseline gap-1">
-                <span className="text-4xl font-extrabold text-slate-900">${plan.price}</span>
-                <span className="text-slate-500 text-sm">/month</span>
+              <h3 className={`text-xs font-black uppercase tracking-widest mb-2 ${plan.highlighted ? 'text-indigo-400' : 'text-slate-500'}`}>
+                {plan.name}
+              </h3>
+              <div className="flex items-baseline gap-1 mb-8">
+                <span className="text-4xl font-extrabold text-white">${plan.price}</span>
+                <span className="text-slate-500">/mo</span>
               </div>
 
-              <ul className="mt-6 space-y-3">
+              <ul className="space-y-4 mb-10 flex-grow">
                 {plan.features.map((feature, i) => (
-                  <li key={i} className="flex items-start gap-2 text-sm">
+                  <li key={i} className="flex items-center gap-3 text-sm">
                     <MaterialIcon
-                      icon={i === 0 && plan.highlighted ? 'star' : 'check_circle'}
-                      className={`text-[16px] mt-0.5 shrink-0 ${
-                        plan.highlighted ? 'text-blue-500' : 'text-emerald-500'
-                      }`}
+                      icon="check_circle"
+                      className={`text-[16px] shrink-0 ${plan.highlighted ? 'text-indigo-400' : 'text-indigo-400/60'}`}
                     />
-                    <span className={`${i === 0 && plan.highlighted ? 'font-bold text-slate-900' : 'text-slate-600'}`}>
+                    <span className={`${i === 0 && plan.highlighted ? 'font-bold text-white' : 'text-slate-300'}`}>
                       {feature}
                     </span>
                   </li>
@@ -153,22 +148,23 @@ export default function SubscribePage() {
               <button
                 onClick={() => handleSubscribe(plan.priceId)}
                 disabled={!!loading}
-                className={`w-full mt-8 py-3 rounded-xl font-bold text-sm transition-all disabled:opacity-50 ${
+                className={`w-full py-4 rounded-xl font-bold text-sm transition-all disabled:opacity-50 ${
                   plan.highlighted
-                    ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-lg shadow-blue-500/20'
-                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    ? 'bg-gradient-to-br from-indigo-400 to-indigo-600 text-white shadow-lg shadow-indigo-600/20 hover:opacity-90 active:scale-[0.98]'
+                    : 'bg-[#23293c] text-slate-200 hover:bg-[#2e3447] border border-white/5'
                 }`}
               >
-                {loading === plan.priceId ? 'Redirecting...' : `Subscribe — $${plan.price}/mo`}
+                {loading === plan.priceId ? 'Redirecting...' : `Choose ${plan.name}`}
               </button>
             </div>
           ))}
         </div>
 
-        <p className="text-center text-xs text-slate-400 mt-8">
-          Cancel anytime. No long-term contracts. Questions? Email support@plotmaps.com
+        {/* Footer */}
+        <p className="text-center text-sm text-slate-500">
+          Cancel anytime. No long-term contracts.
         </p>
-      </div>
+      </main>
     </div>
   );
 }

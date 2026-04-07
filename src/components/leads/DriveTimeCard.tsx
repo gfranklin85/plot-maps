@@ -4,12 +4,15 @@ import { useState, useEffect } from 'react';
 import { Lead } from '@/types';
 import MaterialIcon from '@/components/ui/MaterialIcon';
 import { MAP_CENTER } from '@/lib/constants';
+import { useProfile } from '@/lib/profile-context';
 
 interface Props {
   lead: Lead;
 }
 
 export default function DriveTimeCard({ lead }: Props) {
+  const { profile } = useProfile();
+  const isSubscribed = profile.subscriptionStatus === 'active';
   const [distance, setDistance] = useState<string | null>(null);
   const [duration, setDuration] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -17,7 +20,7 @@ export default function DriveTimeCard({ lead }: Props) {
   const hasLocation = lead.latitude !== null && lead.longitude !== null;
 
   useEffect(() => {
-    if (!hasLocation) return;
+    if (!hasLocation || !isSubscribed) return;
 
     async function fetchDriveTime() {
       setLoading(true);
@@ -46,7 +49,20 @@ export default function DriveTimeCard({ lead }: Props) {
     }
 
     fetchDriveTime();
-  }, [hasLocation, lead.latitude, lead.longitude]);
+  }, [hasLocation, isSubscribed, lead.latitude, lead.longitude]);
+
+  if (!isSubscribed) {
+    return (
+      <div className="rounded-2xl bg-surface-container-lowest p-4 border border-slate-100">
+        <div className="p-6 text-center">
+          <MaterialIcon icon="lock" className="text-[32px] text-indigo-400 mb-2" />
+          <p className="text-sm font-bold text-slate-200 mb-1">Subscribe to Unlock</p>
+          <p className="text-xs text-slate-500 mb-3">Calculate precise travel times using real-time traffic data.</p>
+          <a href="/subscribe" className="text-indigo-400 text-xs font-bold hover:underline">Upgrade Plan</a>
+        </div>
+      </div>
+    );
+  }
 
   if (!hasLocation) return null;
 

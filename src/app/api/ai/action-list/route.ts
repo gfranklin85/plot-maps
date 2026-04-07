@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { supabaseAdmin } from '@/lib/supabase-server';
-import { getAuthUser } from '@/lib/auth';
+import { getAuthUser, isSubscribed } from '@/lib/auth';
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
 
@@ -9,6 +9,10 @@ export async function POST() {
   try {
     const user = await getAuthUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    if (!await isSubscribed(user.id)) {
+      return NextResponse.json({ error: 'Subscription required' }, { status: 403 });
+    }
 
     const today = new Date().toISOString().split('T')[0];
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];

@@ -9,6 +9,7 @@ import PlacesSearch from "@/components/map/PlacesSearch";
 import { PRIORITIES } from "@/lib/constants";
 import { useProfile } from "@/lib/profile-context";
 import MaterialIcon from "@/components/ui/MaterialIcon";
+import UpgradeGate from "@/components/ui/UpgradeGate";
 
 const FILTER_TABS: { label: string; key: string; statuses: LeadStatus[] }[] = [
   { label: "All", key: "all", statuses: [] },
@@ -39,6 +40,8 @@ export default function MapPage() {
   const [walkMode, setWalkMode] = useState(false);
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(profile.defaultMapCenter);
   const [hasUserPanned, setHasUserPanned] = useState(false);
+  const [showGate, setShowGate] = useState(false);
+  const isSubscribed = profile.subscriptionStatus === 'active';
 
   useEffect(() => {
     if (profile.defaultMapCenter && !hasUserPanned) {
@@ -199,7 +202,7 @@ export default function MapPage() {
 
           {/* Walk Mode */}
           <button
-            onClick={() => setWalkMode(true)}
+            onClick={() => isSubscribed ? setWalkMode(true) : setShowGate(true)}
             title="Walk Mode"
             className="w-10 h-10 flex items-center justify-center rounded-xl bg-[#0c1324] text-slate-400 shadow-lg hover:text-indigo-400 transition-all"
           >
@@ -351,6 +354,7 @@ export default function MapPage() {
             onCenterChanged={(c) => { setMapCenter(c); setHasUserPanned(true); }}
             center={mapCenter}
             onWalkHere={(lead) => {
+              if (!isSubscribed) { setShowGate(true); return; }
               if (lead.latitude && lead.longitude) {
                 setMapCenter({ lat: lead.latitude, lng: lead.longitude });
                 setWalkMode(true);
@@ -377,6 +381,8 @@ export default function MapPage() {
           </div>
         )}
       </div>
+
+      <UpgradeGate feature="walkMode" show={showGate} onClose={() => setShowGate(false)} />
     </div>
   );
 }

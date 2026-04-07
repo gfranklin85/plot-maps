@@ -9,6 +9,7 @@ import ActionList from '@/components/dashboard/ActionList';
 import Scorecard from '@/components/dashboard/Scorecard';
 import MaterialIcon from '@/components/ui/MaterialIcon';
 import { useProfile } from '@/lib/profile-context';
+import UpgradeGate from '@/components/ui/UpgradeGate';
 
 const DEFAULT_TARGETS: DailyTarget = {
   id: '',
@@ -33,6 +34,8 @@ export default function Dashboard() {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [actionItems, setActionItems] = useState<ActionItem[]>([]);
   const [actionLoading, setActionLoading] = useState(false);
+  const [showGate, setShowGate] = useState(false);
+  const isSubscribed = profile.subscriptionStatus === 'active';
   const [totalLeads, setTotalLeads] = useState(0);
   const [newThisWeek, setNewThisWeek] = useState(0);
   const [callsToday, setCallsToday] = useState(0);
@@ -136,6 +139,7 @@ export default function Dashboard() {
   }
 
   async function generateActionList() {
+    if (!isSubscribed) { setShowGate(true); return; }
     setActionLoading(true);
     try {
       const res = await fetch('/api/ai/action-list', { method: 'POST' });
@@ -291,6 +295,8 @@ export default function Dashboard() {
           trendUp={avgCallsDay >= 5}
         />
       </div>
+
+      <UpgradeGate feature="ai" show={showGate} onClose={() => setShowGate(false)} />
     </div>
   );
 }

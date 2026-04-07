@@ -6,6 +6,8 @@ import { cn } from '@/lib/utils';
 import MaterialIcon from '@/components/ui/MaterialIcon';
 import ImportMiniMap from '@/components/map/ImportMiniMapDynamic';
 import { useAuth } from '@/lib/auth-context';
+import { useProfile } from '@/lib/profile-context';
+import UpgradeGate from '@/components/ui/UpgradeGate';
 
 /* ================================================================
    UNIFIED IMPORT PAGE
@@ -113,6 +115,9 @@ const STATUS_MAP: Record<string, string> = { S: 'Sold', A: 'Active', T: 'Pending
 
 export default function ImportsPage() {
   const { user } = useAuth();
+  const { profile } = useProfile();
+  const [showGate, setShowGate] = useState(false);
+  const isSubscribed = profile.subscriptionStatus === 'active';
   const fileRef = useRef<HTMLInputElement>(null);
   const [phase, setPhase] = useState<ImportPhase>('idle');
   const [dragActive, setDragActive] = useState(false);
@@ -169,6 +174,7 @@ export default function ImportsPage() {
     }
 
     // Otherwise, use AI to parse unstructured text
+    if (!isSubscribed) { setShowGate(true); return; }
     setAiParsing(true);
     setPhase('detecting');
     try {
@@ -772,6 +778,8 @@ export default function ImportsPage() {
           </div>
         </div>
       )}
+
+      <UpgradeGate feature="smartImport" show={showGate} onClose={() => setShowGate(false)} />
     </div>
   );
 }

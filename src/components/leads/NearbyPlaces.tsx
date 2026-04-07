@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Lead } from '@/types';
 import { cn } from '@/lib/utils';
 import MaterialIcon from '@/components/ui/MaterialIcon';
+import { useProfile } from '@/lib/profile-context';
 
 interface Place {
   name: string;
@@ -27,6 +28,8 @@ interface Props {
 }
 
 export default function NearbyPlaces({ lead }: Props) {
+  const { profile } = useProfile();
+  const isSubscribed = profile.subscriptionStatus === 'active';
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -35,7 +38,7 @@ export default function NearbyPlaces({ lead }: Props) {
   const hasLocation = lead.latitude !== null && lead.longitude !== null;
 
   useEffect(() => {
-    if (!hasLocation) return;
+    if (!hasLocation || !isSubscribed) return;
 
     async function fetchNearby() {
       setLoading(true);
@@ -63,7 +66,26 @@ export default function NearbyPlaces({ lead }: Props) {
     }
 
     fetchNearby();
-  }, [hasLocation, lead.latitude, lead.longitude]);
+  }, [hasLocation, isSubscribed, lead.latitude, lead.longitude]);
+
+  if (!isSubscribed) {
+    return (
+      <div className="rounded-2xl bg-surface-container-lowest p-5 border border-slate-100">
+        <div className="flex items-center gap-2 mb-4">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-100">
+            <MaterialIcon icon="explore_nearby" className="text-[20px] text-indigo-600" filled />
+          </div>
+          <h3 className="font-headline text-lg font-bold text-on-surface">Nearby</h3>
+        </div>
+        <div className="p-6 text-center">
+          <MaterialIcon icon="lock" className="text-[32px] text-indigo-400 mb-2" />
+          <p className="text-sm font-bold text-slate-200 mb-1">Subscribe to Unlock</p>
+          <p className="text-xs text-slate-500 mb-3">Discover schools, grocery stores, and amenities near any property.</p>
+          <a href="/subscribe" className="text-indigo-400 text-xs font-bold hover:underline">Upgrade Plan</a>
+        </div>
+      </div>
+    );
+  }
 
   if (!hasLocation) {
     return (

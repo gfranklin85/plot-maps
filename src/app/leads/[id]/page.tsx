@@ -15,6 +15,8 @@ import MarketComps from '@/components/leads/MarketComps';
 import NearbyPlaces from '@/components/leads/NearbyPlaces';
 import LeadMap from '@/components/leads/LeadMap';
 import { usePhone } from '@/lib/phone-context';
+import { useProfile } from '@/lib/profile-context';
+import UpgradeGate from '@/components/ui/UpgradeGate';
 
 const GROUPS = [
   'Appointment Set', 'BUYERS', 'Dead Lead', 'Future Follow Up',
@@ -49,6 +51,9 @@ export default function LeadDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const { makeCall, isDesktop } = usePhone();
+  const { profile } = useProfile();
+  const [showGate, setShowGate] = useState(false);
+  const isSubscribed = profile.subscriptionStatus === 'active';
   const [lead, setLead] = useState<Lead | null>(null);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
@@ -207,6 +212,7 @@ export default function LeadDetailPage() {
 
   const fetchGuidance = async () => {
     if (!lead) return;
+    if (!isSubscribed) { setShowGate(true); return; }
     setGuidanceLoading(true);
     try {
       const res = await fetch('/api/ai/call-guidance', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ leadId: lead.id }) });
@@ -693,6 +699,7 @@ export default function LeadDetailPage() {
           </div>
         </div>
       </div>
+      <UpgradeGate feature="ai" show={showGate} onClose={() => setShowGate(false)} />
     </div>
   );
 }

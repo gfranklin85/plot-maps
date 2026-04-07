@@ -4,10 +4,13 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { NAV_ITEMS } from '@/lib/constants';
 import { useSidebar } from '@/lib/sidebar-context';
+import { useProfile } from '@/lib/profile-context';
 
 export default function Sidebar() {
   const pathname = usePathname();
   const { collapsed, toggle } = useSidebar();
+  const { profile } = useProfile();
+  const isFree = profile.subscriptionStatus !== 'active';
 
   return (
     <>
@@ -62,6 +65,24 @@ export default function Sidebar() {
             );
           })}
         </nav>
+
+        {/* Upgrade prompt for free users */}
+        {isFree && !collapsed && (
+          <div className="px-4 mb-3">
+            <Link href="/subscribe" className="block w-full rounded-xl bg-gradient-to-r from-indigo-500 to-blue-600 p-3 text-center shadow-lg shadow-indigo-500/20 hover:shadow-xl transition-all">
+              <span className="material-symbols-outlined text-white text-[18px] block mb-1">rocket_launch</span>
+              <p className="text-white text-xs font-bold">Upgrade Plan</p>
+              <p className="text-indigo-200 text-[10px]">From $49/mo</p>
+            </Link>
+          </div>
+        )}
+        {isFree && collapsed && (
+          <div className="px-2 mb-3">
+            <Link href="/subscribe" title="Upgrade Plan" className="flex items-center justify-center bg-gradient-to-r from-indigo-500 to-blue-600 text-white py-3 rounded-xl shadow-lg">
+              <span className="material-symbols-outlined text-[20px]">rocket_launch</span>
+            </Link>
+          </div>
+        )}
 
         {/* Import Button */}
         {!collapsed ? (

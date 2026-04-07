@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Lead, Activity, DailyTarget, ActionItem } from '@/types';
 import StatCard from '@/components/ui/StatCard';
@@ -8,6 +8,7 @@ import DailyTargetBars from '@/components/dashboard/DailyTargetBars';
 import ActionList from '@/components/dashboard/ActionList';
 import Scorecard from '@/components/dashboard/Scorecard';
 import MaterialIcon from '@/components/ui/MaterialIcon';
+import { useProfile } from '@/lib/profile-context';
 
 const DEFAULT_TARGETS: DailyTarget = {
   id: '',
@@ -26,6 +27,7 @@ const DEFAULT_TARGETS: DailyTarget = {
 };
 
 export default function Dashboard() {
+  const { profile, updateProfile } = useProfile();
   const [targets, setTargets] = useState<DailyTarget>(DEFAULT_TARGETS);
   const [attentionLeads, setAttentionLeads] = useState<Lead[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
@@ -166,20 +168,36 @@ export default function Dashboard() {
       <div className="p-8 flex flex-col items-center justify-center min-h-[60vh]">
         <div className="max-w-lg text-center">
           <MaterialIcon icon="rocket_launch" className="text-[72px] text-blue-500 mb-4" />
-          <h2 className="font-headline text-3xl font-extrabold text-on-surface mb-3">Welcome to Plot Maps!</h2>
-          <p className="text-secondary text-lg mb-8">
-            Get started by importing your property list. Upload a CSV from PropWire, BatchLeads, MLS, or any source with addresses.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <a href="/imports" className="flex items-center justify-center gap-2 rounded-xl action-gradient px-8 py-4 text-lg font-bold text-white hover:shadow-lg transition-shadow">
-              <MaterialIcon icon="upload_file" className="text-[22px]" />
-              Import Your First List
-            </a>
-            <a href="/map" className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-8 py-4 text-lg font-bold text-slate-700 hover:bg-slate-50 transition-colors">
-              <MaterialIcon icon="map" className="text-[22px]" />
-              Explore the Map
-            </a>
-          </div>
+          <h2 className="font-headline text-3xl font-extrabold text-on-surface mb-3">
+            Welcome{profile.fullName ? `, ${profile.fullName.split(' ')[0]}` : ''}!
+          </h2>
+
+          {!profile.defaultMapCenter ? (
+            <>
+              <p className="text-secondary text-lg mb-6">
+                First, set your market area so the map centers on your territory.
+              </p>
+              <MarketAreaPicker onComplete={(lat: number, lng: number) => {
+                updateProfile({ defaultMapCenter: { lat, lng } });
+              }} />
+            </>
+          ) : (
+            <>
+              <p className="text-secondary text-lg mb-8">
+                Get started by importing your property list. Upload a CSV from PropWire, BatchLeads, MLS, or any source with addresses.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <a href="/imports" className="flex items-center justify-center gap-2 rounded-xl action-gradient px-8 py-4 text-lg font-bold text-white hover:shadow-lg transition-shadow">
+                  <MaterialIcon icon="upload_file" className="text-[22px]" />
+                  Import Your First List
+                </a>
+                <a href="/map" className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-8 py-4 text-lg font-bold text-slate-700 hover:bg-slate-50 transition-colors">
+                  <MaterialIcon icon="map" className="text-[22px]" />
+                  Explore the Map
+                </a>
+              </div>
+            </>
+          )}
         </div>
       </div>
     );
@@ -273,6 +291,68 @@ export default function Dashboard() {
           trendUp={avgCallsDay >= 5}
         />
       </div>
+    </div>
+  );
+}
+
+/* ── Market Area Picker (onboarding) ── */
+function MarketAreaPicker({ onComplete }: { onComplete: (lat: number, lng: number) => void }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
+  const [retries, setRetries] = useState(0);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!inputRef.current || autocompleteRef.current) return;
+    if (typeof google === 'undefined' || !google?.maps?.places) {
+      const existing = document.querySelector('script[src*="maps.googleapis.com"]');
+      if (!existing) {
+        const script = document.createElement('script');
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places`;
+        script.async = true;
+        script.onload = () => setRetries(r => r + 1);
+        document.head.appendChild(script);
+      } else if (retries < 20) {
+        const timer = setTimeout(() => setRetries(r => r + 1), 500);
+        return () => clearTimeout(timer);
+      }
+      return;
+    }
+
+    const autocomplete = new google.maps.places.Autocomplete(inputRef.current, {
+      types: ['(cities)'],
+      componentRestrictions: { country: 'us' },
+      fields: ['geometry', 'formatted_address'],
+    });
+
+    autocomplete.addListener('place_changed', () => {
+      const place = autocomplete.getPlace();
+      if (place.geometry?.location) {
+        setSaving(true);
+        onComplete(place.geometry.location.lat(), place.geometry.location.lng());
+      }
+    });
+
+    autocompleteRef.current = autocomplete;
+  }, [retries, onComplete]);
+
+  return (
+    <div className="max-w-sm mx-auto">
+      <div className="flex items-center gap-2 mb-3">
+        <MaterialIcon icon="location_on" className="text-[20px] text-blue-500" />
+        <label className="text-sm font-semibold text-slate-700">Your Market Area</label>
+      </div>
+      <input
+        ref={inputRef}
+        type="text"
+        placeholder="Search city or zip code..."
+        disabled={saving}
+        className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 disabled:opacity-50"
+      />
+      {saving && (
+        <p className="text-sm text-blue-600 mt-3 font-medium">Setting your market area...</p>
+      )}
+      <p className="text-xs text-slate-400 mt-2">Start typing to search — select a city to center your map.</p>
     </div>
   );
 }

@@ -7,10 +7,8 @@ import { Lead, LeadStatus, PRIORITY_COLORS } from '@/types';
 import { formatPhone, formatDate, timeAgo } from '@/lib/utils';
 import { LEAD_STATUSES, LEAD_SOURCES, PRIORITIES } from '@/lib/constants';
 import Badge from '@/components/ui/Badge';
-import Tag from '@/components/ui/Tag';
 import SearchInput from '@/components/ui/SearchInput';
 import Pagination from '@/components/ui/Pagination';
-import StatCard from '@/components/ui/StatCard';
 import MaterialIcon from '@/components/ui/MaterialIcon';
 import BulkActionBar from '@/components/leads/BulkActionBar';
 import ExportModal from '@/components/leads/ExportModal';
@@ -166,16 +164,6 @@ export default function LeadsPage() {
     fetchLeads();
   };
 
-  const hotLeadsCount = leads.filter((l) => l.status === 'Hot Lead').length;
-  const newCount = leads.filter((l) => l.status === 'New').length;
-
-  // Extract city from property_address
-  function extractCity(address: string | null): string {
-    if (!address) return '';
-    const parts = address.split(',');
-    return parts.length >= 2 ? parts[parts.length - 2].trim() : '';
-  }
-
   const SortHeader = ({ column, label }: { column: SortColumn; label: string }) => (
     <th
       className="px-4 py-3 font-semibold text-on-surface-variant cursor-pointer select-none hover:text-on-surface transition-colors"
@@ -194,167 +182,92 @@ export default function LeadsPage() {
   );
 
   return (
-    <div className="p-8">
+    <div className="p-6 lg:p-8 space-y-6">
       {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-[10px] uppercase tracking-[0.2em] text-blue-600 font-semibold">
-            Portfolio Management
-          </p>
-          <h2 className="mt-1 text-3xl font-headline font-extrabold">
-            Lead Manifest
-          </h2>
-        </div>
-
+      <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">Leads</h1>
         <div className="flex items-center gap-3">
-          <button className="flex items-center gap-2 rounded-xl border border-outline-variant bg-surface-container-lowest px-4 py-2 text-sm font-medium text-on-surface transition-colors hover:bg-surface-container">
-            <MaterialIcon icon="tune" className="text-[18px]" />
-            Advanced Filters
-          </button>
+          <a href="/imports" className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 font-semibold rounded-lg hover:bg-slate-200 transition-colors text-sm">
+            <MaterialIcon icon="upload" className="text-[16px]" />
+            Import
+          </a>
           <button
             onClick={() => setExportModalOpen(true)}
-            className="flex items-center gap-2 rounded-xl action-gradient px-4 py-2 text-sm font-medium text-on-primary transition-shadow hover:shadow-lg"
+            className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 font-semibold rounded-lg hover:bg-slate-200 transition-colors text-sm"
           >
-            <MaterialIcon icon="download" className="text-[18px]" />
-            Export Manifest
+            <MaterialIcon icon="download" className="text-[16px]" />
+            Export
           </button>
         </div>
       </div>
 
-      {/* Search / Filters + Stats */}
-      <div className="mt-6 grid grid-cols-12 gap-6">
-        {/* Search & Filters */}
-        <div className="col-span-9 space-y-4">
-          <div className="flex items-center gap-3">
-            <SearchInput
-              placeholder="Search by name, address, or phone..."
-              onChange={setSearchTerm}
-              className="flex-1"
-            />
-
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="rounded-xl border border-outline-variant bg-surface-container-lowest px-4 py-2 text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-blue-500/40"
-            >
-              <option value="All">All Statuses</option>
-              {LEAD_STATUSES.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={sourceFilter}
-              onChange={(e) => setSourceFilter(e.target.value)}
-              className="rounded-xl border border-outline-variant bg-surface-container-lowest px-4 py-2 text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-blue-500/40"
-            >
-              <option value="All">All Sources</option>
-              {LEAD_SOURCES.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={priorityFilter}
-              onChange={(e) => setPriorityFilter(e.target.value)}
-              className="rounded-xl border border-outline-variant bg-surface-container-lowest px-4 py-2 text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-blue-500/40"
-            >
-              <option value="All">All Priorities</option>
-              {PRIORITIES.map((p) => (
-                <option key={p} value={p}>
-                  {p.charAt(0).toUpperCase() + p.slice(1)}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Bulk Actions */}
-          {selectedIds.size > 0 && (
-            <BulkActionBar
-              selectedIds={selectedIds}
-              onStatusUpdate={handleBulkStatusUpdate}
-              onTagAdd={handleBulkTagAdd}
-              onExport={() => setExportModalOpen(true)}
-              onClear={() => setSelectedIds(new Set())}
-            />
-          )}
-        </div>
-
-        {/* Stats Panel */}
-        <div className="col-span-3 space-y-3">
-          <div className="rounded-2xl bg-surface-container-low p-5">
-            <p className="text-[10px] uppercase tracking-widest text-slate-500">
-              Conversion Velocity
-            </p>
-            <p className="mt-1 font-headline text-3xl font-extrabold">84%</p>
-            <div className="mt-2 h-1.5 rounded-full bg-slate-200">
-              <div className="h-full w-[84%] rounded-full bg-blue-600" />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <StatCard
-              label="New Opportunities"
-              value={newCount}
-              bgIcon="person_add"
-            />
-            <div className="relative overflow-hidden rounded-2xl bg-surface-container-low p-5">
-              <MaterialIcon
-                icon="local_fire_department"
-                className="absolute -bottom-2 -right-2 text-[60px] text-orange-200/60"
-              />
-              <p className="text-[10px] uppercase tracking-widest text-slate-500">
-                Hot Leads
-              </p>
-              <p className="mt-1 font-headline text-2xl font-extrabold">
-                {hotLeadsCount}
-              </p>
-              <div className="mt-2 h-1.5 rounded-full bg-slate-200">
-                <div
-                  className="h-full rounded-full bg-orange-500"
-                  style={{
-                    width: `${totalCount > 0 ? (hotLeadsCount / totalCount) * 100 : 0}%`,
-                  }}
-                />
-              </div>
-            </div>
-          </div>
-        </div>
+      {/* Filter Bar */}
+      <div className="flex items-center gap-3">
+        <SearchInput
+          placeholder="Search address, owner, phone..."
+          onChange={setSearchTerm}
+          className="flex-1"
+        />
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+        >
+          <option value="All">Status: All</option>
+          {LEAD_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+        </select>
+        <select
+          value={sourceFilter}
+          onChange={(e) => setSourceFilter(e.target.value)}
+          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+        >
+          <option value="All">Source: All</option>
+          {LEAD_SOURCES.map((s) => <option key={s} value={s}>{s}</option>)}
+        </select>
+        <select
+          value={priorityFilter}
+          onChange={(e) => setPriorityFilter(e.target.value)}
+          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+        >
+          <option value="All">Priority: All</option>
+          {PRIORITIES.map((p) => <option key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</option>)}
+        </select>
       </div>
 
+      {/* Bulk Actions */}
+      {selectedIds.size > 0 && (
+        <BulkActionBar
+          selectedIds={selectedIds}
+          onStatusUpdate={handleBulkStatusUpdate}
+          onTagAdd={handleBulkTagAdd}
+          onExport={() => setExportModalOpen(true)}
+          onClear={() => setSelectedIds(new Set())}
+        />
+      )}
+
       {/* Table */}
-      <div className="mt-6 overflow-hidden rounded-2xl border border-outline-variant bg-surface-container-lowest">
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm text-left">
             <thead>
-              <tr className="border-b border-outline-variant bg-surface-container-low text-left">
-                <th className="w-10 px-4 py-3">
-                  <input
-                    type="checkbox"
-                    checked={selectedIds.size === leads.length && leads.length > 0}
-                    onChange={toggleAll}
-                    className="rounded"
-                  />
+              <tr className="border-b border-slate-200 bg-slate-50">
+                <th className="w-10 px-6 py-4">
+                  <input type="checkbox" checked={selectedIds.size === leads.length && leads.length > 0} onChange={toggleAll} className="rounded border-slate-300" />
                 </th>
-                <SortHeader column="property_address" label="Property Address" />
-                <SortHeader column="name" label="Owner / Contact" />
+                <SortHeader column="property_address" label="Address / Contact" />
+                <SortHeader column="name" label="Owner" />
                 <SortHeader column="status" label="Status" />
                 <SortHeader column="priority" label="Priority" />
-                <th className="px-4 py-3 font-semibold text-on-surface-variant">Tags</th>
                 <SortHeader column="source" label="Source" />
-                <SortHeader column="city" label="City" />
-                <SortHeader column="follow_up_date" label="Follow-Up" />
                 <SortHeader column="last_contact_date" label="Last Contact" />
+                <SortHeader column="follow_up_date" label="Follow-up" />
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-slate-100">
               {loading
                 ? Array.from({ length: 8 }).map((_, i) => (
-                    <tr key={i} className="border-b border-outline-variant">
-                      <td className="px-4 py-4" colSpan={10}>
+                    <tr key={i}>
+                      <td className="px-6 py-4" colSpan={8}>
                         <div className="h-4 w-full animate-pulse rounded bg-slate-100" />
                       </td>
                     </tr>
@@ -363,107 +276,47 @@ export default function LeadsPage() {
                     <tr
                       key={lead.id}
                       onClick={() => router.push(`/leads/${lead.id}`)}
-                      className="cursor-pointer border-b border-outline-variant transition-colors hover:bg-surface-container-high"
+                      className="cursor-pointer hover:bg-slate-50 transition-colors"
                     >
-                      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.has(lead.id)}
-                          onChange={() => toggleSelect(lead.id)}
-                          className="rounded"
-                        />
+                      <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                        <input type="checkbox" checked={selectedIds.has(lead.id)} onChange={() => toggleSelect(lead.id)} className="rounded border-slate-300" />
                       </td>
-                      <td className="px-4 py-3">
-                        <p className="font-semibold text-on-surface">
-                          {lead.property_address || 'No address'}
-                        </p>
-                        <p className="text-xs text-secondary">
-                          {lead.city || extractCity(lead.property_address)}
-                        </p>
+                      <td className="px-6 py-4">
+                        <p className="font-semibold text-slate-900">{lead.property_address || 'No address'}</p>
+                        <p className="text-xs text-slate-500">{formatPhone(lead.phone)}</p>
                       </td>
-                      <td className="px-4 py-3">
-                        {lead.owner_name && lead.owner_name !== lead.name ? (
-                          <>
-                            <p className="font-medium">{lead.owner_name}</p>
-                            <p className="text-xs text-secondary">{lead.name}</p>
-                          </>
-                        ) : (
-                          <p className="font-medium">{lead.name}</p>
-                        )}
-                        <p className="text-xs text-secondary">
-                          {formatPhone(lead.phone)}
-                        </p>
+                      <td className="px-6 py-4">
+                        <p className="font-medium text-slate-700">{lead.owner_name || lead.name || '--'}</p>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-6 py-4">
                         <Badge status={lead.status} />
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-6 py-4">
                         {lead.priority ? (
-                          <span
-                            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize ${
-                              PRIORITY_COLORS[lead.priority]
-                            }`}
-                          >
+                          <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize ${PRIORITY_COLORS[lead.priority]}`}>
                             {lead.priority}
                           </span>
-                        ) : (
-                          <span className="text-xs text-slate-300">--</span>
-                        )}
+                        ) : <span className="text-xs text-slate-300">--</span>}
                       </td>
-                      <td className="px-4 py-3">
-                        <div className="flex flex-wrap gap-1">
-                          {lead.tags?.map((tag) => (
-                            <Tag key={tag} label={tag} />
-                          ))}
-                        </div>
+                      <td className="px-6 py-4 text-slate-500 text-sm">{lead.source ?? '--'}</td>
+                      <td className="px-6 py-4 text-sm text-slate-500">
+                        {lead.last_contact_date ? timeAgo(lead.last_contact_date) : 'Never'}
                       </td>
-                      <td className="px-4 py-3 text-secondary">
-                        {lead.source ?? '--'}
-                      </td>
-                      <td className="px-4 py-3 text-secondary">
-                        {lead.city || extractCity(lead.property_address) || '--'}
-                      </td>
-                      <td className="px-4 py-3">
-                        {lead.follow_up_date ? (
-                          <p className="text-on-surface text-xs">
-                            {formatDate(lead.follow_up_date)}
-                          </p>
-                        ) : (
-                          <span className="text-xs text-slate-300">--</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        {lead.last_contact_date ? (
-                          <>
-                            <p className="text-on-surface text-xs">
-                              {formatDate(lead.last_contact_date)}
-                            </p>
-                            <p className="text-xs text-secondary">
-                              {timeAgo(lead.last_contact_date)}
-                            </p>
-                          </>
-                        ) : (
-                          <>
-                            <p className="text-on-surface text-xs">
-                              {formatDate(lead.updated_at)}
-                            </p>
-                            <p className="text-xs text-secondary">
-                              {timeAgo(lead.updated_at)}
-                            </p>
-                          </>
-                        )}
+                      <td className="px-6 py-4 text-sm text-slate-500">
+                        {lead.follow_up_date ? formatDate(lead.follow_up_date) : '--'}
                       </td>
                     </tr>
                   ))}
 
               {!loading && leads.length === 0 && (
                 <tr>
-                  <td colSpan={10} className="px-4 py-16 text-center text-secondary">
-                    <MaterialIcon icon="upload_file" className="text-[40px] text-slate-300" />
-                    <p className="mt-2 text-lg font-medium">No properties yet</p>
-                    <p className="text-sm mb-4">Import your first list to get started.</p>
-                    <a href="/imports" className="inline-flex items-center gap-2 action-gradient text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:shadow-lg transition-shadow">
-                      <MaterialIcon icon="upload_file" className="text-[16px]" />
+                  <td colSpan={8} className="px-6 py-16 text-center">
+                    <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <MaterialIcon icon="person_search" className="text-[32px] text-slate-400" />
+                    </div>
+                    <h3 className="text-lg font-bold text-slate-900">No leads found</h3>
+                    <p className="text-slate-400 max-w-sm mx-auto mt-1 text-sm">Try adjusting your filters or import a new list.</p>
+                    <a href="/imports" className="inline-flex items-center gap-2 mt-4 px-6 py-2 bg-indigo-600 text-white font-bold rounded-lg text-sm hover:bg-indigo-700 transition-colors">
                       Import a List
                     </a>
                   </td>
@@ -473,22 +326,14 @@ export default function LeadsPage() {
           </table>
         </div>
 
-        {/* Pagination */}
         {totalPages > 0 && (
-          <div className="flex items-center justify-between border-t border-outline-variant bg-surface-container-low px-4 py-3">
-            <p className="text-sm text-secondary">
-              Showing {rangeStart} to {rangeEnd} of {totalCount} Results
-            </p>
-            <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              onPageChange={setCurrentPage}
-            />
+          <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50 px-6 py-3">
+            <span className="text-sm text-slate-500">Showing {rangeStart}–{rangeEnd} of {totalCount}</span>
+            <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
           </div>
         )}
       </div>
 
-      {/* Export Modal */}
       <ExportModal
         isOpen={exportModalOpen}
         onClose={() => setExportModalOpen(false)}

@@ -8,11 +8,6 @@ import { Lead, Activity, LeadStatus, CallOutcome } from '@/types';
 import { cn, formatPhone } from '@/lib/utils';
 import { LEAD_STATUSES } from '@/lib/constants';
 import MaterialIcon from '@/components/ui/MaterialIcon';
-import ActivityTimeline from '@/components/leads/ActivityTimeline';
-import FollowUpScheduler from '@/components/leads/FollowUpScheduler';
-import EmailComposer from '@/components/leads/EmailComposer';
-import MarketComps from '@/components/leads/MarketComps';
-import NearbyPlaces from '@/components/leads/NearbyPlaces';
 import LeadMap from '@/components/leads/LeadMap';
 import { usePhone } from '@/lib/phone-context';
 import { useProfile } from '@/lib/profile-context';
@@ -21,11 +16,6 @@ import UpgradeGate from '@/components/ui/UpgradeGate';
 const GROUPS = [
   'Appointment Set', 'BUYERS', 'Dead Lead', 'Future Follow Up',
   'Hot Lead', 'Not Yet Interested', 'Trash', 'Warm Lead',
-];
-
-const TABS = [
-  'Street View', 'Map', 'Satellite', 'Property', 'Activities',
-  'Call Scripts', 'Emails', 'Comps', 'Nearby',
 ];
 
 interface CallGuidance {
@@ -55,7 +45,7 @@ export default function LeadDetailPage() {
   const [showGate, setShowGate] = useState(false);
   const isSubscribed = profile.subscriptionStatus === 'active';
   const [lead, setLead] = useState<Lead | null>(null);
-  const [activities, setActivities] = useState<Activity[]>([]);
+  const [, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
@@ -148,6 +138,16 @@ export default function LeadDetailPage() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
   const refreshData = useCallback(() => { fetchData(); }, [fetchData]);
+
+  // Keyboard navigation: left/right arrows for prev/next lead
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft' && adjacentIds.prev) router.push(`/leads/${adjacentIds.prev}`);
+      if (e.key === 'ArrowRight' && adjacentIds.next) router.push(`/leads/${adjacentIds.next}`);
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [adjacentIds, router]);
 
   const updateStatus = async (s: LeadStatus) => {
     if (!lead) return;
@@ -263,436 +263,393 @@ export default function LeadDetailPage() {
     );
   }
 
+  // Talking points derived from lead data
+  function getTalkingPoints(lead: Lead): string[] {
+    const points: string[] = [];
+    if (lead.selling_date) {
+      const years = Math.floor((Date.now() - new Date(lead.selling_date).getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+      if (years > 5) points.push(`Owned for ~${years} years`);
+    }
+    if (lead.selling_price) points.push(`Last sold for $${lead.selling_price.toLocaleString()}`);
+    if (lead.listing_status === 'Sold' && lead.dom) points.push(`On market ${lead.dom} days`);
+    if (lead.sqft) points.push(`${lead.sqft.toLocaleString()} sqft`);
+    if (lead.lot_acres) points.push(`${lead.lot_acres} acre lot`);
+    if (lead.year_built) points.push(`Built in ${lead.year_built}`);
+    if (lead.price_range) points.push(`Value: ${lead.price_range}`);
+    return points;
+  }
+
   const mapUrl = getMapUrl();
+  const talkingPoints = getTalkingPoints(lead);
+  const priorityColor = lead.status === 'Not Contacted' ? 'bg-blue-500' : lead.tags?.includes('Hot Lead') ? 'bg-red-500' : lead.status === 'Follow-Up' ? 'bg-amber-500' : 'bg-slate-500';
 
   return (
-    <div className="h-[calc(100vh-4rem)] flex flex-col overflow-hidden">
-      {/* ═══ TOP ACTION BAR ═══ */}
-      <div className="h-11 border-b border-gray-100 flex items-center justify-between px-4 bg-white shrink-0">
-        <div className="flex items-center gap-2">
-          <Link href="/leads" className="flex items-center gap-1 px-2 py-1 text-gray-500 hover:bg-gray-100 rounded text-xs font-bold transition-colors">
+    <div className="h-[calc(100vh-4rem)] flex flex-col overflow-hidden bg-[#0c1324]">
+      {/* ═══ ACTION BAR ═══ */}
+      <div className="h-12 bg-[#151b2d] border-b border-slate-800 flex items-center justify-between px-4 shrink-0">
+        <div className="flex items-center gap-3 min-w-0">
+          <Link href="/leads" className="flex items-center gap-1 px-2 py-1 text-slate-400 hover:text-white hover:bg-white/5 rounded text-xs font-bold transition-colors shrink-0">
             <MaterialIcon icon="arrow_back" className="text-[16px]" /> Back
           </Link>
-          <div className="h-4 w-px bg-gray-200 mx-1" />
-          <button className="flex items-center gap-1 px-2.5 py-1 bg-blue-600 text-white rounded text-xs font-bold hover:bg-blue-700 transition-colors">
-            Actions <MaterialIcon icon="expand_more" className="text-[14px]" />
-          </button>
-          <div className="h-4 w-px bg-gray-200 mx-1" />
-          <button className="flex items-center gap-1 px-2 py-1 text-orange-600 font-bold text-xs hover:bg-orange-50 rounded transition-colors">
-            <MaterialIcon icon="add" className="text-[16px]" /> Appointment
-          </button>
-          <button className="flex items-center gap-1 px-2 py-1 text-blue-500 font-bold text-xs hover:bg-blue-50 rounded transition-colors">
-            <MaterialIcon icon="add" className="text-[16px]" /> Task
-          </button>
-          <button className="flex items-center gap-1 px-2 py-1 text-violet-600 font-bold text-xs hover:bg-violet-50 rounded transition-colors">
-            <MaterialIcon icon="schedule" className="text-[16px]" /> Follow-Up
-          </button>
-          <div className="h-4 w-px bg-gray-200 mx-2" />
-          <a
-            href={`https://www.google.com/maps/search/${encodeURIComponent(lead.property_address || '')}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="px-2 py-1 text-xs font-bold text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-          >
-            <MaterialIcon icon="map" className="text-[16px]" /> Google Maps
-          </a>
-          <a
-            href={`https://www.zillow.com/homes/${encodeURIComponent(lead.property_address || '')}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="px-2 py-1 text-xs font-bold text-blue-700 hover:bg-blue-50 rounded transition-colors italic"
-          >
-            Zillow
-          </a>
+          <div className="h-5 w-px bg-slate-700 shrink-0" />
+          <h1 className="text-sm font-bold text-white truncate">{lead.owner_name || lead.name || 'Unknown'}</h1>
+          <span className="text-xs text-slate-500 truncate hidden md:inline">{lead.property_address}</span>
+          <span className={cn('px-2 py-0.5 rounded text-[10px] font-bold text-white shrink-0', priorityColor)}>
+            {lead.status}
+          </span>
+          {siblingProperties.length > 0 && (
+            <span className="text-[10px] font-bold text-violet-400 shrink-0">+{siblingProperties.length} props</span>
+          )}
         </div>
-
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 shrink-0">
           <button
             onClick={() => adjacentIds.prev && router.push(`/leads/${adjacentIds.prev}`)}
             disabled={!adjacentIds.prev}
-            className="p-1.5 text-gray-400 hover:bg-gray-100 rounded-full transition-colors disabled:opacity-30"
+            className="p-1.5 text-slate-400 hover:text-white hover:bg-white/5 rounded transition-colors disabled:opacity-30"
+            title="Previous lead (Left arrow)"
           >
-            <MaterialIcon icon="chevron_left" className="text-[18px]" />
+            <MaterialIcon icon="chevron_left" className="text-[20px]" />
           </button>
           <button
             onClick={() => adjacentIds.next && router.push(`/leads/${adjacentIds.next}`)}
             disabled={!adjacentIds.next}
-            className="p-1.5 text-gray-400 hover:bg-gray-100 rounded-full transition-colors disabled:opacity-30"
+            className="p-1.5 text-slate-400 hover:text-white hover:bg-white/5 rounded transition-colors disabled:opacity-30"
+            title="Next lead (Right arrow)"
           >
-            <MaterialIcon icon="chevron_right" className="text-[18px]" />
+            <MaterialIcon icon="chevron_right" className="text-[20px]" />
           </button>
         </div>
       </div>
 
-      {/* ═══ MAIN CONTENT ═══ */}
+      {/* ═══ COCKPIT: LEFT + RIGHT ═══ */}
       <div className="flex-1 flex overflow-hidden">
-        {/* ─── LEFT: Info + Tabs + Content ─── */}
-        <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Owner / Contact Header */}
-          <div className="px-6 py-3 border-b border-gray-50 flex items-start justify-between bg-gray-50/30 shrink-0">
-            <div className="flex gap-8">
-              <div>
-                <h1 className="text-xl font-bold text-gray-900 tracking-tight">{lead.owner_name || lead.name || 'Unknown'}</h1>
-                {lead.name && lead.owner_name && lead.name !== lead.owner_name && (
-                  <p className="text-xs text-gray-500 font-medium">{lead.name}</p>
-                )}
-                <div className="flex items-center gap-2 mt-1 text-gray-600">
-                  <MaterialIcon icon="location_on" className="text-[14px] text-gray-400" />
-                  <span className="text-xs font-medium">{lead.property_address}</span>
-                </div>
-                {lead.mailing_address && (
-                  <div className="flex items-center gap-2 mt-0.5 text-gray-500">
-                    <MaterialIcon icon="markunread_mailbox" className="text-[14px] text-gray-400" />
-                    <span className="text-[11px]">{lead.mailing_address}, {[lead.mailing_city, lead.mailing_state].filter(Boolean).join(', ')} {lead.mailing_zip}</span>
-                  </div>
-                )}
-              </div>
 
-              <div className="flex gap-8">
-                {/* Phones */}
-                <div className="space-y-1">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Phones</p>
-                  <div className="space-y-1">
-                    {[lead.phone, lead.phone_2, lead.phone_3].filter(Boolean).map((phone, idx) => (
-                      <div key={idx} className="flex items-center gap-2">
-                        <button onClick={() => {
-                          if (isDesktop) { makeCall(phone!, lead.owner_name || lead.name || 'Unknown', lead.id); }
-                          else { window.location.href = `tel:${phone}`; }
-                        }} className="text-xs font-bold text-emerald-600 font-mono hover:underline cursor-pointer">{formatPhone(phone!)}</button>
-                        <MaterialIcon icon="call" className="text-[14px] text-green-600 cursor-pointer hover:scale-110 transition-transform" />
-                      </div>
-                    ))}
-                    {!lead.phone && <span className="text-xs text-gray-400 italic">None</span>}
-                  </div>
+        {/* ─── LEFT PANEL: Street View ─── */}
+        <div className="w-3/5 relative flex flex-col bg-[#151b2d] border-r border-slate-800">
+          {/* View toggle buttons (top-left overlay) */}
+          <div className="absolute top-3 left-3 z-10 flex gap-1">
+            {(['Street View', 'Map', 'Satellite'] as const).map((view) => (
+              <button
+                key={view}
+                onClick={() => setActiveTab(view)}
+                className={cn(
+                  'px-3 py-1.5 rounded text-[11px] font-bold transition-all backdrop-blur-md border',
+                  activeTab === view
+                    ? 'bg-indigo-600 text-white border-indigo-500 shadow-lg'
+                    : 'bg-black/50 text-slate-300 border-white/10 hover:bg-black/70 hover:text-white'
+                )}
+              >
+                {view}
+              </button>
+            ))}
+          </div>
+
+          {/* Map / Street View content */}
+          <div className="flex-1 relative">
+            {!isSubscribed ? (
+              <div className="absolute inset-0 flex items-center justify-center bg-slate-900/80">
+                <div className="text-center">
+                  <MaterialIcon icon="lock" className="text-[48px] text-indigo-400 mb-3" />
+                  <h3 className="text-lg font-bold text-white mb-2">Street View Locked</h3>
+                  <p className="text-sm text-slate-400 mb-4">Subscribe to see properties at street level</p>
+                  <a href="/subscribe" className="px-6 py-2 bg-indigo-600 text-white rounded-lg font-bold text-sm hover:bg-indigo-700 transition-colors">Upgrade</a>
                 </div>
-                {/* Emails */}
-                <div className="space-y-1">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">E-mails</p>
-                  <div className="space-y-1">
-                    {lead.email ? (
-                      <div className="flex items-center gap-2">
-                        <a href={`mailto:${lead.email}`} className="text-xs font-medium text-blue-600 truncate max-w-[160px] hover:underline">{lead.email}</a>
-                        <MaterialIcon icon="mail" className="text-[14px] text-blue-400" />
-                      </div>
-                    ) : (
-                      <span className="text-xs text-gray-400 italic">None</span>
-                    )}
-                  </div>
+              </div>
+            ) : (activeTab === 'Map' || activeTab === 'Satellite') && lead.latitude != null && lead.longitude != null ? (
+              <LeadMap
+                lat={lead.latitude}
+                lng={lead.longitude}
+                mapType={activeTab === 'Satellite' ? 'satellite' : 'roadmap'}
+              />
+            ) : mapUrl ? (
+              <iframe src={mapUrl} className="h-full w-full border-0" loading="lazy" referrerPolicy="no-referrer-when-downgrade" allowFullScreen />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center text-slate-500">
+                <div className="text-center">
+                  <MaterialIcon icon="location_off" className="text-[48px] text-slate-600" />
+                  <p className="mt-2 text-sm">No location data available</p>
                 </div>
+              </div>
+            )}
+          </div>
+
+          {/* Property stats overlay (bottom) */}
+          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-4 pt-10">
+            <div className="flex items-end justify-between">
+              <div>
+                <p className="text-white font-bold text-sm">{lead.property_address?.split(',')[0]}</p>
+                <p className="text-slate-400 text-xs">{lead.property_address?.split(',').slice(1).join(',').trim()}</p>
+              </div>
+              <div className="flex gap-4 text-right">
+                {lead.property_condition && (
+                  <div>
+                    <p className="text-[10px] text-slate-500 uppercase tracking-widest">Type</p>
+                    <p className="text-xs text-white font-bold">{lead.property_condition}</p>
+                  </div>
+                )}
+                {lead.price_range && (
+                  <div>
+                    <p className="text-[10px] text-slate-500 uppercase tracking-widest">Value</p>
+                    <p className="text-xs text-indigo-400 font-bold">{lead.price_range}</p>
+                  </div>
+                )}
               </div>
             </div>
+          </div>
+        </div>
 
-            <div className="flex gap-4">
-              <div className="space-y-1">
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Status</p>
+        {/* ─── RIGHT PANEL: Contact + Actions ─── */}
+        <div className="w-2/5 bg-[#151b2d] flex flex-col overflow-hidden">
+          <div className="flex-1 overflow-y-auto px-4 pt-4 pb-2 space-y-3">
+
+            {/* Owner card */}
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold text-sm shrink-0">
+                {(lead.owner_name || lead.name || '?')[0].toUpperCase()}
+              </div>
+              <div className="min-w-0">
+                <p className="text-white font-bold text-sm truncate">{lead.owner_name || lead.name || 'Unknown'}</p>
+                {lead.price_range && (
+                  <p className="text-indigo-400 text-xs font-bold">{lead.price_range}</p>
+                )}
+              </div>
+              <div className="ml-auto shrink-0">
                 <select
                   value={lead.status}
                   onChange={(e) => updateStatus(e.target.value as LeadStatus)}
-                  className="appearance-none bg-white border border-gray-200 rounded px-2 py-1 text-[11px] font-medium outline-none focus:ring-1 focus:ring-blue-500 pr-6"
+                  className="appearance-none bg-[#0c1324] border border-slate-700 rounded px-2 py-1 text-[11px] font-medium text-slate-300 outline-none focus:ring-1 focus:ring-indigo-500 pr-6 cursor-pointer"
                 >
                   {LEAD_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
-              <div className="space-y-1">
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Source</p>
-                <span className="text-[11px] font-medium text-gray-700 bg-white border border-gray-200 rounded px-2 py-1 inline-block">
-                  {lead.source || 'Unknown'}
-                </span>
-              </div>
-              {lead.price_range && (
-                <div className="space-y-1">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Est. Value</p>
-                  <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-2 py-1 inline-block">
-                    {lead.price_range}
-                  </span>
+            </div>
+
+            {/* Phone cards */}
+            <div className="space-y-1.5">
+              {[lead.phone, lead.phone_2, lead.phone_3].filter(Boolean).map((phone, idx) => (
+                <div key={idx} className="flex items-center justify-between bg-[#0c1324] rounded-lg px-3 py-2 border border-slate-800">
+                  <div className="flex items-center gap-2">
+                    <MaterialIcon icon="phone" className="text-[14px] text-slate-500" />
+                    <span className="text-xs font-mono text-slate-200 font-medium">{formatPhone(phone!)}</span>
+                    {idx === 0 && <span className="text-[9px] bg-indigo-600/20 text-indigo-400 px-1.5 py-0.5 rounded font-bold">PRIMARY</span>}
+                  </div>
+                  <button
+                    onClick={() => {
+                      if (isDesktop) { makeCall(phone!, lead.owner_name || lead.name || 'Unknown', lead.id); }
+                      else { window.location.href = `tel:${phone}`; }
+                    }}
+                    className="flex items-center gap-1 px-3 py-1 bg-indigo-600 text-white rounded text-[11px] font-bold hover:bg-indigo-700 transition-colors"
+                  >
+                    <MaterialIcon icon="call" className="text-[14px]" /> Call
+                  </button>
+                </div>
+              ))}
+              {!lead.phone && (
+                <div className="bg-[#0c1324] rounded-lg px-3 py-2 border border-slate-800 text-center">
+                  <span className="text-xs text-slate-500 italic">No phone numbers</span>
                 </div>
               )}
             </div>
-          </div>
 
-          {/* Groups / Tags Row */}
-          <div className="px-6 py-2 border-b border-gray-100 flex items-center gap-2 overflow-x-auto bg-white shrink-0">
-            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mr-1 shrink-0">Groups:</span>
-            {GROUPS.map((group) => (
-              <button
-                key={group}
-                onClick={() => updateTags(group)}
-                className={cn(
-                  'px-2 py-1 rounded border text-[10px] font-bold transition-all whitespace-nowrap flex items-center gap-1 shrink-0',
-                  lead.tags?.includes(group)
-                    ? 'bg-blue-50 border-blue-200 text-blue-700 shadow-sm'
-                    : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
-                )}
-              >
-                {group === 'Hot Lead' && <MaterialIcon icon="star" className="text-[12px] text-yellow-500" />}
-                {group}
-              </button>
-            ))}
-            {/* Other properties by owner */}
-            {siblingProperties.length > 0 && (
-              <>
-                <div className="h-4 w-px bg-gray-200 mx-2 shrink-0" />
-                <span className="text-[10px] font-bold text-violet-500 uppercase tracking-widest shrink-0">
-                  +{siblingProperties.length} properties
-                </span>
-                {siblingProperties.slice(0, 3).map((s) => (
-                  <Link
-                    key={s.id}
-                    href={`/leads/${s.id}`}
-                    className="px-2 py-1 rounded border border-violet-200 bg-violet-50 text-[10px] font-bold text-violet-700 hover:bg-violet-100 transition-colors whitespace-nowrap shrink-0"
-                  >
-                    {s.property_address?.split(',')[0]}
-                  </Link>
-                ))}
-              </>
-            )}
-          </div>
-
-          {/* Tabs */}
-          <div className="px-6 py-2 border-b border-gray-100 flex items-center gap-1 overflow-x-auto bg-white shrink-0">
-            {TABS.map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={cn(
-                  'px-3 py-1.5 rounded text-[11px] font-bold whitespace-nowrap transition-all',
-                  activeTab === tab
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'
-                )}
-              >
-                {tab}
-              </button>
-            ))}
-          </div>
-
-          {/* Tab Content */}
-          <div className="flex-1 overflow-auto p-4">
-            {/* Street View — iframe */}
-            {activeTab === 'Street View' && (
-              <div className="h-full relative bg-gray-100 rounded-xl overflow-hidden border border-gray-200 shadow-inner">
-                {mapUrl ? (
-                  <iframe src={mapUrl} className="h-full w-full border-0" loading="lazy" referrerPolicy="no-referrer-when-downgrade" allowFullScreen />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center text-gray-400">
-                    <div className="text-center">
-                      <MaterialIcon icon="location_off" className="text-[48px] text-gray-300" />
-                      <p className="mt-2 text-sm">No location data available</p>
-                    </div>
-                  </div>
-                )}
-                {mapUrl && (
-                  <div className="absolute top-3 left-3 bg-black/70 text-white p-2.5 rounded shadow-xl backdrop-blur-md border border-white/10 max-w-[240px]">
-                    <div className="flex items-start gap-2">
-                      <MaterialIcon icon="location_on" className="text-[14px] mt-0.5 text-blue-400 shrink-0" />
-                      <div>
-                        <p className="text-xs font-bold leading-tight">{lead.property_address?.split(',')[0]}</p>
-                        <p className="text-[9px] opacity-70 mt-0.5">{lead.property_address?.split(',').slice(1).join(',')}</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
+            {/* Email card */}
+            {lead.email && (
+              <div className="flex items-center justify-between bg-[#0c1324] rounded-lg px-3 py-2 border border-slate-800">
+                <div className="flex items-center gap-2 min-w-0">
+                  <MaterialIcon icon="mail" className="text-[14px] text-slate-500 shrink-0" />
+                  <span className="text-xs text-slate-200 truncate">{lead.email}</span>
+                </div>
+                <a
+                  href={`mailto:${lead.email}`}
+                  className="flex items-center gap-1 px-3 py-1 bg-slate-700 text-white rounded text-[11px] font-bold hover:bg-slate-600 transition-colors shrink-0 ml-2"
+                >
+                  <MaterialIcon icon="send" className="text-[14px]" /> Send
+                </a>
               </div>
             )}
 
-            {/* Map / Satellite / Hybrid — interactive 3D with right-click tilt */}
-            {(activeTab === 'Map' || activeTab === 'Satellite') && (
-              <div className="h-full relative rounded-xl overflow-hidden border border-gray-200 shadow-inner">
-                {lead.latitude != null && lead.longitude != null ? (
-                  <LeadMap
-                    lat={lead.latitude}
-                    lng={lead.longitude}
-                    mapType={activeTab === 'Satellite' ? 'satellite' : 'roadmap'}
-                  />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center text-gray-400 bg-gray-100">
-                    <div className="text-center">
-                      <MaterialIcon icon="location_off" className="text-[48px] text-gray-300" />
-                      <p className="mt-2 text-sm">No coordinates — right-click drag to tilt when geocoded</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {activeTab === 'Property' && (
-              <div className="space-y-4 max-w-3xl">
-                <div className="grid grid-cols-2 gap-4">
-                  {[
-                    { label: 'Property Type', value: lead.property_condition },
-                    { label: 'Est. Value', value: lead.price_range },
-                    { label: 'City', value: lead.city },
-                    { label: 'State', value: lead.state },
-                    { label: 'Zip', value: lead.zip },
-                    { label: 'Source', value: lead.source },
-                  ].filter(r => r.value).map((r) => (
-                    <div key={r.label} className="rounded-xl border border-gray-200 p-3">
-                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{r.label}</p>
-                      <p className="text-sm font-medium text-gray-800 mt-0.5">{r.value}</p>
+            {/* Talking Points */}
+            {talkingPoints.length > 0 && (
+              <div className="bg-[#0c1324] rounded-lg px-3 py-2.5 border border-slate-800">
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Talking Points</p>
+                <div className="space-y-1">
+                  {talkingPoints.map((pt, i) => (
+                    <div key={i} className="flex items-start gap-2">
+                      <MaterialIcon icon="arrow_right" className="text-[14px] text-indigo-400 mt-0.5 shrink-0" />
+                      <span className="text-xs text-slate-300">{pt}</span>
                     </div>
                   ))}
                 </div>
-                {lead.notes && (
-                  <div className="rounded-xl border border-gray-200 p-3">
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Import Notes</p>
-                    <p className="text-xs text-gray-700 whitespace-pre-wrap">{lead.notes}</p>
-                  </div>
-                )}
               </div>
             )}
 
-            {activeTab === 'Activities' && (
-              <div className="max-w-3xl">
-                <ActivityTimeline activities={activities} />
+            {/* AI Guidance */}
+            <div className="bg-[#0c1324] rounded-lg px-3 py-2.5 border border-slate-800">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">AI Guidance</p>
+                <button
+                  onClick={fetchGuidance}
+                  disabled={guidanceLoading}
+                  className="flex items-center gap-1 px-2 py-1 rounded bg-amber-500/10 text-amber-400 text-[10px] font-bold hover:bg-amber-500/20 transition-colors disabled:opacity-50"
+                >
+                  <MaterialIcon icon="auto_awesome" className="text-[12px]" />
+                  {guidanceLoading ? 'Loading...' : guidance ? 'Refresh' : 'Generate'}
+                </button>
               </div>
-            )}
-
-            {activeTab === 'Call Scripts' && activeScript && (
-              <div className="max-w-2xl space-y-4">
-                <div className="flex items-center gap-3 mb-2">
-                  <select
-                    value={activeScript.id}
-                    onChange={(e) => { const s = scripts.find(s => s.id === e.target.value); if (s) setActiveScript(s); }}
-                    className="text-xs rounded-lg border border-gray-200 bg-white px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  >
-                    {scripts.map(s => <option key={s.id} value={s.id}>{s.category.replace('_', ' ')}</option>)}
-                  </select>
-                  <button
-                    onClick={fetchGuidance}
-                    disabled={guidanceLoading}
-                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 text-xs font-bold hover:bg-amber-100 transition-colors disabled:opacity-50"
-                  >
-                    <MaterialIcon icon="auto_awesome" className="text-[14px]" />
-                    {guidanceLoading ? 'Generating...' : 'AI Follow-Up'}
-                  </button>
+              {guidance && (
+                <div className="space-y-2">
+                  <p className="text-xs text-slate-300 italic">&ldquo;{guidance.opener}&rdquo;</p>
+                  <ul className="space-y-1">
+                    {guidance.talking_points.map((pt, i) => (
+                      <li key={i} className="flex items-start gap-1.5 text-xs text-slate-400">
+                        <MaterialIcon icon="check_circle" className="text-[12px] text-emerald-500 mt-0.5 shrink-0" />
+                        {pt}
+                      </li>
+                    ))}
+                  </ul>
                 </div>
-
-                {/* AI Guidance */}
-                {guidance && (
-                  <div className="rounded-xl bg-amber-50 border border-amber-200 p-4 space-y-2">
-                    <div className="rounded-lg bg-white p-3">
-                      <p className="text-[10px] uppercase tracking-widest text-amber-600 font-bold mb-1">Opener</p>
-                      <p className="text-sm text-gray-800">{guidance.opener}</p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-1">Talking Points</p>
-                      <ul className="space-y-1">
-                        {guidance.talking_points.map((pt, i) => (
-                          <li key={i} className="flex items-start gap-1.5 text-xs"><MaterialIcon icon="check_circle" className="mt-0.5 text-[14px] text-emerald-500" />{pt}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  </div>
-                )}
-
-                {/* Checklist */}
-                <div className="space-y-3">
-                  {(activeScript.questions as ScriptQuestion[]).sort((a, b) => a.order - b.order).map((q) => (
-                    <div key={q.question} className="flex items-start gap-3">
-                      <MaterialIcon
-                        icon={checklistAnswers[q.question] ? 'check_box' : 'check_box_outline_blank'}
-                        className={cn('text-[20px] mt-1', checklistAnswers[q.question] ? 'text-emerald-500' : 'text-gray-400')}
-                      />
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-gray-800">{q.question}</p>
-                        <input
-                          type="text"
-                          value={checklistAnswers[q.question] || ''}
-                          onChange={(e) => setChecklistAnswers(prev => ({ ...prev, [q.question]: e.target.value }))}
-                          placeholder="Record answer..."
-                          className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                {Object.values(checklistAnswers).some(v => v.trim()) && (
-                  <button onClick={saveChecklistAnswers} disabled={savingChecklist}
-                    className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700 transition-colors disabled:opacity-50">
-                    <MaterialIcon icon="save" className="text-[16px]" /> {savingChecklist ? 'Saving...' : 'Save Answers'}
-                  </button>
-                )}
-                {previousResponses.length > 0 && (
-                  <div className="border-t border-gray-200 pt-3">
-                    <p className="text-[10px] uppercase tracking-widest text-gray-400 font-bold mb-2">Previous Responses</p>
-                    <div className="space-y-1.5 max-h-40 overflow-y-auto">
-                      {previousResponses.slice(0, 15).map((r) => (
-                        <div key={r.id} className="flex items-start gap-2 text-xs">
-                          <MaterialIcon icon="chat_bubble_outline" className="text-[14px] text-gray-400 mt-0.5" />
-                          <div><p className="text-gray-500">{r.question}</p><p className="font-medium text-gray-800">{r.answer}</p></div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {activeTab === 'Emails' && (
-              <div className="max-w-3xl">
-                <EmailComposer lead={lead} onEmailSent={refreshData} />
-              </div>
-            )}
-
-            {activeTab === 'Comps' && (
-              <div className="max-w-3xl">
-                <MarketComps leadId={lead.id} />
-              </div>
-            )}
-
-            {activeTab === 'Nearby' && (
-              <div className="max-w-3xl">
-                <NearbyPlaces lead={lead} />
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* ─── RIGHT SIDEBAR: Notes + Call Outcome ─── */}
-        <div className="w-72 border-l border-gray-100 bg-white flex flex-col shrink-0">
-          <div className="p-4 flex-1 flex flex-col overflow-hidden">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Notes</h3>
-              <button onClick={saveNote} disabled={savingNote || !note.trim()}
-                className="text-[10px] text-blue-600 font-bold hover:underline disabled:opacity-40">
-                Save Note
-              </button>
+              )}
             </div>
-            <div className="relative flex-1 flex flex-col">
-              <MaterialIcon icon="chat" className="absolute left-3 top-3 text-[14px] text-gray-300" />
+
+            {/* Notes */}
+            <div className="bg-[#0c1324] rounded-lg px-3 py-2.5 border border-slate-800">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Notes</p>
+                <button onClick={saveNote} disabled={savingNote || !note.trim()}
+                  className="text-[10px] text-indigo-400 font-bold hover:text-indigo-300 disabled:opacity-30 transition-colors">
+                  {savingNote ? 'Saving...' : 'Save'} (Ctrl+Enter)
+                </button>
+              </div>
               <textarea
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter' && e.ctrlKey) saveNote(); }}
-                className="w-full flex-1 p-3 pl-9 border border-gray-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-blue-500 outline-none resize-none bg-gray-50/50"
-                placeholder="Type Note Here..."
+                rows={3}
+                className="w-full p-2 bg-[#151b2d] border border-slate-700 rounded-lg text-xs text-slate-200 font-medium focus:ring-1 focus:ring-indigo-500 outline-none resize-none placeholder:text-slate-600"
+                placeholder="Type notes during the call..."
               />
             </div>
 
-            {/* Follow-Up Quick Scheduler */}
-            <div className="mt-3">
-              <FollowUpScheduler lead={lead} onScheduled={refreshData} />
+            {/* Opening Script */}
+            {profile.openingScript && (
+              <details className="bg-[#0c1324] rounded-lg border border-slate-800 group">
+                <summary className="px-3 py-2.5 cursor-pointer flex items-center justify-between text-[10px] font-bold text-slate-500 uppercase tracking-widest hover:text-slate-400 transition-colors">
+                  <span>Opening Script</span>
+                  <MaterialIcon icon="expand_more" className="text-[16px] text-slate-600 group-open:rotate-180 transition-transform" />
+                </summary>
+                <div className="px-3 pb-3">
+                  <p className="text-xs text-slate-300 leading-relaxed whitespace-pre-wrap">
+                    {profile.openingScript
+                      .replace('{name}', lead.owner_name || '')
+                      .replace('{street}', lead.property_address?.split(',')[0] || '')
+                      .replace('{value}', lead.price_range || '')}
+                  </p>
+                </div>
+              </details>
+            )}
+
+            {/* Call Script Checklist */}
+            {activeScript && (
+              <details className="bg-[#0c1324] rounded-lg border border-slate-800 group">
+                <summary className="px-3 py-2.5 cursor-pointer flex items-center justify-between text-[10px] font-bold text-slate-500 uppercase tracking-widest hover:text-slate-400 transition-colors">
+                  <span>Call Script: {activeScript.category.replace('_', ' ')}</span>
+                  <MaterialIcon icon="expand_more" className="text-[16px] text-slate-600 group-open:rotate-180 transition-transform" />
+                </summary>
+                <div className="px-3 pb-3 space-y-2">
+                  {scripts.length > 1 && (
+                    <select
+                      value={activeScript.id}
+                      onChange={(e) => { const s = scripts.find(s => s.id === e.target.value); if (s) setActiveScript(s); }}
+                      className="w-full text-xs rounded border border-slate-700 bg-[#151b2d] text-slate-300 px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    >
+                      {scripts.map(s => <option key={s.id} value={s.id}>{s.category.replace('_', ' ')}</option>)}
+                    </select>
+                  )}
+                  {(activeScript.questions as ScriptQuestion[]).sort((a, b) => a.order - b.order).map((q) => (
+                    <div key={q.question} className="flex items-start gap-2">
+                      <MaterialIcon
+                        icon={checklistAnswers[q.question] ? 'check_box' : 'check_box_outline_blank'}
+                        className={cn('text-[18px] mt-0.5 cursor-pointer', checklistAnswers[q.question] ? 'text-emerald-500' : 'text-slate-600')}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-slate-300">{q.question}</p>
+                        <input
+                          type="text"
+                          value={checklistAnswers[q.question] || ''}
+                          onChange={(e) => setChecklistAnswers(prev => ({ ...prev, [q.question]: e.target.value }))}
+                          placeholder="Answer..."
+                          className="mt-1 w-full rounded border border-slate-700 bg-[#151b2d] px-2 py-1 text-xs text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                  {Object.values(checklistAnswers).some(v => v.trim()) && (
+                    <button onClick={saveChecklistAnswers} disabled={savingChecklist}
+                      className="w-full flex items-center justify-center gap-1.5 rounded bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-indigo-700 transition-colors disabled:opacity-50">
+                      <MaterialIcon icon="save" className="text-[14px]" /> {savingChecklist ? 'Saving...' : 'Save Answers'}
+                    </button>
+                  )}
+                  {previousResponses.length > 0 && (
+                    <div className="border-t border-slate-700 pt-2 mt-2">
+                      <p className="text-[9px] uppercase tracking-widest text-slate-600 font-bold mb-1">Previous</p>
+                      <div className="space-y-1 max-h-24 overflow-y-auto">
+                        {previousResponses.slice(0, 10).map((r) => (
+                          <div key={r.id} className="text-[11px]">
+                            <span className="text-slate-500">{r.question}: </span>
+                            <span className="text-slate-300 font-medium">{r.answer}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </details>
+            )}
+
+            {/* Groups / Tags */}
+            <div className="bg-[#0c1324] rounded-lg px-3 py-2.5 border border-slate-800">
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Groups</p>
+              <div className="flex flex-wrap gap-1">
+                {GROUPS.map((group) => (
+                  <button
+                    key={group}
+                    onClick={() => updateTags(group)}
+                    className={cn(
+                      'px-2 py-0.5 rounded text-[10px] font-bold transition-all border',
+                      lead.tags?.includes(group)
+                        ? 'bg-indigo-600/20 border-indigo-500/50 text-indigo-300'
+                        : 'bg-transparent border-slate-700 text-slate-500 hover:border-slate-600 hover:text-slate-400'
+                    )}
+                  >
+                    {group}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
-          <div className="p-4 border-t border-gray-100 bg-gray-50/50">
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Call Outcome</p>
-            <div className="grid grid-cols-2 gap-2">
+          {/* ─── STICKY BOTTOM: Call Outcome Buttons ─── */}
+          <div className="p-3 border-t border-slate-800 bg-[#0c1324] shrink-0">
+            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 text-center">Log Call Outcome</p>
+            <div className="grid grid-cols-3 gap-1.5">
               {([
-                { outcome: 'No Answer' as CallOutcome, icon: 'phone_missed', label: 'No Answer' },
-                { outcome: 'Left VM' as CallOutcome, icon: 'voicemail', label: 'Left VM' },
-                { outcome: 'Spoke with Owner' as CallOutcome, icon: 'record_voice_over', label: 'Spoke' },
-                { outcome: 'Follow-Up' as CallOutcome, icon: 'event', label: 'Follow-Up' },
-                { outcome: 'Not Interested' as CallOutcome, icon: 'thumb_down', label: 'Not Int.' },
-                { outcome: 'DNC' as CallOutcome, icon: 'block', label: 'DNC' },
-              ]).map(({ outcome, icon, label }) => (
+                { outcome: 'No Answer' as CallOutcome, icon: 'phone_missed', label: 'No Ans', color: 'bg-slate-700/50 hover:bg-slate-700 text-slate-300' },
+                { outcome: 'Left VM' as CallOutcome, icon: 'voicemail', label: 'Left VM', color: 'bg-blue-900/30 hover:bg-blue-900/50 text-blue-300' },
+                { outcome: 'Spoke with Owner' as CallOutcome, icon: 'record_voice_over', label: 'Spoke', color: 'bg-emerald-900/30 hover:bg-emerald-900/50 text-emerald-300' },
+                { outcome: 'Follow-Up' as CallOutcome, icon: 'event', label: 'Follow-Up', color: 'bg-amber-900/30 hover:bg-amber-900/50 text-amber-300' },
+                { outcome: 'Not Interested' as CallOutcome, icon: 'thumb_down', label: 'Not Int.', color: 'bg-orange-900/30 hover:bg-orange-900/50 text-orange-300' },
+                { outcome: 'DNC' as CallOutcome, icon: 'block', label: 'DNC', color: 'bg-red-900/30 hover:bg-red-900/50 text-red-300' },
+              ]).map(({ outcome, icon, label, color }) => (
                 <button
                   key={outcome}
                   onClick={() => logOutcome(outcome)}
                   disabled={savingOutcome}
-                  className="flex items-center justify-center gap-1.5 py-2 px-2 bg-white border border-gray-200 rounded-lg text-[10px] font-bold text-gray-700 hover:border-blue-500 hover:text-blue-600 transition-all shadow-sm disabled:opacity-50"
+                  className={cn(
+                    'flex flex-col items-center justify-center py-2 px-1 rounded-lg text-[10px] font-bold transition-all border border-slate-800 disabled:opacity-50',
+                    color
+                  )}
                 >
-                  <MaterialIcon icon={icon} className="text-[14px]" /> {label}
+                  <MaterialIcon icon={icon} className="text-[16px] mb-0.5" />
+                  {label}
                 </button>
               ))}
             </div>

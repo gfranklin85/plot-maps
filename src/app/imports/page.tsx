@@ -120,6 +120,7 @@ export default function ImportsPage() {
   const isSubscribed = profile.subscriptionStatus === 'active';
   const fileRef = useRef<HTMLInputElement>(null);
   const [phase, setPhase] = useState<ImportPhase>('idle');
+  const [uploadType, setUploadType] = useState<'context' | 'target' | null>(null);
   const [dragActive, setDragActive] = useState(false);
 
   // Detected data
@@ -413,6 +414,7 @@ export default function ImportsPage() {
   // ── Reset ──
   function reset() {
     setPhase('idle');
+    setUploadType(null);
     setFileName('');
     setHeaders([]);
     setRows([]);
@@ -427,69 +429,146 @@ export default function ImportsPage() {
   const formatLabel = format === 'mls' ? 'MLS Listing Data' : format === 'propwire' ? 'Property List (PropWire format)' : 'Property Data';
 
   return (
-    <div className="max-w-5xl mx-auto px-10 py-12 space-y-16">
+    <div className="max-w-6xl mx-auto px-10 py-12 space-y-16">
       {/* Header */}
-      <div className="max-w-2xl">
-        <h1 className="text-4xl font-headline font-extrabold tracking-tight mb-3">Import Property Leads</h1>
-        <p className="text-slate-400 text-lg leading-relaxed">Turn your CSV or property lists into geolocated pins in seconds. Our AI handles the mapping.</p>
+      <div className="max-w-3xl">
+        <h1 className="text-4xl font-headline font-extrabold tracking-tight mb-2">Build your map before you make your calls</h1>
+        <p className="text-slate-400 text-lg leading-relaxed">Upload your market data and your leads to get started</p>
       </div>
 
-      {/* ═══ IDLE: Drop zone + paste ═══ */}
-      {phase === 'idle' && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Drop Zone */}
-          <div
-            className={cn(
-              'group relative flex flex-col items-center justify-center border-2 border-dashed rounded-2xl p-12 transition-all cursor-pointer',
-              dragActive ? 'border-indigo-500 bg-indigo-500/5' : 'border-slate-600/30 hover:border-indigo-400/50 bg-slate-800/20'
-            )}
-            onClick={() => fileRef.current?.click()}
-            onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
-            onDragLeave={() => setDragActive(false)}
-            onDrop={(e) => {
-              e.preventDefault();
-              setDragActive(false);
-              const file = e.dataTransfer.files?.[0];
-              if (file) handleFile(file);
-            }}
-          >
-            <input ref={fileRef} type="file" accept=".csv,.txt,.tsv" className="hidden" onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) handleFile(file);
-            }} />
-            <div className="w-16 h-16 rounded-full bg-slate-700/50 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-              <MaterialIcon icon="cloud_upload" className="text-[32px] text-indigo-400" />
+      {/* ═══ IDLE: Two-door entry ═══ */}
+      {phase === 'idle' && !uploadType && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+          {/* Market Layer (Left) */}
+          <div className="space-y-6">
+            <div className="flex items-center gap-3 px-1">
+              <MaterialIcon icon="layers" className="text-[20px] text-indigo-400" />
+              <h2 className="text-sm uppercase tracking-widest font-black text-slate-200">Market Layer (MLS / Comps)</h2>
             </div>
-            <p className="text-xl font-semibold text-slate-200 mb-2">Drop CSV or Excel</p>
-            <p className="text-sm text-slate-500 mb-6">PropWire, BatchLeads, MLS exports, county records</p>
-            <button className="bg-slate-700/50 text-slate-200 px-6 py-2 rounded-lg font-medium border border-white/10 hover:bg-slate-600/50 transition-colors text-sm">
-              Select File
-            </button>
+            <div className="group flex flex-col h-full bg-[#070d1f] border border-white/10 rounded-2xl p-10 hover:border-indigo-500/40 transition-all">
+              <div className="w-12 h-12 rounded-xl bg-indigo-500/10 flex items-center justify-center mb-6">
+                <MaterialIcon icon="map" className="text-[24px] text-indigo-400" />
+              </div>
+              <h3 className="text-2xl font-headline font-bold text-slate-100 mb-4">Build your market view first</h3>
+              <p className="text-slate-400 text-sm leading-relaxed mb-6">
+                Download a current snapshot of your market — active, pending, or recent sold listings — and upload it here. We&apos;ll place them on the map with full property cards so you can see what&apos;s happening in real time.
+              </p>
+              <p className="text-[11px] font-bold text-indigo-400/70 uppercase tracking-wide mb-8 mt-auto">
+                Think of this as your live comp layer while you&apos;re calling
+              </p>
+              <button
+                onClick={() => setUploadType('context')}
+                className="w-full bg-[#23293c] text-slate-200 py-3.5 rounded-xl font-bold text-sm border border-white/10 hover:bg-indigo-600 hover:text-white hover:border-indigo-500 transition-all"
+              >
+                Upload Market Snapshot
+              </button>
+              <p className="text-center text-[10px] text-slate-500 mt-2">CSV or paste data</p>
+            </div>
           </div>
 
-          {/* Smart Paste */}
-          <div className="flex flex-col bg-slate-800/30 rounded-2xl p-8 border border-white/5">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-2">
-                <MaterialIcon icon="auto_awesome" className="text-[20px] text-orange-400" />
-                <h3 className="text-sm font-bold uppercase tracking-widest text-slate-300">Smart Paste</h3>
-              </div>
-              <span className="text-[10px] bg-orange-500/10 text-orange-400 px-2 py-0.5 rounded font-bold">AI</span>
+          {/* Your Leads (Right) */}
+          <div className="space-y-6">
+            <div className="flex items-center gap-3 px-1">
+              <MaterialIcon icon="target" className="text-[20px] text-orange-400" />
+              <h2 className="text-sm uppercase tracking-widest font-black text-slate-200">Your Leads (Targets)</h2>
             </div>
-            <textarea
-              value={pasteText}
-              onChange={(e) => setPasteText(e.target.value)}
-              rows={8}
-              className="flex-1 bg-slate-900/50 border-none rounded-lg p-4 font-mono text-xs text-slate-300 focus:ring-1 focus:ring-indigo-500 resize-none placeholder:text-slate-600"
-              placeholder={"Paste address chunks, MLS snippets, or unstructured text...\n\n123 Alpine Way, Boulder CO $1.2M\n09/12/23 - New listing: 455 Sunset Blvd, LA..."}
-            />
-            <button
-              onClick={handlePaste}
-              disabled={!pasteText.trim() || aiParsing}
-              className="mt-4 text-indigo-400 text-xs font-bold flex items-center gap-1 hover:gap-2 transition-all disabled:opacity-50"
-            >
-              {aiParsing ? 'ANALYZING...' : 'PARSE SNIPPET'} <MaterialIcon icon="arrow_forward" className="text-xs" />
+            <div className="group flex flex-col h-full bg-[#151b2d] border border-white/5 rounded-2xl p-10 hover:border-orange-500/40 transition-all">
+              <div className="w-12 h-12 rounded-xl bg-orange-500/10 flex items-center justify-center mb-6">
+                <MaterialIcon icon="person_search" className="text-[24px] text-orange-400" />
+              </div>
+              <h3 className="text-2xl font-headline font-bold text-slate-100 mb-4">Bring your leads in</h3>
+              <p className="text-slate-400 text-sm leading-relaxed mb-6">
+                Upload your lists from any source — PropStream, BatchLeads, county data, or your own notes. We automatically structure the data into property cards, then map them so you can see and work them directly.
+              </p>
+              <p className="text-[11px] font-bold text-orange-400 uppercase tracking-wide mb-8 mt-auto">
+                Your data becomes something you can actually act on
+              </p>
+              <button
+                onClick={() => setUploadType('target')}
+                className="w-full bg-orange-500 text-white py-3.5 rounded-xl font-bold text-sm hover:bg-orange-600 transition-all shadow-lg shadow-orange-500/10"
+              >
+                Upload Lead List
+              </button>
+              <p className="text-center text-[10px] text-slate-500 mt-2">Paste, CSV, or raw text</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ IDLE: Upload zone (after type selected) ═══ */}
+      {phase === 'idle' && uploadType && (
+        <div className="space-y-6">
+          <div className="flex items-center gap-3">
+            <button onClick={() => setUploadType(null)} className="text-slate-400 hover:text-white transition-colors">
+              <MaterialIcon icon="arrow_back" className="text-[20px]" />
             </button>
+            <div className="flex items-center gap-2">
+              <MaterialIcon icon={uploadType === 'context' ? 'layers' : 'target'} className={`text-[20px] ${uploadType === 'context' ? 'text-indigo-400' : 'text-orange-400'}`} />
+              <h2 className="text-sm uppercase tracking-widest font-black text-slate-200">
+                {uploadType === 'context' ? 'Upload Market Snapshot' : 'Upload Lead List'}
+              </h2>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Drop Zone */}
+            <div
+              className={cn(
+                'group relative flex flex-col items-center justify-center border-2 border-dashed rounded-2xl p-12 transition-all cursor-pointer',
+                dragActive
+                  ? (uploadType === 'context' ? 'border-indigo-500 bg-indigo-500/5' : 'border-orange-500 bg-orange-500/5')
+                  : 'border-slate-600/30 hover:border-slate-400/50 bg-[#070d1f]'
+              )}
+              onClick={() => fileRef.current?.click()}
+              onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
+              onDragLeave={() => setDragActive(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragActive(false);
+                const file = e.dataTransfer.files?.[0];
+                if (file) handleFile(file);
+              }}
+            >
+              <input ref={fileRef} type="file" accept=".csv,.txt,.tsv" className="hidden" onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handleFile(file);
+              }} />
+              <div className="w-16 h-16 rounded-full bg-slate-700/50 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                <MaterialIcon icon="cloud_upload" className={`text-[32px] ${uploadType === 'context' ? 'text-indigo-400' : 'text-orange-400'}`} />
+              </div>
+              <p className="text-xl font-semibold text-slate-200 mb-2">Drop CSV or Excel</p>
+              <p className="text-sm text-slate-500 mb-6">
+                {uploadType === 'context' ? 'MLS exports, recent solds, active listings' : 'PropWire, BatchLeads, county records, any format'}
+              </p>
+              <button className="bg-slate-700/50 text-slate-200 px-6 py-2 rounded-lg font-medium border border-white/10 hover:bg-slate-600/50 transition-colors text-sm">
+                Select File
+              </button>
+            </div>
+
+            {/* Smart Paste */}
+            <div className="flex flex-col bg-[#151b2d] rounded-2xl p-8 border border-white/5">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-2">
+                  <MaterialIcon icon="auto_awesome" className="text-[20px] text-orange-400" />
+                  <h3 className="text-sm font-bold uppercase tracking-widest text-slate-300">Smart Paste</h3>
+                </div>
+                <span className="text-[10px] bg-orange-500/10 text-orange-400 px-2 py-0.5 rounded font-bold">AI</span>
+              </div>
+              <textarea
+                value={pasteText}
+                onChange={(e) => setPasteText(e.target.value)}
+                rows={8}
+                className="flex-1 bg-[#070d1f] border-none rounded-lg p-4 font-mono text-xs text-slate-300 focus:ring-1 focus:ring-indigo-500 resize-none placeholder:text-slate-600"
+                placeholder={"Paste address chunks, MLS snippets, or unstructured text...\n\n123 Alpine Way, Boulder CO $1.2M\n09/12/23 - New listing: 455 Sunset Blvd, LA..."}
+              />
+              <button
+                onClick={handlePaste}
+                disabled={!pasteText.trim() || aiParsing}
+                className="mt-4 text-indigo-400 text-xs font-bold flex items-center gap-1 hover:gap-2 transition-all disabled:opacity-50"
+              >
+                {aiParsing ? 'ANALYZING...' : 'PARSE SNIPPET'} <MaterialIcon icon="arrow_forward" className="text-xs" />
+              </button>
+            </div>
           </div>
         </div>
       )}

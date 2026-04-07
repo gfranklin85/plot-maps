@@ -45,16 +45,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'phoneNumber is required' }, { status: 400 });
   }
 
-  // Check subscription and existing number
+  const PRO_PRICE_ID = process.env.NEXT_PUBLIC_STRIPE_PRO_PRICE_ID || '';
+
+  // Check Pro subscription and existing number
   const { data: profile } = await supabaseAdmin
     .from('profiles')
-    .select('twilio_phone_number, subscription_status')
+    .select('twilio_phone_number, subscription_status, stripe_price_id')
     .eq('id', user.id)
     .single();
 
-  if (profile?.subscription_status !== 'active') {
+  if (profile?.subscription_status !== 'active' || profile?.stripe_price_id !== PRO_PRICE_ID) {
     return NextResponse.json(
-      { error: 'Phone numbers require an active subscription. Upgrade to get a local number.' },
+      { error: 'Phone numbers are included with the Pro plan. Upgrade to Pro to get a local number.' },
       { status: 403 }
     );
   }

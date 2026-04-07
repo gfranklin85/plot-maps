@@ -8,11 +8,11 @@ export default function LandingPage() {
       {/* Top Navigation */}
       <header className="fixed top-0 w-full z-50 bg-[#0c1324]/80 backdrop-blur-xl shadow-[0_8px_30px_rgb(0,0,0,0.12)]">
         <nav className="flex justify-between items-center px-8 py-4 max-w-screen-2xl mx-auto">
-          <div className="text-2xl font-black tracking-tighter text-indigo-100 font-headline">Plot Maps</div>
+          <Link href="/" className="text-2xl font-black tracking-tighter text-indigo-100 font-headline">Plot Maps</Link>
           <div className="hidden md:flex items-center gap-8">
-            <button onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })} className="text-indigo-400 font-semibold border-b-2 border-indigo-500 pb-1 font-headline">Features</button>
-            <button onClick={() => document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' })} className="text-slate-400 font-medium hover:text-indigo-200 transition-colors font-headline">Pricing</button>
-            <button onClick={() => document.getElementById('use-cases')?.scrollIntoView({ behavior: 'smooth' })} className="text-slate-400 font-medium hover:text-indigo-200 transition-colors font-headline">Use Cases</button>
+            <a href="#features" className="text-indigo-400 font-semibold border-b-2 border-indigo-500 pb-1 font-headline">Features</a>
+            <a href="#pricing" className="text-slate-400 font-medium hover:text-indigo-200 transition-colors font-headline">Pricing</a>
+            <a href="#use-cases" className="text-slate-400 font-medium hover:text-indigo-200 transition-colors font-headline">Use Cases</a>
             <Link className="text-slate-400 font-medium hover:text-indigo-200 transition-colors font-headline" href="/login">Sign In</Link>
           </div>
           <Link href="/signup" className="bg-gradient-to-br from-indigo-400 to-indigo-600 text-white px-6 py-2.5 rounded-lg font-bold font-headline scale-95 hover:scale-100 transition-all duration-300">
@@ -36,10 +36,10 @@ export default function LandingPage() {
                 <Link href="/signup" className="bg-gradient-to-br from-indigo-400 to-indigo-600 text-white px-8 py-4 rounded-lg font-bold font-headline text-lg hover:shadow-[0_0_20px_rgba(195,192,255,0.3)] transition-all">
                   Get Access
                 </Link>
-                <Link href="/signup" className="bg-[#23293c] border border-slate-700/20 text-[#dce1fb] px-8 py-4 rounded-lg font-bold font-headline text-lg hover:bg-[#2e3447] transition-all flex items-center gap-2">
-                  <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>play_circle</span>
-                  Watch Demo
-                </Link>
+                <a href="#features" className="bg-[#23293c] border border-slate-700/20 text-[#dce1fb] px-8 py-4 rounded-lg font-bold font-headline text-lg hover:bg-[#2e3447] transition-all flex items-center gap-2">
+                  <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>visibility</span>
+                  Learn More
+                </a>
               </div>
             </div>
             <div className="relative">
@@ -287,15 +287,49 @@ export default function LandingPage() {
 
       {/* Footer */}
       <footer className="bg-[#070d1f] w-full py-12 px-8 border-t border-indigo-900/20">
-        <div className="flex flex-col md:flex-row justify-between items-center gap-6 max-w-7xl mx-auto">
-          <div className="text-lg font-bold text-indigo-200 font-headline">Plot Maps</div>
-          <div className="flex flex-wrap justify-center gap-6 text-sm tracking-wide text-slate-500">
-            <a className="hover:text-indigo-400 transition-colors" href="#">Privacy Policy</a>
-            <a className="hover:text-indigo-400 transition-colors" href="#">Terms of Service</a>
-            <a className="hover:text-indigo-400 transition-colors" href="#">Support</a>
+        <div className="max-w-7xl mx-auto grid gap-10 md:grid-cols-4">
+          <div>
+            <div className="text-lg font-bold text-indigo-200 font-headline">Plot Maps</div>
+            <p className="mt-3 text-sm text-slate-400 leading-relaxed">
+              Visual prospecting software for agents, investors, wholesalers, and outreach teams.
+            </p>
           </div>
-          <p className="text-slate-500 text-xs text-center md:text-right">
-            &copy; 2026 Plot Maps by Plot Solutions. All rights reserved.
+
+          <div>
+            <h4 className="text-sm font-semibold text-indigo-100 mb-3">Product</h4>
+            <div className="flex flex-col gap-2 text-sm text-slate-400">
+              <a href="#features" className="hover:text-indigo-400 transition-colors">Features</a>
+              <a href="#pricing" className="hover:text-indigo-400 transition-colors">Pricing</a>
+                <a href="/support" className="hover:text-indigo-400 transition-colors">Support</a>
+            </div>
+          </div>
+
+          <div>
+            <h4 className="text-sm font-semibold text-indigo-100 mb-3">Company</h4>
+            <div className="flex flex-col gap-2 text-sm text-slate-400">
+              <Link href="/support" className="hover:text-indigo-400 transition-colors">Support</Link>
+              <Link href="/login" className="hover:text-indigo-400 transition-colors">Sign In</Link>
+              <Link href="/signup" className="hover:text-indigo-400 transition-colors">Sign Up</Link>
+            </div>
+          </div>
+
+          <div>
+            <h4 className="text-sm font-semibold text-indigo-100 mb-3">Legal</h4>
+            <div className="flex flex-col gap-2 text-sm text-slate-400">
+              <Link href="/privacy" className="hover:text-indigo-400 transition-colors">Privacy Policy</Link>
+              <Link href="/terms" className="hover:text-indigo-400 transition-colors">Terms of Service</Link>
+              <Link href="/cookies" className="hover:text-indigo-400 transition-colors">Cookie Policy</Link>
+            </div>
+          </div>
+        </div>
+
+        <div className="max-w-7xl mx-auto mt-10 pt-6 border-t border-slate-800 flex flex-col md:flex-row justify-between gap-4 text-xs text-slate-500">
+          <p>© 2026 Plot Maps by Plot Solutions. All rights reserved.</p>
+          <p>
+            Support:{' '}
+            <a href="mailto:gregfranklin523@gmail.com" className="hover:text-indigo-400 transition-colors">
+              gregfranklin523@gmail.com
+            </a>
           </p>
         </div>
       </footer>

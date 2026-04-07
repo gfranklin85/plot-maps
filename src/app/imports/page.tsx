@@ -342,6 +342,8 @@ export default function ImportsPage() {
           priority: 'medium',
           notes: getVal(row, 'notes') || null,
           user_id: user?.id || null,
+          record_type: uploadType || 'target',
+          last_imported_at: new Date().toISOString(),
           ...mlsFields,
         };
 

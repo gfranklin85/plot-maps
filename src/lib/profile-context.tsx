@@ -14,6 +14,7 @@ export interface UserProfile {
   defaultMapCenter: { lat: number; lng: number } | null;
   openingScript: string;
   subscriptionStatus: string;
+  isAdmin: boolean;
   notifications: {
     email: boolean;
     push: boolean;
@@ -31,6 +32,7 @@ const defaultProfile: UserProfile = {
   defaultMapCenter: null,
   openingScript: `Hi, is this {name}?\n\nHey {name} — this is Greg Franklin here in Lemoore. I'm reaching out because a home over on {street} just sold around {value}, and I've been touching base with nearby homeowners since there's been a little more movement in the market.\n\n"I'm just curious — are you guys planning to stay there long term, or do you see yourselves making a move at some point down the road?"\n\n"If you ever did move, what would the next place look like for you?"\n• "Would that be somewhere here locally or somewhere else?"\n• "What would the next house need to have that this one doesn't?"`,
   subscriptionStatus: '',
+  isAdmin: false,
   notifications: {
     email: true,
     push: true,
@@ -111,6 +113,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
           defaultMapCenter: data.settings?.defaultMapCenter || null,
           openingScript: data.opening_script || defaultProfile.openingScript,
           subscriptionStatus: data.subscription_status || '',
+          isAdmin: data.is_admin || false,
           notifications: {
             email: data.notification_email ?? true,
             push: data.notification_push ?? true,

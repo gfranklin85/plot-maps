@@ -45,12 +45,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'phoneNumber is required' }, { status: 400 });
   }
 
-  // Check if user already has a number
+  // Check subscription and existing number
   const { data: profile } = await supabaseAdmin
     .from('profiles')
-    .select('twilio_phone_number')
+    .select('twilio_phone_number, subscription_status')
     .eq('id', user.id)
     .single();
+
+  if (profile?.subscription_status !== 'active') {
+    return NextResponse.json(
+      { error: 'Phone numbers require an active subscription. Upgrade to get a local number.' },
+      { status: 403 }
+    );
+  }
 
   if (profile?.twilio_phone_number) {
     return NextResponse.json({ error: 'You already have a number provisioned' }, { status: 400 });

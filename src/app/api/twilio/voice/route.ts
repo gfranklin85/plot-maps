@@ -8,7 +8,12 @@ import twilio from 'twilio';
 export async function POST(request: Request) {
   const formData = await request.formData();
   const to = formData.get('To') as string;
-  const callerId = formData.get('callerId') as string || process.env.TWILIO_PHONE_NUMBER!;
+  const callerId = formData.get('callerId') as string;
+  if (!callerId) {
+    const twimlErr = new twilio.twiml.VoiceResponse();
+    twimlErr.say('No caller ID configured. Please set up your phone number in settings.');
+    return new NextResponse(twimlErr.toString(), { headers: { 'Content-Type': 'text/xml' } });
+  }
 
   const twiml = new twilio.twiml.VoiceResponse();
 

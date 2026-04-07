@@ -103,6 +103,12 @@ export function PhoneProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    // Block calls if user hasn't provisioned a number
+    if (!twilioNumber) {
+      alert('Set up your phone number first. Go to Settings to claim a local number.');
+      return;
+    }
+
     setCallingNumber(phone);
     setCallingName(name);
     setCallingLeadId(leadId);
@@ -112,10 +118,8 @@ export function PhoneProvider({ children }: { children: ReactNode }) {
 
     const params: Record<string, string> = {
       To: phone,
+      callerId: twilioNumber,
     };
-    if (twilioNumber) {
-      params.callerId = twilioNumber;
-    }
 
     device.connect({ params }).then((call) => {
       callRef.current = call;

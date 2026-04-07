@@ -8,9 +8,6 @@ const client = twilio(
   process.env.TWILIO_AUTH_TOKEN!
 );
 
-const USER_PHONE = process.env.USER_PHONE || '+15595551234';
-const TWILIO_PHONE_NUMBER = process.env.TWILIO_PHONE_NUMBER || USER_PHONE;
-
 export async function POST(request: Request) {
   try {
     const user = await getAuthUser();
@@ -25,23 +22,47 @@ export async function POST(request: Request) {
       );
     }
 
+    // Get the user's own provisioned Twilio number and personal phone
+    const { data: profile } = await supabaseAdmin
+      .from('profiles')
+      .select('twilio_phone_number, phone')
+      .eq('id', user.id)
+      .single();
+
+    const twilioNumber = profile?.twilio_phone_number;
+    if (!twilioNumber) {
+      return NextResponse.json(
+        { error: 'No phone number provisioned. Set up your number in Settings first.' },
+        { status: 403 }
+      );
+    }
+
+    const userPhone = profile?.phone;
+    if (!userPhone) {
+      return NextResponse.json(
+        { error: 'No personal phone number set. Add your phone in Settings.' },
+        { status: 400 }
+      );
+    }
+
     // Build TwiML that says a brief message then dials the prospect
     const displayName = leadName || 'the prospect';
-    const twiml = `<Response><Say voice="alice">Connecting to ${displayName}.</Say><Dial callerId="${TWILIO_PHONE_NUMBER}">${phoneNumber}</Dial></Response>`;
+    const twiml = `<Response><Say voice="alice">Connecting to ${displayName}.</Say><Dial callerId="${twilioNumber}">${phoneNumber}</Dial></Response>`;
 
     // Create the call: Twilio calls the USER first, then executes the TwiML
     const call = await client.calls.create({
-      to: USER_PHONE,
-      from: TWILIO_PHONE_NUMBER,
+      to: userPhone,
+      from: twilioNumber,
       twiml,
       statusCallback: `${process.env.NEXT_PUBLIC_APP_URL || 'https://localhost:3000'}/api/call/status`,
       statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
       statusCallbackMethod: 'POST',
     });
 
-    // Log the call initiation to activities
+    // Log the call initiation
     await supabaseAdmin.from('activities').insert({
       lead_id: leadId,
+      user_id: user.id,
       type: 'call',
       title: `Call initiated to ${displayName}`,
       description: `Outbound call to ${phoneNumber}`,

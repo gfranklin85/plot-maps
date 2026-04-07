@@ -43,6 +43,6 @@ export async function GET() {
   return NextResponse.json({
     token: token.toJwt(),
     identity,
-    twilioNumber: profile?.twilio_phone_number || process.env.TWILIO_PHONE_NUMBER || null,
+    twilioNumber: profile?.twilio_phone_number || null,
   });
 }

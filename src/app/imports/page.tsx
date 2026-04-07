@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import MaterialIcon from '@/components/ui/MaterialIcon';
 import ImportProgress from '@/components/ui/ImportProgress';
 import ImportMiniMap from '@/components/map/ImportMiniMapDynamic';
+import { useAuth } from '@/lib/auth-context';
 
 /* ================================================================
    UNIFIED IMPORT PAGE
@@ -112,6 +113,7 @@ function detectFormat(headers: string[]): 'mls' | 'propwire' | 'generic' {
 const STATUS_MAP: Record<string, string> = { S: 'Sold', A: 'Active', T: 'Pending' };
 
 export default function ImportsPage() {
+  const { user } = useAuth();
   const fileRef = useRef<HTMLInputElement>(null);
   const [phase, setPhase] = useState<ImportPhase>('idle');
   const [dragActive, setDragActive] = useState(false);
@@ -333,6 +335,7 @@ export default function ImportsPage() {
           status: 'new' as const,
           priority: 'medium',
           notes: getVal(row, 'notes') || null,
+          user_id: user?.id || null,
           ...mlsFields,
         };
 

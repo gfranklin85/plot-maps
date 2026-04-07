@@ -4,7 +4,6 @@ import { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
 import { Lead, LeadStatus, Priority } from "@/types";
 import MapDynamic from "@/components/map/MapDynamic";
-// RouteOptimizer removed — Walk Mode replaces route planning
 import StreetViewProspecting from "@/components/map/StreetViewProspecting";
 import PlacesSearch from "@/components/map/PlacesSearch";
 import { PRIORITIES } from "@/lib/constants";
@@ -36,6 +35,12 @@ const PRIORITY_BTN_STYLES: Record<Priority, { active: string; inactive: string }
   },
 };
 
+const MAP_TYPE_ICONS: Record<string, string> = {
+  roadmap: "map",
+  satellite: "satellite_alt",
+  hybrid: "layers",
+};
+
 export default function MapPage() {
   const { profile } = useProfile();
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -43,20 +48,18 @@ export default function MapPage() {
   const [activeTab, setActiveTab] = useState("all");
   const [search, setSearch] = useState("");
 
-  // New filter state
+  // Filter state
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [selectedCity, setSelectedCity] = useState("");
   const [selectedPriority, setSelectedPriority] = useState<Priority | "">("");
   const [selectedSource, setSelectedSource] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [mapType, setMapType] = useState<'roadmap' | 'satellite' | 'hybrid'>('hybrid');
-  // Route planner removed — Walk Mode replaces it
   const [listingFilter, setListingFilter] = useState<string>('all');
   const [walkMode, setWalkMode] = useState(false);
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(profile.defaultMapCenter);
   const [hasUserPanned, setHasUserPanned] = useState(false);
 
-  // Sync profile default center when it loads (async)
   useEffect(() => {
     if (profile.defaultMapCenter && !hasUserPanned) {
       setMapCenter(profile.defaultMapCenter);
@@ -77,7 +80,6 @@ export default function MapPage() {
     fetchLeads();
   }, []);
 
-  // Derive distinct values from leads for filter dropdowns
   const distinctTags = useMemo(() => {
     const tagSet = new Set<string>();
     leads.forEach((l) => l.tags?.forEach((t) => tagSet.add(t)));
@@ -86,25 +88,18 @@ export default function MapPage() {
 
   const distinctCities = useMemo(() => {
     const citySet = new Set<string>();
-    leads.forEach((l) => {
-      if (l.city) citySet.add(l.city);
-    });
+    leads.forEach((l) => { if (l.city) citySet.add(l.city); });
     return Array.from(citySet).sort();
   }, [leads]);
 
   const distinctSources = useMemo(() => {
     const srcSet = new Set<string>();
-    leads.forEach((l) => {
-      if (l.source) srcSet.add(l.source);
-    });
+    leads.forEach((l) => { if (l.source) srcSet.add(l.source); });
     return Array.from(srcSet).sort();
   }, [leads]);
 
   const hasActiveFilters =
-    selectedTags.length > 0 ||
-    selectedCity !== "" ||
-    selectedPriority !== "" ||
-    selectedSource !== "";
+    selectedTags.length > 0 || selectedCity !== "" || selectedPriority !== "" || selectedSource !== "";
 
   function resetFilters() {
     setSelectedTags([]);
@@ -124,13 +119,11 @@ export default function MapPage() {
   const filteredLeads = useMemo(() => {
     let result = leads;
 
-    // Filter by tab (status)
     const tab = FILTER_TABS.find((t) => t.key === activeTab);
     if (tab && tab.statuses.length > 0) {
       result = result.filter((l) => tab.statuses.includes(l.status));
     }
 
-    // Filter by search
     if (search.trim()) {
       const q = search.toLowerCase();
       result = result.filter(
@@ -141,29 +134,13 @@ export default function MapPage() {
       );
     }
 
-    // Filter by tags (OR within tags)
     if (selectedTags.length > 0) {
-      result = result.filter((l) =>
-        l.tags?.some((t) => selectedTags.includes(t))
-      );
+      result = result.filter((l) => l.tags?.some((t) => selectedTags.includes(t)));
     }
+    if (selectedCity) result = result.filter((l) => l.city === selectedCity);
+    if (selectedPriority) result = result.filter((l) => l.priority === selectedPriority);
+    if (selectedSource) result = result.filter((l) => l.source === selectedSource);
 
-    // Filter by city
-    if (selectedCity) {
-      result = result.filter((l) => l.city === selectedCity);
-    }
-
-    // Filter by priority
-    if (selectedPriority) {
-      result = result.filter((l) => l.priority === selectedPriority);
-    }
-
-    // Filter by source
-    if (selectedSource) {
-      result = result.filter((l) => l.source === selectedSource);
-    }
-
-    // Filter by listing status
     if (listingFilter === 'prospects') {
       result = result.filter((l) => !l.listing_status);
     } else if (listingFilter === 'Sold' || listingFilter === 'Active' || listingFilter === 'Pending') {
@@ -173,28 +150,22 @@ export default function MapPage() {
     return result;
   }, [leads, activeTab, search, selectedTags, selectedCity, selectedPriority, selectedSource, listingFilter]);
 
-  // Compute summary counts
-  const newCount = leads.filter((l) => l.status === "New").length;
-  const followUpCount = leads.filter((l) => l.status === "Follow-Up").length;
-  const hotCount = leads.filter((l) => l.status === "Hot Lead").length;
-
   return (
     <div className="relative h-[calc(100vh-5rem)] w-full">
-      {/* ═══ CONTROLS — different for Walk Mode vs Map Mode ═══ */}
+      {/* ═══ CONTROLS ═══ */}
       {walkMode ? (
-        /* WALK MODE: minimal controls — positioned to not cover Google's fullscreen button */
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-3">
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10">
           <button
             onClick={() => setWalkMode(false)}
-            className="flex items-center gap-1.5 rounded-full bg-blue-600 text-white px-4 py-2 text-xs font-bold shadow-lg hover:bg-blue-700 transition-all"
+            className="flex items-center gap-1.5 rounded-full bg-blue-600/90 backdrop-blur text-white px-4 py-2 text-xs font-bold shadow-lg hover:bg-blue-700 transition-all"
           >
             <span className="material-symbols-rounded text-[18px]">map</span>
-            Map View
+            Back to Map
           </button>
         </div>
       ) : (
-        /* MAP MODE: full controls */
-        <div className="absolute top-4 left-4 right-4 z-10 flex items-center gap-3">
+        <div className="absolute top-4 left-4 right-4 z-10 flex items-center gap-2">
+          {/* Search */}
           <div className="flex-1 max-w-md">
             <PlacesSearch
               onPlaceSelected={(place) => {
@@ -205,25 +176,26 @@ export default function MapPage() {
             />
           </div>
 
-          {/* Map type toggle */}
-          <div className="inline-flex items-center gap-0.5 rounded-full glass-card p-1 shadow-lg">
+          {/* Map type — icon-only toggle */}
+          <div className="inline-flex items-center gap-0.5 rounded-full glass-card/80 backdrop-blur p-1 shadow-lg">
             {(["roadmap", "satellite", "hybrid"] as const).map((type) => (
               <button
                 key={type}
                 onClick={() => setMapType(type)}
-                className={`rounded-full px-3 py-1.5 text-xs font-medium transition-all capitalize ${
+                title={type === "roadmap" ? "Map" : type === "satellite" ? "Satellite" : "Hybrid"}
+                className={`rounded-full w-8 h-8 flex items-center justify-center transition-all ${
                   mapType === type
-                    ? "bg-white font-bold text-blue-600 shadow-sm"
-                    : "text-slate-600 hover:text-slate-800"
+                    ? "bg-white text-blue-600 shadow-sm"
+                    : "text-slate-500 hover:text-slate-700"
                 }`}
               >
-                {type === "roadmap" ? "Map" : type === "satellite" ? "Satellite" : "Hybrid"}
+                <span className="material-symbols-rounded text-[18px]">{MAP_TYPE_ICONS[type]}</span>
               </button>
             ))}
           </div>
 
-          {/* Listing status filter */}
-          <div className="inline-flex items-center gap-0.5 rounded-full glass-card p-1 shadow-lg">
+          {/* Listing filter */}
+          <div className="inline-flex items-center gap-0.5 rounded-full glass-card/80 backdrop-blur p-1 shadow-lg">
             {[
               { key: 'all', label: 'All' },
               { key: 'prospects', label: 'Prospects' },
@@ -237,7 +209,7 @@ export default function MapPage() {
                 className={`rounded-full px-3 py-1.5 text-xs font-medium transition-all ${
                   listingFilter === f.key
                     ? 'bg-white font-bold text-blue-600 shadow-sm'
-                    : `${f.color || 'text-slate-600'} hover:text-slate-800`
+                    : `${f.color || 'text-slate-500'} hover:text-slate-700`
                 }`}
               >
                 {f.label}
@@ -245,101 +217,43 @@ export default function MapPage() {
             ))}
           </div>
 
-          {/* Walk Mode toggle */}
+          {/* Walk Mode — icon only */}
           <button
             onClick={() => setWalkMode(true)}
-            className="flex items-center gap-1.5 rounded-full glass-card text-slate-700 px-3 py-2 text-xs font-bold shadow-lg hover:shadow-xl transition-all"
+            title="Walk Mode"
+            className="rounded-full w-9 h-9 flex items-center justify-center glass-card/80 backdrop-blur text-slate-600 shadow-lg hover:text-blue-600 hover:shadow-xl transition-all"
           >
-            <span className="material-symbols-rounded text-[18px]">streetview</span>
-            Walk Mode
+            <span className="material-symbols-rounded text-[20px]">streetview</span>
           </button>
 
-          {/* Toggle filters button */}
+          {/* Filters — icon only */}
           <button
             onClick={() => setFiltersOpen((o) => !o)}
-            className={`flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-medium shadow-lg transition-all ${
+            title="Filters"
+            className={`rounded-full w-9 h-9 flex items-center justify-center shadow-lg transition-all ${
               filtersOpen || hasActiveFilters
-                ? "bg-blue-600 text-white"
-                : "glass-card text-slate-600 hover:text-slate-800"
+                ? "bg-blue-600/90 backdrop-blur text-white"
+                : "glass-card/80 backdrop-blur text-slate-600 hover:text-blue-600"
             }`}
           >
-            <span className="material-symbols-rounded text-[18px]">tune</span>
-            Filters
+            <span className="material-symbols-rounded text-[20px]">tune</span>
           </button>
         </div>
       )}
 
-      {/* Filter tabs overlay */}
-      {/* Filter tabs + stats — hidden in walk mode */}
-      {!walkMode && <div className="absolute top-16 left-4 z-10">
-        <div className="inline-flex items-center gap-1 rounded-full glass-card p-1 shadow-lg">
-          {FILTER_TABS.map((tab) => {
-            const isActive = tab.key === activeTab;
-            const count =
-              tab.key === "all"
-                ? leads.length
-                : leads.filter((l) => tab.statuses.includes(l.status)).length;
-            return (
-              <button
-                key={tab.key}
-                onClick={() => setActiveTab(tab.key)}
-                className={`rounded-full px-3 py-1.5 text-xs font-medium transition-all whitespace-nowrap ${
-                  isActive
-                    ? "bg-white font-bold text-blue-600 shadow-sm"
-                    : "text-slate-600 hover:text-slate-800"
-                }`}
-              >
-                {tab.label}
-                <span
-                  className={`ml-1 inline-flex items-center justify-center rounded-full px-1.5 text-[10px] ${
-                    isActive
-                      ? "bg-blue-100 text-blue-600"
-                      : "bg-slate-200/60 text-slate-500"
-                  }`}
-                >
-                  {count}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Lead count + Reset */}
-        <div className="mt-2 flex items-center gap-2">
-          <span className="rounded-full glass-card px-3 py-1 text-xs font-medium text-slate-600 shadow-lg">
-            Showing {filteredLeads.length} of {leads.length} leads
-          </span>
-          {hasActiveFilters && (
-            <button
-              onClick={resetFilters}
-              className="rounded-full glass-card px-3 py-1 text-xs font-medium text-red-600 shadow-lg hover:bg-red-50 transition-colors"
-            >
-              Reset Filters
-            </button>
-          )}
-        </div>
-      </div>}
-
       {/* Collapsible filter panel */}
-      {filtersOpen && (
-        <div className="absolute top-16 right-4 z-10 w-72 glass-card rounded-2xl p-4 shadow-lg space-y-4">
+      {filtersOpen && !walkMode && (
+        <div className="absolute top-16 right-4 z-10 w-72 glass-card/90 backdrop-blur rounded-2xl p-4 shadow-lg space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-xs font-bold uppercase tracking-widest text-slate-500">
-              Filters
-            </h3>
-            <button
-              onClick={() => setFiltersOpen(false)}
-              className="text-slate-400 hover:text-slate-600"
-            >
+            <h3 className="text-xs font-bold uppercase tracking-widest text-slate-500">Filters</h3>
+            <button onClick={() => setFiltersOpen(false)} className="text-slate-400 hover:text-slate-600">
               <span className="material-symbols-rounded text-[18px]">close</span>
             </button>
           </div>
 
-          {/* Priority filter */}
+          {/* Priority */}
           <div>
-            <label className="text-[10px] uppercase tracking-widest text-slate-500 mb-1 block">
-              Priority
-            </label>
+            <label className="text-[10px] uppercase tracking-widest text-slate-500 mb-1 block">Priority</label>
             <div className="flex gap-1">
               {PRIORITIES.map((p) => {
                 const isActive = selectedPriority === p;
@@ -347,9 +261,7 @@ export default function MapPage() {
                 return (
                   <button
                     key={p}
-                    onClick={() =>
-                      setSelectedPriority(isActive ? "" : p)
-                    }
+                    onClick={() => setSelectedPriority(isActive ? "" : p)}
                     className={`flex-1 rounded-full px-2 py-1 text-xs font-medium capitalize transition-all ${
                       isActive ? styles.active : styles.inactive
                     }`}
@@ -361,78 +273,59 @@ export default function MapPage() {
             </div>
           </div>
 
-          {/* City filter */}
+          {/* City */}
           <div>
-            <label className="text-[10px] uppercase tracking-widest text-slate-500 mb-1 block">
-              City
-            </label>
+            <label className="text-[10px] uppercase tracking-widest text-slate-500 mb-1 block">City</label>
             <select
               value={selectedCity}
               onChange={(e) => setSelectedCity(e.target.value)}
               className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
             >
               <option value="">All Cities</option>
-              {distinctCities.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
+              {distinctCities.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
 
-          {/* Source filter */}
+          {/* Source */}
           <div>
-            <label className="text-[10px] uppercase tracking-widest text-slate-500 mb-1 block">
-              Source
-            </label>
+            <label className="text-[10px] uppercase tracking-widest text-slate-500 mb-1 block">Source</label>
             <select
               value={selectedSource}
               onChange={(e) => setSelectedSource(e.target.value)}
               className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
             >
               <option value="">All Sources</option>
-              {distinctSources.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
+              {distinctSources.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
 
-          {/* Tags multi-select */}
+          {/* Tags */}
           <div>
-            <label className="text-[10px] uppercase tracking-widest text-slate-500 mb-1 block">
-              Tags
-            </label>
+            <label className="text-[10px] uppercase tracking-widest text-slate-500 mb-1 block">Tags</label>
             {distinctTags.length === 0 ? (
               <p className="text-xs text-slate-400 italic">No tags found</p>
             ) : (
               <div className="flex flex-wrap gap-1 max-h-28 overflow-y-auto">
-                {distinctTags.map((tag) => {
-                  const isActive = selectedTags.includes(tag);
-                  return (
-                    <button
-                      key={tag}
-                      onClick={() => toggleTag(tag)}
-                      className={`rounded-full px-2 py-0.5 text-[11px] font-medium transition-all ${
-                        isActive
-                          ? "bg-blue-600 text-white"
-                          : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                      }`}
-                    >
-                      {tag}
-                    </button>
-                  );
-                })}
+                {distinctTags.map((tag) => (
+                  <button
+                    key={tag}
+                    onClick={() => toggleTag(tag)}
+                    className={`rounded-full px-2 py-0.5 text-[11px] font-medium transition-all ${
+                      selectedTags.includes(tag)
+                        ? "bg-blue-600 text-white"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    }`}
+                  >
+                    {tag}
+                  </button>
+                ))}
               </div>
             )}
           </div>
 
-          {/* Property Type filter */}
+          {/* Property Type */}
           <div>
-            <label className="text-[10px] uppercase tracking-widest text-slate-500 mb-1 block">
-              Property Type
-            </label>
+            <label className="text-[10px] uppercase tracking-widest text-slate-500 mb-1 block">Property Type</label>
             <select
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -449,7 +342,6 @@ export default function MapPage() {
             </select>
           </div>
 
-          {/* Reset inside panel */}
           {hasActiveFilters && (
             <button
               onClick={resetFilters}
@@ -460,35 +352,6 @@ export default function MapPage() {
           )}
         </div>
       )}
-
-      {/* Stat card overlay — hidden in walk mode */}
-      {!walkMode && <div className="absolute top-28 left-4 z-10 mt-8">
-        <div className="glass-card rounded-2xl p-4 shadow-lg min-w-[180px]">
-          <p className="text-[10px] uppercase tracking-widest text-slate-500 mb-1">
-            Today&apos;s Potential
-          </p>
-          <p className="font-headline text-2xl font-extrabold text-slate-900">
-            {leads.length}
-          </p>
-          <div className="flex flex-col gap-0.5 mt-1 text-xs">
-            {newCount > 0 && (
-              <span className="text-blue-600 font-medium">
-                {newCount} New
-              </span>
-            )}
-            {followUpCount > 0 && (
-              <span className="text-amber-600 font-medium">
-                {followUpCount} Follow-up
-              </span>
-            )}
-            {hotCount > 0 && (
-              <span className="text-emerald-600 font-medium">
-                {hotCount} Hot Lead
-              </span>
-            )}
-          </div>
-        </div>
-      </div>}
 
       {/* Map or Walk Mode */}
       <div className="relative h-full w-full">
@@ -515,16 +378,21 @@ export default function MapPage() {
           />
         )}
 
-        {!loading && leads.length === 0 && (
-          <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
-            <div className="glass-card rounded-2xl p-8 text-center max-w-sm pointer-events-auto shadow-xl">
-              <MaterialIcon icon="add_location_alt" className="text-[48px] text-blue-500 mb-3" />
-              <h3 className="font-headline text-xl font-extrabold text-slate-900 mb-2">No properties yet</h3>
-              <p className="text-sm text-slate-500 mb-6">Import your first list to see pins on the map.</p>
-              <a href="/imports" className="inline-flex items-center gap-2 action-gradient text-white px-6 py-3 rounded-xl font-bold text-sm hover:shadow-lg transition-shadow">
-                <MaterialIcon icon="upload_file" className="text-[18px]" />
-                Import a List
-              </a>
+        {/* Empty state — bottom left, translucent, out of the way */}
+        {!loading && leads.length === 0 && !walkMode && (
+          <div className="absolute bottom-6 left-6 z-10">
+            <div className="glass-card/80 backdrop-blur rounded-2xl p-5 shadow-lg max-w-xs">
+              <div className="flex items-start gap-3">
+                <MaterialIcon icon="add_location_alt" className="text-[28px] text-blue-500 shrink-0 mt-0.5" />
+                <div>
+                  <h3 className="font-bold text-slate-900 text-sm mb-1">Import your first list</h3>
+                  <p className="text-xs text-slate-500 mb-3">Drop a CSV to see pins appear on the map.</p>
+                  <a href="/imports" className="inline-flex items-center gap-1.5 action-gradient text-white px-4 py-2 rounded-lg font-bold text-xs hover:shadow-lg transition-shadow">
+                    <MaterialIcon icon="upload_file" className="text-[14px]" />
+                    Import
+                  </a>
+                </div>
+              </div>
             </div>
           </div>
         )}

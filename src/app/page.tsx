@@ -3,8 +3,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Lead, Activity, DailyTarget, ActionItem } from '@/types';
-import StatCard from '@/components/ui/StatCard';
-import DailyTargetBars from '@/components/dashboard/DailyTargetBars';
 import ActionList from '@/components/dashboard/ActionList';
 import Scorecard from '@/components/dashboard/Scorecard';
 import MaterialIcon from '@/components/ui/MaterialIcon';
@@ -128,15 +126,13 @@ export default function Dashboard() {
     fetchData();
   }, [fetchData]);
 
-  async function handleTargetUpdate(field: string, value: number) {
-    const updated = { ...targets, [field]: value };
-    setTargets(updated);
-    await fetch('/api/daily-targets', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ [field]: value }),
-    });
-  }
+  // Auto-generate action list for subscribers on first load
+  useEffect(() => {
+    if (!loading && totalLeads > 0 && isSubscribed && actionItems.length === 0 && !actionLoading) {
+      generateActionList();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, totalLeads, isSubscribed]);
 
   async function generateActionList() {
     if (!isSubscribed) { setShowGate(true); return; }
@@ -161,9 +157,6 @@ export default function Dashboard() {
     year: 'numeric',
   });
 
-  const pendingCount = attentionLeads.length + actionItems.length;
-
-  // Avg calls per day (total calls / 5 workdays as rough estimate)
   const avgCallsDay = callsToday > 0 ? callsToday : 0;
 
   // New user onboarding — no leads yet
@@ -207,93 +200,85 @@ export default function Dashboard() {
     );
   }
 
+
   return (
     <div className="p-8">
       {/* Page header */}
-      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="font-headline text-4xl font-extrabold text-on-surface">
-            Daily Action Center
-          </h2>
-          <p className="mt-1 text-secondary">
-            {todayFormatted}
-            {pendingCount > 0 && (
-              <span className="ml-3 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-700">
-                <MaterialIcon icon="schedule" className="text-[14px]" />
-                {pendingCount} pending actions
-              </span>
-            )}
-          </p>
-        </div>
-
-        <button
-          onClick={generateActionList}
-          disabled={actionLoading}
-          className="flex items-center gap-2 rounded-xl action-gradient px-5 py-2.5 text-sm font-semibold text-on-primary shadow-sm transition-shadow hover:shadow-lg disabled:opacity-60"
-        >
-          <MaterialIcon
-            icon="auto_awesome"
-            className={`text-[18px] ${actionLoading ? 'animate-spin' : ''}`}
-          />
-          {actionLoading ? 'Generating...' : 'Generate Action List'}
-        </button>
-      </div>
-
-      {/* Top Row: Daily Target Progress Bars */}
       <div className="mb-8">
-        <DailyTargetBars targets={targets} onUpdate={handleTargetUpdate} />
+        <h2 className="font-headline text-3xl font-extrabold text-slate-900">
+          Daily Action Feed
+        </h2>
+        <p className="mt-1 text-slate-500 text-sm">
+          {todayFormatted}
+          {actionItems.length > 0 && (
+            <span className="ml-3 inline-flex items-center gap-1 rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-semibold text-indigo-700">
+              {actionItems.length} priority actions
+            </span>
+          )}
+        </p>
       </div>
 
-      {/* Main Content: Two Columns */}
-      <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-12">
-        {/* Left Column: Action List */}
+      {/* Main Content: Action Feed + Stats */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+        {/* Left: Action Feed (primary) */}
         <div className="lg:col-span-8">
+          {!isSubscribed && actionItems.length === 0 && (
+            <div className="mb-6 bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-200 rounded-xl p-6 flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-indigo-100 flex items-center justify-center shrink-0">
+                <MaterialIcon icon="auto_awesome" className="text-[24px] text-indigo-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-bold text-slate-900 text-sm">AI Daily Action Feed</h3>
+                <p className="text-xs text-slate-500">Subscribe to get AI-prioritized actions every morning — know exactly who to call and why.</p>
+              </div>
+              <a href="/subscribe" className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition-colors whitespace-nowrap">
+                Upgrade
+              </a>
+            </div>
+          )}
+
           <ActionList
             actions={actionItems}
             loading={actionLoading}
             fallbackLeads={attentionLeads}
           />
+
+          {isSubscribed && actionItems.length > 0 && (
+            <button
+              onClick={generateActionList}
+              disabled={actionLoading}
+              className="mt-4 flex items-center gap-2 text-sm text-indigo-600 font-medium hover:text-indigo-800 transition-colors"
+            >
+              <MaterialIcon icon="refresh" className={`text-[16px] ${actionLoading ? 'animate-spin' : ''}`} />
+              {actionLoading ? 'Refreshing...' : 'Refresh action list'}
+            </button>
+          )}
         </div>
 
-        {/* Right Column: Scorecard + Stats */}
-        <div className="lg:col-span-4">
+        {/* Right: Quick Stats + Scorecard */}
+        <div className="lg:col-span-4 space-y-4">
+          {/* Quick stats inline */}
+          <div className="grid grid-cols-3 gap-3">
+            <div className="bg-slate-50 rounded-xl p-4 text-center">
+              <p className="text-2xl font-extrabold text-slate-900">{loading ? '--' : totalLeads}</p>
+              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Leads</p>
+            </div>
+            <div className="bg-slate-50 rounded-xl p-4 text-center">
+              <p className="text-2xl font-extrabold text-slate-900">{loading ? '--' : newThisWeek}</p>
+              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">New</p>
+            </div>
+            <div className="bg-slate-50 rounded-xl p-4 text-center">
+              <p className="text-2xl font-extrabold text-slate-900">{loading ? '--' : avgCallsDay}</p>
+              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Calls</p>
+            </div>
+          </div>
+
           <Scorecard
             activities={activities}
             targets={targets}
             leadsByStatus={leadsByStatus}
           />
         </div>
-      </div>
-
-      {/* Bottom Row: Quick Stats */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <StatCard
-          label="Total Leads"
-          value={loading ? '--' : totalLeads}
-          subtitle="in pipeline"
-          bgIcon="group"
-          trendIcon="trending_up"
-          trendPercent="+12%"
-          trendUp
-        />
-        <StatCard
-          label="New This Week"
-          value={loading ? '--' : newThisWeek}
-          subtitle="added this week"
-          bgIcon="person_add"
-          trendIcon="trending_up"
-          trendPercent={`+${newThisWeek}`}
-          trendUp
-        />
-        <StatCard
-          label="Calls Today"
-          value={loading ? '--' : avgCallsDay}
-          subtitle="calls made"
-          bgIcon="call"
-          trendIcon={avgCallsDay >= 5 ? 'trending_up' : 'trending_down'}
-          trendPercent={avgCallsDay >= 5 ? 'On track' : 'Behind pace'}
-          trendUp={avgCallsDay >= 5}
-        />
       </div>
 
       <UpgradeGate feature="ai" show={showGate} onClose={() => setShowGate(false)} />

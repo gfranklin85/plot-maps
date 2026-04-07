@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { ActionItem, Lead, LeadStatus, STATUS_BG_COLORS } from '@/types';
-import { cn, formatPhone, formatDate } from '@/lib/utils';
+import { cn, formatDate } from '@/lib/utils';
 import MaterialIcon from '@/components/ui/MaterialIcon';
 import Link from 'next/link';
 
@@ -12,99 +12,87 @@ interface Props {
   fallbackLeads?: Lead[];
 }
 
-const PRIORITY_DOTS: Record<string, string> = {
-  high: 'bg-red-500',
-  medium: 'bg-amber-500',
-  low: 'bg-emerald-500',
+const PRIORITY_LABELS: Record<string, { label: string; color: string }> = {
+  high: { label: 'High Priority', color: 'bg-red-500/10 text-red-400' },
+  medium: { label: 'Action Item', color: 'bg-indigo-500/10 text-indigo-400' },
+  low: { label: 'Low Priority', color: 'bg-emerald-500/10 text-emerald-400' },
 };
 
 function SkeletonCard() {
   return (
-    <div className="animate-pulse rounded-2xl bg-surface-container-lowest p-5 space-y-3">
-      <div className="flex items-center gap-3">
-        <div className="h-3 w-3 rounded-full bg-slate-200" />
-        <div className="h-4 w-40 rounded bg-slate-200" />
-      </div>
+    <div className="animate-pulse bg-slate-100 rounded-xl p-6 space-y-3">
+      <div className="h-3 w-24 rounded bg-slate-200" />
+      <div className="h-5 w-48 rounded bg-slate-200" />
       <div className="h-3 w-64 rounded bg-slate-200" />
-      <div className="h-3 w-48 rounded bg-slate-200" />
-      <div className="flex gap-2">
-        <div className="h-8 w-20 rounded-lg bg-slate-200" />
-        <div className="h-8 w-24 rounded-lg bg-slate-200" />
-      </div>
+      <div className="h-12 w-full rounded-lg bg-slate-200" />
     </div>
   );
 }
 
 function ActionCard({ item }: { item: ActionItem }) {
   const [openerOpen, setOpenerOpen] = useState(false);
+  const priority = PRIORITY_LABELS[item.priority] ?? PRIORITY_LABELS.medium;
 
   return (
-    <div className="rounded-2xl bg-surface-container-lowest p-5 transition-shadow hover:shadow-md">
-      <div className="flex items-start gap-3">
-        {/* Priority dot */}
-        <div
-          className={cn(
-            'mt-1.5 h-3 w-3 shrink-0 rounded-full',
-            PRIORITY_DOTS[item.priority] ?? PRIORITY_DOTS.low
-          )}
-        />
+    <div className="bg-white border border-slate-200 rounded-xl p-6 hover:border-indigo-300 hover:shadow-lg transition-all">
+      {/* Priority badge */}
+      <div className="flex justify-between items-start mb-3">
+        <span className={`px-2 py-1 text-[10px] font-bold rounded uppercase tracking-widest ${priority.color}`}>
+          {priority.label}
+        </span>
+      </div>
 
-        <div className="min-w-0 flex-1 space-y-2">
-          {/* Lead name + address */}
-          <div>
-            <p className="font-semibold text-on-surface">{item.leadName}</p>
-            {item.address && (
-              <p className="text-xs text-secondary truncate">{item.address}</p>
-            )}
-          </div>
+      {/* Title */}
+      <h3 className="text-lg font-bold text-slate-900 mb-2">{item.action}</h3>
 
-          {/* Action */}
-          <p className="text-sm font-bold text-on-surface">{item.action}</p>
+      {/* Lead info */}
+      <p className="text-slate-500 text-sm mb-4 leading-relaxed">
+        {item.leadName}{item.address ? ` — ${item.address}` : ''}
+      </p>
 
-          {/* Reason */}
-          <p className="text-xs italic text-secondary">{item.reason}</p>
+      {/* Why? block */}
+      {item.reason && (
+        <div className="bg-indigo-50 rounded-lg p-3 mb-5 border-l-2 border-indigo-500">
+          <span className="block text-[10px] font-black uppercase text-indigo-600 mb-1">Why?</span>
+          <p className="text-xs text-slate-600 italic">{item.reason}</p>
+        </div>
+      )}
 
-          {/* Suggested opener (collapsible) */}
-          {item.suggestedOpener && (
-            <div>
-              <button
-                onClick={() => setOpenerOpen(!openerOpen)}
-                className="flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-              >
-                <MaterialIcon
-                  icon={openerOpen ? 'expand_less' : 'expand_more'}
-                  className="text-[16px]"
-                />
-                Suggested opener
-              </button>
-              {openerOpen && (
-                <p className="mt-1 rounded-lg bg-blue-50 px-3 py-2 text-xs italic text-slate-700">
-                  {item.suggestedOpener}
-                </p>
-              )}
+      {/* Suggested opener */}
+      {item.suggestedOpener && (
+        <div className="mb-5">
+          <button
+            onClick={() => setOpenerOpen(!openerOpen)}
+            className="flex items-center gap-1 text-xs font-medium text-indigo-600 hover:text-indigo-800 transition-colors"
+          >
+            <MaterialIcon icon={openerOpen ? 'expand_less' : 'expand_more'} className="text-[16px]" />
+            Talking points
+          </button>
+          {openerOpen && (
+            <div className="mt-2 bg-slate-50 rounded-lg p-3 border border-slate-200">
+              <p className="text-xs text-slate-600 italic leading-relaxed">{item.suggestedOpener}</p>
             </div>
           )}
-
-          {/* Actions row */}
-          <div className="flex flex-wrap items-center gap-2 pt-1">
-            {item.phone && (
-              <a
-                href={`tel:${item.phone}`}
-                className="flex items-center gap-1.5 rounded-xl bg-primary px-3 py-1.5 text-xs font-semibold text-on-primary shadow-sm transition-shadow hover:shadow-md"
-              >
-                <MaterialIcon icon="call" className="text-[14px]" />
-                {formatPhone(item.phone)}
-              </a>
-            )}
-            <Link
-              href={`/leads/${item.leadId}`}
-              className="flex items-center gap-1 rounded-xl bg-surface-container-low px-3 py-1.5 text-xs font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
-            >
-              <MaterialIcon icon="open_in_new" className="text-[14px]" />
-              Open Record
-            </Link>
-          </div>
         </div>
+      )}
+
+      {/* CTAs */}
+      <div className="flex gap-3">
+        {item.phone && (
+          <a
+            href={`tel:${item.phone}`}
+            className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-lg font-bold text-sm flex items-center justify-center gap-2 transition-all"
+          >
+            <MaterialIcon icon="call" className="text-[16px]" />
+            Call
+          </a>
+        )}
+        <Link
+          href={`/leads/${item.leadId}`}
+          className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2.5 rounded-lg font-bold text-sm text-center transition-all"
+        >
+          View Contact
+        </Link>
       </div>
     </div>
   );
@@ -112,13 +100,13 @@ function ActionCard({ item }: { item: ActionItem }) {
 
 function FallbackLeadCard({ lead }: { lead: Lead }) {
   return (
-    <div className="flex items-center gap-4 rounded-xl px-4 py-3 transition-colors hover:bg-surface-container-low">
+    <div className="flex items-center gap-4 bg-white border border-slate-200 rounded-xl px-5 py-4 hover:border-indigo-200 transition-all">
       <div
         className={cn(
           'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl',
           lead.priority === 'high'
-            ? 'bg-rose-100 text-rose-600'
-            : 'bg-primary-fixed text-primary'
+            ? 'bg-red-100 text-red-600'
+            : 'bg-indigo-100 text-indigo-600'
         )}
       >
         <MaterialIcon
@@ -129,10 +117,10 @@ function FallbackLeadCard({ lead }: { lead: Lead }) {
       </div>
 
       <div className="min-w-0 flex-1">
-        <p className="truncate font-semibold text-on-surface">
+        <p className="truncate font-semibold text-slate-900">
           {lead.name || lead.owner_name || 'Unknown'}
         </p>
-        <p className="truncate text-xs text-secondary">
+        <p className="truncate text-xs text-slate-500">
           {lead.property_address ?? 'No address'}
         </p>
       </div>
@@ -147,7 +135,7 @@ function FallbackLeadCard({ lead }: { lead: Lead }) {
       </span>
 
       {lead.follow_up_date && (
-        <span className="shrink-0 text-xs text-secondary whitespace-nowrap">
+        <span className="shrink-0 text-xs text-slate-500 whitespace-nowrap">
           {formatDate(lead.follow_up_date)}
         </span>
       )}
@@ -155,7 +143,7 @@ function FallbackLeadCard({ lead }: { lead: Lead }) {
       {lead.phone && (
         <a
           href={`tel:${lead.phone}`}
-          className="flex h-9 shrink-0 items-center gap-1.5 rounded-xl bg-primary px-4 text-sm font-semibold text-on-primary shadow-sm transition-shadow hover:shadow-md"
+          className="flex h-9 shrink-0 items-center gap-1.5 rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white shadow-sm transition-shadow hover:shadow-md"
         >
           <MaterialIcon icon="call" className="text-[16px]" />
           Call
@@ -164,7 +152,7 @@ function FallbackLeadCard({ lead }: { lead: Lead }) {
 
       <Link
         href={`/leads/${lead.id}`}
-        className="text-xs font-semibold text-primary hover:underline"
+        className="text-xs font-semibold text-indigo-600 hover:underline"
       >
         Open
       </Link>
@@ -176,29 +164,16 @@ export default function ActionList({ actions, loading, fallbackLeads }: Props) {
   if (loading) {
     return (
       <div className="space-y-4">
-        <h3 className="font-headline text-lg font-bold text-on-surface">
-          Action List
-        </h3>
-        {Array.from({ length: 4 }).map((_, i) => (
+        {Array.from({ length: 3 }).map((_, i) => (
           <SkeletonCard key={i} />
         ))}
       </div>
     );
   }
 
-  // AI-generated action list
   if (actions.length > 0) {
     return (
       <div className="space-y-4">
-        <div className="flex items-center gap-2">
-          <MaterialIcon icon="auto_awesome" className="text-[20px] text-amber-500" filled />
-          <h3 className="font-headline text-lg font-bold text-on-surface">
-            AI-Prioritized Action List
-          </h3>
-          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">
-            {actions.length} actions
-          </span>
-        </div>
         {actions.map((item, i) => (
           <ActionCard key={`${item.leadId}-${i}`} item={item} />
         ))}
@@ -206,20 +181,19 @@ export default function ActionList({ actions, loading, fallbackLeads }: Props) {
     );
   }
 
-  // Fallback: manual lead list
   return (
-    <div className="rounded-2xl bg-surface-container-lowest p-6">
-      <h3 className="font-headline text-lg font-bold text-on-surface mb-4">
+    <div className="bg-white border border-slate-200 rounded-xl p-6">
+      <h3 className="font-headline text-lg font-bold text-slate-900 mb-4">
         Leads Needing Attention
       </h3>
       {fallbackLeads && fallbackLeads.length > 0 ? (
-        <ul className="space-y-2">
+        <div className="space-y-3">
           {fallbackLeads.map((lead) => (
             <FallbackLeadCard key={lead.id} lead={lead} />
           ))}
-        </ul>
+        </div>
       ) : (
-        <div className="flex flex-col items-center justify-center py-10 text-secondary">
+        <div className="flex flex-col items-center justify-center py-10 text-slate-400">
           <MaterialIcon icon="task_alt" className="text-[48px] text-slate-300 mb-2" />
           <p className="text-sm">All caught up! No pending actions.</p>
         </div>

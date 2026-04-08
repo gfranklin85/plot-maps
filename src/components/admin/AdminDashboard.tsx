@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useRef } from 'react';
 import MaterialIcon from '@/components/ui/MaterialIcon';
 
 interface Summary {
@@ -81,12 +82,68 @@ export default function AdminDashboard({ data }: { data: Record<string, unknown>
   const { summary, users, markets, recentSignups } = data as unknown as AdminData;
   const seedingQueue = markets.filter(m => m.coverage_status === 'None' || m.coverage_status === 'Thin').slice(0, 10);
 
+  // Seed import state
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [seedMarketTag, setSeedMarketTag] = useState('');
+  const [seeding, setSeeding] = useState(false);
+  const [seedResult, setSeedResult] = useState<{ inserted: number; updated: number; errors: number; total: number } | null>(null);
+
+  async function handleSeedFile(file: File) {
+    setSeeding(true);
+    setSeedResult(null);
+    const text = await file.text();
+    try {
+      const res = await fetch('/api/admin/seed', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ csvText: text, marketTag: seedMarketTag || null }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setSeedResult({ inserted: data.inserted, updated: data.updated, errors: data.errors, total: data.total });
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Seed failed');
+    } finally {
+      setSeeding(false);
+    }
+  }
+
   return (
     <div className="p-8 bg-[#0c1324] min-h-[calc(100vh-4rem)] space-y-8">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-extrabold text-slate-100 tracking-tight font-headline">Market Coverage & Seeding</h1>
-        <p className="text-sm text-slate-500 mt-1">Operator console — admin only</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-extrabold text-slate-100 tracking-tight font-headline">Market Coverage & Seeding</h1>
+          <p className="text-sm text-slate-500 mt-1">Operator console — admin only</p>
+        </div>
+
+        {/* Seed Import Tool */}
+        <div className="flex items-center gap-3">
+          <input
+            type="text"
+            value={seedMarketTag}
+            onChange={(e) => setSeedMarketTag(e.target.value)}
+            placeholder="Market tag (e.g. Lemoore)"
+            className="bg-[#151b2d] border border-white/10 rounded-lg px-3 py-2 text-sm text-slate-200 w-48 focus:ring-1 focus:ring-indigo-500 focus:outline-none placeholder:text-slate-600"
+          />
+          <input ref={fileRef} type="file" accept=".csv,.txt,.tsv" className="hidden" onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) handleSeedFile(file);
+          }} />
+          <button
+            onClick={() => fileRef.current?.click()}
+            disabled={seeding}
+            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-bold text-sm transition-all disabled:opacity-50"
+          >
+            <MaterialIcon icon={seeding ? 'hourglass_empty' : 'cloud_upload'} className={`text-[18px] ${seeding ? 'animate-spin' : ''}`} />
+            {seeding ? 'Seeding...' : 'Seed Market Data'}
+          </button>
+          {seedResult && (
+            <span className="text-xs text-emerald-400 font-bold">
+              {seedResult.inserted} new · {seedResult.updated} updated · {seedResult.errors} errors
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Summary Cards */}

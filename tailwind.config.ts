@@ -20,7 +20,7 @@ const config: Config = {
         "on-primary-fixed": "#001a42",
         "on-primary-fixed-variant": "#004395",
         surface: {
-          DEFAULT: "#f8f9ff",
+          DEFAULT: "#0c1324",
           dim: "#cbdbf5",
           bright: "#f8f9ff",
           container: "#e5eeff",
@@ -31,7 +31,7 @@ const config: Config = {
         },
         "surface-variant": "#d3e4fe",
         "surface-tint": "#005ac2",
-        "on-surface": "#0b1c30",
+        "on-surface": "#dce1fb",
         "on-surface-variant": "#424754",
         secondary: {
           DEFAULT: "#545f73",
@@ -66,8 +66,8 @@ const config: Config = {
         "inverse-surface": "#213145",
         "inverse-on-surface": "#eaf1ff",
         "inverse-primary": "#adc6ff",
-        background: "#f8f9ff",
-        "on-background": "#0b1c30",
+        background: "#0c1324",
+        "on-background": "#dce1fb",
       },
       fontFamily: {
         headline: ["Manrope", "sans-serif"],

@@ -212,7 +212,7 @@ function LeadMarkers({
       if (lead.latitude == null || lead.longitude == null) return;
 
       // Rich pins only for context/reference data — user targets always get dots
-      const isContext = lead.record_type === 'context';
+      const isContext = lead.record_type === 'context' || !lead.user_id || !!lead.listing_status;
       let icon: google.maps.Icon | google.maps.Symbol;
       if (isContext && pinMode === 'detail') {
         icon = createDetailIcon(lead);

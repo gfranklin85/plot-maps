@@ -1,20 +1,18 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import {
   APIProvider,
   Map,
   useMap,
-  InfoWindow,
 } from "@vis.gl/react-google-maps";
 import { MarkerClusterer, Renderer, Cluster } from "@googlemaps/markerclusterer";
 import { Lead, STATUS_COLORS, LISTING_STATUS_COLORS } from "@/types";
 import { MAP_CENTER, MAP_ZOOM } from "@/lib/constants";
-import PropertyPopup from "./PropertyPopup";
 
 interface Props {
   leads: Lead[];
-  onLeadClick?: (id: string) => void;
+  onLeadClick?: (id: string, lead: Lead) => void;
   onDataChanged?: () => void;
   onCenterChanged?: (center: { lat: number; lng: number }) => void;
   onWalkHere?: (lead: Lead) => void;
@@ -211,21 +209,15 @@ function LeadMarkers({
   return null;
 }
 
-export default function MapView({ leads, onLeadClick, onDataChanged, onCenterChanged, onWalkHere, center, mapType = "roadmap" }: Props) {
+export default function MapView({ leads, onLeadClick, onCenterChanged, center, mapType = "roadmap" }: Props) {
   const isSatellite = mapType === "satellite" || mapType === "hybrid";
-  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
 
   const handleMarkerClick = useCallback(
     (lead: Lead) => {
-      setSelectedLead(lead);
-      onLeadClick?.(lead.id);
+      onLeadClick?.(lead.id, lead);
     },
     [onLeadClick]
   );
-
-  const handleCloseInfo = useCallback(() => {
-    setSelectedLead(null);
-  }, []);
 
   return (
     <APIProvider apiKey={API_KEY} libraries={['places']}>
@@ -246,21 +238,6 @@ export default function MapView({ leads, onLeadClick, onDataChanged, onCenterCha
         <MapTypeSync mapType={mapType} />
         <CenterTracker onCenterChanged={onCenterChanged} />
         <LeadMarkers leads={leads} onMarkerClick={handleMarkerClick} />
-
-        {selectedLead &&
-          selectedLead.latitude != null &&
-          selectedLead.longitude != null && (
-            <InfoWindow
-              position={{
-                lat: selectedLead.latitude,
-                lng: selectedLead.longitude,
-              }}
-              onCloseClick={handleCloseInfo}
-              pixelOffset={[0, -35]}
-            >
-              <PropertyPopup lead={selectedLead} onUpdate={onDataChanged} onWalkHere={onWalkHere} />
-            </InfoWindow>
-          )}
       </Map>
     </APIProvider>
   );

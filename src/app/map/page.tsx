@@ -11,6 +11,7 @@ import { useProfile } from "@/lib/profile-context";
 import { useAuth } from "@/lib/auth-context";
 import MaterialIcon from "@/components/ui/MaterialIcon";
 import UpgradeGate from "@/components/ui/UpgradeGate";
+import PropertyPopup from "@/components/map/PropertyPopup";
 
 const FILTER_TABS: { label: string; key: string; statuses: LeadStatus[] }[] = [
   { label: "All", key: "all", statuses: [] },
@@ -43,6 +44,8 @@ export default function MapPage() {
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(profile.defaultMapCenter);
   const [hasUserPanned, setHasUserPanned] = useState(false);
   const [showGate, setShowGate] = useState(false);
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [expandedView, setExpandedView] = useState(false);
   const isSubscribed = profile.subscriptionStatus === 'active';
 
   useEffect(() => {
@@ -357,6 +360,7 @@ export default function MapPage() {
           <MapDynamic
             leads={filteredLeads}
             mapType={mapType}
+            onLeadClick={(_id, lead) => { setSelectedLead(lead); setExpandedView(false); }}
             onCenterChanged={(c) => { setMapCenter(c); setHasUserPanned(true); }}
             center={mapCenter}
             onWalkHere={(lead) => {
@@ -387,6 +391,88 @@ export default function MapPage() {
           </div>
         )}
       </div>
+
+      {/* Quick Property Card — fixed bottom-left, doesn't shift map */}
+      {selectedLead && !expandedView && !walkMode && (
+        <div className="absolute bottom-6 left-6 z-20 w-[380px] max-h-[70vh] overflow-y-auto rounded-2xl bg-card border border-card-border shadow-2xl">
+          <div className="flex items-center justify-between px-4 pt-3 pb-1">
+            <button
+              onClick={() => setExpandedView(true)}
+              className="text-[10px] font-bold text-primary uppercase tracking-widest hover:underline"
+            >
+              Expand
+            </button>
+            <button
+              onClick={() => setSelectedLead(null)}
+              className="text-secondary hover:text-on-surface transition-colors"
+            >
+              <MaterialIcon icon="close" className="text-[18px]" />
+            </button>
+          </div>
+          <PropertyPopup
+            lead={selectedLead}
+            onUpdate={() => {
+              // Refetch leads after update
+              if (user) {
+                supabase.from("leads").select("*")
+                  .or(`user_id.eq.${user.id},record_type.eq.context`)
+                  .not("latitude", "is", null).not("longitude", "is", null)
+                  .then(({ data }) => { if (data) setLeads(data as Lead[]); });
+              }
+            }}
+            onWalkHere={(lead) => {
+              if (!isSubscribed) { setShowGate(true); return; }
+              if (lead.latitude && lead.longitude) {
+                setMapCenter({ lat: lead.latitude, lng: lead.longitude });
+                setWalkMode(true);
+                setSelectedLead(null);
+              }
+            }}
+          />
+        </div>
+      )}
+
+      {/* Expanded Sidebar — fixed right panel, full detail */}
+      {selectedLead && expandedView && !walkMode && (
+        <div className="absolute right-0 top-0 h-full w-[440px] z-20 bg-card border-l border-card-border shadow-2xl flex flex-col">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-card-border shrink-0">
+            <button
+              onClick={() => setExpandedView(false)}
+              className="text-[10px] font-bold text-primary uppercase tracking-widest hover:underline"
+            >
+              Collapse
+            </button>
+            <button
+              onClick={() => { setSelectedLead(null); setExpandedView(false); }}
+              className="text-secondary hover:text-on-surface transition-colors"
+            >
+              <MaterialIcon icon="close" className="text-[18px]" />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto">
+            <PropertyPopup
+              lead={selectedLead}
+              onUpdate={() => {
+                if (user) {
+                  supabase.from("leads").select("*")
+                    .or(`user_id.eq.${user.id},record_type.eq.context`)
+                    .not("latitude", "is", null).not("longitude", "is", null)
+                    .then(({ data }) => { if (data) setLeads(data as Lead[]); });
+                }
+              }}
+              onWalkHere={(lead) => {
+                if (!isSubscribed) { setShowGate(true); return; }
+                if (lead.latitude && lead.longitude) {
+                  setMapCenter({ lat: lead.latitude, lng: lead.longitude });
+                  setWalkMode(true);
+                  setSelectedLead(null);
+                  setExpandedView(false);
+                }
+              }}
+            />
+          </div>
+        </div>
+      )}
 
       <UpgradeGate feature="walkMode" show={showGate} onClose={() => setShowGate(false)} />
     </div>

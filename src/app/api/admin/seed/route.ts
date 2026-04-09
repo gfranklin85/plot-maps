@@ -329,12 +329,30 @@ export async function POST(request: Request) {
         .limit(1);
 
       if (existing && existing.length > 0) {
-        // Update existing — no geocoding needed
+        // Update existing record
         const { error } = await supabaseAdmin
           .from('leads')
           .update({ ...leadData, property_address: undefined })
           .eq('id', existing[0].id);
-        if (error) errors++; else updated++;
+        if (error) { errors++; }
+        else {
+          updated++;
+          // Geocode if existing record has no coordinates
+          const { data: coordCheck } = await supabaseAdmin
+            .from('leads')
+            .select('latitude')
+            .eq('id', existing[0].id)
+            .single();
+          if (!coordCheck?.latitude) {
+            const geo = await geocodeAddress(prop.address);
+            if (geo) {
+              await supabaseAdmin.from('leads').update({
+                latitude: geo.lat, longitude: geo.lng, geocoded_at: now,
+              }).eq('id', existing[0].id);
+              geocoded++;
+            }
+          }
+        }
       } else {
         // Insert new — then geocode
         const { data: insertedData, error } = await supabaseAdmin.from('leads').insert(leadData).select('id').single();

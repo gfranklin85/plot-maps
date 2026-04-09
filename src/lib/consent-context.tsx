@@ -16,21 +16,21 @@ interface ConsentContextValue {
 const STORAGE_KEY = 'pm_consent';
 
 const ConsentContext = createContext<ConsentContextValue>({
-  consent: { analytics: false },
+  consent: { analytics: true },
   hasConsented: false,
   setConsent: () => {},
   resetConsent: () => {},
 });
 
 function readStoredConsent(): { consent: ConsentState; hasConsented: boolean } {
-  if (typeof window === 'undefined') return { consent: { analytics: false }, hasConsented: false };
+  if (typeof window === 'undefined') return { consent: { analytics: true }, hasConsented: false };
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { consent: { analytics: false }, hasConsented: false };
+    if (!raw) return { consent: { analytics: true }, hasConsented: false };
     const parsed = JSON.parse(raw);
     return { consent: { analytics: !!parsed.analytics }, hasConsented: true };
   } catch {
-    return { consent: { analytics: false }, hasConsented: false };
+    return { consent: { analytics: true }, hasConsented: false };
   }
 }
 
@@ -41,7 +41,7 @@ function writeConsent(consent: ConsentState) {
 }
 
 export function ConsentProvider({ children }: { children: ReactNode }) {
-  const [consent, setConsentState] = useState<ConsentState>({ analytics: false });
+  const [consent, setConsentState] = useState<ConsentState>({ analytics: true });
   const [hasConsented, setHasConsented] = useState(false);
 
   useEffect(() => {
@@ -59,7 +59,7 @@ export function ConsentProvider({ children }: { children: ReactNode }) {
   const resetConsent = useCallback(() => {
     localStorage.removeItem(STORAGE_KEY);
     document.cookie = 'pm_consent=; path=/; max-age=0';
-    setConsentState({ analytics: false });
+    setConsentState({ analytics: true });
     setHasConsented(false);
   }, []);
 

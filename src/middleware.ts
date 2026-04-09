@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createMiddlewareClient } from '@/lib/supabase-middleware';
 
-const PUBLIC_PATHS = ['/login', '/signup', '/auth', '/subscribe', '/landing'];
+const PUBLIC_PATHS = ['/login', '/signup', '/auth', '/subscribe', '/landing', '/privacy', '/terms', '/cookies', '/support'];
 
 export async function middleware(request: NextRequest) {
   const { supabase, response } = createMiddlewareClient(request);

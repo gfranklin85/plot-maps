@@ -25,14 +25,14 @@ export default function Pagination({
       <button
         onClick={() => onPageChange(currentPage - 1)}
         disabled={currentPage === 1}
-        className="flex h-8 w-8 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-transparent"
+        className="flex h-8 w-8 items-center justify-center rounded-full text-secondary transition-colors hover:bg-surface-container disabled:opacity-30 disabled:hover:bg-transparent"
       >
         <MaterialIcon icon="chevron_left" className="text-[20px]" />
       </button>
 
       {pages.map((page, i) =>
         page === "..." ? (
-          <span key={`ellipsis-${i}`} className="px-1 text-slate-400">
+          <span key={`ellipsis-${i}`} className="px-1 text-on-surface-variant">
             ...
           </span>
         ) : (
@@ -42,8 +42,8 @@ export default function Pagination({
             className={cn(
               "flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium transition-colors",
               currentPage === page
-                ? "bg-blue-600 text-white"
-                : "text-slate-600 hover:bg-slate-100"
+                ? "bg-primary text-white"
+                : "text-on-surface-variant hover:bg-surface-container"
             )}
           >
             {page}
@@ -54,7 +54,7 @@ export default function Pagination({
       <button
         onClick={() => onPageChange(currentPage + 1)}
         disabled={currentPage === totalPages}
-        className="flex h-8 w-8 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-transparent"
+        className="flex h-8 w-8 items-center justify-center rounded-full text-secondary transition-colors hover:bg-surface-container disabled:opacity-30 disabled:hover:bg-transparent"
       >
         <MaterialIcon icon="chevron_right" className="text-[20px]" />
       </button>

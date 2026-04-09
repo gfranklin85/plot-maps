@@ -5,6 +5,7 @@ import { Lead, CallOutcome, LeadStatus } from '@/types';
 import { CALL_OUTCOMES } from '@/lib/constants';
 import { cn, formatPhone } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/lib/auth-context';
 import MaterialIcon from '@/components/ui/MaterialIcon';
 
 interface Props {
@@ -13,7 +14,7 @@ interface Props {
 }
 
 const OUTCOME_CONFIG: Record<CallOutcome, { icon: string; color: string }> = {
-  'No Answer': { icon: 'phone_missed', color: 'bg-slate-100 text-slate-600 hover:bg-slate-200' },
+  'No Answer': { icon: 'phone_missed', color: 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high' },
   'Left VM': { icon: 'voicemail', color: 'bg-violet-100 text-violet-700 hover:bg-violet-200' },
   'Spoke with Owner': { icon: 'record_voice_over', color: 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' },
   'Not Interested': { icon: 'thumb_down', color: 'bg-rose-100 text-rose-700 hover:bg-rose-200' },
@@ -31,6 +32,7 @@ const OUTCOME_STATUS_MAP: Partial<Record<CallOutcome, LeadStatus>> = {
 };
 
 export default function CallPanel({ lead, onActivityLogged }: Props) {
+  const { user } = useAuth();
   const [calling, setCalling] = useState(false);
   const [callingNumber, setCallingNumber] = useState<string | null>(null);
   const [selectedOutcome, setSelectedOutcome] = useState<CallOutcome | null>(null);
@@ -86,7 +88,8 @@ export default function CallPanel({ lead, onActivityLogged }: Props) {
       const { error: updateError } = await supabase
         .from('leads')
         .update(updates)
-        .eq('id', lead.id);
+        .eq('id', lead.id)
+        .eq('user_id', user?.id);
       if (updateError) throw updateError;
 
       setSelectedOutcome(null);
@@ -102,7 +105,7 @@ export default function CallPanel({ lead, onActivityLogged }: Props) {
   }
 
   return (
-    <div className="rounded-2xl bg-surface-container-lowest p-5 border border-slate-100">
+    <div className="rounded-2xl bg-surface-container-lowest p-5 border border-card-border">
       {/* Header */}
       <div className="flex items-center gap-2 mb-4">
         <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-100">
@@ -140,7 +143,7 @@ export default function CallPanel({ lead, onActivityLogged }: Props) {
 
       {/* Calling indicator */}
       {calling && (
-        <div className="flex items-center gap-2 rounded-xl bg-blue-50 px-4 py-3 mb-4 text-sm text-blue-700">
+        <div className="flex items-center gap-2 rounded-xl bg-primary/10 px-4 py-3 mb-4 text-sm text-primary">
           <MaterialIcon icon="ring_volume" className="text-[18px] animate-pulse" />
           Calling {formatPhone(callingNumber)}...
         </div>
@@ -192,7 +195,7 @@ export default function CallPanel({ lead, onActivityLogged }: Props) {
           'flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition-all',
           selectedOutcome && !saving
             ? 'action-gradient text-white shadow-sm hover:shadow-md'
-            : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+            : 'bg-surface-container text-on-surface-variant cursor-not-allowed'
         )}
       >
         {saving ? (

@@ -124,7 +124,7 @@ export default function MarketComps({ leadId }: Props) {
       : null;
 
   return (
-    <div className="rounded-2xl bg-surface-container-lowest p-5 border border-slate-100">
+    <div className="rounded-2xl bg-surface-container-lowest p-5 border border-card-border">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
@@ -145,7 +145,7 @@ export default function MarketComps({ leadId }: Props) {
 
       {/* Summary */}
       {comps.length > 0 && (
-        <div className="mb-4 rounded-xl bg-slate-50 px-4 py-2.5 text-xs text-secondary font-medium">
+        <div className="mb-4 rounded-xl bg-surface-container-low px-4 py-2.5 text-xs text-secondary font-medium">
           {soldComps.length} sold{activeComps.length > 0 ? `, ${activeComps.length} active` : ''}
           {pendingComps.length > 0 ? `, ${pendingComps.length} pending` : ''} nearby
           {avgPricePerSqft && ` \u2022 Avg $${avgPricePerSqft}/sqft`}
@@ -235,7 +235,7 @@ export default function MarketComps({ leadId }: Props) {
               'flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all',
               form.address.trim() && !saving
                 ? 'bg-primary text-on-primary shadow-sm hover:shadow-md'
-                : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                : 'bg-surface-container text-on-surface-variant cursor-not-allowed'
             )}
           >
             {saving ? (
@@ -260,7 +260,7 @@ export default function MarketComps({ leadId }: Props) {
         </div>
       ) : comps.length === 0 ? (
         <div className="flex flex-col items-center py-8 text-secondary">
-          <MaterialIcon icon="real_estate_agent" className="text-[40px] text-slate-300" />
+          <MaterialIcon icon="real_estate_agent" className="text-[40px] text-on-surface-variant" />
           <p className="mt-2 text-sm">No comps added yet</p>
         </div>
       ) : (
@@ -277,7 +277,7 @@ export default function MarketComps({ leadId }: Props) {
                 <th className="pb-2 w-8"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-50">
+            <tbody className="divide-y divide-card-border">
               {comps.map((comp) => (
                 <tr key={comp.id} className="group hover:bg-surface-container-low transition-colors">
                   <td className="py-2.5 pr-3 font-medium text-on-surface max-w-[200px] truncate">

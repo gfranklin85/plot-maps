@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 
 export default function SignupPage() {
+  const [oauthLoading, setOauthLoading] = useState(false);
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -54,9 +55,9 @@ export default function SignupPage() {
             <div className="w-16 h-16 rounded-full bg-emerald-500/10 flex items-center justify-center mx-auto mb-4">
               <span className="material-symbols-outlined text-emerald-400 text-3xl">check_circle</span>
             </div>
-            <h2 className="text-xl font-bold text-slate-100 mb-2">You&apos;re in!</h2>
+            <h2 className="text-xl font-bold text-slate-100 mb-2">Almost there!</h2>
             <p className="text-sm text-slate-400 mb-6">
-              Your account is ready. Sign in to start prospecting.
+              We sent a confirmation email to finish setting up your account. Check your inbox, then return to sign in.
             </p>
             <Link href="/login" className="text-indigo-400 font-bold text-sm hover:underline underline-offset-4">
               Sign in now
@@ -95,16 +96,26 @@ export default function SignupPage() {
             {/* Google signup */}
             <button
               type="button"
+              disabled={oauthLoading}
               onClick={async () => {
-                await supabase.auth.signInWithOAuth({
-                  provider: 'google',
-                  options: { redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextUrl)}` },
-                });
+                setError('');
+                setOauthLoading(true);
+                try {
+                  await supabase.auth.signInWithOAuth({
+                    provider: 'google',
+                    options: { redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextUrl)}` },
+                  });
+                } catch (error) {
+                  setError((error as Error)?.message || 'Unable to start Google sign up.');
+                  setOauthLoading(false);
+                }
               }}
-              className="w-full flex items-center justify-center gap-3 bg-[#2e3447] hover:bg-[#33394c] transition-all py-3.5 rounded-lg border border-white/10"
+              className="w-full flex items-center justify-center gap-3 bg-[#2e3447] hover:bg-[#33394c] transition-all py-3.5 rounded-lg border border-white/10 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-50"
             >
               <svg width="18" height="18" viewBox="0 0 18 18"><path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 01-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/><path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 009 18z" fill="#34A853"/><path d="M3.964 10.71A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 000 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/><path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 00.957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/></svg>
-              <span className="font-semibold text-sm text-slate-200">Continue with Google</span>
+              <span className="font-semibold text-sm text-slate-200">
+                {oauthLoading ? 'Redirecting to Google…' : 'Sign up with Google'}
+              </span>
             </button>
 
             {/* Divider */}
@@ -117,8 +128,9 @@ export default function SignupPage() {
             {/* Form */}
             <form onSubmit={handleSubmit} className="space-y-5">
               <div className="space-y-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-400 ml-1">Full Name</label>
+                <label htmlFor="signup-full-name" className="text-xs font-bold uppercase tracking-wider text-slate-400 ml-1">Full Name</label>
                 <input
+                  id="signup-full-name"
                   type="text"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
@@ -129,8 +141,9 @@ export default function SignupPage() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-400 ml-1">Email Address</label>
+                <label htmlFor="signup-email" className="text-xs font-bold uppercase tracking-wider text-slate-400 ml-1">Email Address</label>
                 <input
+                  id="signup-email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -141,8 +154,9 @@ export default function SignupPage() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-400 ml-1">Password</label>
+                <label htmlFor="signup-password" className="text-xs font-bold uppercase tracking-wider text-slate-400 ml-1">Password</label>
                 <input
+                  id="signup-password"
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -154,7 +168,7 @@ export default function SignupPage() {
               </div>
 
               {error && (
-                <div className="flex items-start gap-3 bg-red-900/20 border border-red-500/20 p-3 rounded-lg">
+                <div role="alert" aria-live="polite" className="flex items-start gap-3 bg-red-900/20 border border-red-500/20 p-3 rounded-lg">
                   <span className="material-symbols-outlined text-red-400 text-[20px]">error_outline</span>
                   <p className="text-xs text-red-300 font-medium leading-tight">{error}</p>
                 </div>
@@ -163,7 +177,7 @@ export default function SignupPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-gradient-to-br from-indigo-400 to-indigo-600 hover:opacity-90 active:scale-[0.98] transition-all py-4 rounded-lg shadow-[0_8px_30px_rgb(79,70,229,0.3)] flex items-center justify-center gap-2 disabled:opacity-50"
+                className="w-full bg-gradient-to-br from-indigo-400 to-indigo-600 hover:opacity-90 active:scale-[0.98] transition-all py-4 rounded-lg shadow-[0_8px_30px_rgb(79,70,229,0.3)] flex items-center justify-center gap-2 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
               >
                 <span className="font-headline font-bold text-white text-sm tracking-tight">
                   {loading ? 'Creating account...' : 'Create Free Account'}

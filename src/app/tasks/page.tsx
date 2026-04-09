@@ -126,7 +126,7 @@ export default function TasksPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <button className="rounded-xl border border-slate-300 px-5 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors">
+          <button className="rounded-xl border border-card-border px-5 py-2.5 text-sm font-bold text-on-surface-variant hover:bg-surface-container-low transition-colors">
             <MaterialIcon icon="event_repeat" className="mr-1.5 text-[16px] align-middle" />
             Reschedule All
           </button>
@@ -149,9 +149,9 @@ export default function TasksPage() {
         </div>
       ) : filteredTasks.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-2xl bg-surface-container-lowest py-20">
-          <MaterialIcon icon="task_alt" className="text-[64px] text-slate-200 mb-4" />
-          <h3 className="text-lg font-bold text-slate-400">No tasks here</h3>
-          <p className="mt-1 text-sm text-slate-400">
+          <MaterialIcon icon="task_alt" className="text-[64px] text-on-surface-variant mb-4" />
+          <h3 className="text-lg font-bold text-on-surface-variant">No tasks here</h3>
+          <p className="mt-1 text-sm text-on-surface-variant">
             {activeTab === 'due-today'
               ? 'You\'re all caught up for today!'
               : activeTab === 'overdue'
@@ -199,7 +199,7 @@ export default function TasksPage() {
                           ? 'bg-emerald-100 text-emerald-700'
                           : task.status === 'in_progress'
                             ? 'bg-blue-100 text-blue-700'
-                            : 'bg-slate-100 text-slate-600'
+                            : 'bg-surface-container text-on-surface-variant'
                       )}
                     >
                       {task.status}
@@ -209,8 +209,8 @@ export default function TasksPage() {
                         className={cn(
                           'ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium',
                           task.priority === 'high' || task.priority === 'urgent'
-                            ? 'bg-rose-100 text-rose-600'
-                            : 'bg-slate-100 text-slate-500'
+                            ? 'bg-rose-500/10 text-rose-600'
+                            : 'bg-surface-container text-secondary'
                         )}
                       >
                         {task.priority}
@@ -229,10 +229,10 @@ export default function TasksPage() {
 
                   {/* Time */}
                   <div className="col-span-2 text-right">
-                    <p className="text-sm font-medium text-slate-700">
+                    <p className="text-sm font-medium text-on-surface">
                       {task.due_at ? formatTime(task.due_at) : '--'}
                     </p>
-                    <p className="text-xs text-slate-400">
+                    <p className="text-xs text-on-surface-variant">
                       {task.due_at ? formatDate(task.due_at) : ''}
                     </p>
                   </div>
@@ -248,7 +248,7 @@ export default function TasksPage() {
                     <MaterialIcon icon="check" className="text-[18px]" />
                   </button>
                   <button
-                    className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors"
+                    className="flex h-9 w-9 items-center justify-center rounded-full bg-surface-container text-secondary hover:bg-surface-container-high transition-colors"
                     title="More actions"
                   >
                     <MaterialIcon icon="more_vert" className="text-[18px]" />
@@ -264,13 +264,13 @@ export default function TasksPage() {
       <div className="mt-12 grid grid-cols-1 gap-6 lg:grid-cols-12">
         {/* Efficiency Rating */}
         <div className="lg:col-span-4 rounded-2xl bg-surface-container-lowest p-6">
-          <p className="text-xs uppercase tracking-widest text-slate-500">
+          <p className="text-xs uppercase tracking-widest text-secondary">
             Efficiency Rating
           </p>
           <p className="mt-1 font-headline text-3xl font-extrabold text-on-surface">
             84%
           </p>
-          <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-200">
+          <div className="mt-3 h-2 overflow-hidden rounded-full bg-outline-variant">
             <div
               className="h-full rounded-full bg-gradient-to-r from-blue-500 to-emerald-400"
               style={{ width: '84%' }}
@@ -283,7 +283,7 @@ export default function TasksPage() {
 
         {/* Pipeline Value */}
         <div className="lg:col-span-4 rounded-2xl bg-surface-container-lowest p-6">
-          <p className="text-xs uppercase tracking-widest text-slate-500">
+          <p className="text-xs uppercase tracking-widest text-secondary">
             Pipeline Value
           </p>
           <p className="mt-1 font-headline text-3xl font-extrabold text-on-surface">

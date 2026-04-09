@@ -79,7 +79,7 @@ export default function SubscribePage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0c1324] relative overflow-hidden">
+    <div className="min-h-screen bg-surface relative overflow-hidden">
       {/* Ambient background */}
       <div className="absolute inset-0 opacity-40" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, rgba(79,70,229,0.05) 1px, transparent 0)', backgroundSize: '40px 40px' }} />
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-indigo-600/5 rounded-full blur-[120px]" />
@@ -88,9 +88,9 @@ export default function SubscribePage() {
         {/* Hero */}
         <section className="text-center mb-16">
           <h1 className="text-5xl md:text-6xl font-extrabold tracking-tight text-white mb-6 font-headline">
-            Free to Map. <span className="text-indigo-400 italic">Paid to Move.</span>
+            Free to Map. <span className="text-primary italic">Paid to Move.</span>
           </h1>
-          <p className="text-slate-400 text-lg md:text-xl max-w-2xl mx-auto leading-relaxed">
+          <p className="text-secondary text-lg md:text-xl max-w-2xl mx-auto leading-relaxed">
             Visualize your properties for free. Unlock Walk Mode, AI tools, and advanced analytics when you&apos;re ready to close deals.
           </p>
         </section>
@@ -113,22 +113,22 @@ export default function SubscribePage() {
               key={plan.name}
               className={`rounded-2xl p-8 flex flex-col ${
                 plan.highlighted
-                  ? 'bg-[#23293c] border-2 border-indigo-500/40 shadow-2xl shadow-indigo-900/20 relative'
-                  : 'bg-[#151b2d] border border-white/5'
+                  ? 'bg-surface-container-high border-2 border-indigo-500/40 shadow-2xl shadow-indigo-900/20 relative'
+                  : 'bg-card border border-card-border'
               }`}
             >
               {plan.highlighted && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest px-4 py-1 rounded-full">
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-white text-[10px] font-black uppercase tracking-widest px-4 py-1 rounded-full">
                   Recommended
                 </div>
               )}
 
-              <h3 className={`text-xs font-black uppercase tracking-widest mb-2 ${plan.highlighted ? 'text-indigo-400' : 'text-slate-500'}`}>
+              <h3 className={`text-xs font-black uppercase tracking-widest mb-2 ${plan.highlighted ? 'text-primary' : 'text-secondary'}`}>
                 {plan.name}
               </h3>
               <div className="flex items-baseline gap-1 mb-8">
                 <span className="text-4xl font-extrabold text-white">${plan.price}</span>
-                <span className="text-slate-500">/mo</span>
+                <span className="text-secondary">/mo</span>
               </div>
 
               <ul className="space-y-4 mb-10 flex-grow">
@@ -136,9 +136,9 @@ export default function SubscribePage() {
                   <li key={i} className="flex items-center gap-3 text-sm">
                     <MaterialIcon
                       icon="check_circle"
-                      className={`text-[16px] shrink-0 ${plan.highlighted ? 'text-indigo-400' : 'text-indigo-400/60'}`}
+                      className={`text-[16px] shrink-0 ${plan.highlighted ? 'text-primary' : 'text-primary/60'}`}
                     />
-                    <span className={`${i === 0 && plan.highlighted ? 'font-bold text-white' : 'text-slate-300'}`}>
+                    <span className={`${i === 0 && plan.highlighted ? 'font-bold text-white' : 'text-on-surface-variant'}`}>
                       {feature}
                     </span>
                   </li>
@@ -151,7 +151,7 @@ export default function SubscribePage() {
                 className={`w-full py-4 rounded-xl font-bold text-sm transition-all disabled:opacity-50 ${
                   plan.highlighted
                     ? 'bg-gradient-to-br from-indigo-400 to-indigo-600 text-white shadow-lg shadow-indigo-600/20 hover:opacity-90 active:scale-[0.98]'
-                    : 'bg-[#23293c] text-slate-200 hover:bg-[#2e3447] border border-white/5'
+                    : 'bg-surface-container-high text-on-surface hover:bg-surface-container-highest border border-card-border'
                 }`}
               >
                 {loading === plan.priceId ? 'Redirecting...' : `Choose ${plan.name}`}
@@ -161,7 +161,7 @@ export default function SubscribePage() {
         </div>
 
         {/* Footer */}
-        <p className="text-center text-sm text-slate-500">
+        <p className="text-center text-sm text-secondary">
           Cancel anytime. No long-term contracts.
         </p>
       </main>

@@ -70,7 +70,7 @@ export default function NearbyPlaces({ lead }: Props) {
 
   if (!isSubscribed) {
     return (
-      <div className="rounded-2xl bg-surface-container-lowest p-5 border border-slate-100">
+      <div className="rounded-2xl bg-surface-container-lowest p-5 border border-card-border">
         <div className="flex items-center gap-2 mb-4">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-100">
             <MaterialIcon icon="explore_nearby" className="text-[20px] text-indigo-600" filled />
@@ -78,10 +78,10 @@ export default function NearbyPlaces({ lead }: Props) {
           <h3 className="font-headline text-lg font-bold text-on-surface">Nearby</h3>
         </div>
         <div className="p-6 text-center">
-          <MaterialIcon icon="lock" className="text-[32px] text-indigo-400 mb-2" />
-          <p className="text-sm font-bold text-slate-200 mb-1">Subscribe to Unlock</p>
-          <p className="text-xs text-slate-500 mb-3">Discover schools, grocery stores, and amenities near any property.</p>
-          <a href="/subscribe" className="text-indigo-400 text-xs font-bold hover:underline">Upgrade Plan</a>
+          <MaterialIcon icon="lock" className="text-[32px] text-primary mb-2" />
+          <p className="text-sm font-bold text-on-surface-variant mb-1">Subscribe to Unlock</p>
+          <p className="text-xs text-secondary mb-3">Discover schools, grocery stores, and amenities near any property.</p>
+          <a href="/subscribe" className="text-primary text-xs font-bold hover:underline">Upgrade Plan</a>
         </div>
       </div>
     );
@@ -89,7 +89,7 @@ export default function NearbyPlaces({ lead }: Props) {
 
   if (!hasLocation) {
     return (
-      <div className="rounded-2xl bg-surface-container-lowest p-5 border border-slate-100">
+      <div className="rounded-2xl bg-surface-container-lowest p-5 border border-card-border">
         <div className="flex items-center gap-2 mb-4">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-100">
             <MaterialIcon icon="explore_nearby" className="text-[20px] text-indigo-600" filled />
@@ -97,7 +97,7 @@ export default function NearbyPlaces({ lead }: Props) {
           <h3 className="font-headline text-lg font-bold text-on-surface">Nearby</h3>
         </div>
         <div className="flex flex-col items-center py-6 text-secondary">
-          <MaterialIcon icon="location_off" className="text-[32px] text-slate-300" />
+          <MaterialIcon icon="location_off" className="text-[32px] text-on-surface-variant" />
           <p className="mt-2 text-sm">No location data available</p>
         </div>
       </div>
@@ -107,7 +107,7 @@ export default function NearbyPlaces({ lead }: Props) {
   const activeCategory = categories.find((c) => c.type === activeTab);
 
   return (
-    <div className="rounded-2xl bg-surface-container-lowest p-5 border border-slate-100">
+    <div className="rounded-2xl bg-surface-container-lowest p-5 border border-card-border">
       {/* Header */}
       <div className="flex items-center gap-2 mb-4">
         <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-100">
@@ -121,10 +121,10 @@ export default function NearbyPlaces({ lead }: Props) {
         <div className="space-y-3">
           {[1, 2, 3].map((i) => (
             <div key={i} className="animate-pulse flex gap-3">
-              <div className="h-4 w-4 rounded bg-slate-200" />
+              <div className="h-4 w-4 rounded bg-outline-variant" />
               <div className="flex-1 space-y-1.5">
-                <div className="h-3 w-3/4 rounded bg-slate-200" />
-                <div className="h-2.5 w-1/2 rounded bg-slate-100" />
+                <div className="h-3 w-3/4 rounded bg-outline-variant" />
+                <div className="h-2.5 w-1/2 rounded bg-surface-container" />
               </div>
             </div>
           ))}
@@ -151,7 +151,7 @@ export default function NearbyPlaces({ lead }: Props) {
                   'flex items-center gap-1 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-colors',
                   activeTab === cat.type
                     ? 'bg-primary text-on-primary shadow-sm'
-                    : 'bg-slate-100 text-secondary hover:bg-slate-200'
+                    : 'bg-surface-container text-secondary hover:bg-surface-container-high'
                 )}
               >
                 <MaterialIcon icon={cat.icon} className="text-[14px]" />
@@ -159,7 +159,7 @@ export default function NearbyPlaces({ lead }: Props) {
                 {cat.places.length > 0 && (
                   <span className={cn(
                     'ml-0.5 text-[10px]',
-                    activeTab === cat.type ? 'text-on-primary/70' : 'text-slate-400'
+                    activeTab === cat.type ? 'text-on-primary/70' : 'text-on-surface-variant'
                   )}>
                     {cat.places.length}
                   </span>
@@ -190,7 +190,7 @@ export default function NearbyPlaces({ lead }: Props) {
                           <MaterialIcon icon="star" className="text-[12px] text-amber-500" filled />
                           {place.rating}
                           {place.ratingCount !== null && (
-                            <span className="text-slate-400">({place.ratingCount})</span>
+                            <span className="text-on-surface-variant">({place.ratingCount})</span>
                           )}
                         </span>
                       )}

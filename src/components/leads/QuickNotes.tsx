@@ -49,7 +49,7 @@ export default function QuickNotes({ leadId, onNoteSaved }: Props) {
   }
 
   return (
-    <div className="rounded-2xl bg-surface-container-lowest p-5 border border-slate-100">
+    <div className="rounded-2xl bg-surface-container-lowest p-5 border border-card-border">
       <div className="flex items-center gap-2 mb-3">
         <MaterialIcon icon="sticky_note_2" className="text-[20px] text-amber-500" filled />
         <h3 className="font-headline text-sm font-bold text-on-surface">Quick Note</h3>
@@ -87,7 +87,7 @@ export default function QuickNotes({ leadId, onNoteSaved }: Props) {
             'flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold transition-all',
             text.trim() && !saving
               ? 'bg-primary text-on-primary shadow-sm hover:shadow-md'
-              : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+              : 'bg-surface-container text-on-surface-variant cursor-not-allowed'
           )}
         >
           {saving ? (

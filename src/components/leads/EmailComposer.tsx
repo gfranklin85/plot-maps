@@ -99,7 +99,7 @@ export default function EmailComposer({ lead, onEmailSent }: Props) {
   const canSend = to.trim() && subject.trim() && body.trim() && !sending;
 
   return (
-    <div className="rounded-2xl bg-surface-container-lowest p-5 border border-slate-100">
+    <div className="rounded-2xl bg-surface-container-lowest p-5 border border-card-border">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
@@ -115,7 +115,7 @@ export default function EmailComposer({ lead, onEmailSent }: Props) {
           className={cn(
             'flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold transition-all',
             drafting
-              ? 'bg-slate-100 text-slate-400'
+              ? 'bg-surface-container text-on-surface-variant'
               : 'bg-violet-100 text-violet-700 hover:bg-violet-200'
           )}
         >
@@ -183,7 +183,7 @@ export default function EmailComposer({ lead, onEmailSent }: Props) {
           'flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition-all',
           canSend
             ? 'action-gradient text-white shadow-sm hover:shadow-md'
-            : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+            : 'bg-surface-container text-on-surface-variant cursor-not-allowed'
         )}
       >
         {sending ? (

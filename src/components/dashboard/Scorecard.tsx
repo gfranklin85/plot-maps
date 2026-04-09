@@ -11,10 +11,9 @@ interface Props {
 }
 
 const ACTIVITY_CONFIG: { type: string; label: string; icon: string; color: string }[] = [
-  { type: 'call', label: 'Calls', icon: 'call', color: 'text-blue-600' },
-  { type: 'note', label: 'Notes', icon: 'edit_note', color: 'text-slate-600' },
-  { type: 'email', label: 'Emails', icon: 'email', color: 'text-violet-600' },
-  // Letters removed
+  { type: 'call', label: 'Calls', icon: 'call', color: 'text-blue-500' },
+  { type: 'note', label: 'Notes', icon: 'edit_note', color: 'text-on-surface-variant' },
+  { type: 'email', label: 'Emails', icon: 'email', color: 'text-violet-500' },
 ];
 
 const STATUS_ORDER: LeadStatus[] = [
@@ -93,8 +92,8 @@ export default function Scorecard({ activities, targets, leadsByStatus }: Props)
 
         {/* Call outcome breakdown */}
         {Object.keys(callOutcomes).length > 0 && (
-          <div className="mt-4 border-t border-slate-100 pt-3">
-            <p className="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-2">
+          <div className="mt-4 border-t border-outline-variant/20 pt-3">
+            <p className="text-xs font-semibold uppercase tracking-widest text-secondary mb-2">
               Call Outcomes
             </p>
             <div className="space-y-1">
@@ -132,9 +131,9 @@ export default function Scorecard({ activities, targets, leadsByStatus }: Props)
                     </span>
                     <span className="text-xs font-bold text-on-surface">{count}</span>
                   </div>
-                  <div className="h-1.5 w-full rounded-full bg-slate-100">
+                  <div className="h-1.5 w-full rounded-full bg-surface-container">
                     <div
-                      className="h-1.5 rounded-full bg-slate-400 transition-all duration-500"
+                      className="h-1.5 rounded-full bg-on-surface-variant transition-all duration-500"
                       style={{ width: `${pct}%` }}
                     />
                   </div>

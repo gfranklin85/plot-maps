@@ -24,6 +24,7 @@ export type CompType = "active" | "sold" | "pending";
 
 export interface Lead {
   id: string;
+  user_id: string;
   created_at: string;
   updated_at: string;
   name: string;
@@ -269,9 +270,9 @@ export const LISTING_STATUS_COLORS: Record<string, string> = {
 };
 
 export const LISTING_STATUS_BG: Record<string, string> = {
-  'Sold': 'bg-green-100 text-green-700',
-  'Active': 'bg-orange-100 text-orange-700',
-  'Pending': 'bg-yellow-100 text-yellow-700',
+  'Sold': 'bg-green-500/10 text-green-500',
+  'Active': 'bg-orange-500/10 text-orange-500',
+  'Pending': 'bg-yellow-500/10 text-yellow-500',
 };
 
 // Status color mapping
@@ -287,18 +288,18 @@ export const STATUS_COLORS: Record<LeadStatus, string> = {
 };
 
 export const STATUS_BG_COLORS: Record<LeadStatus, string> = {
-  "New": "bg-blue-100 text-blue-700",
-  "Not Contacted": "bg-slate-100 text-slate-500",
-  "Called": "bg-violet-100 text-violet-700",
-  "Follow-Up": "bg-amber-100 text-amber-700",
-  "Interested": "bg-emerald-100 text-emerald-700",
-  "Not Interested": "bg-rose-100 text-rose-700",
-  "Do Not Call": "bg-red-100 text-red-700",
-  "Hot Lead": "bg-green-100 text-green-700",
+  "New": "bg-blue-500/10 text-blue-400",
+  "Not Contacted": "bg-slate-500/10 text-slate-400",
+  "Called": "bg-violet-500/10 text-violet-400",
+  "Follow-Up": "bg-amber-500/10 text-amber-400",
+  "Interested": "bg-emerald-500/10 text-emerald-400",
+  "Not Interested": "bg-rose-500/10 text-rose-400",
+  "Do Not Call": "bg-red-500/10 text-red-400",
+  "Hot Lead": "bg-green-500/10 text-green-400",
 };
 
 export const PRIORITY_COLORS: Record<Priority, string> = {
-  high: "bg-red-100 text-red-700",
-  medium: "bg-amber-100 text-amber-700",
-  low: "bg-slate-100 text-slate-500",
+  high: "bg-red-500/10 text-red-400",
+  medium: "bg-amber-500/10 text-amber-400",
+  low: "bg-slate-500/10 text-slate-400",
 };

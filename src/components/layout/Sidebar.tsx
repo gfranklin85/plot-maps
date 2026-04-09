@@ -14,22 +14,22 @@ export default function Sidebar() {
 
   return (
     <>
-      <aside className={`fixed left-0 top-0 h-screen bg-slate-50 flex flex-col py-6 z-50 transition-all duration-300 ${collapsed ? 'w-16' : 'w-64'}`}>
+      <aside className={`fixed left-0 top-0 h-screen bg-surface-container-low flex flex-col py-6 z-50 transition-all duration-300 ${collapsed ? 'w-16' : 'w-64'}`}>
         {/* Logo + collapse toggle */}
         <div className={`flex items-center justify-between ${collapsed ? 'px-3' : 'px-6'} mb-8`}>
           {!collapsed && (
             <div>
-              <h1 className="text-xl font-bold tracking-tight text-slate-900 font-headline">
+              <h1 className="text-xl font-bold tracking-tight text-on-surface font-headline">
                 Plot Maps
               </h1>
-              <p className="text-[10px] uppercase tracking-wider text-slate-500 font-label mt-1">
+              <p className="text-[10px] uppercase tracking-wider text-primary font-label mt-1">
                 VISUAL PROSPECTING CRM
               </p>
             </div>
           )}
           <button
             onClick={toggle}
-            className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-200 hover:text-slate-600 transition-colors"
+            className="p-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors"
             title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
             <span className="material-symbols-outlined text-[20px]">
@@ -53,8 +53,8 @@ export default function Sidebar() {
                 title={collapsed ? item.label : undefined}
                 className={`flex items-center gap-3 ${collapsed ? 'justify-center px-2' : 'px-4'} py-3 rounded-lg transition-colors ${
                   isActive
-                    ? 'text-blue-700 font-bold border-r-4 border-blue-600 bg-slate-100'
-                    : 'text-slate-500 hover:bg-slate-200/50'
+                    ? 'text-primary font-bold border-r-4 border-primary bg-surface-container'
+                    : 'text-secondary hover:bg-surface-container/50'
                 }`}
               >
                 <span className="material-symbols-outlined text-[20px]">
@@ -100,11 +100,11 @@ export default function Sidebar() {
         )}
 
         {/* Footer */}
-        <div className="px-2 border-t border-slate-200/50 pt-4 flex flex-col gap-1">
+        <div className="px-2 border-t border-outline-variant/30 pt-4 flex flex-col gap-1">
           <Link
             href="/settings"
             title={collapsed ? 'Settings' : undefined}
-            className={`flex items-center gap-3 ${collapsed ? 'justify-center px-2' : 'px-4'} py-2 text-slate-500 hover:bg-slate-200/50 rounded-lg transition-colors`}
+            className={`flex items-center gap-3 ${collapsed ? 'justify-center px-2' : 'px-4'} py-2 text-secondary hover:bg-surface-container/50 rounded-lg transition-colors`}
           >
             <span className="material-symbols-outlined text-[20px]">settings</span>
             {!collapsed && <span className="text-sm">Settings</span>}

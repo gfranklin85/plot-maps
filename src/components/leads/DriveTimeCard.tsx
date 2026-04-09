@@ -53,12 +53,12 @@ export default function DriveTimeCard({ lead }: Props) {
 
   if (!isSubscribed) {
     return (
-      <div className="rounded-2xl bg-surface-container-lowest p-4 border border-slate-100">
+      <div className="rounded-2xl bg-surface-container-lowest p-4 border border-card-border">
         <div className="p-6 text-center">
-          <MaterialIcon icon="lock" className="text-[32px] text-indigo-400 mb-2" />
-          <p className="text-sm font-bold text-slate-200 mb-1">Subscribe to Unlock</p>
-          <p className="text-xs text-slate-500 mb-3">Calculate precise travel times using real-time traffic data.</p>
-          <a href="/subscribe" className="text-indigo-400 text-xs font-bold hover:underline">Upgrade Plan</a>
+          <MaterialIcon icon="lock" className="text-[32px] text-primary mb-2" />
+          <p className="text-sm font-bold text-on-surface-variant mb-1">Subscribe to Unlock</p>
+          <p className="text-xs text-secondary mb-3">Calculate precise travel times using real-time traffic data.</p>
+          <a href="/subscribe" className="text-primary text-xs font-bold hover:underline">Upgrade Plan</a>
         </div>
       </div>
     );
@@ -69,7 +69,7 @@ export default function DriveTimeCard({ lead }: Props) {
   const directionsUrl = `https://www.google.com/maps/dir/?api=1&origin=${MAP_CENTER.lat},${MAP_CENTER.lng}&destination=${lead.latitude},${lead.longitude}`;
 
   return (
-    <div className="rounded-2xl bg-surface-container-lowest p-4 border border-slate-100">
+    <div className="rounded-2xl bg-surface-container-lowest p-4 border border-card-border">
       <div className="flex items-center gap-2.5">
         <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-100">
           <MaterialIcon icon="directions_car" className="text-[20px] text-blue-600" filled />
@@ -80,7 +80,7 @@ export default function DriveTimeCard({ lead }: Props) {
           </p>
           {loading ? (
             <div className="animate-pulse mt-1">
-              <div className="h-4 w-32 rounded bg-slate-200" />
+              <div className="h-4 w-32 rounded bg-outline-variant" />
             </div>
           ) : distance && duration ? (
             <p className="text-sm font-semibold text-on-surface mt-0.5">
@@ -94,7 +94,7 @@ export default function DriveTimeCard({ lead }: Props) {
           href={directionsUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center gap-1 rounded-lg bg-slate-100 px-2.5 py-1.5 text-xs font-semibold text-secondary hover:bg-slate-200 transition-colors"
+          className="flex items-center gap-1 rounded-lg bg-surface-container px-2.5 py-1.5 text-xs font-semibold text-secondary hover:bg-surface-container-high transition-colors"
         >
           <MaterialIcon icon="directions" className="text-[14px]" />
           Directions

@@ -36,13 +36,13 @@ const TYPE_CONFIG: Record<
   },
   status_change: {
     icon: 'swap_horiz',
-    bg: 'bg-slate-100',
-    iconColor: 'text-slate-500',
+    bg: 'bg-surface-container',
+    iconColor: 'text-secondary',
   },
   import: {
     icon: 'upload_file',
-    bg: 'bg-slate-100',
-    iconColor: 'text-slate-500',
+    bg: 'bg-surface-container',
+    iconColor: 'text-secondary',
   },
 };
 
@@ -50,7 +50,7 @@ const OUTCOME_COLORS: Record<string, string> = {
   'Spoke with Owner': 'bg-emerald-100 text-emerald-700',
   'Follow-Up': 'bg-amber-100 text-amber-700',
   'Left VM': 'bg-blue-100 text-blue-700',
-  'No Answer': 'bg-slate-100 text-slate-600',
+  'No Answer': 'bg-surface-container text-on-surface-variant',
   'Not Interested': 'bg-rose-100 text-rose-700',
   DNC: 'bg-red-100 text-red-700',
 };
@@ -63,7 +63,7 @@ export default function ActivityTimeline({
   if (activities.length === 0) {
     return (
       <div className="flex flex-col items-center py-12 text-secondary">
-        <MaterialIcon icon="timeline" className="text-[48px] text-slate-300" />
+        <MaterialIcon icon="timeline" className="text-[48px] text-on-surface-variant" />
         <p className="mt-3 text-lg font-medium">No activity yet</p>
         <p className="text-sm">
           Calls, notes, emails, and status changes will appear here
@@ -112,7 +112,7 @@ export default function ActivityTimeline({
                           className={cn(
                             'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide',
                             OUTCOME_COLORS[activity.outcome] ??
-                              'bg-slate-100 text-slate-600'
+                              'bg-surface-container text-on-surface-variant'
                           )}
                         >
                           {activity.outcome}
@@ -130,7 +130,7 @@ export default function ActivityTimeline({
                   <p className="shrink-0 text-xs text-secondary whitespace-nowrap">
                     {formatDate(activity.created_at)}
                     <br />
-                    <span className="text-slate-400">
+                    <span className="text-on-surface-variant">
                       {timeAgo(activity.created_at)}
                     </span>
                   </p>

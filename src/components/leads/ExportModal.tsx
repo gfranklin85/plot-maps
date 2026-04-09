@@ -82,12 +82,12 @@ export default function ExportModal({
       />
 
       {/* Modal */}
-      <div className="relative z-10 w-full max-w-lg rounded-2xl border border-white/20 bg-white/90 p-6 shadow-2xl backdrop-blur-xl">
+      <div className="relative z-10 w-full max-w-lg rounded-2xl border border-card-border bg-card/90 p-6 shadow-2xl backdrop-blur-xl">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-headline font-bold">Export Leads</h3>
           <button
             onClick={onClose}
-            className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+            className="rounded-lg p-1 text-on-surface-variant hover:bg-surface-container hover:text-on-surface"
           >
             <MaterialIcon icon="close" className="text-[20px]" />
           </button>
@@ -95,15 +95,15 @@ export default function ExportModal({
 
         {/* Scope selector */}
         <div className="mt-4">
-          <p className="text-sm font-medium text-slate-600 mb-2">Export scope</p>
+          <p className="text-sm font-medium text-on-surface-variant mb-2">Export scope</p>
           <div className="flex gap-3">
             {selectedIds.length > 0 && (
               <button
                 onClick={() => setScope('selected')}
                 className={`rounded-xl border px-4 py-2 text-sm font-medium transition-colors ${
                   scope === 'selected'
-                    ? 'border-blue-300 bg-blue-50 text-blue-700'
-                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                    ? 'border-primary bg-primary/10 text-primary'
+                    : 'border-card-border bg-card text-on-surface-variant hover:bg-surface-container-low'
                 }`}
               >
                 Selected ({selectedIds.length})
@@ -113,8 +113,8 @@ export default function ExportModal({
               onClick={() => setScope('all')}
               className={`rounded-xl border px-4 py-2 text-sm font-medium transition-colors ${
                 scope === 'all'
-                  ? 'border-blue-300 bg-blue-50 text-blue-700'
-                  : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                  ? 'border-primary bg-primary/10 text-primary'
+                  : 'border-card-border bg-card text-on-surface-variant hover:bg-surface-container-low'
               }`}
             >
               All Filtered ({totalFiltered})
@@ -124,15 +124,15 @@ export default function ExportModal({
 
         {/* Format selector */}
         <div className="mt-4">
-          <p className="text-sm font-medium text-slate-600 mb-2">Format</p>
+          <p className="text-sm font-medium text-on-surface-variant mb-2">Format</p>
           <div className="space-y-2">
             {EXPORT_FORMATS.map((f) => (
               <label
                 key={f.key}
                 className={`flex items-center gap-3 rounded-xl border px-4 py-2.5 cursor-pointer transition-colors ${
                   format === f.key
-                    ? 'border-blue-300 bg-blue-50'
-                    : 'border-slate-200 hover:bg-slate-50'
+                    ? 'border-primary bg-primary/10'
+                    : 'border-card-border hover:bg-surface-container-low'
                 }`}
               >
                 <input
@@ -146,7 +146,7 @@ export default function ExportModal({
                 <div>
                   <p className="text-sm font-medium">{f.label}</p>
                   {f.fields.length > 0 && (
-                    <p className="text-xs text-slate-400">{f.fields.join(', ')}</p>
+                    <p className="text-xs text-on-surface-variant">{f.fields.join(', ')}</p>
                   )}
                 </div>
               </label>
@@ -157,10 +157,10 @@ export default function ExportModal({
         {/* Custom columns for full export */}
         {format === 'full' && (
           <div className="mt-4">
-            <p className="text-sm font-medium text-slate-600 mb-2">
+            <p className="text-sm font-medium text-on-surface-variant mb-2">
               Custom fields (optional, leave empty for all)
             </p>
-            <div className="max-h-40 overflow-y-auto rounded-xl border border-slate-200 p-3 grid grid-cols-2 gap-1">
+            <div className="max-h-40 overflow-y-auto rounded-xl border border-card-border p-3 grid grid-cols-2 gap-1">
               {IMPORT_SYSTEM_FIELDS.map((field) => (
                 <label
                   key={field.key}

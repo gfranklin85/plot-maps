@@ -19,7 +19,7 @@ export default function ImportProgress({ current, total, phase, label }: Props) 
   const config = phaseConfig[phase];
 
   return (
-    <div className="rounded-2xl bg-gradient-to-br from-slate-900 to-slate-800 p-6 text-white overflow-hidden relative">
+    <div className="rounded-2xl bg-gradient-to-br from-surface-container to-surface-container-high p-6 text-on-surface overflow-hidden relative">
       {/* Animated background dots */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         {Array.from({ length: 12 }).map((_, i) => (

@@ -25,7 +25,7 @@ export default function CallBar() {
   // ACTIVE CALL state (connecting, ringing, in-call)
   if (callState !== 'ended') {
     return (
-      <div className="fixed bottom-0 left-0 w-full z-[100] h-16 bg-slate-900 shadow-[0_-4px_30px_rgba(0,0,0,0.6)] flex items-center justify-between px-6 border-t border-white/5">
+      <div className="fixed bottom-0 left-0 w-full z-[100] h-16 bg-surface-container shadow-[0_-4px_30px_rgba(0,0,0,0.6)] flex items-center justify-between px-6 border-t border-card-border">
         {/* Left: Status + Name */}
         <div className="flex items-center gap-4">
           <div className="relative flex items-center justify-center">
@@ -33,10 +33,10 @@ export default function CallBar() {
             <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.5)]" />
           </div>
           <div className="flex flex-col">
-            <span className="font-headline font-bold text-white text-sm tracking-tight">
+            <span className="font-headline font-bold text-on-surface text-sm tracking-tight">
               {callState === 'connecting' ? 'Connecting...' : callState === 'ringing' ? `Ringing ${callingName}...` : `On call with ${callingName}`}
             </span>
-            <span className="text-[10px] text-slate-400 uppercase tracking-widest font-semibold">
+            <span className="text-[10px] text-on-surface-variant uppercase tracking-widest font-semibold">
               {callingNumber}
             </span>
           </div>
@@ -44,7 +44,7 @@ export default function CallBar() {
 
         {/* Center: Timer */}
         <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center">
-          <div className="text-white text-xl font-bold tracking-widest font-mono">
+          <div className="text-on-surface text-xl font-bold tracking-widest font-mono">
             {formatDuration(callDuration)}
           </div>
           <div className="h-1 w-24 bg-white/10 rounded-full mt-1 overflow-hidden">
@@ -57,13 +57,13 @@ export default function CallBar() {
           <button
             onClick={toggleMute}
             className={`w-10 h-10 rounded-full flex items-center justify-center transition-all active:scale-95 ${
-              isMuted ? 'bg-amber-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'
+              isMuted ? 'bg-amber-600 text-white' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high'
             }`}
             title={isMuted ? 'Unmute' : 'Mute'}
           >
             <span className="material-symbols-outlined text-[20px]">{isMuted ? 'mic_off' : 'mic'}</span>
           </button>
-          <div className="w-px h-6 bg-slate-700 mx-2" />
+          <div className="w-px h-6 bg-card-border mx-2" />
           <button
             onClick={hangUp}
             className="flex items-center gap-2 bg-red-600 hover:bg-red-500 text-white font-headline font-bold px-6 py-2 rounded-lg transition-all active:scale-95 shadow-lg shadow-red-900/20"
@@ -78,10 +78,10 @@ export default function CallBar() {
 
   // ENDED state — show outcome selection
   return (
-    <div className="fixed bottom-0 left-0 w-full z-[100] flex justify-center items-center gap-4 px-6 py-3 bg-[#070d1f] shadow-[0_-4px_20px_rgba(0,0,0,0.4)] border-t border-white/5">
+    <div className="fixed bottom-0 left-0 w-full z-[100] flex justify-center items-center gap-4 px-6 py-3 bg-surface shadow-[0_-4px_20px_rgba(0,0,0,0.4)] border-t border-card-border">
       <div className="flex gap-2 items-center mr-8">
         <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-        <span className="text-xs font-bold text-white uppercase tracking-widest">Call Outcome: {callingName}</span>
+        <span className="text-xs font-bold text-on-surface uppercase tracking-widest">Call Outcome: {callingName}</span>
       </div>
 
       {OUTCOMES.map(({ key, icon, label, highlight, danger }) => (
@@ -90,10 +90,10 @@ export default function CallBar() {
           onClick={() => logOutcome(key)}
           className={`flex flex-col items-center justify-center px-3 py-1 transition-all duration-200 group ${
             highlight
-              ? 'text-white bg-indigo-600 rounded-md px-4 py-2 shadow-lg shadow-indigo-500/20'
+              ? 'text-white bg-primary rounded-md px-4 py-2 shadow-lg shadow-primary/20'
               : danger
-              ? 'text-slate-400 hover:text-red-400 hover:bg-red-900/20 rounded-md'
-              : 'text-slate-400 hover:text-white hover:bg-slate-800 rounded-md'
+              ? 'text-on-surface-variant hover:text-red-400 hover:bg-red-900/20 rounded-md'
+              : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded-md'
           }`}
         >
           <span className="material-symbols-outlined text-lg mb-0.5 group-hover:scale-110">{icon}</span>
@@ -101,10 +101,10 @@ export default function CallBar() {
         </button>
       ))}
 
-      <div className="ml-8 w-px h-8 bg-slate-700/20" />
+      <div className="ml-8 w-px h-8 bg-card-border/20" />
       <button
         onClick={() => logOutcome('Dismissed')}
-        className="ml-4 text-slate-500 hover:text-white flex items-center gap-2 text-xs font-bold uppercase tracking-tighter"
+        className="ml-4 text-secondary hover:text-on-surface flex items-center gap-2 text-xs font-bold uppercase tracking-tighter"
       >
         <span className="material-symbols-outlined text-base">close</span>
         Dismiss

@@ -251,6 +251,11 @@ export default function ImportsPage() {
 
   // ── Run import ──
   async function runImport() {
+    if (!user?.id) {
+      setPhase('idle');
+      return;
+    }
+
     setPhase('importing');
     setProgress(0);
     setProgressPhase('importing');
@@ -259,8 +264,8 @@ export default function ImportsPage() {
     let inserted = 0, updated = 0, geocoded = 0, errors = 0;
     const toGeocode: { id: string; address: string }[] = [];
 
-    // Build lookup for existing addresses
-    const { data: existing } = await supabase.from('leads').select('id, property_address');
+    // Build lookup for existing addresses owned by this user
+    const { data: existing } = await supabase.from('leads').select('id, property_address').eq('user_id', user.id);
     const addrMap = new Map<string, string>();
     (existing || []).forEach(l => {
       if (l.property_address) {
@@ -310,7 +315,7 @@ export default function ImportsPage() {
         const phone = getVal(row, 'phone');
         if (phone) updateData.phone = phone;
 
-        const { error } = await supabase.from('leads').update(updateData).eq('id', existingId);
+        const { error } = await supabase.from('leads').update(updateData).eq('id', existingId).eq('user_id', user.id);
         if (error) errors++; else updated++;
       } else {
         // Insert new
@@ -341,7 +346,7 @@ export default function ImportsPage() {
           status: 'new' as const,
           priority: 'medium',
           notes: getVal(row, 'notes') || null,
-          user_id: user?.id || null,
+          user_id: user.id,
           record_type: uploadType || 'target',
           last_imported_at: new Date().toISOString(),
           ...mlsFields,
@@ -387,7 +392,7 @@ export default function ImportsPage() {
               if (geo.lat && geo.lng) {
                 await supabase.from('leads').update({
                   latitude: geo.lat, longitude: geo.lng, geocoded_at: new Date().toISOString(),
-                }).eq('id', toGeocode[i].id);
+                }).eq('id', toGeocode[i].id).eq('user_id', user.id);
                 geocoded++;
                 setGeocodedPins(prev => [...prev, { lat: geo.lat, lng: geo.lng, color: '#3b82f6' }]);
               }
@@ -435,7 +440,7 @@ export default function ImportsPage() {
       {/* Header */}
       <div className="max-w-3xl">
         <h1 className="text-4xl font-headline font-extrabold tracking-tight mb-2">Build your map before you make your calls</h1>
-        <p className="text-slate-400 text-lg leading-relaxed">Upload your market data and your leads to get started</p>
+        <p className="text-secondary text-lg leading-relaxed">Upload your market data and your leads to get started</p>
       </div>
 
       {/* ═══ IDLE: Two-door entry ═══ */}
@@ -444,27 +449,27 @@ export default function ImportsPage() {
           {/* Market Layer (Left) */}
           <div className="space-y-6">
             <div className="flex items-center gap-3 px-1">
-              <MaterialIcon icon="layers" className="text-[20px] text-indigo-400" />
-              <h2 className="text-sm uppercase tracking-widest font-black text-slate-200">Market Layer (MLS / Comps)</h2>
+              <MaterialIcon icon="layers" className="text-[20px] text-primary" />
+              <h2 className="text-sm uppercase tracking-widest font-black text-on-surface">Market Layer (MLS / Comps)</h2>
             </div>
-            <div className="group flex flex-col h-full bg-[#070d1f] border border-white/10 rounded-2xl p-10 hover:border-indigo-500/40 transition-all">
+            <div className="group flex flex-col h-full bg-surface-container-lowest border border-card-border rounded-2xl p-10 hover:border-indigo-500/40 transition-all">
               <div className="w-12 h-12 rounded-xl bg-indigo-500/10 flex items-center justify-center mb-6">
-                <MaterialIcon icon="map" className="text-[24px] text-indigo-400" />
+                <MaterialIcon icon="map" className="text-[24px] text-primary" />
               </div>
-              <h3 className="text-2xl font-headline font-bold text-slate-100 mb-4">Build your market view first</h3>
-              <p className="text-slate-400 text-sm leading-relaxed mb-6">
+              <h3 className="text-2xl font-headline font-bold text-on-surface mb-4">Build your market view first</h3>
+              <p className="text-secondary text-sm leading-relaxed mb-6">
                 Download a current snapshot of your market — active, pending, or recent sold listings — and upload it here. We&apos;ll place them on the map with full property cards so you can see what&apos;s happening in real time.
               </p>
-              <p className="text-[11px] font-bold text-indigo-400/70 uppercase tracking-wide mb-8 mt-auto">
+              <p className="text-[11px] font-bold text-primary/70 uppercase tracking-wide mb-8 mt-auto">
                 Think of this as your live comp layer while you&apos;re calling
               </p>
               <button
                 onClick={() => setUploadType('context')}
-                className="w-full bg-[#23293c] text-slate-200 py-3.5 rounded-xl font-bold text-sm border border-white/10 hover:bg-indigo-600 hover:text-white hover:border-indigo-500 transition-all"
+                className="w-full bg-surface-container-high text-on-surface py-3.5 rounded-xl font-bold text-sm border border-card-border hover:bg-primary hover:text-white hover:border-primary transition-all"
               >
                 Upload Market Snapshot
               </button>
-              <p className="text-center text-[10px] text-slate-500 mt-2">CSV or paste data</p>
+              <p className="text-center text-[10px] text-secondary mt-2">CSV or paste data</p>
             </div>
           </div>
 
@@ -472,14 +477,14 @@ export default function ImportsPage() {
           <div className="space-y-6">
             <div className="flex items-center gap-3 px-1">
               <MaterialIcon icon="target" className="text-[20px] text-orange-400" />
-              <h2 className="text-sm uppercase tracking-widest font-black text-slate-200">Your Leads (Targets)</h2>
+              <h2 className="text-sm uppercase tracking-widest font-black text-on-surface">Your Leads (Targets)</h2>
             </div>
-            <div className="group flex flex-col h-full bg-[#151b2d] border border-white/5 rounded-2xl p-10 hover:border-orange-500/40 transition-all">
+            <div className="group flex flex-col h-full bg-card border border-card-border rounded-2xl p-10 hover:border-orange-500/40 transition-all">
               <div className="w-12 h-12 rounded-xl bg-orange-500/10 flex items-center justify-center mb-6">
                 <MaterialIcon icon="person_search" className="text-[24px] text-orange-400" />
               </div>
-              <h3 className="text-2xl font-headline font-bold text-slate-100 mb-4">Bring your leads in</h3>
-              <p className="text-slate-400 text-sm leading-relaxed mb-6">
+              <h3 className="text-2xl font-headline font-bold text-on-surface mb-4">Bring your leads in</h3>
+              <p className="text-secondary text-sm leading-relaxed mb-6">
                 Upload your lists from any source — PropStream, BatchLeads, county data, or your own notes. We automatically structure the data into property cards, then map them so you can see and work them directly.
               </p>
               <p className="text-[11px] font-bold text-orange-400 uppercase tracking-wide mb-8 mt-auto">
@@ -491,7 +496,7 @@ export default function ImportsPage() {
               >
                 Upload Lead List
               </button>
-              <p className="text-center text-[10px] text-slate-500 mt-2">Paste, CSV, or raw text</p>
+              <p className="text-center text-[10px] text-secondary mt-2">Paste, CSV, or raw text</p>
             </div>
           </div>
         </div>
@@ -501,12 +506,12 @@ export default function ImportsPage() {
       {phase === 'idle' && uploadType && (
         <div className="space-y-6">
           <div className="flex items-center gap-3">
-            <button onClick={() => setUploadType(null)} className="text-slate-400 hover:text-white transition-colors">
+            <button onClick={() => setUploadType(null)} className="text-secondary hover:text-white transition-colors">
               <MaterialIcon icon="arrow_back" className="text-[20px]" />
             </button>
             <div className="flex items-center gap-2">
-              <MaterialIcon icon={uploadType === 'context' ? 'layers' : 'target'} className={`text-[20px] ${uploadType === 'context' ? 'text-indigo-400' : 'text-orange-400'}`} />
-              <h2 className="text-sm uppercase tracking-widest font-black text-slate-200">
+              <MaterialIcon icon={uploadType === 'context' ? 'layers' : 'target'} className={`text-[20px] ${uploadType === 'context' ? 'text-primary' : 'text-orange-400'}`} />
+              <h2 className="text-sm uppercase tracking-widest font-black text-on-surface">
                 {uploadType === 'context' ? 'Upload Market Snapshot' : 'Upload Lead List'}
               </h2>
             </div>
@@ -519,7 +524,7 @@ export default function ImportsPage() {
                 'group relative flex flex-col items-center justify-center border-2 border-dashed rounded-2xl p-12 transition-all cursor-pointer',
                 dragActive
                   ? (uploadType === 'context' ? 'border-indigo-500 bg-indigo-500/5' : 'border-orange-500 bg-orange-500/5')
-                  : 'border-slate-600/30 hover:border-slate-400/50 bg-[#070d1f]'
+                  : 'border-outline-variant/30 hover:border-outline-variant/50 bg-surface-container-lowest'
               )}
               onClick={() => fileRef.current?.click()}
               onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
@@ -535,24 +540,24 @@ export default function ImportsPage() {
                 const file = e.target.files?.[0];
                 if (file) handleFile(file);
               }} />
-              <div className="w-16 h-16 rounded-full bg-slate-700/50 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                <MaterialIcon icon="cloud_upload" className={`text-[32px] ${uploadType === 'context' ? 'text-indigo-400' : 'text-orange-400'}`} />
+              <div className="w-16 h-16 rounded-full bg-surface-container/50 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                <MaterialIcon icon="cloud_upload" className={`text-[32px] ${uploadType === 'context' ? 'text-primary' : 'text-orange-400'}`} />
               </div>
-              <p className="text-xl font-semibold text-slate-200 mb-2">Drop CSV or Excel</p>
-              <p className="text-sm text-slate-500 mb-6">
+              <p className="text-xl font-semibold text-on-surface mb-2">Drop CSV or Excel</p>
+              <p className="text-sm text-secondary mb-6">
                 {uploadType === 'context' ? 'MLS exports, recent solds, active listings' : 'PropWire, BatchLeads, county records, any format'}
               </p>
-              <button className="bg-slate-700/50 text-slate-200 px-6 py-2 rounded-lg font-medium border border-white/10 hover:bg-slate-600/50 transition-colors text-sm">
+              <button className="bg-surface-container/50 text-on-surface px-6 py-2 rounded-lg font-medium border border-card-border hover:bg-surface-container transition-colors text-sm">
                 Select File
               </button>
             </div>
 
             {/* Smart Paste */}
-            <div className="flex flex-col bg-[#151b2d] rounded-2xl p-8 border border-white/5">
+            <div className="flex flex-col bg-card rounded-2xl p-8 border border-card-border">
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-2">
                   <MaterialIcon icon="auto_awesome" className="text-[20px] text-orange-400" />
-                  <h3 className="text-sm font-bold uppercase tracking-widest text-slate-300">Smart Paste</h3>
+                  <h3 className="text-sm font-bold uppercase tracking-widest text-on-surface-variant">Smart Paste</h3>
                 </div>
                 <span className="text-[10px] bg-orange-500/10 text-orange-400 px-2 py-0.5 rounded font-bold">AI</span>
               </div>
@@ -560,13 +565,13 @@ export default function ImportsPage() {
                 value={pasteText}
                 onChange={(e) => setPasteText(e.target.value)}
                 rows={8}
-                className="flex-1 bg-[#070d1f] border-none rounded-lg p-4 font-mono text-xs text-slate-300 focus:ring-1 focus:ring-indigo-500 resize-none placeholder:text-slate-600"
+                className="flex-1 bg-surface-container-lowest border-none rounded-lg p-4 font-mono text-xs text-on-surface-variant focus:ring-1 focus:ring-primary resize-none placeholder:text-secondary"
                 placeholder={"Paste address chunks, MLS snippets, or unstructured text...\n\n123 Alpine Way, Boulder CO $1.2M\n09/12/23 - New listing: 455 Sunset Blvd, LA..."}
               />
               <button
                 onClick={handlePaste}
                 disabled={!pasteText.trim() || aiParsing}
-                className="mt-4 text-indigo-400 text-xs font-bold flex items-center gap-1 hover:gap-2 transition-all disabled:opacity-50"
+                className="mt-4 text-primary text-xs font-bold flex items-center gap-1 hover:gap-2 transition-all disabled:opacity-50"
               >
                 {aiParsing ? 'ANALYZING...' : 'PARSE SNIPPET'} <MaterialIcon icon="arrow_forward" className="text-xs" />
               </button>
@@ -578,9 +583,9 @@ export default function ImportsPage() {
       {/* ═══ DETECTING: Loading ═══ */}
       {phase === 'detecting' && (
         <div className="flex flex-col items-center justify-center py-20">
-          <div className="h-12 w-12 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent mb-4" />
-          <p className="text-lg font-bold text-slate-200">Analyzing your data...</p>
-          <p className="text-sm text-slate-500 mt-1">Auto-detecting columns and format</p>
+          <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent mb-4" />
+          <p className="text-lg font-bold text-on-surface">Analyzing your data...</p>
+          <p className="text-sm text-secondary mt-1">Auto-detecting columns and format</p>
         </div>
       )}
 
@@ -590,48 +595,48 @@ export default function ImportsPage() {
           {/* Ready bar */}
           <div className="flex items-end justify-between">
             <div className="space-y-1">
-              <span className="text-[10px] font-bold text-indigo-400 tracking-[0.2em] uppercase">Data Preview</span>
-              <h2 className="text-3xl font-headline font-bold text-slate-100">Ready to Import</h2>
+              <span className="text-[10px] font-bold text-primary tracking-[0.2em] uppercase">Data Preview</span>
+              <h2 className="text-3xl font-headline font-bold text-on-surface">Ready to Import</h2>
             </div>
-            <div className="bg-slate-800/60 border border-indigo-500/20 px-6 py-3 rounded-full flex items-center gap-6">
+            <div className="bg-surface-container/60 border border-primary/20 px-6 py-3 rounded-full flex items-center gap-6">
               <div className="flex items-center gap-2">
-                <MaterialIcon icon="check_circle" className="text-[16px] text-indigo-400" />
-                <span className="text-sm font-semibold text-slate-200">{rows.length} Rows Detected</span>
+                <MaterialIcon icon="check_circle" className="text-[16px] text-primary" />
+                <span className="text-sm font-semibold text-on-surface">{rows.length} Rows Detected</span>
               </div>
-              <div className="h-4 w-px bg-slate-600" />
+              <div className="h-4 w-px bg-outline-variant" />
               <div className="flex items-center gap-2">
-                <span className="text-xs text-slate-500 uppercase tracking-wider">Format:</span>
-                <span className="text-xs font-bold text-slate-200 uppercase">{formatLabel}</span>
+                <span className="text-xs text-secondary uppercase tracking-wider">Format:</span>
+                <span className="text-xs font-bold text-on-surface uppercase">{formatLabel}</span>
               </div>
-              <button onClick={reset} className="text-xs text-slate-500 hover:text-red-400 transition-colors ml-2">Clear</button>
+              <button onClick={reset} className="text-xs text-secondary hover:text-red-400 transition-colors ml-2">Clear</button>
             </div>
           </div>
 
           {/* Field grid */}
           <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
             {mappedFields.map((f) => (
-              <div key={f.systemField} className="bg-slate-900/50 p-4 rounded-xl border border-white/5 flex flex-col gap-2">
-                <MaterialIcon icon="task_alt" className="text-[14px] text-indigo-400" />
-                <span className="text-[10px] font-bold text-slate-500 uppercase">{f.systemField.replace(/_/g, ' ')}</span>
-                <span className="text-xs text-slate-300 truncate">{f.sampleValue || '—'}</span>
+              <div key={f.systemField} className="bg-surface/50 p-4 rounded-xl border border-card-border flex flex-col gap-2">
+                <MaterialIcon icon="task_alt" className="text-[14px] text-primary" />
+                <span className="text-[10px] font-bold text-secondary uppercase">{f.systemField.replace(/_/g, ' ')}</span>
+                <span className="text-xs text-on-surface-variant truncate">{f.sampleValue || '—'}</span>
               </div>
             ))}
           </div>
 
           {/* Preview table */}
-          <div className="bg-slate-900/50 rounded-2xl border border-white/5 overflow-hidden">
+          <div className="bg-surface/50 rounded-2xl border border-card-border overflow-hidden">
             <div className="overflow-x-auto max-h-64">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="bg-slate-800/50 border-b border-white/5">
+                  <tr className="bg-surface-container/50 border-b border-card-border">
                     {mappedFields.slice(0, 6).map((f) => (
-                      <th key={f.systemField} className="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">{f.systemField.replace(/_/g, ' ')}</th>
+                      <th key={f.systemField} className="px-6 py-4 text-[10px] font-bold text-secondary uppercase tracking-widest">{f.systemField.replace(/_/g, ' ')}</th>
                     ))}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-white/5">
+                <tbody className="divide-y divide-card-border">
                   {rows.slice(0, 10).map((row, i) => (
-                    <tr key={i} className="hover:bg-slate-800/30 transition-colors">
+                    <tr key={i} className="hover:bg-surface-container/30 transition-colors">
                       {mappedFields.slice(0, 6).map((f) => {
                         let val = '';
                         if (f.csvHeader.includes(' + ')) {
@@ -639,7 +644,7 @@ export default function ImportsPage() {
                         } else {
                           val = row[f.csvHeader] || '';
                         }
-                        return <td key={f.systemField} className="px-6 py-3 text-xs text-slate-300 truncate max-w-[150px]">{val}</td>;
+                        return <td key={f.systemField} className="px-6 py-3 text-xs text-on-surface-variant truncate max-w-[150px]">{val}</td>;
                       })}
                     </tr>
                   ))}
@@ -666,15 +671,15 @@ export default function ImportsPage() {
             <div className="flex justify-between items-end">
               <div className="space-y-1">
                 <span className="text-[10px] font-bold text-orange-400 tracking-[0.2em] uppercase">Live Processing</span>
-                <h2 className="text-3xl font-headline font-bold text-slate-100">
+                <h2 className="text-3xl font-headline font-bold text-on-surface">
                   {phase === 'geocoding' ? 'Geocoding & Mapping' : 'Importing Data'}
                 </h2>
               </div>
-              <span className="text-sm font-bold text-indigo-400">
+              <span className="text-sm font-bold text-primary">
                 {progress} / {phase === 'geocoding' ? rows.length : rows.length} Properties
               </span>
             </div>
-            <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden">
+            <div className="h-2 w-full bg-surface-container rounded-full overflow-hidden">
               <div
                 className="h-full bg-gradient-to-r from-indigo-500 to-indigo-400 transition-all duration-300"
                 style={{ width: `${rows.length > 0 ? (progress / rows.length) * 100 : 0}%` }}
@@ -683,14 +688,14 @@ export default function ImportsPage() {
           </div>
 
           {phase === 'geocoding' && geocodedPins.length > 0 && (
-            <div className="relative h-[400px] rounded-3xl overflow-hidden border border-white/5">
+            <div className="relative h-[400px] rounded-3xl overflow-hidden border border-card-border">
               <ImportMiniMap pins={geocodedPins} />
-              <div className="absolute top-4 left-4 bg-slate-900/80 backdrop-blur p-3 rounded-xl border border-white/10">
+              <div className="absolute top-4 left-4 bg-surface/80 backdrop-blur p-3 rounded-xl border border-card-border">
                 <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse" />
-                  <span className="text-xs font-bold text-slate-200 uppercase tracking-wider">Live Geocoding</span>
+                  <div className="w-2 h-2 bg-primary rounded-full animate-pulse" />
+                  <span className="text-xs font-bold text-on-surface uppercase tracking-wider">Live Geocoding</span>
                 </div>
-                <p className="text-[10px] text-slate-500 mt-1 font-mono">{geocodedPins.length} pins placed</p>
+                <p className="text-[10px] text-secondary mt-1 font-mono">{geocodedPins.length} pins placed</p>
               </div>
             </div>
           )}
@@ -703,7 +708,7 @@ export default function ImportsPage() {
           {/* Left: Map */}
           <div className="lg:col-span-7">
             {geocodedPins.length > 0 && (
-              <div className="relative h-[400px] rounded-3xl overflow-hidden border border-white/5">
+              <div className="relative h-[400px] rounded-3xl overflow-hidden border border-card-border">
                 <ImportMiniMap pins={geocodedPins} />
               </div>
             )}
@@ -711,21 +716,21 @@ export default function ImportsPage() {
 
           {/* Right: Summary */}
           <div className="lg:col-span-5">
-            <div className="bg-slate-800/30 p-8 rounded-3xl border border-white/5">
-              <h3 className="text-lg font-bold text-slate-100 mb-8">Import Summary</h3>
+            <div className="bg-surface-container/30 p-8 rounded-3xl border border-card-border">
+              <h3 className="text-lg font-bold text-on-surface mb-8">Import Summary</h3>
               <div className="space-y-6">
                 {result.inserted > 0 && (
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-full bg-indigo-500/10 flex items-center justify-center">
-                        <MaterialIcon icon="add" className="text-[20px] text-indigo-400" />
+                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                        <MaterialIcon icon="add" className="text-[20px] text-primary" />
                       </div>
                       <div>
-                        <p className="text-xs font-bold text-slate-200">New Records</p>
-                        <p className="text-[10px] text-slate-500">Inserted into database</p>
+                        <p className="text-xs font-bold text-on-surface">New Records</p>
+                        <p className="text-[10px] text-secondary">Inserted into database</p>
                       </div>
                     </div>
-                    <span className="text-xl font-headline font-extrabold text-slate-100">{result.inserted}</span>
+                    <span className="text-xl font-headline font-extrabold text-on-surface">{result.inserted}</span>
                   </div>
                 )}
                 {result.updated > 0 && (
@@ -735,11 +740,11 @@ export default function ImportsPage() {
                         <MaterialIcon icon="update" className="text-[20px] text-violet-400" />
                       </div>
                       <div>
-                        <p className="text-xs font-bold text-slate-200">Updated</p>
-                        <p className="text-[10px] text-slate-500">Existing records enriched</p>
+                        <p className="text-xs font-bold text-on-surface">Updated</p>
+                        <p className="text-[10px] text-secondary">Existing records enriched</p>
                       </div>
                     </div>
-                    <span className="text-xl font-headline font-extrabold text-slate-100">{result.updated}</span>
+                    <span className="text-xl font-headline font-extrabold text-on-surface">{result.updated}</span>
                   </div>
                 )}
                 {result.geocoded > 0 && (
@@ -749,11 +754,11 @@ export default function ImportsPage() {
                         <MaterialIcon icon="location_on" className="text-[20px] text-orange-400" />
                       </div>
                       <div>
-                        <p className="text-xs font-bold text-slate-200">Pinpointed</p>
-                        <p className="text-[10px] text-slate-500">High-confidence geocode</p>
+                        <p className="text-xs font-bold text-on-surface">Pinpointed</p>
+                        <p className="text-[10px] text-secondary">High-confidence geocode</p>
                       </div>
                     </div>
-                    <span className="text-xl font-headline font-extrabold text-slate-100">{result.geocoded}</span>
+                    <span className="text-xl font-headline font-extrabold text-on-surface">{result.geocoded}</span>
                   </div>
                 )}
                 {result.errors > 0 && (
@@ -763,21 +768,21 @@ export default function ImportsPage() {
                         <MaterialIcon icon="error" className="text-[20px] text-red-400" />
                       </div>
                       <div>
-                        <p className="text-xs font-bold text-slate-200">Errors</p>
-                        <p className="text-[10px] text-slate-500">Could not process</p>
+                        <p className="text-xs font-bold text-on-surface">Errors</p>
+                        <p className="text-[10px] text-secondary">Could not process</p>
                       </div>
                     </div>
-                    <span className="text-xl font-headline font-extrabold text-slate-100">{result.errors}</span>
+                    <span className="text-xl font-headline font-extrabold text-on-surface">{result.errors}</span>
                   </div>
                 )}
               </div>
 
-              <div className="mt-10 pt-8 border-t border-white/5 space-y-3">
+              <div className="mt-10 pt-8 border-t border-card-border space-y-3">
                 <a href="/map" className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-500 to-indigo-600 text-white py-3 rounded-xl font-bold text-sm shadow-lg shadow-indigo-500/20 hover:shadow-xl transition-all">
                   <MaterialIcon icon="map" className="text-[18px]" />
                   Finish &amp; View Map
                 </a>
-                <button onClick={reset} className="w-full text-slate-500 py-3 rounded-xl font-bold text-sm hover:text-slate-300 transition-colors">
+                <button onClick={reset} className="w-full text-secondary py-3 rounded-xl font-bold text-sm hover:text-on-surface-variant transition-colors">
                   Import Another
                 </button>
               </div>
@@ -786,14 +791,14 @@ export default function ImportsPage() {
             {/* Overage / Upgrade prompt */}
             {overagePrompt && overagePrompt.isFree && (
               <div className="mt-6 rounded-2xl bg-gradient-to-br from-indigo-900/50 to-blue-900/50 border border-indigo-500/30 p-8 text-center">
-                <MaterialIcon icon="lock_open" className="text-[40px] text-indigo-400 mb-3" />
-                <h4 className="font-headline text-xl font-extrabold text-slate-100 mb-2">
+                <MaterialIcon icon="lock_open" className="text-[40px] text-primary mb-3" />
+                <h4 className="font-headline text-xl font-extrabold text-on-surface mb-2">
                   You&apos;ve used your 50 free geocodes
                 </h4>
-                <p className="text-sm text-slate-400 mb-2">
+                <p className="text-sm text-secondary mb-2">
                   {overagePrompt.remaining} properties imported but not yet mapped.
                 </p>
-                <p className="text-sm text-slate-500 mb-6">
+                <p className="text-sm text-secondary mb-6">
                   Subscribe to unlock 500+ geocodes/month and more.
                 </p>
                 <a
@@ -803,7 +808,7 @@ export default function ImportsPage() {
                   <MaterialIcon icon="upgrade" className="text-[20px]" />
                   Subscribe — $49/mo
                 </a>
-                <p className="text-xs text-slate-600 mt-3">Cancel anytime. Your data is saved.</p>
+                <p className="text-xs text-secondary mt-3">Cancel anytime. Your data is saved.</p>
               </div>
             )}
 
@@ -818,6 +823,7 @@ export default function ImportsPage() {
                 <p className="text-sm text-amber-300/70 mb-4">
                   Monthly limit reached. Properties saved but not mapped.
                 </p>
+
                 <div className="flex flex-col sm:flex-row gap-3">
                   <button
                     onClick={async () => {
@@ -848,7 +854,7 @@ export default function ImportsPage() {
                   </button>
                   <a
                     href="/subscribe"
-                    className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-indigo-600 text-white py-3 font-bold text-sm hover:bg-indigo-700 transition-colors"
+                    className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-primary text-white py-3 font-bold text-sm hover:bg-primary/90 transition-colors"
                   >
                     <MaterialIcon icon="upgrade" className="text-[18px]" />
                     Upgrade

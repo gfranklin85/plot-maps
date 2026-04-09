@@ -2,17 +2,98 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─── Light Theme ─── */
 :root {
-  --primary: #0058be;
-  --primary-container: #2170e4;
-  --surface: #0c1324;
-  --on-surface: #dce1fb;
+  --color-primary: 0 88 190;
+  --color-primary-container: 33 112 228;
+  --color-primary-fixed: 216 226 255;
+  --color-primary-fixed-dim: 173 198 255;
+  --color-on-primary: 255 255 255;
+  --color-on-primary-container: 254 252 255;
+
+  --color-surface: 248 249 255;
+  --color-surface-dim: 203 219 245;
+  --color-surface-bright: 248 249 255;
+  --color-surface-container: 229 238 255;
+  --color-surface-container-lowest: 255 255 255;
+  --color-surface-container-low: 239 244 255;
+  --color-surface-container-high: 220 233 255;
+  --color-surface-container-highest: 211 228 254;
+  --color-surface-variant: 211 228 254;
+  --color-surface-tint: 0 90 194;
+
+  --color-on-surface: 26 28 32;
+  --color-on-surface-variant: 66 71 84;
+
+  --color-secondary: 84 95 115;
+  --color-secondary-container: 213 224 248;
+  --color-on-secondary: 255 255 255;
+  --color-on-secondary-container: 88 99 119;
+
+  --color-outline: 114 119 133;
+  --color-outline-variant: 194 198 214;
+
+  --color-inverse-surface: 33 49 69;
+  --color-inverse-on-surface: 234 241 255;
+
+  --color-background: 248 249 255;
+  --color-on-background: 26 28 32;
+
+  --color-card: 255 255 255;
+  --color-card-border: 226 232 240;
+  --color-card-border-hover: 129 140 248;
+  --color-input-bg: 241 245 249;
+  --color-input-border: 226 232 240;
+}
+
+/* ─── Dark Theme ─── */
+.dark {
+  --color-primary: 79 70 229;
+  --color-primary-container: 79 70 229;
+  --color-primary-fixed: 216 226 255;
+  --color-primary-fixed-dim: 173 198 255;
+  --color-on-primary: 255 255 255;
+  --color-on-primary-container: 254 252 255;
+
+  --color-surface: 12 19 36;
+  --color-surface-dim: 8 13 26;
+  --color-surface-bright: 30 37 56;
+  --color-surface-container: 21 27 45;
+  --color-surface-container-lowest: 21 27 45;
+  --color-surface-container-low: 17 24 39;
+  --color-surface-container-high: 30 37 56;
+  --color-surface-container-highest: 37 44 63;
+  --color-surface-variant: 37 44 63;
+  --color-surface-tint: 79 70 229;
+
+  --color-on-surface: 220 225 251;
+  --color-on-surface-variant: 156 163 180;
+
+  --color-secondary: 156 163 180;
+  --color-secondary-container: 37 44 63;
+  --color-on-secondary: 220 225 251;
+  --color-on-secondary-container: 156 163 180;
+
+  --color-outline: 70 69 85;
+  --color-outline-variant: 70 69 85;
+
+  --color-inverse-surface: 220 225 251;
+  --color-inverse-on-surface: 12 19 36;
+
+  --color-background: 12 19 36;
+  --color-on-background: 220 225 251;
+
+  --color-card: 21 27 45;
+  --color-card-border: 70 69 85;
+  --color-card-border-hover: 79 70 229;
+  --color-input-bg: 12 19 36;
+  --color-input-border: 70 69 85;
 }
 
 body {
   font-family: "Inter", sans-serif;
-  background-color: var(--surface);
-  color: var(--on-surface);
+  background-color: rgb(var(--color-background));
+  color: rgb(var(--color-on-surface));
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -26,17 +107,17 @@ h1, h2, h3, h4, h5, h6 {
 
 @layer components {
   .glass-card {
-    background: rgba(255, 255, 255, 0.7);
+    background: rgb(var(--color-card) / 0.7);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
   }
 
   .action-gradient {
-    background: linear-gradient(135deg, #0058be 0%, #2170e4 100%);
+    background: linear-gradient(135deg, rgb(var(--color-primary)) 0%, rgb(var(--color-primary-container)) 100%);
   }
 
   .glass-panel {
-    background: rgba(255, 255, 255, 0.7);
+    background: rgb(var(--color-card) / 0.7);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
   }
@@ -49,6 +130,18 @@ h1, h2, h3, h4, h5, h6 {
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+/* Custom scrollbar for dark theme */
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: rgb(var(--color-surface));
+}
+::-webkit-scrollbar-thumb {
+  background: rgb(var(--color-outline));
+  border-radius: 10px;
 }
 
 /* Google Maps InfoWindow overrides */

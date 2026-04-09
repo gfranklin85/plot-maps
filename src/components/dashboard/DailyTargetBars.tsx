@@ -87,7 +87,7 @@ export default function DailyTargetBars({ targets, onUpdate }: Props) {
                 >
                   <MaterialIcon icon={bar.icon} className="text-[16px]" />
                 </div>
-                <span className="text-xs font-semibold uppercase tracking-widest text-slate-500">
+                <span className="text-xs font-semibold uppercase tracking-widest text-secondary">
                   {bar.label}
                 </span>
               </div>
@@ -109,7 +109,7 @@ export default function DailyTargetBars({ targets, onUpdate }: Props) {
                 <input
                   type="number"
                   min={0}
-                  className="w-14 rounded border border-slate-300 px-1.5 py-0.5 text-sm font-bold text-on-surface focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-14 rounded border border-input-border bg-input-bg px-1.5 py-0.5 text-sm font-bold text-on-surface focus:outline-none focus:ring-2 focus:ring-primary"
                   value={editValue}
                   onChange={(e) => setEditValue(e.target.value)}
                   onBlur={() => commitEdit(bar.targetKey)}

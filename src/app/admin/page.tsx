@@ -31,18 +31,18 @@ export default function AdminPage() {
 
   if (loading) {
     return (
-      <div className="h-[calc(100vh-4rem)] flex items-center justify-center bg-[#0c1324]">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent" />
+      <div className="h-[calc(100vh-4rem)] flex items-center justify-center bg-surface">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
       </div>
     );
   }
 
   if (error || !data) {
     return (
-      <div className="h-[calc(100vh-4rem)] flex items-center justify-center bg-[#0c1324]">
+      <div className="h-[calc(100vh-4rem)] flex items-center justify-center bg-surface">
         <div className="text-center">
           <p className="text-2xl font-bold text-red-400 mb-2">{error || 'Error'}</p>
-          <button onClick={() => router.push('/')} className="text-indigo-400 text-sm hover:underline">
+          <button onClick={() => router.push('/')} className="text-primary text-sm hover:underline">
             Back to Dashboard
           </button>
         </div>

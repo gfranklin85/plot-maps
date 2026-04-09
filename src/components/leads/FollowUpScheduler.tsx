@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Lead } from '@/types';
 import { cn, formatDate } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/lib/auth-context';
 import MaterialIcon from '@/components/ui/MaterialIcon';
 
 interface Props {
@@ -26,6 +27,7 @@ function addDays(days: number): string {
 }
 
 export default function FollowUpScheduler({ lead, onScheduled }: Props) {
+  const { user } = useAuth();
   const [selectedDate, setSelectedDate] = useState(
     lead.follow_up_date ? lead.follow_up_date.split('T')[0] : ''
   );
@@ -47,7 +49,8 @@ export default function FollowUpScheduler({ lead, onScheduled }: Props) {
       const { error: updateError } = await supabase
         .from('leads')
         .update({ follow_up_date: selectedDate })
-        .eq('id', lead.id);
+        .eq('id', lead.id)
+        .eq('user_id', user?.id);
       if (updateError) throw updateError;
 
       const { error: insertError } = await supabase.from('activities').insert({
@@ -72,7 +75,7 @@ export default function FollowUpScheduler({ lead, onScheduled }: Props) {
   }
 
   return (
-    <div className="rounded-2xl bg-surface-container-lowest p-5 border border-slate-100">
+    <div className="rounded-2xl bg-surface-container-lowest p-5 border border-card-border">
       {/* Header */}
       <div className="flex items-center gap-2 mb-4">
         <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-100">
@@ -104,7 +107,7 @@ export default function FollowUpScheduler({ lead, onScheduled }: Props) {
                 'rounded-xl px-3 py-1.5 text-xs font-semibold transition-all',
                 isSelected
                   ? 'bg-primary text-on-primary shadow-sm'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'
               )}
             >
               {opt.label}
@@ -144,7 +147,7 @@ export default function FollowUpScheduler({ lead, onScheduled }: Props) {
           'flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition-all',
           selectedDate && !saving
             ? 'action-gradient text-white shadow-sm hover:shadow-md'
-            : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+            : 'bg-surface-container text-on-surface-variant cursor-not-allowed'
         )}
       >
         {saving ? (

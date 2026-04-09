@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useProfile, type UserProfile } from '@/lib/profile-context';
+import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase';
 import MaterialIcon from '@/components/ui/MaterialIcon';
 
@@ -65,15 +66,24 @@ export default function SettingsPage() {
     }));
   }
 
+  const { user } = useAuth();
+
   async function handleReGeocode() {
     setGeocoding(true);
     setGeocodeResult(null);
 
+    if (!user) {
+      setGeocodeResult({ total: 0, geocoded: 0 });
+      setGeocoding(false);
+      return;
+    }
+
     try {
-      // Fetch leads with missing coordinates
+      // Fetch leads with missing coordinates for the current user only
       const { data: leads } = await supabase
         .from('leads')
         .select('id, property_address, city, state, zip')
+        .eq('user_id', user.id)
         .is('latitude', null)
         .not('property_address', 'is', null);
 
@@ -103,7 +113,10 @@ export default function SettingsPage() {
             const data = await res.json();
             const geoArr = Array.isArray(data) ? data : data.results ?? [];
 
-            for (const geo of geoArr) {
+            for (let j = 0; j < Math.min(geoArr.length, chunk.length); j++) {
+              const geo = geoArr[j];
+              const lead = chunk[j];
+
               if (geo.lat && geo.lng && geo.address) {
                 await supabase
                   .from('leads')
@@ -112,7 +125,8 @@ export default function SettingsPage() {
                     longitude: geo.lng,
                     geocoded_at: new Date().toISOString(),
                   })
-                  .ilike('property_address', `%${geo.address.split(',')[0]}%`);
+                  .eq('id', lead.id)
+                  .eq('user_id', user.id);
                 geocoded++;
               }
             }
@@ -134,75 +148,75 @@ export default function SettingsPage() {
     <div className="p-8 max-w-4xl mx-auto space-y-8">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-slate-900 font-headline">Settings</h1>
-        <p className="text-sm text-slate-500 mt-1">Manage your profile and preferences</p>
+        <h1 className="text-2xl font-bold text-on-surface font-headline">Settings</h1>
+        <p className="text-sm text-secondary mt-1">Manage your profile and preferences</p>
       </div>
 
       {/* Profile Section */}
       <section className="glass-card rounded-2xl p-6 space-y-6">
         <div className="flex items-center gap-3 mb-2">
-          <MaterialIcon icon="person" className="text-blue-600" />
-          <h2 className="text-lg font-bold text-slate-900 font-headline">Profile</h2>
+          <MaterialIcon icon="person" className="text-primary" />
+          <h2 className="text-lg font-bold text-on-surface font-headline">Profile</h2>
         </div>
 
         <div className="flex items-center gap-6 mb-6">
-          <div className="w-16 h-16 rounded-full bg-blue-600 flex items-center justify-center text-white text-xl font-bold shrink-0">
+          <div className="w-16 h-16 rounded-full bg-primary flex items-center justify-center text-white text-xl font-bold shrink-0">
             {initials}
           </div>
-          <div className="text-sm text-slate-500">
+          <div className="text-sm text-secondary">
             Your initials are auto-generated from your name.
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Full Name</label>
+            <label className="block text-sm font-medium text-on-surface mb-1">Full Name</label>
             <input
               type="text"
               value={form.fullName}
               onChange={(e) => handleChange('fullName', e.target.value)}
               placeholder="Your full name"
-              className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
+              className="w-full px-4 py-2.5 rounded-xl bg-input-bg border border-card-border text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Title / Role</label>
+            <label className="block text-sm font-medium text-on-surface mb-1">Title / Role</label>
             <input
               type="text"
               value={form.title}
               onChange={(e) => handleChange('title', e.target.value)}
               placeholder="e.g. Senior Agent"
-              className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
+              className="w-full px-4 py-2.5 rounded-xl bg-input-bg border border-card-border text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
+            <label className="block text-sm font-medium text-on-surface mb-1">Email</label>
             <input
               type="email"
               value={form.email}
               onChange={(e) => handleChange('email', e.target.value)}
               placeholder="you@example.com"
-              className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
+              className="w-full px-4 py-2.5 rounded-xl bg-input-bg border border-card-border text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Phone</label>
+            <label className="block text-sm font-medium text-on-surface mb-1">Phone</label>
             <input
               type="tel"
               value={form.phone}
               onChange={(e) => handleChange('phone', e.target.value)}
               placeholder="(555) 123-4567"
-              className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
+              className="w-full px-4 py-2.5 rounded-xl bg-input-bg border border-card-border text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
             />
           </div>
           <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-slate-700 mb-1">Company</label>
+            <label className="block text-sm font-medium text-on-surface mb-1">Company</label>
             <input
               type="text"
               value={form.company}
               onChange={(e) => handleChange('company', e.target.value)}
               placeholder="Your brokerage or company name"
-              className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
+              className="w-full px-4 py-2.5 rounded-xl bg-input-bg border border-card-border text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
             />
           </div>
         </div>
@@ -214,12 +228,12 @@ export default function SettingsPage() {
       {/* Map Preferences */}
       <section className="glass-card rounded-2xl p-6 space-y-4">
         <div className="flex items-center gap-3 mb-2">
-          <MaterialIcon icon="map" className="text-blue-600" />
-          <h2 className="text-lg font-bold text-slate-900 font-headline">Map Preferences</h2>
+          <MaterialIcon icon="map" className="text-primary" />
+          <h2 className="text-lg font-bold text-on-surface font-headline">Map Preferences</h2>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">Default Map Type</label>
+          <label className="block text-sm font-medium text-on-surface mb-2">Default Map Type</label>
           <div className="flex gap-3">
             {(['roadmap', 'satellite', 'hybrid'] as const).map((type) => (
               <button
@@ -227,8 +241,8 @@ export default function SettingsPage() {
                 onClick={() => setForm((prev) => ({ ...prev, defaultMapType: type }))}
                 className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
                   form.defaultMapType === type
-                    ? 'bg-blue-600 text-white shadow-md'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    ? 'bg-primary text-white shadow-md'
+                    : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'
                 }`}
               >
                 {type.charAt(0).toUpperCase() + type.slice(1)}
@@ -238,8 +252,8 @@ export default function SettingsPage() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">Default Map Center</label>
-          <p className="text-xs text-slate-500 mb-2">
+          <label className="block text-sm font-medium text-on-surface mb-2">Default Map Center</label>
+          <p className="text-xs text-secondary mb-2">
             Search for a city or address to set where the map opens by default.
           </p>
           <MapCenterAutocomplete
@@ -251,7 +265,7 @@ export default function SettingsPage() {
           />
           {form.defaultMapCenter && (
             <div className="flex items-center gap-2 mt-2">
-              <span className="text-xs text-slate-500">
+              <span className="text-xs text-secondary">
                 Current: {mapCenterAddress || `${form.defaultMapCenter.lat.toFixed(4)}, ${form.defaultMapCenter.lng.toFixed(4)}`}
               </span>
               <button
@@ -268,17 +282,17 @@ export default function SettingsPage() {
       {/* Opening Script */}
       <section className="glass-card rounded-2xl p-6 space-y-4">
         <div className="flex items-center gap-3 mb-2">
-          <MaterialIcon icon="record_voice_over" className="text-blue-600" />
-          <h2 className="text-lg font-bold text-slate-900 font-headline">Opening Script</h2>
+          <MaterialIcon icon="record_voice_over" className="text-primary" />
+          <h2 className="text-lg font-bold text-on-surface font-headline">Opening Script</h2>
         </div>
-        <p className="text-xs text-slate-500">
-          This script appears on map popups and lead pages. Use placeholders: <code className="bg-slate-100 px-1 rounded">{'{name}'}</code> for owner name, <code className="bg-slate-100 px-1 rounded">{'{street}'}</code> for street address, <code className="bg-slate-100 px-1 rounded">{'{value}'}</code> for estimated value.
+        <p className="text-xs text-secondary">
+          This script appears on map popups and lead pages. Use placeholders: <code className="bg-surface-container px-1 rounded">{'{name}'}</code> for owner name, <code className="bg-surface-container px-1 rounded">{'{street}'}</code> for street address, <code className="bg-surface-container px-1 rounded">{'{value}'}</code> for estimated value.
         </p>
         <textarea
           value={form.openingScript}
           onChange={(e) => setForm((prev) => ({ ...prev, openingScript: e.target.value }))}
           rows={10}
-          className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 font-mono leading-relaxed"
+          className="w-full px-4 py-3 rounded-xl bg-input-bg border border-card-border text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-mono leading-relaxed"
         />
       </section>
 
@@ -291,8 +305,8 @@ export default function SettingsPage() {
       {/* Notifications */}
       <section className="glass-card rounded-2xl p-6 space-y-4">
         <div className="flex items-center gap-3 mb-2">
-          <MaterialIcon icon="notifications" className="text-blue-600" />
-          <h2 className="text-lg font-bold text-slate-900 font-headline">Notifications</h2>
+          <MaterialIcon icon="notifications" className="text-primary" />
+          <h2 className="text-lg font-bold text-on-surface font-headline">Notifications</h2>
         </div>
 
         {([
@@ -302,13 +316,13 @@ export default function SettingsPage() {
         ]).map(({ key, label, desc }) => (
           <div key={key} className="flex items-center justify-between py-2">
             <div>
-              <p className="text-sm font-medium text-slate-800">{label}</p>
-              <p className="text-xs text-slate-500">{desc}</p>
+              <p className="text-sm font-medium text-on-surface">{label}</p>
+              <p className="text-xs text-secondary">{desc}</p>
             </div>
             <button
               onClick={() => handleNotificationToggle(key)}
               className={`relative w-11 h-6 rounded-full transition-colors ${
-                form.notifications[key] ? 'bg-blue-600' : 'bg-slate-300'
+                form.notifications[key] ? 'bg-primary' : 'bg-outline-variant'
               }`}
             >
               <span
@@ -324,22 +338,22 @@ export default function SettingsPage() {
       {/* Call Scripts */}
       <section className="glass-card rounded-2xl p-6 space-y-4">
         <div className="flex items-center gap-3 mb-2">
-          <MaterialIcon icon="checklist" className="text-blue-600" />
-          <h2 className="text-lg font-bold text-slate-900 font-headline">Call Scripts</h2>
+          <MaterialIcon icon="checklist" className="text-primary" />
+          <h2 className="text-lg font-bold text-on-surface font-headline">Call Scripts</h2>
         </div>
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-secondary">
           Configure the questions shown on each lead&apos;s detail page during calls. Questions are grouped by property type.
         </p>
 
         {callScripts.map((script) => (
-          <div key={script.id} className="border border-slate-200 rounded-xl p-4">
+          <div key={script.id} className="border border-card-border rounded-xl p-4">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-bold text-slate-800 capitalize">
+              <h3 className="text-sm font-bold text-on-surface capitalize">
                 {script.category.replace('_', ' ')}
               </h3>
               <button
                 onClick={() => setEditingScript(editingScript === script.id ? null : script.id)}
-                className="text-xs text-blue-600 hover:underline"
+                className="text-xs text-primary hover:underline"
               >
                 {editingScript === script.id ? 'Done' : 'Edit'}
               </button>
@@ -350,8 +364,8 @@ export default function SettingsPage() {
                 .sort((a, b) => a.order - b.order)
                 .map((q, idx) => (
                   <div key={idx} className="flex items-center gap-2">
-                    <span className="text-xs text-slate-400 w-5">{idx + 1}.</span>
-                    <span className="text-sm text-slate-700 flex-1">{q.question}</span>
+                    <span className="text-xs text-on-surface-variant w-5">{idx + 1}.</span>
+                    <span className="text-sm text-on-surface flex-1">{q.question}</span>
                     {editingScript === script.id && (
                       <button
                         onClick={() => removeQuestion(script.id, idx)}
@@ -372,11 +386,11 @@ export default function SettingsPage() {
                   onChange={(e) => setNewQuestion(e.target.value)}
                   placeholder="Add a question..."
                   onKeyDown={(e) => e.key === 'Enter' && addQuestion(script.id)}
-                  className="flex-1 px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  className="flex-1 px-3 py-1.5 rounded-lg bg-input-bg border border-card-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
                 />
                 <button
                   onClick={() => addQuestion(script.id)}
-                  className="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700"
+                  className="px-3 py-1.5 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary/90"
                 >
                   Add
                 </button>
@@ -386,7 +400,7 @@ export default function SettingsPage() {
         ))}
 
         {callScripts.length === 0 && (
-          <p className="text-sm text-slate-500 italic">
+          <p className="text-sm text-secondary italic">
             No call scripts configured yet. They will be created when the database tables are set up.
           </p>
         )}
@@ -395,25 +409,25 @@ export default function SettingsPage() {
       {/* Data Management */}
       <section className="glass-card rounded-2xl p-6 space-y-4">
         <div className="flex items-center gap-3 mb-2">
-          <MaterialIcon icon="database" className="text-blue-600" />
-          <h2 className="text-lg font-bold text-slate-900 font-headline">Data Management</h2>
+          <MaterialIcon icon="database" className="text-primary" />
+          <h2 className="text-lg font-bold text-on-surface font-headline">Data Management</h2>
         </div>
 
         <div className="flex items-center justify-between py-2">
           <div>
-            <p className="text-sm font-medium text-slate-800">Re-geocode Missing Leads</p>
-            <p className="text-xs text-slate-500">
+            <p className="text-sm font-medium text-on-surface">Re-geocode Missing Leads</p>
+            <p className="text-xs text-secondary">
               Find leads without map coordinates and geocode their addresses
             </p>
           </div>
           <button
             onClick={handleReGeocode}
             disabled={geocoding}
-            className="px-4 py-2 rounded-xl text-sm font-medium bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors disabled:opacity-50"
+            className="px-4 py-2 rounded-xl text-sm font-medium bg-surface-container text-on-surface hover:bg-surface-container-high transition-colors disabled:opacity-50"
           >
             {geocoding ? (
               <span className="flex items-center gap-2">
-                <span className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
+                <span className="w-4 h-4 border-2 border-on-surface-variant border-t-transparent rounded-full animate-spin" />
                 Processing...
               </span>
             ) : (
@@ -423,7 +437,7 @@ export default function SettingsPage() {
         </div>
 
         {geocodeResult && (
-          <div className="text-sm px-4 py-3 rounded-xl bg-blue-50 text-blue-800">
+          <div className="text-sm px-4 py-3 rounded-xl bg-primary/10 text-primary">
             {geocodeResult.total === 0
               ? 'All leads already have coordinates.'
               : `Found ${geocodeResult.total} leads without coordinates. Successfully geocoded ${geocodeResult.geocoded}.`}
@@ -434,8 +448,8 @@ export default function SettingsPage() {
       {/* Integrations */}
       <section className="glass-card rounded-2xl p-6 space-y-4">
         <div className="flex items-center gap-3 mb-2">
-          <MaterialIcon icon="extension" className="text-blue-600" />
-          <h2 className="text-lg font-bold text-slate-900 font-headline">Integrations</h2>
+          <MaterialIcon icon="extension" className="text-primary" />
+          <h2 className="text-lg font-bold text-on-surface font-headline">Integrations</h2>
         </div>
 
         <div className="space-y-3">
@@ -448,8 +462,8 @@ export default function SettingsPage() {
           ].map(({ name, icon, status }) => (
             <div key={name} className="flex items-center justify-between py-2">
               <div className="flex items-center gap-3">
-                <MaterialIcon icon={icon} className="text-slate-500 text-[20px]" />
-                <span className="text-sm font-medium text-slate-800">{name}</span>
+                <MaterialIcon icon={icon} className="text-secondary text-[20px]" />
+                <span className="text-sm font-medium text-on-surface">{name}</span>
               </div>
               <span className="text-xs font-medium text-green-600 bg-green-50 px-2.5 py-1 rounded-full">
                 {status}
@@ -548,16 +562,16 @@ function PhoneNumberSection() {
   return (
     <section className="glass-card rounded-2xl p-6 space-y-4">
       <div className="flex items-center gap-3 mb-2">
-        <MaterialIcon icon="phone_in_talk" className="text-blue-600" />
-        <h2 className="text-lg font-bold text-slate-900 font-headline">Phone Number</h2>
+        <MaterialIcon icon="phone_in_talk" className="text-primary" />
+        <h2 className="text-lg font-bold text-on-surface font-headline">Phone Number</h2>
       </div>
 
       {twilioNumber ? (
         <div className="flex items-center justify-between py-3">
           <div>
-            <p className="text-sm font-medium text-slate-800">Your calling number</p>
+            <p className="text-sm font-medium text-on-surface">Your calling number</p>
             <p className="text-2xl font-bold text-emerald-600 font-mono mt-1">{formatPhone(twilioNumber)}</p>
-            <p className="text-xs text-slate-500 mt-1">This number shows as your caller ID when you call from the app</p>
+            <p className="text-xs text-secondary mt-1">This number shows as your caller ID when you call from the app</p>
           </div>
           <div className="flex items-center gap-2">
             <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
@@ -568,7 +582,7 @@ function PhoneNumberSection() {
         </div>
       ) : (
         <div>
-          <p className="text-sm text-slate-500 mb-4">
+          <p className="text-sm text-secondary mb-4">
             Get a local phone number so property owners see a familiar area code when you call. Your number is used as caller ID for all outbound calls from the browser.
           </p>
           {!showSearch ? (
@@ -588,12 +602,12 @@ function PhoneNumberSection() {
                   onChange={(e) => setAreaCode(e.target.value.replace(/\D/g, '').slice(0, 3))}
                   maxLength={3}
                   placeholder="Area code (e.g. 559)"
-                  className="flex-1 px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-input-bg border border-card-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
                 />
                 <button
                   onClick={searchNumbers}
                   disabled={searching || areaCode.length < 3}
-                  className="px-4 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-bold disabled:opacity-50"
+                  className="px-4 py-2.5 rounded-xl bg-primary text-white text-sm font-bold disabled:opacity-50"
                 >
                   {searching ? 'Searching...' : 'Search'}
                 </button>
@@ -608,7 +622,7 @@ function PhoneNumberSection() {
                       <label
                         key={n.phoneNumber}
                         className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-colors ${
-                          selected === n.phoneNumber ? 'bg-blue-50 border border-blue-200' : 'bg-slate-50 border border-slate-200 hover:bg-slate-100'
+                          selected === n.phoneNumber ? 'bg-primary/10 border border-primary/30' : 'bg-input-bg border border-card-border hover:bg-surface-container'
                         }`}
                       >
                         <input
@@ -617,10 +631,10 @@ function PhoneNumberSection() {
                           value={n.phoneNumber}
                           checked={selected === n.phoneNumber}
                           onChange={() => setSelected(n.phoneNumber)}
-                          className="w-4 h-4 text-blue-600"
+                          className="w-4 h-4 text-primary"
                         />
                         <span className="font-mono font-bold text-sm">{formatPhone(n.phoneNumber)}</span>
-                        {n.locality && <span className="text-xs text-slate-400">{n.locality}, {n.region}</span>}
+                        {n.locality && <span className="text-xs text-on-surface-variant">{n.locality}, {n.region}</span>}
                       </label>
                     ))}
                   </div>
@@ -657,18 +671,18 @@ function UsageMeter() {
   return (
     <section className="glass-card rounded-2xl p-6 space-y-4">
       <div className="flex items-center gap-3 mb-2">
-        <MaterialIcon icon="speed" className="text-blue-600" />
-        <h2 className="text-lg font-bold text-slate-900 font-headline">Usage This Month</h2>
+        <MaterialIcon icon="speed" className="text-primary" />
+        <h2 className="text-lg font-bold text-on-surface font-headline">Usage This Month</h2>
       </div>
 
       <div>
         <div className="flex items-center justify-between mb-2">
-          <span className="text-sm font-medium text-slate-700">Geocodes</span>
-          <span className={`text-sm font-bold ${isNearLimit ? 'text-amber-600' : 'text-slate-600'}`}>
+          <span className="text-sm font-medium text-on-surface">Geocodes</span>
+          <span className={`text-sm font-bold ${isNearLimit ? 'text-amber-600' : 'text-on-surface-variant'}`}>
             {usage.geocodes_used} / {usage.geocodes_limit}
           </span>
         </div>
-        <div className="h-3 w-full bg-slate-200 rounded-full overflow-hidden">
+        <div className="h-3 w-full bg-outline-variant rounded-full overflow-hidden">
           <div
             className={`h-full rounded-full transition-all ${
               isNearLimit ? 'bg-amber-500' : 'bg-blue-500'
@@ -676,7 +690,7 @@ function UsageMeter() {
             style={{ width: `${Math.min(100, percent)}%` }}
           />
         </div>
-        <p className="text-xs text-slate-500 mt-1">
+        <p className="text-xs text-secondary mt-1">
           {usage.geocodes_remaining} remaining · Resets monthly
         </p>
       </div>
@@ -709,7 +723,7 @@ function BillingSection() {
 
   const { label: statusLabel, color: statusColor } = statusConfig[status] || {
     label: 'Free',
-    color: 'bg-slate-100 text-slate-600',
+    color: 'bg-surface-container text-on-surface-variant',
   };
 
   async function handleManageBilling() {
@@ -730,15 +744,15 @@ function BillingSection() {
   return (
     <section className="glass-card rounded-2xl p-6 space-y-4">
       <div className="flex items-center gap-3 mb-2">
-        <MaterialIcon icon="credit_card" className="text-blue-600" />
-        <h2 className="text-lg font-bold text-slate-900 font-headline">Billing & Subscription</h2>
+        <MaterialIcon icon="credit_card" className="text-primary" />
+        <h2 className="text-lg font-bold text-on-surface font-headline">Billing & Subscription</h2>
       </div>
 
       <div className="flex items-center gap-4">
         <div>
-          <p className="text-sm text-slate-500">Current Plan</p>
+          <p className="text-sm text-secondary">Current Plan</p>
           <div className="flex items-center gap-2 mt-1">
-            <span className="text-lg font-bold text-slate-900">
+            <span className="text-lg font-bold text-on-surface">
               {isSubscribed ? 'Subscribed' : 'Free'}
             </span>
             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${statusColor}`}>
@@ -746,7 +760,7 @@ function BillingSection() {
             </span>
           </div>
           {!isSubscribed && (
-            <p className="text-xs text-slate-400 mt-1">50 free geocodes included</p>
+            <p className="text-xs text-on-surface-variant mt-1">50 free geocodes included</p>
           )}
         </div>
       </div>
@@ -833,7 +847,7 @@ function MapCenterAutocomplete({ onPlaceSelected, currentCenter }: {
       ref={inputRef}
       type="text"
       placeholder={currentCenter ? 'Update location...' : 'e.g. Hanford, CA or 523 Puffin Ln'}
-      className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
+      className="w-full px-4 py-2.5 rounded-xl bg-input-bg border border-card-border text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
     />
   );
 }

@@ -75,7 +75,7 @@ export default function OutreachChart({
       </div>
 
       {/* Motivational footer */}
-      <div className="mt-6 flex items-center gap-2 rounded-xl bg-emerald-50 px-4 py-3">
+      <div className="mt-6 flex items-center gap-2 rounded-xl bg-emerald-500/10 px-4 py-3">
         <MaterialIcon
           icon={ahead >= 0 ? 'trending_up' : 'trending_down'}
           className={`text-[20px] ${ahead >= 0 ? 'text-emerald-600' : 'text-amber-600'}`}

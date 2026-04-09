@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/lib/auth-context';
 import { Lead, Activity, LeadStatus, CallOutcome } from '@/types';
 import { cn, formatPhone } from '@/lib/utils';
 import { LEAD_STATUSES } from '@/lib/constants';
@@ -40,6 +41,7 @@ const OUTCOME_STATUS_MAP: Partial<Record<CallOutcome, LeadStatus>> = {
 export default function LeadDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
+  const { user } = useAuth();
   const { makeCall, isDesktop } = usePhone();
   const { profile } = useProfile();
   const [showGate, setShowGate] = useState(false);
@@ -76,9 +78,9 @@ export default function LeadDetailPage() {
   const API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
 
   const fetchData = useCallback(async () => {
-    if (!params.id) return;
+    if (!params.id || !user) return;
     const [leadRes, activitiesRes] = await Promise.all([
-      supabase.from('leads').select('*').eq('id', params.id).single(),
+      supabase.from('leads').select('*').eq('id', params.id).eq('user_id', user.id).single(),
       supabase.from('activities').select('*').eq('lead_id', params.id).order('created_at', { ascending: false }).limit(50),
     ]);
     if (leadRes.error || !leadRes.data) { setNotFound(true); setLoading(false); return; }
@@ -86,8 +88,12 @@ export default function LeadDetailPage() {
     setActivities(activitiesRes.data ?? []);
     setLoading(false);
 
-    // Fetch prev/next for navigation
-    const { data: allIds } = await supabase.from('leads').select('id').order('created_at', { ascending: false });
+    // Fetch prev/next for navigation scoped to current user
+    const { data: allIds } = await supabase
+      .from('leads')
+      .select('id')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
     if (allIds) {
       const idx = allIds.findIndex((l) => l.id === params.id);
       setAdjacentIds({
@@ -102,6 +108,7 @@ export default function LeadDetailPage() {
       const { data: siblings } = await supabase
         .from('leads')
         .select('id, property_address, city, status, price_range')
+        .eq('user_id', user.id)
         .eq('owner_name', ownerName)
         .neq('id', params.id)
         .limit(20);
@@ -134,7 +141,7 @@ export default function LeadDetailPage() {
       const rRes = await fetch(`/api/call-responses?leadId=${params.id}`);
       if (rRes.ok) setPreviousResponses(await rRes.json());
     } catch { /* non-fatal */ }
-  }, [params.id]);
+  }, [params.id, user]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
   const refreshData = useCallback(() => { fetchData(); }, [fetchData]);
@@ -150,28 +157,28 @@ export default function LeadDetailPage() {
   }, [adjacentIds, router]);
 
   const updateStatus = async (s: LeadStatus) => {
-    if (!lead) return;
+    if (!lead || !user?.id) return;
     const old = lead.status;
-    await supabase.from('leads').update({ status: s }).eq('id', lead.id);
+    await supabase.from('leads').update({ status: s }).eq('id', lead.id).eq('user_id', user.id);
     await supabase.from('activities').insert({ lead_id: lead.id, type: 'status_change', title: `Status: ${old} → ${s}` });
     setLead((prev) => (prev ? { ...prev, status: s } : null));
     refreshData();
   };
 
   const updateTags = async (tag: string) => {
-    if (!lead) return;
+    if (!lead || !user?.id) return;
     const current = lead.tags || [];
     const next = current.includes(tag) ? current.filter((t) => t !== tag) : [...current, tag];
-    await supabase.from('leads').update({ tags: next }).eq('id', lead.id);
+    await supabase.from('leads').update({ tags: next }).eq('id', lead.id).eq('user_id', user.id);
     setLead((prev) => (prev ? { ...prev, tags: next } : null));
   };
 
   const logOutcome = async (outcome: CallOutcome) => {
-    if (!lead) return;
+    if (!lead || !user?.id) return;
     setSavingOutcome(true);
     const newStatus = OUTCOME_STATUS_MAP[outcome];
     if (newStatus) {
-      await supabase.from('leads').update({ status: newStatus, last_contact_date: new Date().toISOString() }).eq('id', lead.id);
+      await supabase.from('leads').update({ status: newStatus, last_contact_date: new Date().toISOString() }).eq('id', lead.id).eq('user_id', user.id);
     }
     await supabase.from('activities').insert({
       lead_id: lead.id,
@@ -254,7 +261,7 @@ export default function LeadDetailPage() {
   if (notFound || !lead) {
     return (
       <div className="flex flex-col items-center justify-center p-16">
-        <MaterialIcon icon="person_off" className="text-[64px] text-slate-300" />
+        <MaterialIcon icon="person_off" className="text-[64px] text-on-surface-variant" />
         <h2 className="mt-4 text-2xl font-headline font-bold">Lead not found</h2>
         <Link href="/leads" className="mt-6 flex items-center gap-2 rounded-xl action-gradient px-4 py-2 text-sm font-medium text-white">
           <MaterialIcon icon="arrow_back" className="text-[18px]" /> Back to Leads
@@ -281,19 +288,19 @@ export default function LeadDetailPage() {
 
   const mapUrl = getMapUrl();
   const talkingPoints = getTalkingPoints(lead);
-  const priorityColor = lead.status === 'Not Contacted' ? 'bg-blue-500' : lead.tags?.includes('Hot Lead') ? 'bg-red-500' : lead.status === 'Follow-Up' ? 'bg-amber-500' : 'bg-slate-500';
+  const priorityColor = lead.status === 'Not Contacted' ? 'bg-blue-500' : lead.tags?.includes('Hot Lead') ? 'bg-red-500' : lead.status === 'Follow-Up' ? 'bg-amber-500' : 'bg-secondary';
 
   return (
-    <div className="h-[calc(100vh-4rem)] flex flex-col overflow-hidden bg-[#0c1324]">
+    <div className="h-[calc(100vh-4rem)] flex flex-col overflow-hidden bg-surface">
       {/* ═══ ACTION BAR ═══ */}
-      <div className="h-12 bg-[#151b2d] border-b border-slate-800 flex items-center justify-between px-4 shrink-0">
+      <div className="h-12 bg-card border-b border-card-border flex items-center justify-between px-4 shrink-0">
         <div className="flex items-center gap-3 min-w-0">
-          <Link href="/leads" className="flex items-center gap-1 px-2 py-1 text-slate-400 hover:text-white hover:bg-white/5 rounded text-xs font-bold transition-colors shrink-0">
+          <Link href="/leads" className="flex items-center gap-1 px-2 py-1 text-secondary hover:text-white hover:bg-white/5 rounded text-xs font-bold transition-colors shrink-0">
             <MaterialIcon icon="arrow_back" className="text-[16px]" /> Back
           </Link>
-          <div className="h-5 w-px bg-slate-700 shrink-0" />
+          <div className="h-5 w-px bg-outline-variant shrink-0" />
           <h1 className="text-sm font-bold text-white truncate">{lead.owner_name || lead.name || 'Unknown'}</h1>
-          <span className="text-xs text-slate-500 truncate hidden md:inline">{lead.property_address}</span>
+          <span className="text-xs text-secondary truncate hidden md:inline">{lead.property_address}</span>
           <span className={cn('px-2 py-0.5 rounded text-[10px] font-bold text-white shrink-0', priorityColor)}>
             {lead.status}
           </span>
@@ -305,7 +312,7 @@ export default function LeadDetailPage() {
           <button
             onClick={() => adjacentIds.prev && router.push(`/leads/${adjacentIds.prev}`)}
             disabled={!adjacentIds.prev}
-            className="p-1.5 text-slate-400 hover:text-white hover:bg-white/5 rounded transition-colors disabled:opacity-30"
+            className="p-1.5 text-secondary hover:text-white hover:bg-white/5 rounded transition-colors disabled:opacity-30"
             title="Previous lead (Left arrow)"
           >
             <MaterialIcon icon="chevron_left" className="text-[20px]" />
@@ -313,7 +320,7 @@ export default function LeadDetailPage() {
           <button
             onClick={() => adjacentIds.next && router.push(`/leads/${adjacentIds.next}`)}
             disabled={!adjacentIds.next}
-            className="p-1.5 text-slate-400 hover:text-white hover:bg-white/5 rounded transition-colors disabled:opacity-30"
+            className="p-1.5 text-secondary hover:text-white hover:bg-white/5 rounded transition-colors disabled:opacity-30"
             title="Next lead (Right arrow)"
           >
             <MaterialIcon icon="chevron_right" className="text-[20px]" />
@@ -325,7 +332,7 @@ export default function LeadDetailPage() {
       <div className="flex-1 flex overflow-hidden">
 
         {/* ─── LEFT PANEL: Street View ─── */}
-        <div className="w-3/5 relative flex flex-col bg-[#151b2d] border-r border-slate-800">
+        <div className="w-3/5 relative flex flex-col bg-card border-r border-card-border">
           {/* View toggle buttons (top-left overlay) */}
           <div className="absolute top-3 left-3 z-10 flex gap-1">
             {(['Street View', 'Map', 'Satellite'] as const).map((view) => (
@@ -335,8 +342,8 @@ export default function LeadDetailPage() {
                 className={cn(
                   'px-3 py-1.5 rounded text-[11px] font-bold transition-all backdrop-blur-md border',
                   activeTab === view
-                    ? 'bg-indigo-600 text-white border-indigo-500 shadow-lg'
-                    : 'bg-black/50 text-slate-300 border-white/10 hover:bg-black/70 hover:text-white'
+                    ? 'bg-primary text-white border-primary shadow-lg'
+                    : 'bg-black/50 text-on-surface-variant border-card-border hover:bg-black/70 hover:text-white'
                 )}
               >
                 {view}
@@ -347,12 +354,12 @@ export default function LeadDetailPage() {
           {/* Map / Street View content */}
           <div className="flex-1 relative">
             {!isSubscribed ? (
-              <div className="absolute inset-0 flex items-center justify-center bg-slate-900/80">
+              <div className="absolute inset-0 flex items-center justify-center bg-surface/80">
                 <div className="text-center">
-                  <MaterialIcon icon="lock" className="text-[48px] text-indigo-400 mb-3" />
+                  <MaterialIcon icon="lock" className="text-[48px] text-primary mb-3" />
                   <h3 className="text-lg font-bold text-white mb-2">Street View Locked</h3>
-                  <p className="text-sm text-slate-400 mb-4">Subscribe to see properties at street level</p>
-                  <a href="/subscribe" className="px-6 py-2 bg-indigo-600 text-white rounded-lg font-bold text-sm hover:bg-indigo-700 transition-colors">Upgrade</a>
+                  <p className="text-sm text-secondary mb-4">Subscribe to see properties at street level</p>
+                  <a href="/subscribe" className="px-6 py-2 bg-primary text-white rounded-lg font-bold text-sm hover:bg-primary/90 transition-colors">Upgrade</a>
                 </div>
               </div>
             ) : (activeTab === 'Map' || activeTab === 'Satellite') && lead.latitude != null && lead.longitude != null ? (
@@ -364,9 +371,9 @@ export default function LeadDetailPage() {
             ) : mapUrl ? (
               <iframe src={mapUrl} className="h-full w-full border-0" loading="lazy" referrerPolicy="no-referrer-when-downgrade" allowFullScreen />
             ) : (
-              <div className="flex h-full w-full items-center justify-center text-slate-500">
+              <div className="flex h-full w-full items-center justify-center text-secondary">
                 <div className="text-center">
-                  <MaterialIcon icon="location_off" className="text-[48px] text-slate-600" />
+                  <MaterialIcon icon="location_off" className="text-[48px] text-secondary" />
                   <p className="mt-2 text-sm">No location data available</p>
                 </div>
               </div>
@@ -378,19 +385,19 @@ export default function LeadDetailPage() {
             <div className="flex items-end justify-between">
               <div>
                 <p className="text-white font-bold text-sm">{lead.property_address?.split(',')[0]}</p>
-                <p className="text-slate-400 text-xs">{lead.property_address?.split(',').slice(1).join(',').trim()}</p>
+                <p className="text-secondary text-xs">{lead.property_address?.split(',').slice(1).join(',').trim()}</p>
               </div>
               <div className="flex gap-4 text-right">
                 {lead.property_condition && (
                   <div>
-                    <p className="text-[10px] text-slate-500 uppercase tracking-widest">Type</p>
+                    <p className="text-[10px] text-secondary uppercase tracking-widest">Type</p>
                     <p className="text-xs text-white font-bold">{lead.property_condition}</p>
                   </div>
                 )}
                 {lead.price_range && (
                   <div>
-                    <p className="text-[10px] text-slate-500 uppercase tracking-widest">Value</p>
-                    <p className="text-xs text-indigo-400 font-bold">{lead.price_range}</p>
+                    <p className="text-[10px] text-secondary uppercase tracking-widest">Value</p>
+                    <p className="text-xs text-primary font-bold">{lead.price_range}</p>
                   </div>
                 )}
               </div>
@@ -399,25 +406,25 @@ export default function LeadDetailPage() {
         </div>
 
         {/* ─── RIGHT PANEL: Contact + Actions ─── */}
-        <div className="w-2/5 bg-[#151b2d] flex flex-col overflow-hidden">
+        <div className="w-2/5 bg-card flex flex-col overflow-hidden">
           <div className="flex-1 overflow-y-auto px-4 pt-4 pb-2 space-y-3">
 
             {/* Owner card */}
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold text-sm shrink-0">
+              <div className="h-10 w-10 rounded-full bg-primary flex items-center justify-center text-white font-bold text-sm shrink-0">
                 {(lead.owner_name || lead.name || '?')[0].toUpperCase()}
               </div>
               <div className="min-w-0">
                 <p className="text-white font-bold text-sm truncate">{lead.owner_name || lead.name || 'Unknown'}</p>
                 {lead.price_range && (
-                  <p className="text-indigo-400 text-xs font-bold">{lead.price_range}</p>
+                  <p className="text-primary text-xs font-bold">{lead.price_range}</p>
                 )}
               </div>
               <div className="ml-auto shrink-0">
                 <select
                   value={lead.status}
                   onChange={(e) => updateStatus(e.target.value as LeadStatus)}
-                  className="appearance-none bg-[#0c1324] border border-slate-700 rounded px-2 py-1 text-[11px] font-medium text-slate-300 outline-none focus:ring-1 focus:ring-indigo-500 pr-6 cursor-pointer"
+                  className="appearance-none bg-surface border border-outline-variant rounded px-2 py-1 text-[11px] font-medium text-on-surface-variant outline-none focus:ring-1 focus:ring-primary pr-6 cursor-pointer"
                 >
                   {LEAD_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
                 </select>
@@ -427,40 +434,40 @@ export default function LeadDetailPage() {
             {/* Phone cards */}
             <div className="space-y-1.5">
               {[lead.phone, lead.phone_2, lead.phone_3].filter(Boolean).map((phone, idx) => (
-                <div key={idx} className="flex items-center justify-between bg-[#0c1324] rounded-lg px-3 py-2 border border-slate-800">
+                <div key={idx} className="flex items-center justify-between bg-surface rounded-lg px-3 py-2 border border-card-border">
                   <div className="flex items-center gap-2">
-                    <MaterialIcon icon="phone" className="text-[14px] text-slate-500" />
-                    <span className="text-xs font-mono text-slate-200 font-medium">{formatPhone(phone!)}</span>
-                    {idx === 0 && <span className="text-[9px] bg-indigo-600/20 text-indigo-400 px-1.5 py-0.5 rounded font-bold">PRIMARY</span>}
+                    <MaterialIcon icon="phone" className="text-[14px] text-secondary" />
+                    <span className="text-xs font-mono text-on-surface font-medium">{formatPhone(phone!)}</span>
+                    {idx === 0 && <span className="text-[9px] bg-primary/20 text-primary px-1.5 py-0.5 rounded font-bold">PRIMARY</span>}
                   </div>
                   <button
                     onClick={() => {
                       if (isDesktop) { makeCall(phone!, lead.owner_name || lead.name || 'Unknown', lead.id); }
                       else { window.location.href = `tel:${phone}`; }
                     }}
-                    className="flex items-center gap-1 px-3 py-1 bg-indigo-600 text-white rounded text-[11px] font-bold hover:bg-indigo-700 transition-colors"
+                    className="flex items-center gap-1 px-3 py-1 bg-primary text-white rounded text-[11px] font-bold hover:bg-primary/90 transition-colors"
                   >
                     <MaterialIcon icon="call" className="text-[14px]" /> Call
                   </button>
                 </div>
               ))}
               {!lead.phone && (
-                <div className="bg-[#0c1324] rounded-lg px-3 py-2 border border-slate-800 text-center">
-                  <span className="text-xs text-slate-500 italic">No phone numbers</span>
+                <div className="bg-surface rounded-lg px-3 py-2 border border-card-border text-center">
+                  <span className="text-xs text-secondary italic">No phone numbers</span>
                 </div>
               )}
             </div>
 
             {/* Email card */}
             {lead.email && (
-              <div className="flex items-center justify-between bg-[#0c1324] rounded-lg px-3 py-2 border border-slate-800">
+              <div className="flex items-center justify-between bg-surface rounded-lg px-3 py-2 border border-card-border">
                 <div className="flex items-center gap-2 min-w-0">
-                  <MaterialIcon icon="mail" className="text-[14px] text-slate-500 shrink-0" />
-                  <span className="text-xs text-slate-200 truncate">{lead.email}</span>
+                  <MaterialIcon icon="mail" className="text-[14px] text-secondary shrink-0" />
+                  <span className="text-xs text-on-surface truncate">{lead.email}</span>
                 </div>
                 <a
                   href={`mailto:${lead.email}`}
-                  className="flex items-center gap-1 px-3 py-1 bg-slate-700 text-white rounded text-[11px] font-bold hover:bg-slate-600 transition-colors shrink-0 ml-2"
+                  className="flex items-center gap-1 px-3 py-1 bg-surface-container text-white rounded text-[11px] font-bold hover:bg-surface-container-high transition-colors shrink-0 ml-2"
                 >
                   <MaterialIcon icon="send" className="text-[14px]" /> Send
                 </a>
@@ -469,13 +476,13 @@ export default function LeadDetailPage() {
 
             {/* Talking Points */}
             {talkingPoints.length > 0 && (
-              <div className="bg-[#0c1324] rounded-lg px-3 py-2.5 border border-slate-800">
-                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Talking Points</p>
+              <div className="bg-surface rounded-lg px-3 py-2.5 border border-card-border">
+                <p className="text-[10px] font-bold text-secondary uppercase tracking-widest mb-2">Talking Points</p>
                 <div className="space-y-1">
                   {talkingPoints.map((pt, i) => (
                     <div key={i} className="flex items-start gap-2">
-                      <MaterialIcon icon="arrow_right" className="text-[14px] text-indigo-400 mt-0.5 shrink-0" />
-                      <span className="text-xs text-slate-300">{pt}</span>
+                      <MaterialIcon icon="arrow_right" className="text-[14px] text-primary mt-0.5 shrink-0" />
+                      <span className="text-xs text-on-surface-variant">{pt}</span>
                     </div>
                   ))}
                 </div>
@@ -483,9 +490,9 @@ export default function LeadDetailPage() {
             )}
 
             {/* AI Guidance */}
-            <div className="bg-[#0c1324] rounded-lg px-3 py-2.5 border border-slate-800">
+            <div className="bg-surface rounded-lg px-3 py-2.5 border border-card-border">
               <div className="flex items-center justify-between mb-2">
-                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">AI Guidance</p>
+                <p className="text-[10px] font-bold text-secondary uppercase tracking-widest">AI Guidance</p>
                 <button
                   onClick={fetchGuidance}
                   disabled={guidanceLoading}
@@ -497,10 +504,10 @@ export default function LeadDetailPage() {
               </div>
               {guidance && (
                 <div className="space-y-2">
-                  <p className="text-xs text-slate-300 italic">&ldquo;{guidance.opener}&rdquo;</p>
+                  <p className="text-xs text-on-surface-variant italic">&ldquo;{guidance.opener}&rdquo;</p>
                   <ul className="space-y-1">
                     {guidance.talking_points.map((pt, i) => (
-                      <li key={i} className="flex items-start gap-1.5 text-xs text-slate-400">
+                      <li key={i} className="flex items-start gap-1.5 text-xs text-secondary">
                         <MaterialIcon icon="check_circle" className="text-[12px] text-emerald-500 mt-0.5 shrink-0" />
                         {pt}
                       </li>
@@ -511,11 +518,11 @@ export default function LeadDetailPage() {
             </div>
 
             {/* Notes */}
-            <div className="bg-[#0c1324] rounded-lg px-3 py-2.5 border border-slate-800">
+            <div className="bg-surface rounded-lg px-3 py-2.5 border border-card-border">
               <div className="flex items-center justify-between mb-2">
-                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Notes</p>
+                <p className="text-[10px] font-bold text-secondary uppercase tracking-widest">Notes</p>
                 <button onClick={saveNote} disabled={savingNote || !note.trim()}
-                  className="text-[10px] text-indigo-400 font-bold hover:text-indigo-300 disabled:opacity-30 transition-colors">
+                  className="text-[10px] text-primary font-bold hover:text-primary/80 disabled:opacity-30 transition-colors">
                   {savingNote ? 'Saving...' : 'Save'} (Ctrl+Enter)
                 </button>
               </div>
@@ -524,20 +531,20 @@ export default function LeadDetailPage() {
                 onChange={(e) => setNote(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter' && e.ctrlKey) saveNote(); }}
                 rows={3}
-                className="w-full p-2 bg-[#151b2d] border border-slate-700 rounded-lg text-xs text-slate-200 font-medium focus:ring-1 focus:ring-indigo-500 outline-none resize-none placeholder:text-slate-600"
+                className="w-full p-2 bg-card border border-outline-variant rounded-lg text-xs text-on-surface font-medium focus:ring-1 focus:ring-primary outline-none resize-none placeholder:text-secondary"
                 placeholder="Type notes during the call..."
               />
             </div>
 
             {/* Opening Script */}
             {profile.openingScript && (
-              <details className="bg-[#0c1324] rounded-lg border border-slate-800 group">
-                <summary className="px-3 py-2.5 cursor-pointer flex items-center justify-between text-[10px] font-bold text-slate-500 uppercase tracking-widest hover:text-slate-400 transition-colors">
+              <details className="bg-surface rounded-lg border border-card-border group">
+                <summary className="px-3 py-2.5 cursor-pointer flex items-center justify-between text-[10px] font-bold text-secondary uppercase tracking-widest hover:text-secondary transition-colors">
                   <span>Opening Script</span>
-                  <MaterialIcon icon="expand_more" className="text-[16px] text-slate-600 group-open:rotate-180 transition-transform" />
+                  <MaterialIcon icon="expand_more" className="text-[16px] text-secondary group-open:rotate-180 transition-transform" />
                 </summary>
                 <div className="px-3 pb-3">
-                  <p className="text-xs text-slate-300 leading-relaxed whitespace-pre-wrap">
+                  <p className="text-xs text-on-surface-variant leading-relaxed whitespace-pre-wrap">
                     {profile.openingScript
                       .replace('{name}', lead.owner_name || '')
                       .replace('{street}', lead.property_address?.split(',')[0] || '')
@@ -549,17 +556,17 @@ export default function LeadDetailPage() {
 
             {/* Call Script Checklist */}
             {activeScript && (
-              <details className="bg-[#0c1324] rounded-lg border border-slate-800 group">
-                <summary className="px-3 py-2.5 cursor-pointer flex items-center justify-between text-[10px] font-bold text-slate-500 uppercase tracking-widest hover:text-slate-400 transition-colors">
+              <details className="bg-surface rounded-lg border border-card-border group">
+                <summary className="px-3 py-2.5 cursor-pointer flex items-center justify-between text-[10px] font-bold text-secondary uppercase tracking-widest hover:text-secondary transition-colors">
                   <span>Call Script: {activeScript.category.replace('_', ' ')}</span>
-                  <MaterialIcon icon="expand_more" className="text-[16px] text-slate-600 group-open:rotate-180 transition-transform" />
+                  <MaterialIcon icon="expand_more" className="text-[16px] text-secondary group-open:rotate-180 transition-transform" />
                 </summary>
                 <div className="px-3 pb-3 space-y-2">
                   {scripts.length > 1 && (
                     <select
                       value={activeScript.id}
                       onChange={(e) => { const s = scripts.find(s => s.id === e.target.value); if (s) setActiveScript(s); }}
-                      className="w-full text-xs rounded border border-slate-700 bg-[#151b2d] text-slate-300 px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      className="w-full text-xs rounded border border-outline-variant bg-card text-on-surface-variant px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary"
                     >
                       {scripts.map(s => <option key={s.id} value={s.id}>{s.category.replace('_', ' ')}</option>)}
                     </select>
@@ -568,34 +575,34 @@ export default function LeadDetailPage() {
                     <div key={q.question} className="flex items-start gap-2">
                       <MaterialIcon
                         icon={checklistAnswers[q.question] ? 'check_box' : 'check_box_outline_blank'}
-                        className={cn('text-[18px] mt-0.5 cursor-pointer', checklistAnswers[q.question] ? 'text-emerald-500' : 'text-slate-600')}
+                        className={cn('text-[18px] mt-0.5 cursor-pointer', checklistAnswers[q.question] ? 'text-emerald-500' : 'text-secondary')}
                       />
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium text-slate-300">{q.question}</p>
+                        <p className="text-xs font-medium text-on-surface-variant">{q.question}</p>
                         <input
                           type="text"
                           value={checklistAnswers[q.question] || ''}
                           onChange={(e) => setChecklistAnswers(prev => ({ ...prev, [q.question]: e.target.value }))}
                           placeholder="Answer..."
-                          className="mt-1 w-full rounded border border-slate-700 bg-[#151b2d] px-2 py-1 text-xs text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                          className="mt-1 w-full rounded border border-outline-variant bg-card px-2 py-1 text-xs text-on-surface placeholder:text-secondary focus:outline-none focus:ring-1 focus:ring-primary"
                         />
                       </div>
                     </div>
                   ))}
                   {Object.values(checklistAnswers).some(v => v.trim()) && (
                     <button onClick={saveChecklistAnswers} disabled={savingChecklist}
-                      className="w-full flex items-center justify-center gap-1.5 rounded bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-indigo-700 transition-colors disabled:opacity-50">
+                      className="w-full flex items-center justify-center gap-1.5 rounded bg-primary px-3 py-1.5 text-xs font-bold text-white hover:bg-primary/90 transition-colors disabled:opacity-50">
                       <MaterialIcon icon="save" className="text-[14px]" /> {savingChecklist ? 'Saving...' : 'Save Answers'}
                     </button>
                   )}
                   {previousResponses.length > 0 && (
-                    <div className="border-t border-slate-700 pt-2 mt-2">
-                      <p className="text-[9px] uppercase tracking-widest text-slate-600 font-bold mb-1">Previous</p>
+                    <div className="border-t border-outline-variant pt-2 mt-2">
+                      <p className="text-[9px] uppercase tracking-widest text-secondary font-bold mb-1">Previous</p>
                       <div className="space-y-1 max-h-24 overflow-y-auto">
                         {previousResponses.slice(0, 10).map((r) => (
                           <div key={r.id} className="text-[11px]">
-                            <span className="text-slate-500">{r.question}: </span>
-                            <span className="text-slate-300 font-medium">{r.answer}</span>
+                            <span className="text-secondary">{r.question}: </span>
+                            <span className="text-on-surface-variant font-medium">{r.answer}</span>
                           </div>
                         ))}
                       </div>
@@ -606,8 +613,8 @@ export default function LeadDetailPage() {
             )}
 
             {/* Groups / Tags */}
-            <div className="bg-[#0c1324] rounded-lg px-3 py-2.5 border border-slate-800">
-              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Groups</p>
+            <div className="bg-surface rounded-lg px-3 py-2.5 border border-card-border">
+              <p className="text-[10px] font-bold text-secondary uppercase tracking-widest mb-2">Groups</p>
               <div className="flex flex-wrap gap-1">
                 {GROUPS.map((group) => (
                   <button
@@ -616,8 +623,8 @@ export default function LeadDetailPage() {
                     className={cn(
                       'px-2 py-0.5 rounded text-[10px] font-bold transition-all border',
                       lead.tags?.includes(group)
-                        ? 'bg-indigo-600/20 border-indigo-500/50 text-indigo-300'
-                        : 'bg-transparent border-slate-700 text-slate-500 hover:border-slate-600 hover:text-slate-400'
+                        ? 'bg-primary/20 border-primary/50 text-primary'
+                        : 'bg-transparent border-outline-variant text-secondary hover:border-outline-variant/80 hover:text-secondary'
                     )}
                   >
                     {group}
@@ -628,11 +635,11 @@ export default function LeadDetailPage() {
           </div>
 
           {/* ─── STICKY BOTTOM: Call Outcome Buttons ─── */}
-          <div className="p-3 border-t border-slate-800 bg-[#0c1324] shrink-0">
-            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 text-center">Log Call Outcome</p>
+          <div className="p-3 border-t border-card-border bg-surface shrink-0">
+            <p className="text-[10px] font-bold text-secondary uppercase tracking-widest mb-2 text-center">Log Call Outcome</p>
             <div className="grid grid-cols-3 gap-1.5">
               {([
-                { outcome: 'No Answer' as CallOutcome, icon: 'phone_missed', label: 'No Ans', color: 'bg-slate-700/50 hover:bg-slate-700 text-slate-300' },
+                { outcome: 'No Answer' as CallOutcome, icon: 'phone_missed', label: 'No Ans', color: 'bg-surface-container/50 hover:bg-surface-container text-on-surface-variant' },
                 { outcome: 'Left VM' as CallOutcome, icon: 'voicemail', label: 'Left VM', color: 'bg-blue-900/30 hover:bg-blue-900/50 text-blue-300' },
                 { outcome: 'Spoke with Owner' as CallOutcome, icon: 'record_voice_over', label: 'Spoke', color: 'bg-emerald-900/30 hover:bg-emerald-900/50 text-emerald-300' },
                 { outcome: 'Follow-Up' as CallOutcome, icon: 'event', label: 'Follow-Up', color: 'bg-amber-900/30 hover:bg-amber-900/50 text-amber-300' },
@@ -644,7 +651,7 @@ export default function LeadDetailPage() {
                   onClick={() => logOutcome(outcome)}
                   disabled={savingOutcome}
                   className={cn(
-                    'flex flex-col items-center justify-center py-2 px-1 rounded-lg text-[10px] font-bold transition-all border border-slate-800 disabled:opacity-50',
+                    'flex flex-col items-center justify-center py-2 px-1 rounded-lg text-[10px] font-bold transition-all border border-card-border disabled:opacity-50',
                     color
                   )}
                 >

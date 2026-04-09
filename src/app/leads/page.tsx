@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/lib/auth-context';
 import { Lead, LeadStatus, PRIORITY_COLORS } from '@/types';
 import { formatPhone, formatDate, timeAgo } from '@/lib/utils';
 import { LEAD_STATUSES, LEAD_SOURCES, PRIORITIES } from '@/lib/constants';
@@ -20,6 +21,7 @@ type SortDirection = 'asc' | 'desc';
 
 export default function LeadsPage() {
   const router = useRouter();
+  const { user } = useAuth();
 
   const [leads, setLeads] = useState<Lead[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -39,10 +41,12 @@ export default function LeadsPage() {
   const [allFilteredIds, setAllFilteredIds] = useState<string[]>([]);
 
   const fetchLeads = useCallback(async () => {
+    if (!user) return;
+
     setLoading(true);
     const offset = (currentPage - 1) * PAGE_SIZE;
 
-    let query = supabase.from('leads').select('*', { count: 'exact' });
+    let query = supabase.from('leads').select('*', { count: 'exact' }).eq('user_id', user.id);
 
     if (searchTerm) {
       query = query.or(
@@ -73,11 +77,13 @@ export default function LeadsPage() {
       setTotalCount(count ?? 0);
     }
     setLoading(false);
-  }, [searchTerm, statusFilter, sourceFilter, priorityFilter, currentPage, sortColumn, sortDirection]);
+  }, [user, searchTerm, statusFilter, sourceFilter, priorityFilter, currentPage, sortColumn, sortDirection]);
 
   // Fetch all filtered IDs for export (separate lightweight query)
   const fetchAllFilteredIds = useCallback(async () => {
-    let query = supabase.from('leads').select('id');
+    if (!user) return;
+
+    let query = supabase.from('leads').select('id').eq('user_id', user.id);
 
     if (searchTerm) {
       query = query.or(
@@ -96,7 +102,7 @@ export default function LeadsPage() {
 
     const { data } = await query;
     setAllFilteredIds((data ?? []).map((r) => r.id));
-  }, [searchTerm, statusFilter, sourceFilter, priorityFilter]);
+  }, [user, searchTerm, statusFilter, sourceFilter, priorityFilter]);
 
   useEffect(() => {
     fetchLeads();
@@ -143,7 +149,7 @@ export default function LeadsPage() {
 
   const handleBulkStatusUpdate = async (status: LeadStatus) => {
     const ids = Array.from(selectedIds);
-    await supabase.from('leads').update({ status }).in('id', ids);
+    await supabase.from('leads').update({ status }).in('id', ids).eq('user_id', user?.id);
     setSelectedIds(new Set());
     fetchLeads();
   };
@@ -158,7 +164,8 @@ export default function LeadsPage() {
       return supabase
         .from('leads')
         .update({ tags: [...existingTags, tag] })
-        .eq('id', lead.id);
+        .eq('id', lead.id)
+        .eq('user_id', user?.id);
     });
     await Promise.all(updates.filter(Boolean));
     fetchLeads();
@@ -174,7 +181,7 @@ export default function LeadsPage() {
         {sortColumn === column && (
           <MaterialIcon
             icon={sortDirection === 'asc' ? 'arrow_upward' : 'arrow_downward'}
-            className="text-[14px] text-blue-600"
+            className="text-[14px] text-primary"
           />
         )}
       </div>
@@ -185,15 +192,15 @@ export default function LeadsPage() {
     <div className="p-6 lg:p-8 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">Leads</h1>
+        <h1 className="text-3xl font-extrabold tracking-tight text-on-surface">Leads</h1>
         <div className="flex items-center gap-3">
-          <a href="/imports" className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 font-semibold rounded-lg hover:bg-slate-200 transition-colors text-sm">
+          <a href="/imports" className="flex items-center gap-2 px-4 py-2 bg-surface-container text-on-surface font-semibold rounded-lg hover:bg-surface-container-high transition-colors text-sm">
             <MaterialIcon icon="upload" className="text-[16px]" />
             Import
           </a>
           <button
             onClick={() => setExportModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 font-semibold rounded-lg hover:bg-slate-200 transition-colors text-sm"
+            className="flex items-center gap-2 px-4 py-2 bg-surface-container text-on-surface font-semibold rounded-lg hover:bg-surface-container-high transition-colors text-sm"
           >
             <MaterialIcon icon="download" className="text-[16px]" />
             Export
@@ -211,7 +218,7 @@ export default function LeadsPage() {
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+          className="rounded-lg border border-card-border bg-card px-3 py-2 text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/40"
         >
           <option value="All">Status: All</option>
           {LEAD_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
@@ -219,7 +226,7 @@ export default function LeadsPage() {
         <select
           value={sourceFilter}
           onChange={(e) => setSourceFilter(e.target.value)}
-          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+          className="rounded-lg border border-card-border bg-card px-3 py-2 text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/40"
         >
           <option value="All">Source: All</option>
           {LEAD_SOURCES.map((s) => <option key={s} value={s}>{s}</option>)}
@@ -227,7 +234,7 @@ export default function LeadsPage() {
         <select
           value={priorityFilter}
           onChange={(e) => setPriorityFilter(e.target.value)}
-          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+          className="rounded-lg border border-card-border bg-card px-3 py-2 text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/40"
         >
           <option value="All">Priority: All</option>
           {PRIORITIES.map((p) => <option key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</option>)}
@@ -246,13 +253,13 @@ export default function LeadsPage() {
       )}
 
       {/* Table */}
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+      <div className="overflow-hidden rounded-xl border border-card-border bg-card">
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
             <thead>
-              <tr className="border-b border-slate-200 bg-slate-50">
+              <tr className="border-b border-card-border bg-surface-container-low">
                 <th className="w-10 px-6 py-4">
-                  <input type="checkbox" checked={selectedIds.size === leads.length && leads.length > 0} onChange={toggleAll} className="rounded border-slate-300" />
+                  <input type="checkbox" checked={selectedIds.size === leads.length && leads.length > 0} onChange={toggleAll} className="rounded border-card-border" />
                 </th>
                 <SortHeader column="property_address" label="Address / Contact" />
                 <SortHeader column="name" label="Owner" />
@@ -263,12 +270,12 @@ export default function LeadsPage() {
                 <SortHeader column="follow_up_date" label="Follow-up" />
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-card-border">
               {loading
                 ? Array.from({ length: 8 }).map((_, i) => (
                     <tr key={i}>
                       <td className="px-6 py-4" colSpan={8}>
-                        <div className="h-4 w-full animate-pulse rounded bg-slate-100" />
+                        <div className="h-4 w-full animate-pulse rounded bg-surface-container" />
                       </td>
                     </tr>
                   ))
@@ -276,17 +283,17 @@ export default function LeadsPage() {
                     <tr
                       key={lead.id}
                       onClick={() => router.push(`/leads/${lead.id}`)}
-                      className="cursor-pointer hover:bg-slate-50 transition-colors"
+                      className="cursor-pointer hover:bg-surface-container-low transition-colors"
                     >
                       <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
-                        <input type="checkbox" checked={selectedIds.has(lead.id)} onChange={() => toggleSelect(lead.id)} className="rounded border-slate-300" />
+                        <input type="checkbox" checked={selectedIds.has(lead.id)} onChange={() => toggleSelect(lead.id)} className="rounded border-card-border" />
                       </td>
                       <td className="px-6 py-4">
-                        <p className="font-semibold text-slate-900">{lead.property_address || 'No address'}</p>
-                        <p className="text-xs text-slate-500">{formatPhone(lead.phone)}</p>
+                        <p className="font-semibold text-on-surface">{lead.property_address || 'No address'}</p>
+                        <p className="text-xs text-secondary">{formatPhone(lead.phone)}</p>
                       </td>
                       <td className="px-6 py-4">
-                        <p className="font-medium text-slate-700">{lead.owner_name || lead.name || '--'}</p>
+                        <p className="font-medium text-on-surface">{lead.owner_name || lead.name || '--'}</p>
                       </td>
                       <td className="px-6 py-4">
                         <Badge status={lead.status} />
@@ -296,13 +303,13 @@ export default function LeadsPage() {
                           <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize ${PRIORITY_COLORS[lead.priority]}`}>
                             {lead.priority}
                           </span>
-                        ) : <span className="text-xs text-slate-300">--</span>}
+                        ) : <span className="text-xs text-on-surface-variant">--</span>}
                       </td>
-                      <td className="px-6 py-4 text-slate-500 text-sm">{lead.source ?? '--'}</td>
-                      <td className="px-6 py-4 text-sm text-slate-500">
+                      <td className="px-6 py-4 text-secondary text-sm">{lead.source ?? '--'}</td>
+                      <td className="px-6 py-4 text-sm text-secondary">
                         {lead.last_contact_date ? timeAgo(lead.last_contact_date) : 'Never'}
                       </td>
-                      <td className="px-6 py-4 text-sm text-slate-500">
+                      <td className="px-6 py-4 text-sm text-secondary">
                         {lead.follow_up_date ? formatDate(lead.follow_up_date) : '--'}
                       </td>
                     </tr>
@@ -311,12 +318,12 @@ export default function LeadsPage() {
               {!loading && leads.length === 0 && (
                 <tr>
                   <td colSpan={8} className="px-6 py-16 text-center">
-                    <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <MaterialIcon icon="person_search" className="text-[32px] text-slate-400" />
+                    <div className="w-16 h-16 bg-surface-container rounded-full flex items-center justify-center mx-auto mb-4">
+                      <MaterialIcon icon="person_search" className="text-[32px] text-on-surface-variant" />
                     </div>
-                    <h3 className="text-lg font-bold text-slate-900">No leads found</h3>
-                    <p className="text-slate-400 max-w-sm mx-auto mt-1 text-sm">Try adjusting your filters or import a new list.</p>
-                    <a href="/imports" className="inline-flex items-center gap-2 mt-4 px-6 py-2 bg-indigo-600 text-white font-bold rounded-lg text-sm hover:bg-indigo-700 transition-colors">
+                    <h3 className="text-lg font-bold text-on-surface">No leads found</h3>
+                    <p className="text-on-surface-variant max-w-sm mx-auto mt-1 text-sm">Try adjusting your filters or import a new list.</p>
+                    <a href="/imports" className="inline-flex items-center gap-2 mt-4 px-6 py-2 bg-primary text-white font-bold rounded-lg text-sm hover:bg-primary/90 transition-colors">
                       Import a List
                     </a>
                   </td>
@@ -327,8 +334,8 @@ export default function LeadsPage() {
         </div>
 
         {totalPages > 0 && (
-          <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50 px-6 py-3">
-            <span className="text-sm text-slate-500">Showing {rangeStart}–{rangeEnd} of {totalCount}</span>
+          <div className="flex items-center justify-between border-t border-card-border bg-surface-container-low px-6 py-3">
+            <span className="text-sm text-secondary">Showing {rangeStart}–{rangeEnd} of {totalCount}</span>
             <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
           </div>
         )}

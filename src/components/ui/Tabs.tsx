@@ -32,8 +32,8 @@ export default function Tabs({ tabs, activeKey, onTabChange, className }: Props)
             className={cn(
               "rounded-full px-4 py-1.5 text-sm transition-all",
               isActive
-                ? "bg-white font-bold text-blue-600 shadow-sm"
-                : "text-slate-500 hover:text-slate-700"
+                ? "bg-card font-bold text-primary shadow-sm"
+                : "text-secondary hover:text-on-surface"
             )}
           >
             {tab.label}
@@ -42,8 +42,8 @@ export default function Tabs({ tabs, activeKey, onTabChange, className }: Props)
                 className={cn(
                   "ml-1.5 inline-flex items-center justify-center rounded-full px-1.5 text-xs",
                   isActive
-                    ? "bg-blue-100 text-blue-600"
-                    : "bg-slate-200 text-slate-500"
+                    ? "bg-primary/10 text-primary"
+                    : "bg-outline-variant text-secondary"
                 )}
               >
                 {tab.count}

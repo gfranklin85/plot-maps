@@ -50,8 +50,8 @@ interface AdminData {
 const PRO_PRICE_ID = process.env.NEXT_PUBLIC_STRIPE_PRO_PRICE_ID || '';
 
 function getPlanLabel(status: string, priceId: string): { label: string; color: string } {
-  if (status !== 'active') return { label: 'Free', color: 'bg-slate-500/10 text-slate-400 border-slate-500/20' };
-  if (priceId === PRO_PRICE_ID) return { label: 'Pro', color: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' };
+  if (status !== 'active') return { label: 'Free', color: 'bg-secondary/10 text-on-surface-variant border-secondary/20' };
+  if (priceId === PRO_PRICE_ID) return { label: 'Pro', color: 'bg-primary/10 text-primary border-primary/20' };
   return { label: 'Starter', color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' };
 }
 
@@ -109,12 +109,12 @@ export default function AdminDashboard({ data }: { data: Record<string, unknown>
   }
 
   return (
-    <div className="p-8 bg-[#0c1324] min-h-[calc(100vh-4rem)] space-y-8">
+    <div className="p-8 bg-surface min-h-[calc(100vh-4rem)] space-y-8">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-extrabold text-slate-100 tracking-tight font-headline">Market Coverage & Seeding</h1>
-          <p className="text-sm text-slate-500 mt-1">Operator console — admin only</p>
+          <h1 className="text-2xl font-extrabold text-on-surface tracking-tight font-headline">Market Coverage & Seeding</h1>
+          <p className="text-sm text-secondary mt-1">Operator console — admin only</p>
         </div>
 
         {/* Seed Import Tool */}
@@ -124,7 +124,7 @@ export default function AdminDashboard({ data }: { data: Record<string, unknown>
             value={seedMarketTag}
             onChange={(e) => setSeedMarketTag(e.target.value)}
             placeholder="Market tag (e.g. Lemoore)"
-            className="bg-[#151b2d] border border-white/10 rounded-lg px-3 py-2 text-sm text-slate-200 w-48 focus:ring-1 focus:ring-indigo-500 focus:outline-none placeholder:text-slate-600"
+            className="bg-card border border-card-border rounded-lg px-3 py-2 text-sm text-on-surface w-48 focus:ring-1 focus:ring-primary focus:outline-none placeholder:text-on-surface-variant"
           />
           <input ref={fileRef} type="file" accept=".csv,.txt,.tsv" className="hidden" onChange={(e) => {
             const file = e.target.files?.[0];
@@ -133,7 +133,7 @@ export default function AdminDashboard({ data }: { data: Record<string, unknown>
           <button
             onClick={() => fileRef.current?.click()}
             disabled={seeding}
-            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-bold text-sm transition-all disabled:opacity-50"
+            className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-lg font-bold text-sm transition-all disabled:opacity-50"
           >
             <MaterialIcon icon={seeding ? 'hourglass_empty' : 'cloud_upload'} className={`text-[18px] ${seeding ? 'animate-spin' : ''}`} />
             {seeding ? 'Seeding...' : 'Seed Market Data'}
@@ -159,38 +159,38 @@ export default function AdminDashboard({ data }: { data: Record<string, unknown>
       {/* Main Grid */}
       <div className="grid grid-cols-12 gap-8">
         {/* Seeding Queue */}
-        <div className="col-span-12 xl:col-span-4 bg-[#151b2d] rounded-2xl border border-white/5 flex flex-col max-h-[600px]">
-          <div className="p-5 border-b border-white/5 flex justify-between items-center">
-            <h3 className="font-bold text-sm flex items-center gap-2 text-slate-200">
-              <MaterialIcon icon="queue" className="text-[18px] text-indigo-400" />
+        <div className="col-span-12 xl:col-span-4 bg-card rounded-2xl border border-card-border flex flex-col max-h-[600px]">
+          <div className="p-5 border-b border-card-border flex justify-between items-center">
+            <h3 className="font-bold text-sm flex items-center gap-2 text-on-surface">
+              <MaterialIcon icon="queue" className="text-[18px] text-primary" />
               Seeding Queue
             </h3>
-            <span className="text-[10px] font-black px-2 py-1 bg-white/10 rounded-full text-slate-300">{seedingQueue.length}</span>
+            <span className="text-[10px] font-black px-2 py-1 bg-surface-container rounded-full text-on-surface-variant">{seedingQueue.length}</span>
           </div>
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
             {seedingQueue.length === 0 && (
-              <p className="text-sm text-slate-500 text-center py-8">All markets have coverage</p>
+              <p className="text-sm text-secondary text-center py-8">All markets have coverage</p>
             )}
             {seedingQueue.map((m, i) => {
               const borderColor = m.coverage_status === 'None' ? 'border-rose-500' : 'border-amber-500';
               return (
-                <div key={i} className={`p-4 bg-[#0c1324] rounded-xl border-l-4 ${borderColor} flex justify-between items-start`}>
+                <div key={i} className={`p-4 bg-surface rounded-xl border-l-4 ${borderColor} flex justify-between items-start`}>
                   <div>
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs font-black text-slate-200">{titleCase(m.city)}</span>
+                      <span className="text-xs font-black text-on-surface">{titleCase(m.city)}</span>
                       <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase ${m.coverage_status === 'None' ? 'bg-rose-500/10 text-rose-400' : 'bg-amber-500/10 text-amber-400'}`}>
                         {m.coverage_status === 'None' ? 'No Coverage' : 'Thin'}
                       </span>
                     </div>
-                    <p className="text-xs text-slate-500 mb-2">{m.state}</p>
-                    <div className="flex items-center gap-3 text-[10px] text-slate-500">
-                      <span><b className="text-slate-300">{m.user_count}</b> Users</span>
-                      <span><b className="text-slate-300">{m.target_count}</b> Targets</span>
-                      <span><b className="text-slate-300">{m.context_count}</b> Context</span>
+                    <p className="text-xs text-secondary mb-2">{m.state}</p>
+                    <div className="flex items-center gap-3 text-[10px] text-secondary">
+                      <span><b className="text-on-surface-variant">{m.user_count}</b> Users</span>
+                      <span><b className="text-on-surface-variant">{m.target_count}</b> Targets</span>
+                      <span><b className="text-on-surface-variant">{m.context_count}</b> Context</span>
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-[10px] text-slate-500 uppercase mb-1">Priority</div>
+                    <div className="text-[10px] text-secondary uppercase mb-1">Priority</div>
                     <div className={`text-lg font-black ${m.coverage_status === 'None' ? 'text-rose-400' : 'text-amber-400'}`}>{m.priority_score}</div>
                   </div>
                 </div>
@@ -200,16 +200,16 @@ export default function AdminDashboard({ data }: { data: Record<string, unknown>
         </div>
 
         {/* Users Table */}
-        <div className="col-span-12 xl:col-span-8 bg-[#151b2d] rounded-2xl border border-white/5 overflow-hidden">
-          <div className="p-5 border-b border-white/5 flex justify-between items-center">
-            <h3 className="font-bold text-sm flex items-center gap-2 text-slate-200">
-              <MaterialIcon icon="group" className="text-[18px] text-indigo-400" />
+        <div className="col-span-12 xl:col-span-8 bg-card rounded-2xl border border-card-border overflow-hidden">
+          <div className="p-5 border-b border-card-border flex justify-between items-center">
+            <h3 className="font-bold text-sm flex items-center gap-2 text-on-surface">
+              <MaterialIcon icon="group" className="text-[18px] text-primary" />
               Users ({users.length})
             </h3>
           </div>
           <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
             <table className="w-full text-left">
-              <thead className="bg-[#0c1324]/50 text-[10px] font-bold uppercase tracking-widest text-slate-500 sticky top-0">
+              <thead className="bg-surface/50 text-[10px] font-bold uppercase tracking-widest text-secondary sticky top-0">
                 <tr>
                   <th className="px-5 py-3">User</th>
                   <th className="px-5 py-3">Plan</th>
@@ -218,21 +218,21 @@ export default function AdminDashboard({ data }: { data: Record<string, unknown>
                   <th className="px-5 py-3">Joined</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/5 text-sm">
+              <tbody className="divide-y divide-card-border text-sm">
                 {users.map(u => {
                   const plan = getPlanLabel(u.subscription_status, u.stripe_price_id);
                   return (
                     <tr key={u.id} className="hover:bg-white/[0.02] transition-colors">
                       <td className="px-5 py-3">
-                        <div className="font-semibold text-slate-200">{u.full_name || 'No name'}</div>
-                        <div className="text-[11px] text-slate-500">{u.email}</div>
+                        <div className="font-semibold text-on-surface">{u.full_name || 'No name'}</div>
+                        <div className="text-[11px] text-secondary">{u.email}</div>
                       </td>
                       <td className="px-5 py-3">
                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${plan.color}`}>{plan.label}</span>
                       </td>
-                      <td className="px-5 py-3 text-slate-400">{titleCase(u.primary_city)}</td>
-                      <td className="px-5 py-3 text-slate-300 font-semibold">{u.lead_count}</td>
-                      <td className="px-5 py-3 text-slate-500 text-xs">{timeAgo(u.created_at)}</td>
+                      <td className="px-5 py-3 text-on-surface-variant">{titleCase(u.primary_city)}</td>
+                      <td className="px-5 py-3 text-on-surface-variant font-semibold">{u.lead_count}</td>
+                      <td className="px-5 py-3 text-secondary text-xs">{timeAgo(u.created_at)}</td>
                     </tr>
                   );
                 })}
@@ -243,16 +243,16 @@ export default function AdminDashboard({ data }: { data: Record<string, unknown>
       </div>
 
       {/* Market Coverage Table */}
-      <div className="bg-[#151b2d] rounded-2xl border border-white/5 overflow-hidden">
-        <div className="p-5 border-b border-white/5">
-          <h3 className="font-bold text-sm flex items-center gap-2 text-slate-200">
-            <MaterialIcon icon="layers" className="text-[18px] text-indigo-400" />
+      <div className="bg-card rounded-2xl border border-card-border overflow-hidden">
+        <div className="p-5 border-b border-card-border">
+          <h3 className="font-bold text-sm flex items-center gap-2 text-on-surface">
+            <MaterialIcon icon="layers" className="text-[18px] text-primary" />
             Market Coverage ({markets.length} markets)
           </h3>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left">
-            <thead className="bg-[#0c1324]/50 text-[10px] font-bold uppercase tracking-widest text-slate-500">
+            <thead className="bg-surface/50 text-[10px] font-bold uppercase tracking-widest text-secondary">
               <tr>
                 <th className="px-5 py-3">City / State</th>
                 <th className="px-5 py-3">Users</th>
@@ -263,18 +263,18 @@ export default function AdminDashboard({ data }: { data: Record<string, unknown>
                 <th className="px-5 py-3">Priority</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/5 text-sm">
+            <tbody className="divide-y divide-card-border text-sm">
               {markets.slice(0, 50).map((m, i) => {
                 const badge = getCoverageBadge(m.coverage_status);
                 return (
                   <tr key={i} className="hover:bg-white/[0.02] transition-colors">
-                    <td className="px-5 py-3 font-semibold text-slate-200">{titleCase(m.city)}, {m.state}</td>
-                    <td className="px-5 py-3 text-slate-400">{m.user_count}</td>
-                    <td className="px-5 py-3 text-slate-300">{m.target_count}</td>
-                    <td className="px-5 py-3 text-slate-300">{m.context_count}</td>
+                    <td className="px-5 py-3 font-semibold text-on-surface">{titleCase(m.city)}, {m.state}</td>
+                    <td className="px-5 py-3 text-on-surface-variant">{m.user_count}</td>
+                    <td className="px-5 py-3 text-on-surface-variant">{m.target_count}</td>
+                    <td className="px-5 py-3 text-on-surface-variant">{m.context_count}</td>
                     <td className="px-5 py-3">
                       <div className="flex items-center gap-2">
-                        <div className="w-12 bg-white/5 h-1.5 rounded-full overflow-hidden">
+                        <div className="w-12 bg-card-border h-1.5 rounded-full overflow-hidden">
                           <div className={`h-full rounded-full ${badge.dotColor}`} style={{ width: `${m.coverage_pct}%` }} />
                         </div>
                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${badge.color}`}>
@@ -283,8 +283,8 @@ export default function AdminDashboard({ data }: { data: Record<string, unknown>
                         </span>
                       </div>
                     </td>
-                    <td className="px-5 py-3 text-xs text-slate-500">{timeAgo(m.freshness_date)}</td>
-                    <td className="px-5 py-3 font-black text-slate-300">{m.priority_score}</td>
+                    <td className="px-5 py-3 text-xs text-secondary">{timeAgo(m.freshness_date)}</td>
+                    <td className="px-5 py-3 font-black text-on-surface-variant">{m.priority_score}</td>
                   </tr>
                 );
               })}
@@ -294,31 +294,31 @@ export default function AdminDashboard({ data }: { data: Record<string, unknown>
       </div>
 
       {/* Recent Signups */}
-      <div className="bg-[#151b2d] rounded-2xl border border-white/5 overflow-hidden">
-        <div className="p-5 border-b border-white/5">
-          <h3 className="font-bold text-sm flex items-center gap-2 text-slate-200">
-            <MaterialIcon icon="person_add" className="text-[18px] text-indigo-400" />
+      <div className="bg-card rounded-2xl border border-card-border overflow-hidden">
+        <div className="p-5 border-b border-card-border">
+          <h3 className="font-bold text-sm flex items-center gap-2 text-on-surface">
+            <MaterialIcon icon="person_add" className="text-[18px] text-primary" />
             Recent Signups
           </h3>
         </div>
-        <div className="divide-y divide-white/5">
+        <div className="divide-y divide-card-border">
           {recentSignups.map(u => {
             const plan = getPlanLabel(u.subscription_status, u.stripe_price_id);
             return (
               <div key={u.id} className="px-5 py-3 flex items-center justify-between hover:bg-white/[0.02]">
                 <div className="flex items-center gap-4">
-                  <div className="w-8 h-8 rounded bg-[#23293c] flex items-center justify-center text-xs font-bold text-slate-300">
+                  <div className="w-8 h-8 rounded bg-surface-container flex items-center justify-center text-xs font-bold text-on-surface-variant">
                     {(u.full_name || '?').slice(0, 2).toUpperCase()}
                   </div>
                   <div>
-                    <div className="text-sm font-semibold text-slate-200">{u.full_name || 'No name'}</div>
-                    <div className="text-[11px] text-slate-500">{u.email}</div>
+                    <div className="text-sm font-semibold text-on-surface">{u.full_name || 'No name'}</div>
+                    <div className="text-[11px] text-secondary">{u.email}</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
                   <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${plan.color}`}>{plan.label}</span>
-                  <span className="text-xs text-slate-500">{u.lead_count} leads</span>
-                  <span className="text-xs text-slate-500">{timeAgo(u.created_at)}</span>
+                  <span className="text-xs text-secondary">{u.lead_count} leads</span>
+                  <span className="text-xs text-secondary">{timeAgo(u.created_at)}</span>
                 </div>
               </div>
             );
@@ -333,13 +333,13 @@ function SummaryCard({ label, value, sub, icon, accent, alert }: {
   label: string; value: string | number; sub: string; icon: string; accent?: boolean; alert?: boolean;
 }) {
   return (
-    <div className={`p-5 rounded-xl border ${accent ? 'bg-indigo-500/10 border-indigo-500/30' : alert ? 'bg-[#151b2d] border-rose-500/30' : 'bg-[#151b2d] border-white/5'}`}>
+    <div className={`p-5 rounded-xl border ${accent ? 'bg-primary/10 border-primary/30' : alert ? 'bg-card border-rose-500/30' : 'bg-card border-card-border'}`}>
       <div className="flex items-center justify-between mb-3">
-        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{label}</p>
-        <MaterialIcon icon={icon} className={`text-[18px] ${accent ? 'text-indigo-400' : alert ? 'text-rose-400' : 'text-slate-600'}`} />
+        <p className="text-[10px] font-bold text-secondary uppercase tracking-widest">{label}</p>
+        <MaterialIcon icon={icon} className={`text-[18px] ${accent ? 'text-primary' : alert ? 'text-rose-400' : 'text-on-surface-variant'}`} />
       </div>
-      <div className="text-2xl font-black text-slate-100 font-headline">{value}</div>
-      <p className="text-[11px] text-slate-500 mt-1">{sub}</p>
+      <div className="text-2xl font-black text-on-surface font-headline">{value}</div>
+      <p className="text-[11px] text-secondary mt-1">{sub}</p>
     </div>
   );
 }

@@ -48,14 +48,14 @@ export default function PlacesSearch({ onPlaceSelected, className }: Props) {
 
   return (
     <div className={`relative ${className || ''}`}>
-      <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[20px]">
+      <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[20px]">
         search
       </span>
       <input
         ref={inputRef}
         type="text"
         placeholder="Search address or area..."
-        className="w-full pl-10 pr-4 py-2.5 rounded-full bg-white text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 shadow-lg border border-slate-200"
+        className="w-full pl-10 pr-4 py-2.5 rounded-full bg-card text-sm text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-lg border border-card-border"
       />
     </div>
   );

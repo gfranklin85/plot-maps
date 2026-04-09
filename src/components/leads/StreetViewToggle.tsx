@@ -75,7 +75,7 @@ export default function StreetViewToggle({ lead }: Props) {
   }, [hasAddress, isSubscribed, lead.property_address]);
 
   return (
-    <div className="rounded-2xl bg-surface-container-lowest p-5 border border-slate-100">
+    <div className="rounded-2xl bg-surface-container-lowest p-5 border border-card-border">
       {/* Header + Toggle */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
@@ -91,13 +91,13 @@ export default function StreetViewToggle({ lead }: Props) {
           </h3>
         </div>
 
-        <div className="flex rounded-xl bg-slate-100 p-1">
+        <div className="flex rounded-xl bg-surface-container p-1">
           <button
             onClick={() => setMode('street')}
             className={cn(
               'flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all',
               mode === 'street'
-                ? 'bg-white text-on-surface shadow-sm'
+                ? 'bg-card text-on-surface shadow-sm'
                 : 'text-secondary hover:text-on-surface'
             )}
           >
@@ -109,7 +109,7 @@ export default function StreetViewToggle({ lead }: Props) {
             className={cn(
               'flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all',
               mode === 'map'
-                ? 'bg-white text-on-surface shadow-sm'
+                ? 'bg-card text-on-surface shadow-sm'
                 : 'text-secondary hover:text-on-surface'
             )}
           >
@@ -121,7 +121,7 @@ export default function StreetViewToggle({ lead }: Props) {
             className={cn(
               'flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all',
               mode === 'aerial'
-                ? 'bg-white text-on-surface shadow-sm'
+                ? 'bg-card text-on-surface shadow-sm'
                 : 'text-secondary hover:text-on-surface'
             )}
           >
@@ -141,8 +141,8 @@ export default function StreetViewToggle({ lead }: Props) {
           referrerPolicy="no-referrer-when-downgrade"
         />
       ) : (
-        <div className="flex flex-col items-center justify-center aspect-video rounded-xl bg-slate-50 text-secondary">
-          <MaterialIcon icon="location_off" className="text-[40px] text-slate-300 mb-2" />
+        <div className="flex flex-col items-center justify-center aspect-video rounded-xl bg-surface-container-low text-secondary">
+          <MaterialIcon icon="location_off" className="text-[40px] text-on-surface-variant mb-2" />
           <p className="text-sm font-medium">
             {!apiKey
               ? 'Google Maps API key not configured'

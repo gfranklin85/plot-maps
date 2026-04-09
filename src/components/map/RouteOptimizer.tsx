@@ -213,7 +213,7 @@ export default function RouteOptimizer({ leads, onClose }: Props) {
   }
 
   return (
-    <div className="fixed right-4 top-20 z-50 w-80 rounded-2xl bg-white shadow-2xl flex flex-col max-h-[calc(100vh-6rem)]">
+    <div className="fixed right-4 top-20 z-50 w-80 rounded-2xl bg-card shadow-2xl flex flex-col max-h-[calc(100vh-6rem)]">
       {/* Header */}
       <div className="flex items-center justify-between p-5 pb-3">
         <div className="flex items-center gap-2">
@@ -224,7 +224,7 @@ export default function RouteOptimizer({ leads, onClose }: Props) {
         </div>
         <button
           onClick={onClose}
-          className="flex h-8 w-8 items-center justify-center rounded-lg text-secondary hover:bg-slate-100 transition-colors"
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-secondary hover:bg-surface-container transition-colors"
         >
           <MaterialIcon icon="close" className="text-[20px]" />
         </button>
@@ -240,7 +240,7 @@ export default function RouteOptimizer({ leads, onClose }: Props) {
         <div className="relative">
           <MaterialIcon
             icon="search"
-            className="absolute left-2.5 top-2 text-[16px] text-slate-400"
+            className="absolute left-2.5 top-2 text-[16px] text-on-surface-variant"
           />
           <input
             type="text"
@@ -250,12 +250,12 @@ export default function RouteOptimizer({ leads, onClose }: Props) {
             className="w-full rounded-xl border border-outline-variant bg-surface-container-lowest pl-8 pr-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
           />
           {search.trim() && availableLeads.length > 0 && (
-            <div className="absolute left-0 right-0 top-full z-10 mt-1 max-h-40 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg">
+            <div className="absolute left-0 right-0 top-full z-10 mt-1 max-h-40 overflow-y-auto rounded-xl border border-card-border bg-card shadow-lg">
               {availableLeads.map((l) => (
                 <button
                   key={l.id}
                   onClick={() => addLead(l)}
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-slate-50 transition-colors"
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-surface-container-low transition-colors"
                 >
                   <MaterialIcon icon="add_circle" className="text-[16px] text-primary" />
                   <div className="min-w-0 flex-1">
@@ -273,7 +273,7 @@ export default function RouteOptimizer({ leads, onClose }: Props) {
         {/* Selected leads */}
         {selectedLeads.length === 0 ? (
           <div className="flex flex-col items-center py-6 text-secondary">
-            <MaterialIcon icon="pin_drop" className="text-[32px] text-slate-300" />
+            <MaterialIcon icon="pin_drop" className="text-[32px] text-on-surface-variant" />
             <p className="mt-2 text-sm">No leads added yet</p>
           </div>
         ) : (
@@ -301,8 +301,8 @@ export default function RouteOptimizer({ leads, onClose }: Props) {
                     className={cn(
                       'flex h-6 w-6 items-center justify-center rounded-md transition-colors',
                       idx === 0
-                        ? 'text-slate-300'
-                        : 'text-secondary hover:bg-slate-200'
+                        ? 'text-on-surface-variant'
+                        : 'text-secondary hover:bg-surface-container-high'
                     )}
                   >
                     <MaterialIcon icon="keyboard_arrow_up" className="text-[16px]" />
@@ -313,8 +313,8 @@ export default function RouteOptimizer({ leads, onClose }: Props) {
                     className={cn(
                       'flex h-6 w-6 items-center justify-center rounded-md transition-colors',
                       idx === selectedLeads.length - 1
-                        ? 'text-slate-300'
-                        : 'text-secondary hover:bg-slate-200'
+                        ? 'text-on-surface-variant'
+                        : 'text-secondary hover:bg-surface-container-high'
                     )}
                   >
                     <MaterialIcon icon="keyboard_arrow_down" className="text-[16px]" />
@@ -339,7 +339,7 @@ export default function RouteOptimizer({ leads, onClose }: Props) {
             className={cn(
               'flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all',
               loading
-                ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                ? 'bg-surface-container text-on-surface-variant cursor-not-allowed'
                 : 'bg-primary text-on-primary shadow-sm hover:shadow-md'
             )}
           >
@@ -360,7 +360,7 @@ export default function RouteOptimizer({ leads, onClose }: Props) {
         {/* Optimized results */}
         {optimizedRoute && (
           <div className="space-y-3">
-            <div className="rounded-xl bg-slate-50 px-4 py-2.5 text-xs font-medium text-secondary">
+            <div className="rounded-xl bg-surface-container-low px-4 py-2.5 text-xs font-medium text-secondary">
               {totalDistance && totalDuration && (
                 <span>
                   Total: {totalDistance} &bull; {totalDuration}
@@ -376,7 +376,7 @@ export default function RouteOptimizer({ leads, onClose }: Props) {
               {optimizedRoute.map((stop, idx) => (
                 <div key={stop.lead.id}>
                   {stop.distanceToNext && (
-                    <div className="ml-[22px] border-l-2 border-dashed border-slate-200 py-1 pl-4 text-[10px] text-slate-400">
+                    <div className="ml-[22px] border-l-2 border-dashed border-card-border py-1 pl-4 text-[10px] text-on-surface-variant">
                       {idx === 0
                         ? stop.distanceToNext + ' / ' + (stop.durationToNext || '')
                         : (optimizedRoute[idx - 1]?.distanceToNext || '') +
@@ -401,7 +401,7 @@ export default function RouteOptimizer({ leads, onClose }: Props) {
             {/* Open in Google Maps */}
             <button
               onClick={openInGoogleMaps}
-              className="flex w-full items-center justify-center gap-2 rounded-xl border border-outline-variant px-4 py-2.5 text-sm font-semibold text-primary hover:bg-slate-50 transition-colors"
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-outline-variant px-4 py-2.5 text-sm font-semibold text-primary hover:bg-surface-container-low transition-colors"
             >
               <MaterialIcon icon="open_in_new" className="text-[16px]" />
               Open in Google Maps
@@ -413,7 +413,7 @@ export default function RouteOptimizer({ leads, onClose }: Props) {
         {selectedLeads.length >= 1 && !optimizedRoute && (
           <button
             onClick={openInGoogleMaps}
-            className="flex w-full items-center justify-center gap-2 rounded-xl border border-outline-variant px-4 py-2.5 text-sm font-semibold text-primary hover:bg-slate-50 transition-colors"
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-outline-variant px-4 py-2.5 text-sm font-semibold text-primary hover:bg-surface-container-low transition-colors"
           >
             <MaterialIcon icon="open_in_new" className="text-[16px]" />
             Open in Google Maps

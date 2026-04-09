@@ -7,6 +7,7 @@ import ActionList from '@/components/dashboard/ActionList';
 import Scorecard from '@/components/dashboard/Scorecard';
 import MaterialIcon from '@/components/ui/MaterialIcon';
 import { useProfile } from '@/lib/profile-context';
+import { useAuth } from '@/lib/auth-context';
 import UpgradeGate from '@/components/ui/UpgradeGate';
 
 const DEFAULT_TARGETS: DailyTarget = {
@@ -27,6 +28,7 @@ const DEFAULT_TARGETS: DailyTarget = {
 
 export default function Dashboard() {
   const { profile, updateProfile } = useProfile();
+  const { user } = useAuth();
   const [targets, setTargets] = useState<DailyTarget>(DEFAULT_TARGETS);
   const [attentionLeads, setAttentionLeads] = useState<Lead[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
@@ -65,6 +67,7 @@ export default function Dashboard() {
       supabase
         .from('leads')
         .select('*')
+        .eq('user_id', user!.id)
         .eq('follow_up_date', todayStr)
         .in('status', ['Follow-Up', 'Hot Lead', 'New'])
         .eq('priority', 'high')
@@ -75,24 +78,28 @@ export default function Dashboard() {
       supabase
         .from('activities')
         .select('*')
+        .eq('user_id', user!.id)
         .gte('created_at', todayStart)
         .order('created_at', { ascending: false }),
 
       // Total lead count
       supabase
         .from('leads')
-        .select('*', { count: 'exact', head: true }),
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user!.id),
 
       // New leads this week
       supabase
         .from('leads')
         .select('*', { count: 'exact', head: true })
+        .eq('user_id', user!.id)
         .gte('created_at', weekStart.toISOString()),
 
       // Calls today
       supabase
         .from('activities')
         .select('*', { count: 'exact', head: true })
+        .eq('user_id', user!.id)
         .eq('type', 'call')
         .gte('created_at', todayStart),
     ]);
@@ -110,7 +117,8 @@ export default function Dashboard() {
     // Pipeline summary
     const allLeads = await supabase
       .from('leads')
-      .select('status');
+      .select('status')
+      .eq('user_id', user!.id);
     if (allLeads.data) {
       const counts: Record<string, number> = {};
       for (const row of allLeads.data) {
@@ -120,7 +128,7 @@ export default function Dashboard() {
     }
 
     setLoading(false);
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     fetchData();
@@ -184,11 +192,11 @@ export default function Dashboard() {
                 Get started by importing your property list. Upload a CSV from PropWire, BatchLeads, MLS, or any source with addresses.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <a href="/imports" className="flex items-center justify-center gap-2 rounded-xl action-gradient px-8 py-4 text-lg font-bold text-white hover:shadow-lg transition-shadow">
+                <a href="/imports" className="flex items-center justify-center gap-2 rounded-xl action-gradient px-8 py-4 text-lg font-bold text-on-primary hover:shadow-lg transition-shadow">
                   <MaterialIcon icon="upload_file" className="text-[22px]" />
                   Import Your First List
                 </a>
-                <a href="/map" className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-8 py-4 text-lg font-bold text-slate-700 hover:bg-slate-50 transition-colors">
+                <a href="/map" className="flex items-center justify-center gap-2 rounded-xl border border-card-border bg-card px-8 py-4 text-lg font-bold text-on-surface hover:bg-surface-container-low transition-colors">
                   <MaterialIcon icon="map" className="text-[22px]" />
                   Explore the Map
                 </a>
@@ -205,13 +213,13 @@ export default function Dashboard() {
     <div className="p-8">
       {/* Page header */}
       <div className="mb-8">
-        <h2 className="font-headline text-3xl font-extrabold text-slate-900">
+        <h2 className="font-headline text-3xl font-extrabold text-on-surface">
           Daily Action Feed
         </h2>
-        <p className="mt-1 text-slate-500 text-sm">
+        <p className="mt-1 text-secondary text-sm">
           {todayFormatted}
           {actionItems.length > 0 && (
-            <span className="ml-3 inline-flex items-center gap-1 rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-semibold text-indigo-700">
+            <span className="ml-3 inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
               {actionItems.length} priority actions
             </span>
           )}
@@ -223,15 +231,15 @@ export default function Dashboard() {
         {/* Left: Action Feed (primary) */}
         <div className="lg:col-span-8">
           {!isSubscribed && actionItems.length === 0 && (
-            <div className="mb-6 bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-200 rounded-xl p-6 flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-indigo-100 flex items-center justify-center shrink-0">
-                <MaterialIcon icon="auto_awesome" className="text-[24px] text-indigo-600" />
+            <div className="mb-6 bg-primary/5 border border-primary/20 rounded-xl p-6 flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                <MaterialIcon icon="auto_awesome" className="text-[24px] text-primary" />
               </div>
               <div className="flex-1">
-                <h3 className="font-bold text-slate-900 text-sm">AI Daily Action Feed</h3>
-                <p className="text-xs text-slate-500">Subscribe to get AI-prioritized actions every morning — know exactly who to call and why.</p>
+                <h3 className="font-bold text-on-surface text-sm">AI Daily Action Feed</h3>
+                <p className="text-xs text-secondary">Subscribe to get AI-prioritized actions every morning — know exactly who to call and why.</p>
               </div>
-              <a href="/subscribe" className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition-colors whitespace-nowrap">
+              <a href="/subscribe" className="px-4 py-2 bg-primary text-on-primary rounded-lg text-xs font-bold hover:bg-primary/90 transition-colors whitespace-nowrap">
                 Upgrade
               </a>
             </div>
@@ -247,7 +255,7 @@ export default function Dashboard() {
             <button
               onClick={generateActionList}
               disabled={actionLoading}
-              className="mt-4 flex items-center gap-2 text-sm text-indigo-600 font-medium hover:text-indigo-800 transition-colors"
+              className="mt-4 flex items-center gap-2 text-sm text-primary font-medium hover:text-primary/80 transition-colors"
             >
               <MaterialIcon icon="refresh" className={`text-[16px] ${actionLoading ? 'animate-spin' : ''}`} />
               {actionLoading ? 'Refreshing...' : 'Refresh action list'}
@@ -259,17 +267,17 @@ export default function Dashboard() {
         <div className="lg:col-span-4 space-y-4">
           {/* Quick stats inline */}
           <div className="grid grid-cols-3 gap-3">
-            <div className="bg-slate-50 rounded-xl p-4 text-center">
-              <p className="text-2xl font-extrabold text-slate-900">{loading ? '--' : totalLeads}</p>
-              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Leads</p>
+            <div className="bg-surface-container-lowest rounded-xl p-4 text-center">
+              <p className="text-2xl font-extrabold text-on-surface">{loading ? '--' : totalLeads}</p>
+              <p className="text-[10px] text-secondary font-bold uppercase tracking-wider">Leads</p>
             </div>
-            <div className="bg-slate-50 rounded-xl p-4 text-center">
-              <p className="text-2xl font-extrabold text-slate-900">{loading ? '--' : newThisWeek}</p>
-              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">New</p>
+            <div className="bg-surface-container-lowest rounded-xl p-4 text-center">
+              <p className="text-2xl font-extrabold text-on-surface">{loading ? '--' : newThisWeek}</p>
+              <p className="text-[10px] text-secondary font-bold uppercase tracking-wider">New</p>
             </div>
-            <div className="bg-slate-50 rounded-xl p-4 text-center">
-              <p className="text-2xl font-extrabold text-slate-900">{loading ? '--' : avgCallsDay}</p>
-              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Calls</p>
+            <div className="bg-surface-container-lowest rounded-xl p-4 text-center">
+              <p className="text-2xl font-extrabold text-on-surface">{loading ? '--' : avgCallsDay}</p>
+              <p className="text-[10px] text-secondary font-bold uppercase tracking-wider">Calls</p>
             </div>
           </div>
 
@@ -330,20 +338,20 @@ function MarketAreaPicker({ onComplete }: { onComplete: (lat: number, lng: numbe
   return (
     <div className="max-w-sm mx-auto">
       <div className="flex items-center gap-2 mb-3">
-        <MaterialIcon icon="location_on" className="text-[20px] text-blue-500" />
-        <label className="text-sm font-semibold text-slate-700">Your Market Area</label>
+        <MaterialIcon icon="location_on" className="text-[20px] text-primary" />
+        <label className="text-sm font-semibold text-on-surface">Your Market Area</label>
       </div>
       <input
         ref={inputRef}
         type="text"
         placeholder="Search city or zip code..."
         disabled={saving}
-        className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 disabled:opacity-50"
+        className="w-full px-4 py-3 rounded-xl bg-input-bg border border-input-border text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:opacity-50"
       />
       {saving && (
-        <p className="text-sm text-blue-600 mt-3 font-medium">Setting your market area...</p>
+        <p className="text-sm text-primary mt-3 font-medium">Setting your market area...</p>
       )}
-      <p className="text-xs text-slate-400 mt-2">Start typing to search — select a city to center your map.</p>
+      <p className="text-xs text-on-surface-variant mt-2">Start typing to search — select a city to center your map.</p>
     </div>
   );
 }

@@ -199,11 +199,11 @@ export function PhoneProvider({ children }: { children: ReactNode }) {
       'DNC': 'Do Not Call',
     };
     const newStatus = statusMap[outcome];
-    if (newStatus) {
+    if (newStatus && user?.id) {
       await supabase.from('leads').update({
         status: newStatus,
         last_contact_date: new Date().toISOString(),
-      }).eq('id', callingLeadId);
+      }).eq('id', callingLeadId).eq('user_id', user.id);
     }
 
     // Reset call state

@@ -3,7 +3,7 @@ import dynamic from "next/dynamic";
 const ImportMiniMap = dynamic(() => import("./ImportMiniMap"), {
   ssr: false,
   loading: () => (
-    <div className="h-full w-full bg-slate-100 animate-pulse rounded-2xl" />
+    <div className="h-full w-full bg-surface-container animate-pulse rounded-2xl" />
   ),
 });
 

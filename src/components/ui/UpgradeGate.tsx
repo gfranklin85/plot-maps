@@ -61,6 +61,20 @@ const FEATURES: Record<string, FeatureConfig> = {
     bullets: ['Real-Time Traffic Data', 'Multi-Destination Routes', 'Commute Scoring'],
     dismiss: 'Skip for now',
   },
+  dialer: {
+    title: 'Power Dialer Included',
+    icon: 'phone_in_talk',
+    description: 'Call owners directly from the map with one click. See the property while you talk.',
+    bullets: ['One-Click Calling from Map & Walk Mode', 'Call Logging & Outcome Tracking', 'Your Own Dedicated Phone Number'],
+    dismiss: 'Maybe later',
+  },
+  marketData: {
+    title: 'Unlock Full Market Data',
+    icon: 'analytics',
+    description: 'See pricing, sale history, and property details for every listing in your market.',
+    bullets: ['Sold Prices & Days on Market', 'Price-per-Sqft Comps', 'Complete Property Details'],
+    dismiss: 'Continue with limited view',
+  },
 };
 
 interface Props {

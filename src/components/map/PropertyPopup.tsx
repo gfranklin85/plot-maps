@@ -9,6 +9,7 @@ import { supabase } from "@/lib/supabase";
 import { useProfile } from "@/lib/profile-context";
 import { useAuth } from "@/lib/auth-context";
 import { usePhone } from "@/lib/phone-context";
+import UpgradeGate from "@/components/ui/UpgradeGate";
 
 interface Props {
   lead: Lead;
@@ -116,6 +117,9 @@ export default function PropertyPopup({ lead, onUpdate, walkMode = false, onWalk
   const [scriptOpen, setScriptOpen] = useState(false); // always collapsed by default
   const [editingScript, setEditingScript] = useState(false);
   const [localScript, setLocalScript] = useState('');
+  const [upgradeFeature, setUpgradeFeature] = useState<string | null>(null);
+
+  const isFree = profile.subscriptionStatus !== 'active';
 
   const phones = [lead.phone, lead.phone_2, lead.phone_3].filter(Boolean) as string[];
   const isMLS = !!lead.listing_status;
@@ -198,34 +202,53 @@ export default function PropertyPopup({ lead, onUpdate, walkMode = false, onWalk
           )}
         </div>
 
-        {/* 2. PRICE + STATUS (inline, not boxed) */}
+        {/* 2. PRICE + STATUS (inline, not boxed) — blurred for free users on MLS data */}
         {(priceStr || statusText) && (
-          <div className="flex items-center gap-2">
-            {priceStr && <span className="font-bold text-on-surface">{priceStr}</span>}
-            {priceStr && statusText && <span className="text-on-surface-variant/40 text-xs">·</span>}
-            {statusText && <span className={`font-semibold ${statusColor}`}>{statusText}</span>}
-            {lead.dom != null && (
-              <>
-                <span className="text-on-surface-variant/40 text-xs">·</span>
-                <span className="text-xs text-on-surface-variant">{lead.dom}d DOM</span>
-              </>
+          <div className={cn("flex items-center gap-2", isFree && isMLS && "relative")}>
+            <div className={cn(isFree && isMLS && "blur-sm select-none")}>
+              {priceStr && <span className="font-bold text-on-surface">{priceStr}</span>}
+              {priceStr && statusText && <span className="text-on-surface-variant/40 text-xs">·</span>}
+              {statusText && <span className={`font-semibold ${statusColor}`}>{statusText}</span>}
+              {lead.dom != null && (
+                <>
+                  <span className="text-on-surface-variant/40 text-xs">·</span>
+                  <span className="text-xs text-on-surface-variant">{lead.dom}d DOM</span>
+                </>
+              )}
+            </div>
+            {isFree && isMLS && (
+              <button onClick={() => setUpgradeFeature('marketData')} className="absolute inset-0 flex items-center justify-center">
+                <span className="text-[10px] font-bold text-primary bg-card/80 px-2 py-0.5 rounded-full border border-primary/30">Upgrade to see</span>
+              </button>
             )}
           </div>
         )}
 
-        {/* 3. KEY FACTS (one compressed line) */}
+        {/* 3. KEY FACTS (one compressed line) — blurred for free on MLS */}
         {facts && (
-          <p className="text-[11px] font-medium text-on-surface-variant/70 uppercase tracking-wide">{facts}</p>
+          <div className={cn(isFree && isMLS && "relative")}>
+            <p className={cn("text-[11px] font-medium text-on-surface-variant/70 uppercase tracking-wide", isFree && isMLS && "blur-sm select-none")}>{facts}</p>
+            {isFree && isMLS && (
+              <button onClick={() => setUpgradeFeature('marketData')} className="absolute inset-0" />
+            )}
+          </div>
         )}
 
-        {/* 4. TALKING POINTS (condensed — max 2, inline) */}
+        {/* 4. TALKING POINTS (condensed — max 2, inline) — blurred for free on MLS */}
         {topTalkingPoints.length > 0 && (
-          <div className="py-2 border-y border-card-border/50">
-            {topTalkingPoints.map((pt, i) => (
-              <p key={i} className="text-xs text-on-surface-variant leading-relaxed">
-                <span className="text-primary mr-1">·</span>{pt}
-              </p>
-            ))}
+          <div className={cn("py-2 border-y border-card-border/50", isFree && isMLS && "relative")}>
+            <div className={cn(isFree && isMLS && "blur-sm select-none")}>
+              {topTalkingPoints.map((pt, i) => (
+                <p key={i} className="text-xs text-on-surface-variant leading-relaxed">
+                  <span className="text-primary mr-1">·</span>{pt}
+                </p>
+              ))}
+            </div>
+            {isFree && isMLS && (
+              <button onClick={() => setUpgradeFeature('marketData')} className="absolute inset-0 flex items-center justify-center">
+                <span className="text-[10px] font-bold text-primary bg-card/80 px-2 py-0.5 rounded-full border border-primary/30">Upgrade to see</span>
+              </button>
+            )}
           </div>
         )}
 
@@ -236,6 +259,7 @@ export default function PropertyPopup({ lead, onUpdate, walkMode = false, onWalk
               <button
                 key={idx}
                 onClick={() => {
+                  if (isFree) { setUpgradeFeature('dialer'); return; }
                   if (isDesktop) makeCall(phone, lead.owner_name || lead.name || 'Unknown', lead.id);
                   else window.location.href = `tel:${phone}`;
                 }}
@@ -318,6 +342,13 @@ export default function PropertyPopup({ lead, onUpdate, walkMode = false, onWalk
           Open Full Record
         </Link>
       </div>
+
+      {/* Upgrade Gate Modal */}
+      <UpgradeGate
+        feature={upgradeFeature as 'dialer' | 'marketData'}
+        show={!!upgradeFeature}
+        onClose={() => setUpgradeFeature(null)}
+      />
     </div>
   );
 }

@@ -15,6 +15,7 @@ export default function SettingsPage() {
   const [geocoding, setGeocoding] = useState(false);
   const [mapCenterAddress, setMapCenterAddress] = useState('');
   const [geocodeResult, setGeocodeResult] = useState<{ total: number; geocoded: number } | null>(null);
+  const [prospectingFocus, setProspectingFocus] = useState('residential');
 
   // Local form state
   const [form, setForm] = useState<UserProfile>({ ...profile });
@@ -22,7 +23,7 @@ export default function SettingsPage() {
   // Call Scripts
   const [callScripts, setCallScripts] = useState<CallScript[]>([]);
   const [editingScript, setEditingScript] = useState<string | null>(null);
-  const [newQuestion, setNewQuestion] = useState('');
+  const [newQuestions, setNewQuestions] = useState<Record<string, string>>({});
 
   const fetchScripts = useCallback(async () => {
     const res = await fetch('/api/call-scripts');
@@ -32,12 +33,13 @@ export default function SettingsPage() {
   useEffect(() => { fetchScripts(); }, [fetchScripts]);
 
   async function addQuestion(scriptId: string) {
-    if (!newQuestion.trim()) return;
+    const text = (newQuestions[scriptId] || '').trim();
+    if (!text) return;
     const script = callScripts.find(s => s.id === scriptId);
     if (!script) return;
-    const questions = [...script.questions, { question: newQuestion.trim(), order: script.questions.length + 1 }];
+    const questions = [...script.questions, { question: text, order: script.questions.length + 1 }];
     await fetch('/api/call-scripts', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: scriptId, questions }) });
-    setNewQuestion('');
+    setNewQuestions((prev) => ({ ...prev, [scriptId]: '' }));
     fetchScripts();
   }
 
@@ -57,13 +59,6 @@ export default function SettingsPage() {
     updateProfile(form);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
-  }
-
-  function handleNotificationToggle(key: keyof UserProfile['notifications']) {
-    setForm((prev) => ({
-      ...prev,
-      notifications: { ...prev.notifications, [key]: !prev.notifications[key] },
-    }));
   }
 
   const { user } = useAuth();
@@ -252,9 +247,9 @@ export default function SettingsPage() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-on-surface mb-2">Default Map Center</label>
+          <label className="block text-sm font-medium text-on-surface mb-2">Default Market Area</label>
           <p className="text-xs text-secondary mb-2">
-            Search for a city or address to set where the map opens by default.
+            Set your primary prospecting area. The map will center here when you open it.
           </p>
           <MapCenterAutocomplete
             onPlaceSelected={(lat, lng, address) => {
@@ -276,6 +271,22 @@ export default function SettingsPage() {
               </button>
             </div>
           )}
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-on-surface mb-2">Prospecting Focus</label>
+          <select
+            value={prospectingFocus}
+            onChange={(e) => setProspectingFocus(e.target.value)}
+            className="w-full px-4 py-2.5 rounded-xl bg-input-bg border border-card-border text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+          >
+            <option value="residential">Residential</option>
+            <option value="multifamily">Multifamily</option>
+            <option value="land">Vacant Land</option>
+            <option value="commercial">Commercial</option>
+            <option value="mixed">Mixed Use</option>
+          </select>
+          <p className="text-xs text-secondary mt-1">This helps tailor scripts and suggestions to your focus.</p>
         </div>
       </section>
 
@@ -306,33 +317,37 @@ export default function SettingsPage() {
       <section className="glass-card rounded-2xl p-6 space-y-4">
         <div className="flex items-center gap-3 mb-2">
           <MaterialIcon icon="notifications" className="text-primary" />
-          <h2 className="text-lg font-bold text-on-surface font-headline">Notifications</h2>
+          <h2 className="text-lg font-bold text-on-surface font-headline">Notifications <span className="text-sm font-normal text-secondary">(Coming soon)</span></h2>
         </div>
 
-        {([
-          { key: 'email' as const, label: 'Email Notifications', desc: 'Receive updates and alerts via email' },
-          { key: 'push' as const, label: 'Push Notifications', desc: 'Browser push notifications for new activity' },
-          { key: 'sms' as const, label: 'SMS Alerts', desc: 'Text message alerts for urgent items' },
-        ]).map(({ key, label, desc }) => (
-          <div key={key} className="flex items-center justify-between py-2">
-            <div>
-              <p className="text-sm font-medium text-on-surface">{label}</p>
-              <p className="text-xs text-secondary">{desc}</p>
-            </div>
-            <button
-              onClick={() => handleNotificationToggle(key)}
-              className={`relative w-11 h-6 rounded-full transition-colors ${
-                form.notifications[key] ? 'bg-primary' : 'bg-outline-variant'
-              }`}
-            >
-              <span
-                className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${
-                  form.notifications[key] ? 'translate-x-5' : 'translate-x-0'
+        <p className="text-xs text-secondary italic">Notifications are not yet active.</p>
+
+        <div className="opacity-50 pointer-events-none">
+          {([
+            { key: 'email' as const, label: 'Email Notifications', desc: 'Receive updates and alerts via email' },
+            { key: 'push' as const, label: 'Push Notifications', desc: 'Browser push notifications for new activity' },
+            { key: 'sms' as const, label: 'SMS Alerts', desc: 'Text message alerts for urgent items' },
+          ]).map(({ key, label, desc }) => (
+            <div key={key} className="flex items-center justify-between py-2">
+              <div>
+                <p className="text-sm font-medium text-on-surface">{label}</p>
+                <p className="text-xs text-secondary">{desc}</p>
+              </div>
+              <button
+                onClick={() => {}}
+                className={`relative w-11 h-6 rounded-full transition-colors ${
+                  form.notifications[key] ? 'bg-primary' : 'bg-outline-variant'
                 }`}
-              />
-            </button>
-          </div>
-        ))}
+              >
+                <span
+                  className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${
+                    form.notifications[key] ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+          ))}
+        </div>
       </section>
 
       {/* Call Scripts */}
@@ -382,8 +397,8 @@ export default function SettingsPage() {
               <div className="flex gap-2 mt-3">
                 <input
                   type="text"
-                  value={newQuestion}
-                  onChange={(e) => setNewQuestion(e.target.value)}
+                  value={newQuestions[script.id] || ''}
+                  onChange={(e) => setNewQuestions((prev) => ({ ...prev, [script.id]: e.target.value }))}
                   placeholder="Add a question..."
                   onKeyDown={(e) => e.key === 'Enter' && addQuestion(script.id)}
                   className="flex-1 px-3 py-1.5 rounded-lg bg-input-bg border border-card-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
@@ -445,34 +460,6 @@ export default function SettingsPage() {
         )}
       </section>
 
-      {/* Integrations */}
-      <section className="glass-card rounded-2xl p-6 space-y-4">
-        <div className="flex items-center gap-3 mb-2">
-          <MaterialIcon icon="extension" className="text-primary" />
-          <h2 className="text-lg font-bold text-on-surface font-headline">Integrations</h2>
-        </div>
-
-        <div className="space-y-3">
-          {[
-            { name: 'Supabase', icon: 'cloud', status: 'Connected' },
-            { name: 'Google Maps', icon: 'map', status: 'Connected' },
-            { name: 'Twilio (Voice)', icon: 'call', status: 'Connected' },
-            { name: 'Resend (Email)', icon: 'mail', status: 'Connected' },
-            { name: 'Claude AI', icon: 'smart_toy', status: 'Connected' },
-          ].map(({ name, icon, status }) => (
-            <div key={name} className="flex items-center justify-between py-2">
-              <div className="flex items-center gap-3">
-                <MaterialIcon icon={icon} className="text-secondary text-[20px]" />
-                <span className="text-sm font-medium text-on-surface">{name}</span>
-              </div>
-              <span className="text-xs font-medium text-green-600 bg-green-50 px-2.5 py-1 rounded-full">
-                {status}
-              </span>
-            </div>
-          ))}
-        </div>
-      </section>
-
       {/* Save Button */}
       <div className="flex items-center gap-4">
         <button
@@ -485,6 +472,7 @@ export default function SettingsPage() {
           <span className="text-sm text-green-600 font-medium">Settings saved!</span>
         )}
       </div>
+      <p className="text-xs text-secondary -mt-4">Saves profile, map preferences, and script. Call scripts save automatically when edited.</p>
     </div>
   );
 }

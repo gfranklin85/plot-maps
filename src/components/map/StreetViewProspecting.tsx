@@ -185,13 +185,15 @@ function getLabel(lead: Lead): string {
   return firstName.length > 12 ? firstName.slice(0, 10) + '..' : firstName || '•';
 }
 
-function StreetViewInner({ leads, startPosition, onDataChanged, onPositionChanged, pinMode = 'labels' }: Props) {
+function StreetViewInner({ leads, startPosition, onDataChanged, onPositionChanged }: Props) {
   const apiLoaded = useApiIsLoaded();
   const containerRef = useRef<HTMLDivElement>(null);
   const panoramaRef = useRef<google.maps.StreetViewPanorama | null>(null);
   const markersRef = useRef<google.maps.Marker[]>([]);
   const leadsRef = useRef<Lead[]>([]);
   const visibleLeadIdsRef = useRef<Set<string>>(new Set());
+  const [walkPinMode, setWalkPinMode] = useState<PinMode>('detail');
+  const walkPinModeRef = useRef<PinMode>('detail');
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [popupPos, setPopupPos] = useState({ x: 16, y: 80 });
   const [posLocked, setPosLocked] = useState(false);
@@ -224,7 +226,7 @@ function StreetViewInner({ leads, startPosition, onDataChanged, onPositionChange
       if (!p) return;
       const heading = panorama.getPov()?.heading || 0;
       onPositionChanged?.({ lat: p.lat(), lng: p.lng() });
-      refreshMarkers(panorama, p.lat(), p.lng(), heading);
+      refreshMarkers(panorama, p.lat(), p.lng(), heading, walkPinModeRef.current);
     };
 
     // Refresh on walk AND on pan/turn
@@ -247,12 +249,25 @@ function StreetViewInner({ leads, startPosition, onDataChanged, onPositionChange
     const p = panorama.getPosition();
     if (p) {
       const heading = panorama.getPov()?.heading || 0;
-      refreshMarkers(panorama, p.lat(), p.lng(), heading);
+      refreshMarkers(panorama, p.lat(), p.lng(), heading, walkPinModeRef.current);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [leads]);
 
-  function refreshMarkers(panorama: google.maps.StreetViewPanorama, camLat: number, camLng: number, camHeading: number) {
+  // Re-render markers when walk pin mode changes
+  useEffect(() => {
+    walkPinModeRef.current = walkPinMode;
+    const panorama = panoramaRef.current;
+    if (!panorama) return;
+    const p = panorama.getPosition();
+    if (p) {
+      const heading = panorama.getPov()?.heading || 0;
+      refreshMarkers(panorama, p.lat(), p.lng(), heading, walkPinMode);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [walkPinMode]);
+
+  function refreshMarkers(panorama: google.maps.StreetViewPanorama, camLat: number, camLng: number, camHeading: number, pinMode: PinMode = 'detail') {
     markersRef.current.forEach((m) => m.setMap(null));
     markersRef.current = [];
 
@@ -310,9 +325,33 @@ function StreetViewInner({ leads, startPosition, onDataChanged, onPositionChange
     visibleLeadIdsRef.current = currentlyVisible;
   }
 
+  const PIN_OPTIONS: { mode: PinMode; label: string }[] = [
+    { mode: 'detail', label: 'Cards' },
+    { mode: 'labels', label: 'Labels' },
+    { mode: 'dots', label: 'Dots' },
+  ];
+
   return (
     <div className="relative h-full w-full">
       <div ref={containerRef} className="h-full w-full" />
+
+      {/* Walk Mode Pin Toggle */}
+      <div className="absolute top-4 left-4 z-40 flex items-center gap-1 rounded-full bg-slate-900/80 backdrop-blur-sm border border-slate-700 px-1 py-1">
+        <span className="material-symbols-outlined text-[14px] text-slate-400 ml-2 mr-1">push_pin</span>
+        {PIN_OPTIONS.map(({ mode, label }) => (
+          <button
+            key={mode}
+            onClick={() => setWalkPinMode(mode)}
+            className={`px-3 py-1 rounded-full text-xs font-semibold transition-all ${
+              walkPinMode === mode
+                ? 'bg-primary text-white'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
 
       {selectedLead && (
         <div
@@ -360,10 +399,10 @@ function StreetViewInner({ leads, startPosition, onDataChanged, onPositionChange
   );
 }
 
-export default function StreetViewProspecting({ leads, startPosition, onDataChanged, onPositionChanged, pinMode }: Props) {
+export default function StreetViewProspecting({ leads, startPosition, onDataChanged, onPositionChanged }: Props) {
   return (
     <APIProvider apiKey={API_KEY}>
-      <StreetViewInner leads={leads} startPosition={startPosition} onDataChanged={onDataChanged} onPositionChanged={onPositionChanged} pinMode={pinMode} />
+      <StreetViewInner leads={leads} startPosition={startPosition} onDataChanged={onDataChanged} onPositionChanged={onPositionChanged} />
     </APIProvider>
   );
 }

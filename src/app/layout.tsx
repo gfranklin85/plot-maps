@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { Analytics } from "@vercel/analytics/next";
 import ClientProviders from "@/components/layout/ClientProviders";
 import AppShell from "@/components/layout/AppShell";
 
@@ -33,6 +34,7 @@ export default function RootLayout({
             {children}
           </AppShell>
         </ClientProviders>
+        <Analytics />
       </body>
     </html>
   );

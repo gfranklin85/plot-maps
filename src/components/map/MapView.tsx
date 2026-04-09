@@ -64,24 +64,36 @@ function createDotIcon(lead: Lead): google.maps.Icon | google.maps.Symbol {
     : { path: google.maps.SymbolPath.CIRCLE, scale: 10, fillColor: color, fillOpacity: 1, strokeColor: "#ffffff", strokeWeight: 3 };
 }
 
-// Label mode: pill with price + status dot
+// Helper: days since a date
+function daysSince(dateStr: string | null): string {
+  if (!dateStr) return '';
+  const days = Math.floor((Date.now() - new Date(dateStr + 'T00:00:00').getTime()) / 86400000);
+  if (days <= 0) return 'Today';
+  if (days === 1) return '1d';
+  if (days < 30) return `${days}d`;
+  if (days < 365) return `${Math.round(days / 30)}mo`;
+  return `${Math.round(days / 365)}yr`;
+}
+
+// Label mode: compact rich pin — price + status + DOM + recency
 function createLabelIcon(lead: Lead): google.maps.Icon {
   const color = getStatusColor(lead);
   const price = formatPriceShort(lead.listing_price || lead.selling_price || null);
   const statusLabel = getStatusLabel(lead);
-  const label = price || lead.property_address?.split(',')[0]?.substring(0, 15) || '•';
+  const dom = lead.dom != null ? `${lead.dom}d` : '';
+  const recency = daysSince(lead.selling_date || lead.listing_date);
+  const subLine = [statusLabel, dom ? `${dom} DOM` : '', recency ? `${recency} ago` : ''].filter(Boolean).join(' · ');
 
-  const textLen = Math.max(label.length, 3);
-  const width = textLen * 8 + (statusLabel ? 40 : 20);
-  const height = 28;
+  const width = 120;
+  const height = subLine ? 38 : 28;
 
   const svg = `
     <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height + 8}">
-      <rect x="0" y="0" width="${width}" height="${height}" rx="14" fill="rgba(15,23,42,0.85)" stroke="${color}" stroke-width="1.5"/>
-      <circle cx="10" cy="${height / 2}" r="4" fill="${color}"/>
-      <text x="20" y="${height / 2 + 1}" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="11" font-weight="700" fill="white">${label}</text>
-      ${statusLabel ? `<text x="${width - 6}" y="${height / 2 + 1}" dominant-baseline="central" text-anchor="end" font-family="system-ui,sans-serif" font-size="8" font-weight="800" fill="${color}">${statusLabel}</text>` : ''}
-      <polygon points="${width / 2 - 4},${height} ${width / 2},${height + 7} ${width / 2 + 4},${height}" fill="rgba(15,23,42,0.85)"/>
+      <rect x="0" y="0" width="${width}" height="${height}" rx="8" fill="rgba(15,23,42,0.9)" stroke="${color}" stroke-width="1.5"/>
+      <circle cx="10" cy="12" r="3.5" fill="${color}"/>
+      <text x="18" y="13" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="800" fill="white">${price || '—'}</text>
+      ${subLine ? `<text x="6" y="30" font-family="system-ui,sans-serif" font-size="8" font-weight="600" fill="${color}">${subLine}</text>` : ''}
+      <polygon points="${width / 2 - 4},${height} ${width / 2},${height + 7} ${width / 2 + 4},${height}" fill="rgba(15,23,42,0.9)"/>
     </svg>`;
 
   return {
@@ -91,30 +103,29 @@ function createLabelIcon(lead: Lead): google.maps.Icon {
   };
 }
 
-// Detail mode: larger card with price, beds, sqft, status
+// Detail mode: full card — price, status, DOM, recency, sqft, year, pricing insight
 function createDetailIcon(lead: Lead): google.maps.Icon {
   const color = getStatusColor(lead);
   const price = formatPriceShort(lead.listing_price || lead.selling_price || null);
   const statusLabel = getStatusLabel(lead);
+  const dom = lead.dom != null ? `${lead.dom}d DOM` : '';
+  const recency = daysSince(lead.selling_date || lead.listing_date);
   const sqft = lead.sqft ? `${lead.sqft.toLocaleString()}sf` : '';
   const year = lead.year_built ? `${lead.year_built}` : '';
-  const detail = [sqft, year].filter(Boolean).join(' · ') || lead.property_address?.split(',')[0]?.substring(0, 20) || '';
+  const line2 = [statusLabel, dom, recency ? `${recency} ago` : ''].filter(Boolean).join(' · ');
+  const line3 = [sqft, year].filter(Boolean).join(' · ') || lead.property_address?.split(',')[0]?.substring(0, 22) || '';
 
-  const width = 160;
-  const height = 52;
+  const width = 150;
+  const height = 56;
 
   const svg = `
     <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height + 10}">
-      <defs>
-        <filter id="s" x="-10%" y="-10%" width="120%" height="120%">
-          <feDropShadow dx="0" dy="2" stdDeviation="3" flood-opacity="0.3"/>
-        </filter>
-      </defs>
-      <rect x="2" y="2" width="${width - 4}" height="${height - 4}" rx="10" fill="rgba(15,23,42,0.92)" filter="url(#s)" stroke="${color}" stroke-width="2"/>
-      ${statusLabel ? `<rect x="${width - 48}" y="6" width="42" height="14" rx="7" fill="${color}"/>
-      <text x="${width - 27}" y="14" dominant-baseline="central" text-anchor="middle" font-family="system-ui,sans-serif" font-size="8" font-weight="800" fill="white">${statusLabel}</text>` : ''}
-      <text x="12" y="20" font-family="system-ui,sans-serif" font-size="14" font-weight="800" fill="white">${price || '—'}</text>
-      <text x="12" y="38" font-family="system-ui,sans-serif" font-size="10" font-weight="500" fill="#94a3b8">${detail}</text>
+      <rect x="1" y="1" width="${width - 2}" height="${height - 2}" rx="10" fill="rgba(15,23,42,0.92)" stroke="${color}" stroke-width="2"/>
+      ${statusLabel ? `<rect x="${width - 48}" y="5" width="44" height="13" rx="6" fill="${color}"/>
+      <text x="${width - 26}" y="12.5" dominant-baseline="central" text-anchor="middle" font-family="system-ui,sans-serif" font-size="7.5" font-weight="800" fill="white">${statusLabel}</text>` : ''}
+      <text x="10" y="18" font-family="system-ui,sans-serif" font-size="14" font-weight="800" fill="white">${price || '—'}</text>
+      <text x="10" y="32" font-family="system-ui,sans-serif" font-size="8.5" font-weight="600" fill="${color}">${line2}</text>
+      <text x="10" y="46" font-family="system-ui,sans-serif" font-size="9" font-weight="500" fill="#94a3b8">${line3}</text>
       <polygon points="${width / 2 - 5},${height - 2} ${width / 2},${height + 8} ${width / 2 + 5},${height - 2}" fill="rgba(15,23,42,0.92)"/>
     </svg>`;
 

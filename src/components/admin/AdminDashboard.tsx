@@ -134,14 +134,23 @@ export default function AdminDashboard({ data }: { data: Record<string, unknown>
           <p className="text-sm text-secondary mt-1">Operator console — admin only</p>
         </div>
 
-        {/* Seed Toggle */}
-        <button
-          onClick={() => setSeedPanelOpen(!seedPanelOpen)}
-          className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-lg font-bold text-sm transition-all"
-        >
-          <MaterialIcon icon={seedPanelOpen ? 'close' : 'cloud_upload'} className="text-[18px]" />
-          {seedPanelOpen ? 'Close' : 'Seed Market Data'}
-        </button>
+        <div className="flex items-center gap-3">
+          <a
+            href="/admin/analytics"
+            className="flex items-center gap-2 border border-outline-variant hover:bg-surface-container text-on-surface px-4 py-2 rounded-lg font-bold text-sm transition-all"
+          >
+            <MaterialIcon icon="monitoring" className="text-[18px]" />
+            War Room
+          </a>
+          {/* Seed Toggle */}
+          <button
+            onClick={() => setSeedPanelOpen(!seedPanelOpen)}
+            className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-lg font-bold text-sm transition-all"
+          >
+            <MaterialIcon icon={seedPanelOpen ? 'close' : 'cloud_upload'} className="text-[18px]" />
+            {seedPanelOpen ? 'Close' : 'Seed Market Data'}
+          </button>
+        </div>
       </div>
 
       {/* Seed Panel */}

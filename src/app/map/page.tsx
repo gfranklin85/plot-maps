@@ -46,6 +46,7 @@ export default function MapPage() {
   const [hasUserPanned, setHasUserPanned] = useState(false);
   const [showGate, setShowGate] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [pinnedRef, setPinnedRef] = useState<Lead | null>(null);
   const [expandedView, setExpandedView] = useState(false);
   const [pinMode, setPinMode] = useState<PinMode>('dots');
   const isSubscribed = profile.subscriptionStatus === 'active';
@@ -73,6 +74,14 @@ export default function MapPage() {
     }
     fetchLeads();
   }, [user]);
+
+  function refetchLeads() {
+    if (!user) return;
+    supabase.from("leads").select("*")
+      .or(`user_id.eq.${user.id},record_type.eq.context`)
+      .not("latitude", "is", null).not("longitude", "is", null)
+      .then(({ data }) => { if (data) setLeads(data as Lead[]); });
+  }
 
   const distinctTags = useMemo(() => {
     const tagSet = new Set<string>();
@@ -192,9 +201,9 @@ export default function MapPage() {
             {[
               { key: 'all', label: 'All', dot: 'bg-primary' },
               { key: 'prospects', label: 'Prospects', dot: 'bg-orange-400' },
-              { key: 'Sold', label: 'Sold', dot: 'bg-green-500' },
-              { key: 'Active', label: 'Active', dot: 'bg-blue-500' },
-              { key: 'Pending', label: 'Pending', dot: 'bg-yellow-500' },
+              { key: 'Active', label: 'Active', dot: 'bg-green-500' },
+              { key: 'Sold', label: 'Sold', dot: 'bg-yellow-400' },
+              { key: 'Pending', label: 'Pending', dot: 'bg-purple-500' },
             ].map((f) => (
               <button
                 key={f.key}
@@ -211,24 +220,26 @@ export default function MapPage() {
             ))}
           </div>
 
-          {/* Pin View Mode */}
-          <div className="flex gap-0.5 bg-surface p-1 rounded-xl shadow-lg">
+          {/* Pins View Mode */}
+          <div className="flex items-center gap-0.5 bg-surface p-1 rounded-xl shadow-lg">
+            <span className="text-[9px] font-bold text-on-surface-variant uppercase tracking-wider px-2">Pins</span>
             {([
-              { mode: 'dots' as PinMode, icon: 'circle', label: 'Dots' },
-              { mode: 'labels' as PinMode, icon: 'label', label: 'Labels' },
-              { mode: 'detail' as PinMode, icon: 'badge', label: 'Detail' },
+              { mode: 'dots' as PinMode, icon: 'fiber_manual_record', label: 'Dots' },
+              { mode: 'labels' as PinMode, icon: 'sell', label: 'Labels' },
+              { mode: 'detail' as PinMode, icon: 'view_agenda', label: 'Cards' },
             ]).map(({ mode, icon, label }) => (
               <button
                 key={mode}
                 onClick={() => setPinMode(mode)}
                 title={label}
-                className={`w-9 h-9 flex items-center justify-center rounded-lg transition-all ${
+                className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1 ${
                   pinMode === mode
                     ? 'bg-primary text-white'
                     : 'text-on-surface-variant hover:text-primary'
                 }`}
               >
-                <MaterialIcon icon={icon} className="text-[18px]" />
+                <MaterialIcon icon={icon} className="text-[14px]" />
+                {label}
               </button>
             ))}
           </div>
@@ -417,34 +428,63 @@ export default function MapPage() {
         )}
       </div>
 
-      {/* Quick Property Card — fixed bottom-left, doesn't shift map */}
-      {selectedLead && !expandedView && !walkMode && (
-        <div className="absolute bottom-6 left-6 z-20 w-[380px] max-h-[70vh] overflow-y-auto rounded-2xl bg-card border border-card-border shadow-2xl">
+      {/* ═══ PINNED REFERENCE SIDEBAR — persistent comp while prospecting ═══ */}
+      {pinnedRef && !walkMode && (
+        <div className="absolute left-0 top-0 h-full w-[320px] z-20 bg-card/95 backdrop-blur-xl border-r border-card-border shadow-2xl flex flex-col">
+          <div className="px-4 py-3 bg-primary/10 border-b border-card-border shrink-0">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-black uppercase tracking-[0.15em] text-primary">Reference Property</span>
+              <button onClick={() => setPinnedRef(null)} className="text-secondary hover:text-on-surface">
+                <MaterialIcon icon="close" className="text-[18px]" />
+              </button>
+            </div>
+            <p className="text-sm font-bold text-on-surface mt-1 truncate">{pinnedRef.property_address?.split(',')[0]}</p>
+          </div>
+          <div className="flex-1 overflow-y-auto">
+            <PropertyPopup
+              lead={pinnedRef}
+              onUpdate={refetchLeads}
+              onWalkHere={(lead) => {
+                if (!isSubscribed) { setShowGate(true); return; }
+                if (lead.latitude && lead.longitude) {
+                  setMapCenter({ lat: lead.latitude, lng: lead.longitude });
+                  setWalkMode(true);
+                }
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* ═══ ACTIVE SELECTION CARD — bottom, changes with each click ═══ */}
+      {selectedLead && !walkMode && (
+        <div className={`absolute bottom-6 z-20 w-[380px] max-h-[60vh] overflow-y-auto rounded-2xl bg-card border border-card-border shadow-2xl ${pinnedRef ? 'left-[340px]' : 'left-6'}`}>
           <div className="flex items-center justify-between px-4 pt-3 pb-1">
-            <button
-              onClick={() => setExpandedView(true)}
-              className="text-[10px] font-bold text-primary uppercase tracking-widest hover:underline"
-            >
-              Expand
-            </button>
-            <button
-              onClick={() => setSelectedLead(null)}
-              className="text-secondary hover:text-on-surface transition-colors"
-            >
+            <div className="flex items-center gap-2">
+              {/* Pin to sidebar as reference */}
+              <button
+                onClick={() => { setPinnedRef(selectedLead); setSelectedLead(null); }}
+                className="flex items-center gap-1 text-[10px] font-bold text-primary uppercase tracking-widest hover:underline"
+                title="Pin as reference property"
+              >
+                <MaterialIcon icon="push_pin" className="text-[14px]" />
+                Pin
+              </button>
+              <button
+                onClick={() => setExpandedView(true)}
+                className="flex items-center gap-1 text-[10px] font-bold text-primary uppercase tracking-widest hover:underline"
+              >
+                <MaterialIcon icon="open_in_full" className="text-[14px]" />
+                Expand
+              </button>
+            </div>
+            <button onClick={() => setSelectedLead(null)} className="text-secondary hover:text-on-surface transition-colors">
               <MaterialIcon icon="close" className="text-[18px]" />
             </button>
           </div>
           <PropertyPopup
             lead={selectedLead}
-            onUpdate={() => {
-              // Refetch leads after update
-              if (user) {
-                supabase.from("leads").select("*")
-                  .or(`user_id.eq.${user.id},record_type.eq.context`)
-                  .not("latitude", "is", null).not("longitude", "is", null)
-                  .then(({ data }) => { if (data) setLeads(data as Lead[]); });
-              }
-            }}
+            onUpdate={refetchLeads}
             onWalkHere={(lead) => {
               if (!isSubscribed) { setShowGate(true); return; }
               if (lead.latitude && lead.longitude) {
@@ -457,34 +497,30 @@ export default function MapPage() {
         </div>
       )}
 
-      {/* Expanded Sidebar — fixed right panel, full detail */}
+      {/* ═══ EXPANDED FULL SIDEBAR — deep dive on selected property ═══ */}
       {selectedLead && expandedView && !walkMode && (
         <div className="absolute right-0 top-0 h-full w-[440px] z-20 bg-card border-l border-card-border shadow-2xl flex flex-col">
           <div className="flex items-center justify-between px-4 py-3 border-b border-card-border shrink-0">
-            <button
-              onClick={() => setExpandedView(false)}
-              className="text-[10px] font-bold text-primary uppercase tracking-widest hover:underline"
-            >
-              Collapse
-            </button>
-            <button
-              onClick={() => { setSelectedLead(null); setExpandedView(false); }}
-              className="text-secondary hover:text-on-surface transition-colors"
-            >
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => { setPinnedRef(selectedLead); setExpandedView(false); setSelectedLead(null); }}
+                className="flex items-center gap-1 text-[10px] font-bold text-primary uppercase tracking-widest hover:underline"
+              >
+                <MaterialIcon icon="push_pin" className="text-[14px]" />
+                Pin as Reference
+              </button>
+              <button onClick={() => setExpandedView(false)} className="text-[10px] font-bold text-secondary uppercase tracking-widest hover:underline">
+                Collapse
+              </button>
+            </div>
+            <button onClick={() => { setSelectedLead(null); setExpandedView(false); }} className="text-secondary hover:text-on-surface transition-colors">
               <MaterialIcon icon="close" className="text-[18px]" />
             </button>
           </div>
           <div className="flex-1 overflow-y-auto">
             <PropertyPopup
               lead={selectedLead}
-              onUpdate={() => {
-                if (user) {
-                  supabase.from("leads").select("*")
-                    .or(`user_id.eq.${user.id},record_type.eq.context`)
-                    .not("latitude", "is", null).not("longitude", "is", null)
-                    .then(({ data }) => { if (data) setLeads(data as Lead[]); });
-                }
-              }}
+              onUpdate={refetchLeads}
               onWalkHere={(lead) => {
                 if (!isSubscribed) { setShowGate(true); return; }
                 if (lead.latitude && lead.longitude) {

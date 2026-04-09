@@ -264,9 +264,9 @@ export interface ActionItem {
 export type ListingStatus = 'Sold' | 'Active' | 'Pending';
 
 export const LISTING_STATUS_COLORS: Record<string, string> = {
-  'Sold': '#16a34a',
-  'Active': '#f97316',
-  'Pending': '#eab308',
+  'Active': '#22c55e',    // green
+  'Pending': '#a855f7',   // purple
+  'Sold': '#eab308',      // yellow/gold
 };
 
 export const LISTING_STATUS_BG: Record<string, string> = {

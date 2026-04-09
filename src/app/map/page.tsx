@@ -458,7 +458,7 @@ export default function MapPage() {
 
       {/* ═══ ACTIVE SELECTION CARD — bottom, changes with each click ═══ */}
       {selectedLead && !walkMode && (
-        <div className={`absolute bottom-6 z-20 w-[380px] max-h-[60vh] overflow-y-auto rounded-2xl bg-card border border-card-border shadow-2xl ${pinnedRef ? 'left-[416px]' : 'left-6'}`}>
+        <div className={`absolute bottom-6 z-20 w-[380px] rounded-2xl bg-card border border-card-border shadow-2xl ${pinnedRef ? 'left-[416px]' : 'left-6'}`}>
           <div className="flex items-center justify-between px-4 pt-3 pb-1">
             <div className="flex items-center gap-2">
               {/* Pin to sidebar as reference */}

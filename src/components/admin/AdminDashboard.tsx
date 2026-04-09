@@ -88,7 +88,12 @@ export default function AdminDashboard({ data }: { data: Record<string, unknown>
   const [seedMode, setSeedMode] = useState<'file' | 'paste'>('paste');
   const [seedPasteText, setSeedPasteText] = useState('');
   const [seeding, setSeeding] = useState(false);
-  const [seedResult, setSeedResult] = useState<{ inserted: number; updated: number; geocoded: number; errors: number; total: number; format?: string; geocodeCost?: number } | null>(null);
+  const [seedResult, setSeedResult] = useState<{
+    inserted: number; updated: number; geocoded: number; errors: number; total: number;
+    format?: string; geocodeCost?: number;
+    incomplete?: { address: string; missing: string[] }[];
+    incompleteCount?: number; completeCount?: number;
+  } | null>(null);
   const [seedPanelOpen, setSeedPanelOpen] = useState(false);
 
   async function handleSeed(text: string, format?: string) {
@@ -102,7 +107,12 @@ export default function AdminDashboard({ data }: { data: Record<string, unknown>
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
-      setSeedResult({ inserted: data.inserted, updated: data.updated, geocoded: data.geocoded || 0, errors: data.errors, total: data.total, format: data.format, geocodeCost: data.geocodeCost || 0 });
+      setSeedResult({
+        inserted: data.inserted, updated: data.updated, geocoded: data.geocoded || 0,
+        errors: data.errors, total: data.total, format: data.format, geocodeCost: data.geocodeCost || 0,
+        incomplete: data.incomplete || [], incompleteCount: data.incompleteCount || 0,
+        completeCount: data.completeCount || 0,
+      });
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Seed failed');
     } finally {
@@ -191,6 +201,39 @@ export default function AdminDashboard({ data }: { data: Record<string, unknown>
               {seedResult.errors > 0 && (
                 <p className="text-xs text-red-400">{seedResult.errors} records failed to process</p>
               )}
+
+              {/* Quality Report */}
+              {seedResult.incompleteCount && seedResult.incompleteCount > 0 ? (
+                <div className="border-t border-card-border pt-3 mt-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <MaterialIcon icon="warning" className="text-[16px] text-amber-400" />
+                    <span className="text-xs font-bold text-amber-400">
+                      {seedResult.incompleteCount} records with missing data
+                    </span>
+                    <span className="text-xs text-secondary ml-auto">
+                      {seedResult.completeCount} complete
+                    </span>
+                  </div>
+                  <div className="max-h-48 overflow-y-auto space-y-1">
+                    {seedResult.incomplete?.map((item, i) => (
+                      <div key={i} className="flex items-center justify-between text-xs py-1 border-b border-card-border/50 last:border-0">
+                        <span className="text-on-surface font-medium truncate max-w-[200px]">{item.address}</span>
+                        <div className="flex gap-1 flex-wrap justify-end">
+                          {item.missing.map(field => (
+                            <span key={field} className="px-1.5 py-0.5 bg-amber-500/10 text-amber-400 rounded text-[10px] font-bold uppercase">
+                              {field}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                    {(seedResult.incompleteCount || 0) > 50 && (
+                      <p className="text-[10px] text-secondary italic">Showing first 50 of {seedResult.incompleteCount}</p>
+                    )}
+                  </div>
+                </div>
+              ) : null}
+
               <button
                 onClick={() => { setSeedResult(null); setSeedPasteText(''); }}
                 className="text-xs text-primary font-bold hover:underline"

@@ -287,6 +287,9 @@ export async function POST(request: Request) {
     return null;
   }
 
+  // Quality tracking
+  const incomplete: { address: string; missing: string[] }[] = [];
+
   if (format === 'rpr') {
     // ── RPR Paste Flow ──
     const properties = parseRPR(csvText);
@@ -297,6 +300,18 @@ export async function POST(request: Request) {
     }
 
     for (const prop of properties) {
+      // Track missing fields
+      const missing: string[] = [];
+      if (!prop.price) missing.push('price');
+      if (!prop.beds) missing.push('beds');
+      if (!prop.baths) missing.push('baths');
+      if (!prop.sqft) missing.push('sqft');
+      if (!prop.year_built) missing.push('year_built');
+      if (!prop.lot_acres) missing.push('lot_size');
+      if (!prop.date) missing.push('list_date');
+      if (missing.length > 0) {
+        incomplete.push({ address: prop.address.split(',')[0], missing });
+      }
       const addrKey = prop.address.split(',')[0].trim().toUpperCase();
 
       const leadData = {
@@ -466,5 +481,8 @@ export async function POST(request: Request) {
     format,
     geocodeCost,
     marketTag: marketTag || null,
+    incomplete: incomplete.slice(0, 50), // top 50 incomplete records
+    incompleteCount: incomplete.length,
+    completeCount: total - incomplete.length - errors,
   });
 }

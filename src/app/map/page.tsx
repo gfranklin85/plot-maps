@@ -55,10 +55,11 @@ export default function MapPage() {
     async function fetchLeads() {
       if (!user) return;
 
+      // Fetch user's own leads + shared context records
       const { data } = await supabase
         .from("leads")
         .select("*")
-        .eq("user_id", user.id)
+        .or(`user_id.eq.${user.id},record_type.eq.context`)
         .not("latitude", "is", null)
         .not("longitude", "is", null);
 

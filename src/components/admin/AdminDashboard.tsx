@@ -85,27 +85,34 @@ export default function AdminDashboard({ data }: { data: Record<string, unknown>
   // Seed import state
   const fileRef = useRef<HTMLInputElement>(null);
   const [seedMarketTag, setSeedMarketTag] = useState('');
+  const [seedMode, setSeedMode] = useState<'file' | 'paste'>('paste');
+  const [seedPasteText, setSeedPasteText] = useState('');
   const [seeding, setSeeding] = useState(false);
-  const [seedResult, setSeedResult] = useState<{ inserted: number; updated: number; errors: number; total: number } | null>(null);
+  const [seedResult, setSeedResult] = useState<{ inserted: number; updated: number; errors: number; total: number; format?: string } | null>(null);
+  const [seedPanelOpen, setSeedPanelOpen] = useState(false);
 
-  async function handleSeedFile(file: File) {
+  async function handleSeed(text: string, format?: string) {
     setSeeding(true);
     setSeedResult(null);
-    const text = await file.text();
     try {
       const res = await fetch('/api/admin/seed', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ csvText: text, marketTag: seedMarketTag || null }),
+        body: JSON.stringify({ csvText: text, marketTag: seedMarketTag || null, format }),
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
-      setSeedResult({ inserted: data.inserted, updated: data.updated, errors: data.errors, total: data.total });
+      setSeedResult({ inserted: data.inserted, updated: data.updated, errors: data.errors, total: data.total, format: data.format });
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Seed failed');
     } finally {
       setSeeding(false);
     }
+  }
+
+  async function handleSeedFile(file: File) {
+    const text = await file.text();
+    await handleSeed(text);
   }
 
   return (
@@ -117,34 +124,91 @@ export default function AdminDashboard({ data }: { data: Record<string, unknown>
           <p className="text-sm text-secondary mt-1">Operator console — admin only</p>
         </div>
 
-        {/* Seed Import Tool */}
-        <div className="flex items-center gap-3">
-          <input
-            type="text"
-            value={seedMarketTag}
-            onChange={(e) => setSeedMarketTag(e.target.value)}
-            placeholder="Market tag (e.g. Lemoore)"
-            className="bg-card border border-card-border rounded-lg px-3 py-2 text-sm text-on-surface w-48 focus:ring-1 focus:ring-primary focus:outline-none placeholder:text-on-surface-variant"
-          />
-          <input ref={fileRef} type="file" accept=".csv,.txt,.tsv" className="hidden" onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) handleSeedFile(file);
-          }} />
-          <button
-            onClick={() => fileRef.current?.click()}
-            disabled={seeding}
-            className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-lg font-bold text-sm transition-all disabled:opacity-50"
-          >
-            <MaterialIcon icon={seeding ? 'hourglass_empty' : 'cloud_upload'} className={`text-[18px] ${seeding ? 'animate-spin' : ''}`} />
-            {seeding ? 'Seeding...' : 'Seed Market Data'}
-          </button>
-          {seedResult && (
-            <span className="text-xs text-emerald-400 font-bold">
-              {seedResult.inserted} new · {seedResult.updated} updated · {seedResult.errors} errors
-            </span>
+        {/* Seed Toggle */}
+        <button
+          onClick={() => setSeedPanelOpen(!seedPanelOpen)}
+          className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-lg font-bold text-sm transition-all"
+        >
+          <MaterialIcon icon={seedPanelOpen ? 'close' : 'cloud_upload'} className="text-[18px]" />
+          {seedPanelOpen ? 'Close' : 'Seed Market Data'}
+        </button>
+      </div>
+
+      {/* Seed Panel */}
+      {seedPanelOpen && (
+        <div className="bg-card border border-card-border rounded-2xl p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="font-bold text-sm text-on-surface flex items-center gap-2">
+              <MaterialIcon icon="cloud_upload" className="text-[18px] text-primary" />
+              Seed Market Data
+            </h3>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setSeedMode('paste')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${seedMode === 'paste' ? 'bg-primary text-white' : 'bg-surface-container text-secondary'}`}
+              >
+                Paste RPR
+              </button>
+              <button
+                onClick={() => setSeedMode('file')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${seedMode === 'file' ? 'bg-primary text-white' : 'bg-surface-container text-secondary'}`}
+              >
+                Upload CSV
+              </button>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <input
+              type="text"
+              value={seedMarketTag}
+              onChange={(e) => setSeedMarketTag(e.target.value)}
+              placeholder="Market tag (e.g. Hanford)"
+              className="bg-surface border border-card-border rounded-lg px-3 py-2 text-sm text-on-surface w-48 focus:ring-1 focus:ring-primary focus:outline-none placeholder:text-secondary"
+            />
+            {seedResult && (
+              <span className="text-xs text-emerald-400 font-bold">
+                {seedResult.format === 'rpr' ? 'RPR' : 'CSV'}: {seedResult.inserted} new · {seedResult.updated} updated · {seedResult.errors} errors ({seedResult.total} total)
+              </span>
+            )}
+          </div>
+
+          {seedMode === 'paste' ? (
+            <div className="space-y-3">
+              <textarea
+                value={seedPasteText}
+                onChange={(e) => setSeedPasteText(e.target.value)}
+                rows={10}
+                className="w-full bg-surface border border-card-border rounded-xl p-4 font-mono text-xs text-on-surface focus:ring-1 focus:ring-primary resize-none placeholder:text-secondary"
+                placeholder={"Paste RPR listing data here...\n\nCopy from RPR → Ctrl+A → Ctrl+C → Paste here\n\nActive  SFR  $450,000  3/15/26  123 Main St\nHanford, CA 93230  3  2  1,500  0.25 Acres  1995  $300"}
+              />
+              <button
+                onClick={() => handleSeed(seedPasteText, 'rpr')}
+                disabled={seeding || !seedPasteText.trim()}
+                className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-6 py-2.5 rounded-lg font-bold text-sm transition-all disabled:opacity-50"
+              >
+                <MaterialIcon icon={seeding ? 'hourglass_empty' : 'rocket_launch'} className={`text-[18px] ${seeding ? 'animate-spin' : ''}`} />
+                {seeding ? 'Seeding...' : 'Seed from Paste'}
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <input ref={fileRef} type="file" accept=".csv,.txt,.tsv" className="hidden" onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handleSeedFile(file);
+              }} />
+              <button
+                onClick={() => fileRef.current?.click()}
+                disabled={seeding}
+                className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-6 py-2.5 rounded-lg font-bold text-sm transition-all disabled:opacity-50"
+              >
+                <MaterialIcon icon={seeding ? 'hourglass_empty' : 'upload_file'} className={`text-[18px] ${seeding ? 'animate-spin' : ''}`} />
+                {seeding ? 'Seeding...' : 'Upload CSV File'}
+              </button>
+            </div>
           )}
         </div>
-      </div>
+      )}
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">

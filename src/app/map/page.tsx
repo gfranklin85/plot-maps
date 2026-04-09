@@ -390,6 +390,7 @@ export default function MapPage() {
             leads={filteredLeads}
             startPosition={mapCenter || undefined}
             onPositionChanged={setMapCenter}
+            pinMode={pinMode}
           />
         ) : (
           <MapDynamic

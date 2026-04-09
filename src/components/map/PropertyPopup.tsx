@@ -41,12 +41,6 @@ function fillScript(template: string, lead: Lead): string {
     .replace(/\{value\}/g, value);
 }
 
-function formatSaleDate(dateStr: string | null): string {
-  if (!dateStr) return '';
-  const d = new Date(dateStr + 'T00:00:00');
-  return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-}
-
 function generateTalkingPoints(lead: Lead): string[] {
   const points: string[] = [];
 
@@ -116,7 +110,7 @@ export default function PropertyPopup({ lead, onUpdate, walkMode = false, onWalk
   const { user } = useAuth();
   const { makeCall, isDesktop } = usePhone();
   const [note, setNote] = useState('');
-  const [saving, setSaving] = useState(false);
+  const [, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [outcomeLogged, setOutcomeLogged] = useState<string | null>(null);
   const [scriptOpen, setScriptOpen] = useState(false); // always collapsed by default
@@ -159,195 +153,168 @@ export default function PropertyPopup({ lead, onUpdate, walkMode = false, onWalk
     onUpdate?.();
   }
 
+  // Status color for inline text
+  const statusColor = isSold ? 'text-yellow-400' : isActive ? 'text-green-400' : isPending ? 'text-purple-400' : 'text-on-surface-variant';
+  const statusText = isSold ? 'Sold' : isActive ? 'Active' : isPending ? 'Pending' : '';
+  const price = lead.selling_price || lead.listing_price;
+  const priceStr = price ? `$${price.toLocaleString()}` : '';
+
+  // Compact facts line
+  const facts = [
+    lead.sqft ? `${lead.sqft.toLocaleString()} sqft` : '',
+    lead.year_built ? `Built ${lead.year_built}` : '',
+    lead.lot_acres ? `${lead.lot_acres} ac` : '',
+  ].filter(Boolean).join(' · ');
+
+  // Top 2 talking points only for compact view
+  const topTalkingPoints = talkingPoints.slice(0, 2);
+
   return (
-    <div className={cn("bg-card rounded-2xl overflow-hidden", walkMode ? "min-w-[280px] max-w-[320px]" : "min-w-[360px] max-w-[400px]")}>
-      {/* ─── Walk Here button (aerial mode only) ─── */}
-      {!walkMode && onWalkHere && lead.latitude != null && lead.longitude != null && (
-        <div className="px-4 pt-3 pb-1">
-          <button
-            onClick={() => onWalkHere(lead)}
-            className="w-full flex items-center justify-center gap-2 py-2 rounded-lg bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 transition-colors"
-          >
-            <span className="material-symbols-outlined text-[16px]">streetview</span>
-            Walk Here
-          </button>
-        </div>
-      )}
-
-      {/* ─── HEADLINE ─── */}
-      <div className="px-4 pt-3 pb-2">
-        {/* Sold/Active headline — BIG and prominent for MLS */}
-        {isSold && lead.selling_price && (
-          <div className="mb-2 rounded-lg bg-green-50 border border-green-200 p-2.5 text-center">
-            <p className="text-lg font-black text-green-800">
-              Sold for ${lead.selling_price.toLocaleString()}
+    <div className={cn("bg-card rounded-2xl overflow-hidden", walkMode ? "min-w-[280px] max-w-[320px]" : "w-full")}>
+      {/* ─── CONTENT ─── */}
+      <div className="px-5 pt-4 pb-3 space-y-3">
+        {/* 1. ADDRESS (primary — largest, boldest) */}
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="font-headline text-lg font-extrabold tracking-tight text-on-surface leading-tight">
+              {lead.property_address?.split(',')[0] || 'No address'}
+            </h2>
+            <p className="text-xs text-on-surface-variant font-medium">
+              {lead.property_address?.split(',').slice(1).join(',').trim() || ''}
             </p>
-            {lead.selling_date && (
-              <p className="text-xs font-bold text-green-600">{formatSaleDate(lead.selling_date)}</p>
-            )}
-            {lead.dom != null && (
-              <p className="text-[10px] text-green-500 mt-0.5">{lead.dom} days on market</p>
+            {!isMLS && (lead.owner_name || lead.name) && (
+              <p className="text-xs text-on-surface-variant mt-0.5">{lead.owner_name || lead.name}</p>
             )}
           </div>
-        )}
-
-        {isActive && lead.listing_price && (
-          <div className="mb-2 rounded-lg bg-orange-50 border border-orange-200 p-2.5 text-center">
-            <p className="text-lg font-black text-orange-800">
-              Listed ${lead.listing_price.toLocaleString()}
-            </p>
-            {lead.dom != null && (
-              <p className="text-xs font-bold text-orange-600">{lead.dom} days on market</p>
-            )}
-          </div>
-        )}
-
-        {isPending && (
-          <div className="mb-2 rounded-lg bg-yellow-50 border border-yellow-200 p-2.5 text-center">
-            <p className="text-lg font-black text-yellow-800">
-              Pending {lead.listing_price ? `— $${lead.listing_price.toLocaleString()}` : ''}
-            </p>
-          </div>
-        )}
-
-        <p className="text-sm font-bold text-on-surface leading-snug">{lead.property_address || 'No address'}</p>
-        {!isMLS && (
-          <p className="text-xs text-on-surface-variant font-medium">{lead.owner_name || lead.name}</p>
-        )}
-
-        {/* MLS detail row */}
-        {isMLS && lead.listing_price && lead.selling_price && lead.selling_price > 0 && (
-          <p className="text-[11px] text-secondary mt-0.5">
-            Listed ${lead.listing_price.toLocaleString()} → Sold ${lead.selling_price.toLocaleString()}
-          </p>
-        )}
-      </div>
-
-      {/* ─── TALKING POINTS (MLS only) ─── */}
-      {talkingPoints.length > 0 && (
-        <div className="px-4 pb-2">
-          <p className="text-[9px] font-bold text-on-surface-variant uppercase tracking-widest mb-1">Talking Points</p>
-          <ul className="space-y-1">
-            {talkingPoints.map((pt, i) => (
-              <li key={i} className="flex items-start gap-1.5 text-[11px] text-on-surface">
-                <MaterialIcon icon="arrow_right" className="text-[14px] text-blue-500 mt-0 shrink-0" />
-                <span>{pt}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {/* ─── PHONES (prospects with phone data) ─── */}
-      {phones.length > 0 && (
-        <div className="px-4 pb-2 flex flex-wrap gap-2">
-          {phones.map((phone, idx) => (
+          {/* Walk Here — demoted to small pill */}
+          {!walkMode && onWalkHere && lead.latitude != null && lead.longitude != null && (
             <button
-              key={idx}
-              onClick={() => {
-                if (isDesktop) {
-                  makeCall(phone, lead.owner_name || lead.name || 'Unknown', lead.id);
-                } else {
-                  window.location.href = `tel:${phone}`;
-                }
-              }}
-              className="flex items-center gap-1 text-[11px] font-bold text-emerald-600 hover:underline cursor-pointer"
+              onClick={() => onWalkHere(lead)}
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-surface-container-high border border-card-border text-xs font-medium text-primary hover:bg-primary hover:text-white transition-all shrink-0"
             >
-              <MaterialIcon icon="call" className="text-[12px] text-green-600" />
-              {formatPhone(phone)}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* ─── SCRIPT (collapsible, editable) ─── */}
-      {profile.openingScript && (
-        <div className="px-4 pb-2">
-          <button
-            onClick={() => setScriptOpen(!scriptOpen)}
-            className="flex items-center gap-1 text-[10px] font-bold text-primary uppercase tracking-widest hover:text-primary/80 w-full"
-          >
-            <MaterialIcon icon={scriptOpen ? 'expand_less' : 'expand_more'} className="text-[16px]" />
-            Script
-            {!scriptOpen && <span className="text-on-surface-variant normal-case font-normal ml-1">tap to expand</span>}
-          </button>
-          {scriptOpen && (
-            <div className="mt-1 rounded-lg bg-primary/10 border border-primary/20 p-2 max-h-40 overflow-y-auto">
-              {editingScript ? (
-                <div>
-                  <textarea
-                    value={localScript}
-                    onChange={(e) => setLocalScript(e.target.value)}
-                    rows={5}
-                    className="w-full rounded border border-primary/20 bg-card px-2 py-1.5 text-[11px] text-primary leading-snug focus:outline-none focus:ring-1 focus:ring-primary resize-none"
-                  />
-                  <div className="flex gap-2 mt-1">
-                    <button onClick={() => setEditingScript(false)} className="text-[10px] font-bold text-primary hover:underline">Done</button>
-                  </div>
-                </div>
-              ) : (
-                <div onClick={() => { setLocalScript(fillScript(profile.openingScript, lead)); setEditingScript(true); }} className="cursor-pointer">
-                  <p className="text-[11px] text-primary leading-snug whitespace-pre-line">{fillScript(profile.openingScript, lead)}</p>
-                  <p className="text-[9px] text-primary/60 mt-1 italic">Click to edit</p>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ─── NOTES ─── */}
-      <div className="px-4 pb-2">
-        <div className="relative">
-          <textarea
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter' && e.ctrlKey) saveNote(); }}
-            rows={2}
-            className="w-full rounded-lg border border-card-border bg-surface-container-low px-3 py-2 text-xs focus:ring-2 focus:ring-primary outline-none resize-none placeholder:text-on-surface-variant"
-            placeholder="Type note here... (Ctrl+Enter to save)"
-          />
-          {note.trim() && (
-            <button onClick={saveNote} disabled={saving}
-              className="absolute bottom-2 right-2 text-[10px] font-bold text-primary hover:text-primary/80 disabled:opacity-50">
-              {saving ? '...' : 'Save'}
+              <MaterialIcon icon="directions_walk" className="text-[14px]" />
+              Walk
             </button>
           )}
         </div>
-        {saved && <p className="text-[10px] text-emerald-600 font-bold mt-0.5">Note saved!</p>}
-      </div>
 
-      {/* ─── CALL OUTCOMES ─── */}
-      <div className="px-4 pb-3">
-        <p className="text-[9px] font-bold text-on-surface-variant uppercase tracking-widest mb-1.5">Call Outcome</p>
-        {outcomeLogged ? (
-          <div className="text-center py-2">
-            <MaterialIcon icon="check_circle" className="text-[20px] text-emerald-500" />
-            <p className="text-[11px] font-bold text-emerald-700 mt-0.5">Logged: {outcomeLogged}</p>
+        {/* 2. PRICE + STATUS (inline, not boxed) */}
+        {(priceStr || statusText) && (
+          <div className="flex items-center gap-2">
+            {priceStr && <span className="font-bold text-on-surface">{priceStr}</span>}
+            {priceStr && statusText && <span className="text-on-surface-variant/40 text-xs">·</span>}
+            {statusText && <span className={`font-semibold ${statusColor}`}>{statusText}</span>}
+            {lead.dom != null && (
+              <>
+                <span className="text-on-surface-variant/40 text-xs">·</span>
+                <span className="text-xs text-on-surface-variant">{lead.dom}d DOM</span>
+              </>
+            )}
           </div>
-        ) : (
-          <div className="grid grid-cols-3 gap-1.5">
-            {([
-              { outcome: 'No Answer' as CallOutcome, icon: 'phone_missed', label: 'No Answer' },
-              { outcome: 'Left VM' as CallOutcome, icon: 'voicemail', label: 'Left VM' },
-              { outcome: 'Spoke with Owner' as CallOutcome, icon: 'record_voice_over', label: 'Spoke' },
-              { outcome: 'Follow-Up' as CallOutcome, icon: 'event', label: 'Follow-Up' },
-              { outcome: 'Not Interested' as CallOutcome, icon: 'thumb_down', label: 'Not Int.' },
-              { outcome: 'DNC' as CallOutcome, icon: 'block', label: 'DNC' },
-            ]).map(({ outcome, icon, label }) => (
-              <button key={outcome} onClick={() => logOutcome(outcome)}
-                className="flex items-center justify-center gap-1 py-1.5 bg-card border border-card-border rounded-lg text-[9px] font-bold text-on-surface-variant hover:border-primary hover:text-primary transition-all">
-                <MaterialIcon icon={icon} className="text-[12px]" /> {label}
+        )}
+
+        {/* 3. KEY FACTS (one compressed line) */}
+        {facts && (
+          <p className="text-[11px] font-medium text-on-surface-variant/70 uppercase tracking-wide">{facts}</p>
+        )}
+
+        {/* 4. TALKING POINTS (condensed — max 2, inline) */}
+        {topTalkingPoints.length > 0 && (
+          <div className="py-2 border-y border-card-border/50">
+            {topTalkingPoints.map((pt, i) => (
+              <p key={i} className="text-xs text-on-surface-variant leading-relaxed">
+                <span className="text-primary mr-1">·</span>{pt}
+              </p>
+            ))}
+          </div>
+        )}
+
+        {/* 5. PHONES */}
+        {phones.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {phones.map((phone, idx) => (
+              <button
+                key={idx}
+                onClick={() => {
+                  if (isDesktop) makeCall(phone, lead.owner_name || lead.name || 'Unknown', lead.id);
+                  else window.location.href = `tel:${phone}`;
+                }}
+                className="flex items-center gap-1 text-[11px] font-bold text-emerald-500 hover:underline"
+              >
+                <MaterialIcon icon="call" className="text-[12px]" />
+                {formatPhone(phone)}
               </button>
             ))}
           </div>
         )}
-      </div>
 
-      {/* ─── OPEN FULL RECORD ─── */}
-      <div className="px-4 pb-4">
+        {/* 6. SCRIPT (collapsed by default) */}
+        {profile.openingScript && (
+          <div>
+            <button
+              onClick={() => setScriptOpen(!scriptOpen)}
+              className="flex items-center gap-1 text-[10px] font-bold text-primary uppercase tracking-widest hover:text-primary/80"
+            >
+              <MaterialIcon icon={scriptOpen ? 'expand_less' : 'expand_more'} className="text-[14px]" />
+              Script
+            </button>
+            {scriptOpen && (
+              <div className="mt-1 rounded-lg bg-surface-container-low border border-card-border p-2">
+                {editingScript ? (
+                  <div>
+                    <textarea value={localScript} onChange={(e) => setLocalScript(e.target.value)} rows={4}
+                      className="w-full rounded border border-card-border bg-card px-2 py-1.5 text-[11px] text-on-surface leading-snug focus:outline-none focus:ring-1 focus:ring-primary resize-none" />
+                    <button onClick={() => setEditingScript(false)} className="text-[10px] font-bold text-primary hover:underline mt-1">Done</button>
+                  </div>
+                ) : (
+                  <div onClick={() => { setLocalScript(fillScript(profile.openingScript, lead)); setEditingScript(true); }} className="cursor-pointer">
+                    <p className="text-[11px] text-on-surface-variant leading-snug whitespace-pre-line">{fillScript(profile.openingScript, lead)}</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 7. NOTE INPUT */}
+        <div className="relative">
+          <input
+            type="text"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') saveNote(); }}
+            className="w-full rounded-lg border border-card-border bg-surface-container-low px-3 py-2 text-xs focus:ring-1 focus:ring-primary outline-none placeholder:text-on-surface-variant/50"
+            placeholder="Quick note..."
+          />
+          {saved && <span className="absolute right-2 top-2 text-[10px] text-emerald-500 font-bold">Saved</span>}
+        </div>
+
+        {/* 8. CALL OUTCOMES (compact) */}
+        {outcomeLogged ? (
+          <div className="flex items-center gap-2 justify-center py-1">
+            <MaterialIcon icon="check_circle" className="text-[16px] text-emerald-500" />
+            <span className="text-[11px] font-bold text-emerald-600">Logged: {outcomeLogged}</span>
+          </div>
+        ) : (
+          <div className="grid grid-cols-4 gap-1.5">
+            {([
+              { outcome: 'No Answer' as CallOutcome, icon: 'phone_disabled', label: 'No Ans' },
+              { outcome: 'Left VM' as CallOutcome, icon: 'voicemail', label: 'VM' },
+              { outcome: 'Spoke with Owner' as CallOutcome, icon: 'forum', label: 'Spoke' },
+              { outcome: 'DNC' as CallOutcome, icon: 'block', label: 'DNC' },
+            ]).map(({ outcome, icon, label }) => (
+              <button key={outcome} onClick={() => logOutcome(outcome)}
+                className="flex flex-col items-center py-1.5 rounded-lg bg-surface-container-high hover:bg-primary/20 text-[9px] font-semibold text-on-surface-variant hover:text-primary transition-all">
+                <MaterialIcon icon={icon} className="text-[14px] mb-0.5" />
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* 9. OPEN FULL RECORD */}
         <Link href={`/leads/${lead.id}`}
-          className="block w-full text-center rounded-xl bg-primary text-white text-xs font-bold py-2 hover:bg-primary/90 transition-colors">
+          className="block w-full text-center rounded-lg bg-primary text-white text-xs font-bold py-2 hover:bg-primary/90 transition-colors">
           Open Full Record
         </Link>
       </div>

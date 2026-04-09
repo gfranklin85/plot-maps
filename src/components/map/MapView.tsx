@@ -211,10 +211,12 @@ function LeadMarkers({
     leads.forEach((lead) => {
       if (lead.latitude == null || lead.longitude == null) return;
 
+      // Rich pins only for context/reference data — user targets always get dots
+      const isContext = lead.record_type === 'context';
       let icon: google.maps.Icon | google.maps.Symbol;
-      if (pinMode === 'detail') {
+      if (isContext && pinMode === 'detail') {
         icon = createDetailIcon(lead);
-      } else if (pinMode === 'labels') {
+      } else if (isContext && pinMode === 'labels') {
         icon = createLabelIcon(lead);
       } else {
         icon = createDotIcon(lead);

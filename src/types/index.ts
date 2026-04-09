@@ -75,6 +75,7 @@ export interface Lead {
   sqft: number | null;
   lot_acres: number | null;
   year_built: number | null;
+  record_type: string | null;
 }
 
 export interface Activity {

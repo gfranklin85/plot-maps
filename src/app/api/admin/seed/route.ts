@@ -272,7 +272,20 @@ export async function POST(request: Request) {
 
   const format = requestedFormat || detectFormat(csvText);
   const now = new Date().toISOString();
-  let inserted = 0, updated = 0, errors = 0, total = 0;
+  let inserted = 0, updated = 0, errors = 0, total = 0, geocoded = 0;
+  const GOOGLE_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
+
+  // Geocode a single address — only for new records
+  async function geocodeAddress(address: string): Promise<{ lat: number; lng: number } | null> {
+    try {
+      const res = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${GOOGLE_API_KEY}`);
+      const data = await res.json();
+      if (data.results?.[0]?.geometry?.location) {
+        return data.results[0].geometry.location;
+      }
+    } catch { /* non-fatal */ }
+    return null;
+  }
 
   if (format === 'rpr') {
     // ── RPR Paste Flow ──
@@ -316,14 +329,27 @@ export async function POST(request: Request) {
         .limit(1);
 
       if (existing && existing.length > 0) {
+        // Update existing — no geocoding needed
         const { error } = await supabaseAdmin
           .from('leads')
           .update({ ...leadData, property_address: undefined })
           .eq('id', existing[0].id);
         if (error) errors++; else updated++;
       } else {
-        const { error } = await supabaseAdmin.from('leads').insert(leadData);
-        if (error) errors++; else inserted++;
+        // Insert new — then geocode
+        const { data: insertedData, error } = await supabaseAdmin.from('leads').insert(leadData).select('id').single();
+        if (error) { errors++; }
+        else {
+          inserted++;
+          // Geocode the new record
+          const geo = await geocodeAddress(prop.address);
+          if (geo && insertedData) {
+            await supabaseAdmin.from('leads').update({
+              latitude: geo.lat, longitude: geo.lng, geocoded_at: now,
+            }).eq('id', insertedData.id);
+            geocoded++;
+          }
+        }
       }
     }
   } else {
@@ -410,13 +436,17 @@ export async function POST(request: Request) {
     }
   }
 
+  const geocodeCost = Math.round(geocoded * 0.7) / 100; // $0.007 per geocode
+
   return NextResponse.json({
     success: true,
     inserted,
     updated,
+    geocoded,
     errors,
     total,
     format,
+    geocodeCost,
     marketTag: marketTag || null,
   });
 }

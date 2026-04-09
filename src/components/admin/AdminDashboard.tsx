@@ -88,7 +88,7 @@ export default function AdminDashboard({ data }: { data: Record<string, unknown>
   const [seedMode, setSeedMode] = useState<'file' | 'paste'>('paste');
   const [seedPasteText, setSeedPasteText] = useState('');
   const [seeding, setSeeding] = useState(false);
-  const [seedResult, setSeedResult] = useState<{ inserted: number; updated: number; errors: number; total: number; format?: string } | null>(null);
+  const [seedResult, setSeedResult] = useState<{ inserted: number; updated: number; geocoded: number; errors: number; total: number; format?: string; geocodeCost?: number } | null>(null);
   const [seedPanelOpen, setSeedPanelOpen] = useState(false);
 
   async function handleSeed(text: string, format?: string) {
@@ -102,7 +102,7 @@ export default function AdminDashboard({ data }: { data: Record<string, unknown>
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
-      setSeedResult({ inserted: data.inserted, updated: data.updated, errors: data.errors, total: data.total, format: data.format });
+      setSeedResult({ inserted: data.inserted, updated: data.updated, geocoded: data.geocoded || 0, errors: data.errors, total: data.total, format: data.format, geocodeCost: data.geocodeCost || 0 });
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Seed failed');
     } finally {
@@ -158,54 +158,103 @@ export default function AdminDashboard({ data }: { data: Record<string, unknown>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <input
-              type="text"
-              value={seedMarketTag}
-              onChange={(e) => setSeedMarketTag(e.target.value)}
-              placeholder="Market tag (e.g. Hanford)"
-              className="bg-surface border border-card-border rounded-lg px-3 py-2 text-sm text-on-surface w-48 focus:ring-1 focus:ring-primary focus:outline-none placeholder:text-secondary"
-            />
-            {seedResult && (
-              <span className="text-xs text-emerald-400 font-bold">
-                {seedResult.format === 'rpr' ? 'RPR' : 'CSV'}: {seedResult.inserted} new · {seedResult.updated} updated · {seedResult.errors} errors ({seedResult.total} total)
-              </span>
-            )}
-          </div>
+          {/* Results Card */}
+          {seedResult && (
+            <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-5 space-y-3">
+              <div className="flex items-center gap-2">
+                <MaterialIcon icon="check_circle" className="text-[20px] text-emerald-400" />
+                <span className="font-bold text-emerald-400 text-sm">Seeding Complete</span>
+                <span className="text-xs text-secondary ml-auto">{seedResult.format === 'rpr' ? 'RPR Format' : 'CSV Format'}</span>
+              </div>
+              <div className="grid grid-cols-5 gap-3">
+                <div className="text-center">
+                  <p className="text-lg font-extrabold text-on-surface">{seedResult.total}</p>
+                  <p className="text-[10px] text-secondary uppercase tracking-wider">Total</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-lg font-extrabold text-primary">{seedResult.inserted}</p>
+                  <p className="text-[10px] text-secondary uppercase tracking-wider">New</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-lg font-extrabold text-amber-400">{seedResult.updated}</p>
+                  <p className="text-[10px] text-secondary uppercase tracking-wider">Updated</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-lg font-extrabold text-emerald-400">{seedResult.geocoded}</p>
+                  <p className="text-[10px] text-secondary uppercase tracking-wider">Geocoded</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-lg font-extrabold text-on-surface">${seedResult.geocodeCost?.toFixed(2) || '0.00'}</p>
+                  <p className="text-[10px] text-secondary uppercase tracking-wider">Cost</p>
+                </div>
+              </div>
+              {seedResult.errors > 0 && (
+                <p className="text-xs text-red-400">{seedResult.errors} records failed to process</p>
+              )}
+              <button
+                onClick={() => { setSeedResult(null); setSeedPasteText(''); }}
+                className="text-xs text-primary font-bold hover:underline"
+              >
+                Seed Another Market
+              </button>
+            </div>
+          )}
 
-          {seedMode === 'paste' ? (
-            <div className="space-y-3">
-              <textarea
-                value={seedPasteText}
-                onChange={(e) => setSeedPasteText(e.target.value)}
-                rows={10}
-                className="w-full bg-surface border border-card-border rounded-xl p-4 font-mono text-xs text-on-surface focus:ring-1 focus:ring-primary resize-none placeholder:text-secondary"
-                placeholder={"Paste RPR listing data here...\n\nCopy from RPR → Ctrl+A → Ctrl+C → Paste here\n\nActive  SFR  $450,000  3/15/26  123 Main St\nHanford, CA 93230  3  2  1,500  0.25 Acres  1995  $300"}
-              />
-              <button
-                onClick={() => handleSeed(seedPasteText, 'rpr')}
-                disabled={seeding || !seedPasteText.trim()}
-                className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-6 py-2.5 rounded-lg font-bold text-sm transition-all disabled:opacity-50"
-              >
-                <MaterialIcon icon={seeding ? 'hourglass_empty' : 'rocket_launch'} className={`text-[18px] ${seeding ? 'animate-spin' : ''}`} />
-                {seeding ? 'Seeding...' : 'Seed from Paste'}
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <input ref={fileRef} type="file" accept=".csv,.txt,.tsv" className="hidden" onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) handleSeedFile(file);
-              }} />
-              <button
-                onClick={() => fileRef.current?.click()}
-                disabled={seeding}
-                className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-6 py-2.5 rounded-lg font-bold text-sm transition-all disabled:opacity-50"
-              >
-                <MaterialIcon icon={seeding ? 'hourglass_empty' : 'upload_file'} className={`text-[18px] ${seeding ? 'animate-spin' : ''}`} />
-                {seeding ? 'Seeding...' : 'Upload CSV File'}
-              </button>
-            </div>
+          {/* Input Area (hidden when results shown) */}
+          {!seedResult && (
+            <>
+              <div className="flex items-center gap-3">
+                <input
+                  type="text"
+                  value={seedMarketTag}
+                  onChange={(e) => setSeedMarketTag(e.target.value)}
+                  placeholder="Market tag (e.g. Hanford)"
+                  className="bg-surface border border-card-border rounded-lg px-3 py-2 text-sm text-on-surface w-48 focus:ring-1 focus:ring-primary focus:outline-none placeholder:text-secondary"
+                />
+                {seeding && (
+                  <span className="text-xs text-primary font-bold flex items-center gap-2">
+                    <div className="w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                    Processing & geocoding...
+                  </span>
+                )}
+              </div>
+
+              {seedMode === 'paste' ? (
+                <div className="space-y-3">
+                  <textarea
+                    value={seedPasteText}
+                    onChange={(e) => setSeedPasteText(e.target.value)}
+                    rows={10}
+                    disabled={seeding}
+                    className="w-full bg-surface border border-card-border rounded-xl p-4 font-mono text-xs text-on-surface focus:ring-1 focus:ring-primary resize-none placeholder:text-secondary disabled:opacity-50"
+                    placeholder={"Paste RPR listing data here...\n\nCopy from RPR → Ctrl+A → Ctrl+C → Paste here\n\nActive  SFR  $450,000  3/15/26  123 Main St\nHanford, CA 93230  3  2  1,500  0.25 Acres  1995  $300"}
+                  />
+                  <button
+                    onClick={() => handleSeed(seedPasteText, 'rpr')}
+                    disabled={seeding || !seedPasteText.trim()}
+                    className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-6 py-2.5 rounded-lg font-bold text-sm transition-all disabled:opacity-50"
+                  >
+                    <MaterialIcon icon={seeding ? 'hourglass_empty' : 'rocket_launch'} className={`text-[18px] ${seeding ? 'animate-spin' : ''}`} />
+                    {seeding ? 'Seeding & Geocoding...' : 'Seed from Paste'}
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <input ref={fileRef} type="file" accept=".csv,.txt,.tsv" className="hidden" onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleSeedFile(file);
+                  }} />
+                  <button
+                    onClick={() => fileRef.current?.click()}
+                    disabled={seeding}
+                    className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-6 py-2.5 rounded-lg font-bold text-sm transition-all disabled:opacity-50"
+                  >
+                    <MaterialIcon icon={seeding ? 'hourglass_empty' : 'upload_file'} className={`text-[18px] ${seeding ? 'animate-spin' : ''}`} />
+                    {seeding ? 'Seeding & Geocoding...' : 'Upload CSV File'}
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
       )}

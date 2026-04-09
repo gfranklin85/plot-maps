@@ -10,6 +10,8 @@ import { MarkerClusterer, Renderer, Cluster } from "@googlemaps/markerclusterer"
 import { Lead, STATUS_COLORS, LISTING_STATUS_COLORS } from "@/types";
 import { MAP_CENTER, MAP_ZOOM } from "@/lib/constants";
 
+export type PinMode = "dots" | "labels" | "detail";
+
 interface Props {
   leads: Lead[];
   onLeadClick?: (id: string, lead: Lead) => void;
@@ -18,11 +20,11 @@ interface Props {
   onWalkHere?: (lead: Lead) => void;
   center?: { lat: number; lng: number } | null;
   mapType?: "roadmap" | "satellite" | "hybrid" | "terrain";
+  pinMode?: PinMode;
 }
 
 const API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
 
-// Light/muted map style for roadmap
 const MAP_STYLES: google.maps.MapTypeStyle[] = [
   { featureType: "poi", elementType: "labels", stylers: [{ visibility: "off" }] },
   { featureType: "transit", stylers: [{ visibility: "off" }] },
@@ -31,6 +33,97 @@ const MAP_STYLES: google.maps.MapTypeStyle[] = [
   { featureType: "road", elementType: "geometry", stylers: [{ color: "#ffffff" }] },
   { featureType: "road", elementType: "labels.text.fill", stylers: [{ color: "#8c9bab" }] },
 ];
+
+// ── Pin Icon Generators ──
+
+function formatPriceShort(price: number | null): string {
+  if (!price) return '';
+  if (price >= 1000000) return `$${(price / 1000000).toFixed(1)}M`;
+  if (price >= 1000) return `$${Math.round(price / 1000)}K`;
+  return `$${price}`;
+}
+
+function getStatusColor(lead: Lead): string {
+  if (lead.listing_status) return LISTING_STATUS_COLORS[lead.listing_status] || '#6b7280';
+  return STATUS_COLORS[lead.status] || '#6b7280';
+}
+
+function getStatusLabel(lead: Lead): string {
+  if (lead.listing_status === 'Sold') return 'SOLD';
+  if (lead.listing_status === 'Active') return 'ACTIVE';
+  if (lead.listing_status === 'Pending') return 'PEND';
+  return '';
+}
+
+// Dot mode: simple colored circles/diamonds
+function createDotIcon(lead: Lead): google.maps.Icon | google.maps.Symbol {
+  const isMLS = !!lead.listing_status;
+  const color = getStatusColor(lead);
+  return isMLS
+    ? { path: "M 0,-12 L 8,0 L 0,12 L -8,0 Z", scale: 1, fillColor: color, fillOpacity: 1, strokeColor: "#ffffff", strokeWeight: 2 }
+    : { path: google.maps.SymbolPath.CIRCLE, scale: 10, fillColor: color, fillOpacity: 1, strokeColor: "#ffffff", strokeWeight: 3 };
+}
+
+// Label mode: pill with price + status dot
+function createLabelIcon(lead: Lead): google.maps.Icon {
+  const color = getStatusColor(lead);
+  const price = formatPriceShort(lead.listing_price || lead.selling_price || null);
+  const statusLabel = getStatusLabel(lead);
+  const label = price || lead.property_address?.split(',')[0]?.substring(0, 15) || '•';
+
+  const textLen = Math.max(label.length, 3);
+  const width = textLen * 8 + (statusLabel ? 40 : 20);
+  const height = 28;
+
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height + 8}">
+      <rect x="0" y="0" width="${width}" height="${height}" rx="14" fill="rgba(15,23,42,0.85)" stroke="${color}" stroke-width="1.5"/>
+      <circle cx="10" cy="${height / 2}" r="4" fill="${color}"/>
+      <text x="20" y="${height / 2 + 1}" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="11" font-weight="700" fill="white">${label}</text>
+      ${statusLabel ? `<text x="${width - 6}" y="${height / 2 + 1}" dominant-baseline="central" text-anchor="end" font-family="system-ui,sans-serif" font-size="8" font-weight="800" fill="${color}">${statusLabel}</text>` : ''}
+      <polygon points="${width / 2 - 4},${height} ${width / 2},${height + 7} ${width / 2 + 4},${height}" fill="rgba(15,23,42,0.85)"/>
+    </svg>`;
+
+  return {
+    url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
+    scaledSize: new google.maps.Size(width, height + 8),
+    anchor: new google.maps.Point(width / 2, height + 8),
+  };
+}
+
+// Detail mode: larger card with price, beds, sqft, status
+function createDetailIcon(lead: Lead): google.maps.Icon {
+  const color = getStatusColor(lead);
+  const price = formatPriceShort(lead.listing_price || lead.selling_price || null);
+  const statusLabel = getStatusLabel(lead);
+  const sqft = lead.sqft ? `${lead.sqft.toLocaleString()}sf` : '';
+  const year = lead.year_built ? `${lead.year_built}` : '';
+  const detail = [sqft, year].filter(Boolean).join(' · ') || lead.property_address?.split(',')[0]?.substring(0, 20) || '';
+
+  const width = 160;
+  const height = 52;
+
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height + 10}">
+      <defs>
+        <filter id="s" x="-10%" y="-10%" width="120%" height="120%">
+          <feDropShadow dx="0" dy="2" stdDeviation="3" flood-opacity="0.3"/>
+        </filter>
+      </defs>
+      <rect x="2" y="2" width="${width - 4}" height="${height - 4}" rx="10" fill="rgba(15,23,42,0.92)" filter="url(#s)" stroke="${color}" stroke-width="2"/>
+      ${statusLabel ? `<rect x="${width - 48}" y="6" width="42" height="14" rx="7" fill="${color}"/>
+      <text x="${width - 27}" y="14" dominant-baseline="central" text-anchor="middle" font-family="system-ui,sans-serif" font-size="8" font-weight="800" fill="white">${statusLabel}</text>` : ''}
+      <text x="12" y="20" font-family="system-ui,sans-serif" font-size="14" font-weight="800" fill="white">${price || '—'}</text>
+      <text x="12" y="38" font-family="system-ui,sans-serif" font-size="10" font-weight="500" fill="#94a3b8">${detail}</text>
+      <polygon points="${width / 2 - 5},${height - 2} ${width / 2},${height + 8} ${width / 2 + 5},${height - 2}" fill="rgba(15,23,42,0.92)"/>
+    </svg>`;
+
+  return {
+    url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
+    scaledSize: new google.maps.Size(width, height + 10),
+    anchor: new google.maps.Point(width / 2, height + 10),
+  };
+}
 
 /** Custom cluster renderer */
 class BlueCircleRenderer implements Renderer {
@@ -62,27 +155,19 @@ class BlueCircleRenderer implements Renderer {
   }
 }
 
-/** Syncs the mapType prop to the actual google map instance */
 function MapTypeSync({ mapType }: { mapType: string }) {
   const map = useMap();
-  useEffect(() => {
-    if (map) {
-      map.setMapTypeId(mapType);
-    }
-  }, [map, mapType]);
+  useEffect(() => { if (map) map.setMapTypeId(mapType); }, [map, mapType]);
   return null;
 }
 
-/** Reports map center changes to parent */
 function CenterTracker({ onCenterChanged }: { onCenterChanged?: (c: { lat: number; lng: number }) => void }) {
   const map = useMap();
   useEffect(() => {
     if (!map || !onCenterChanged) return;
     const listener = map.addListener("idle", () => {
       const center = map.getCenter();
-      if (center) {
-        onCenterChanged({ lat: center.lat(), lng: center.lng() });
-      }
+      if (center) onCenterChanged({ lat: center.lat(), lng: center.lng() });
     });
     return () => google.maps.event.removeListener(listener);
   }, [map, onCenterChanged]);
@@ -92,9 +177,11 @@ function CenterTracker({ onCenterChanged }: { onCenterChanged?: (c: { lat: numbe
 function LeadMarkers({
   leads,
   onMarkerClick,
+  pinMode = "dots",
 }: {
   leads: Lead[];
   onMarkerClick: (lead: Lead) => void;
+  pinMode: PinMode;
 }) {
   const map = useMap();
   const markersRef = useRef<google.maps.Marker[]>([]);
@@ -103,57 +190,47 @@ function LeadMarkers({
   useEffect(() => {
     if (!map) return;
 
-    // Clear previous
     if (clustererRef.current) {
       clustererRef.current.clearMarkers();
-      clustererRef.current.setMap(null);
       clustererRef.current = null;
     }
     markersRef.current.forEach((m) => m.setMap(null));
     markersRef.current = [];
 
-    // Build all markers
     leads.forEach((lead) => {
       if (lead.latitude == null || lead.longitude == null) return;
 
-      const isMLS = !!lead.listing_status;
-      const color = isMLS
-        ? (LISTING_STATUS_COLORS[lead.listing_status!] || "#6b7280")
-        : (STATUS_COLORS[lead.status] || "#6b7280");
+      let icon: google.maps.Icon | google.maps.Symbol;
+      if (pinMode === 'detail') {
+        icon = createDetailIcon(lead);
+      } else if (pinMode === 'labels') {
+        icon = createLabelIcon(lead);
+      } else {
+        icon = createDotIcon(lead);
+      }
 
       const marker = new google.maps.Marker({
         position: { lat: lead.latitude, lng: lead.longitude },
         title: lead.property_address || lead.name,
-        icon: isMLS
-          ? {
-              path: "M 0,-12 L 8,0 L 0,12 L -8,0 Z",
-              scale: 1,
-              fillColor: color,
-              fillOpacity: 1,
-              strokeColor: "#ffffff",
-              strokeWeight: 2,
-            }
-          : {
-              path: google.maps.SymbolPath.CIRCLE,
-              scale: 10,
-              fillColor: color,
-              fillOpacity: 1,
-              strokeColor: "#ffffff",
-              strokeWeight: 3,
-            },
+        icon,
       });
 
       marker.addListener("click", () => onMarkerClick(lead));
       markersRef.current.push(marker);
     });
 
-    // Create clusterer with all markers at once — no animation
-    const clusterer = new MarkerClusterer({
-      map,
-      markers: markersRef.current,
-      renderer: new BlueCircleRenderer(),
-    });
-    clustererRef.current = clusterer;
+    // Only cluster in dots mode — labels/detail need individual visibility
+    if (pinMode === 'dots') {
+      const clusterer = new MarkerClusterer({
+        map,
+        markers: markersRef.current,
+        renderer: new BlueCircleRenderer(),
+      });
+      clustererRef.current = clusterer;
+    } else {
+      // No clustering — show all markers directly
+      markersRef.current.forEach(m => m.setMap(map));
+    }
 
     return () => {
       if (clustererRef.current) {
@@ -163,18 +240,16 @@ function LeadMarkers({
       markersRef.current.forEach((m) => m.setMap(null));
       markersRef.current = [];
     };
-  }, [map, leads, onMarkerClick]);
+  }, [map, leads, onMarkerClick, pinMode]);
 
   return null;
 }
 
-export default function MapView({ leads, onLeadClick, onCenterChanged, center, mapType = "roadmap" }: Props) {
+export default function MapView({ leads, onLeadClick, onCenterChanged, center, mapType = "roadmap", pinMode = "dots" }: Props) {
   const isSatellite = mapType === "satellite" || mapType === "hybrid";
 
   const handleMarkerClick = useCallback(
-    (lead: Lead) => {
-      onLeadClick?.(lead.id, lead);
-    },
+    (lead: Lead) => { onLeadClick?.(lead.id, lead); },
     [onLeadClick]
   );
 
@@ -196,7 +271,7 @@ export default function MapView({ leads, onLeadClick, onCenterChanged, center, m
       >
         <MapTypeSync mapType={mapType} />
         <CenterTracker onCenterChanged={onCenterChanged} />
-        <LeadMarkers leads={leads} onMarkerClick={handleMarkerClick} />
+        <LeadMarkers leads={leads} onMarkerClick={handleMarkerClick} pinMode={pinMode} />
       </Map>
     </APIProvider>
   );

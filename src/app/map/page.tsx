@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
 import { Lead, LeadStatus, Priority } from "@/types";
 import MapDynamic from "@/components/map/MapDynamic";
+import type { PinMode } from "@/components/map/MapView";
 import StreetViewProspecting from "@/components/map/StreetViewProspecting";
 import PlacesSearch from "@/components/map/PlacesSearch";
 import { PRIORITIES } from "@/lib/constants";
@@ -46,6 +47,7 @@ export default function MapPage() {
   const [showGate, setShowGate] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [expandedView, setExpandedView] = useState(false);
+  const [pinMode, setPinMode] = useState<PinMode>('dots');
   const isSubscribed = profile.subscriptionStatus === 'active';
 
   useEffect(() => {
@@ -209,6 +211,28 @@ export default function MapPage() {
             ))}
           </div>
 
+          {/* Pin View Mode */}
+          <div className="flex gap-0.5 bg-surface p-1 rounded-xl shadow-lg">
+            {([
+              { mode: 'dots' as PinMode, icon: 'circle', label: 'Dots' },
+              { mode: 'labels' as PinMode, icon: 'label', label: 'Labels' },
+              { mode: 'detail' as PinMode, icon: 'badge', label: 'Detail' },
+            ]).map(({ mode, icon, label }) => (
+              <button
+                key={mode}
+                onClick={() => setPinMode(mode)}
+                title={label}
+                className={`w-9 h-9 flex items-center justify-center rounded-lg transition-all ${
+                  pinMode === mode
+                    ? 'bg-primary text-white'
+                    : 'text-on-surface-variant hover:text-primary'
+                }`}
+              >
+                <MaterialIcon icon={icon} className="text-[18px]" />
+              </button>
+            ))}
+          </div>
+
           {/* Walk Mode */}
           <button
             onClick={() => isSubscribed ? setWalkMode(true) : setShowGate(true)}
@@ -360,6 +384,7 @@ export default function MapPage() {
           <MapDynamic
             leads={filteredLeads}
             mapType={mapType}
+            pinMode={pinMode}
             onLeadClick={(_id, lead) => { setSelectedLead(lead); setExpandedView(false); }}
             onCenterChanged={(c) => { setMapCenter(c); setHasUserPanned(true); }}
             center={mapCenter}

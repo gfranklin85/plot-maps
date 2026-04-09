@@ -430,7 +430,7 @@ export default function MapPage() {
 
       {/* ═══ PINNED REFERENCE SIDEBAR — persistent comp while prospecting ═══ */}
       {pinnedRef && !walkMode && (
-        <div className="absolute left-0 top-0 h-full w-[320px] z-20 bg-card/95 backdrop-blur-xl border-r border-card-border shadow-2xl flex flex-col">
+        <div className="absolute left-0 top-0 h-full w-[400px] z-20 bg-card/95 backdrop-blur-xl border-r border-card-border shadow-2xl flex flex-col overflow-hidden">
           <div className="px-4 py-3 bg-primary/10 border-b border-card-border shrink-0">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-black uppercase tracking-[0.15em] text-primary">Reference Property</span>
@@ -458,7 +458,7 @@ export default function MapPage() {
 
       {/* ═══ ACTIVE SELECTION CARD — bottom, changes with each click ═══ */}
       {selectedLead && !walkMode && (
-        <div className={`absolute bottom-6 z-20 w-[380px] max-h-[60vh] overflow-y-auto rounded-2xl bg-card border border-card-border shadow-2xl ${pinnedRef ? 'left-[340px]' : 'left-6'}`}>
+        <div className={`absolute bottom-6 z-20 w-[380px] max-h-[60vh] overflow-y-auto rounded-2xl bg-card border border-card-border shadow-2xl ${pinnedRef ? 'left-[416px]' : 'left-6'}`}>
           <div className="flex items-center justify-between px-4 pt-3 pb-1">
             <div className="flex items-center gap-2">
               {/* Pin to sidebar as reference */}

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Lead, Activity, DailyTarget, ActionItem } from '@/types';
+import { Lead, Activity, DailyTarget } from '@/types';
 import ActionList from '@/components/dashboard/ActionList';
 import Scorecard from '@/components/dashboard/Scorecard';
 import MaterialIcon from '@/components/ui/MaterialIcon';
@@ -32,8 +32,6 @@ export default function Dashboard() {
   const [targets, setTargets] = useState<DailyTarget>(DEFAULT_TARGETS);
   const [attentionLeads, setAttentionLeads] = useState<Lead[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
-  const [actionItems, setActionItems] = useState<ActionItem[]>([]);
-  const [actionLoading, setActionLoading] = useState(false);
   const [showGate, setShowGate] = useState(false);
   const isSubscribed = profile.subscriptionStatus === 'active';
   const [totalLeads, setTotalLeads] = useState(0);
@@ -136,27 +134,8 @@ export default function Dashboard() {
 
   // Auto-generate action list for subscribers on first load
   useEffect(() => {
-    if (!loading && totalLeads > 0 && isSubscribed && actionItems.length === 0 && !actionLoading) {
-      generateActionList();
-    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, totalLeads, isSubscribed]);
-
-  async function generateActionList() {
-    if (!isSubscribed) { setShowGate(true); return; }
-    setActionLoading(true);
-    try {
-      const res = await fetch('/api/ai/action-list', { method: 'POST' });
-      const data = await res.json();
-      if (Array.isArray(data)) {
-        setActionItems(data);
-      }
-    } catch {
-      // Silently fail — the user can retry
-    } finally {
-      setActionLoading(false);
-    }
-  }
 
   const todayFormatted = new Date().toLocaleDateString('en-US', {
     weekday: 'long',
@@ -218,49 +197,18 @@ export default function Dashboard() {
         </h2>
         <p className="mt-1 text-secondary text-sm">
           {todayFormatted}
-          {actionItems.length > 0 && (
-            <span className="ml-3 inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
-              {actionItems.length} priority actions
-            </span>
-          )}
         </p>
       </div>
 
       {/* Main Content: Action Feed + Stats */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-        {/* Left: Action Feed (primary) */}
+        {/* Left: Leads Needing Attention */}
         <div className="lg:col-span-8">
-          {!isSubscribed && actionItems.length === 0 && (
-            <div className="mb-6 bg-primary/5 border border-primary/20 rounded-xl p-6 flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                <MaterialIcon icon="auto_awesome" className="text-[24px] text-primary" />
-              </div>
-              <div className="flex-1">
-                <h3 className="font-bold text-on-surface text-sm">AI Daily Action Feed</h3>
-                <p className="text-xs text-secondary">Subscribe to get AI-prioritized actions every morning — know exactly who to call and why.</p>
-              </div>
-              <a href="/subscribe" className="px-4 py-2 bg-primary text-on-primary rounded-lg text-xs font-bold hover:bg-primary/90 transition-colors whitespace-nowrap">
-                Upgrade
-              </a>
-            </div>
-          )}
-
           <ActionList
-            actions={actionItems}
-            loading={actionLoading}
+            actions={[]}
+            loading={false}
             fallbackLeads={attentionLeads}
           />
-
-          {isSubscribed && actionItems.length > 0 && (
-            <button
-              onClick={generateActionList}
-              disabled={actionLoading}
-              className="mt-4 flex items-center gap-2 text-sm text-primary font-medium hover:text-primary/80 transition-colors"
-            >
-              <MaterialIcon icon="refresh" className={`text-[16px] ${actionLoading ? 'animate-spin' : ''}`} />
-              {actionLoading ? 'Refreshing...' : 'Refresh action list'}
-            </button>
-          )}
         </div>
 
         {/* Right: Quick Stats + Scorecard */}

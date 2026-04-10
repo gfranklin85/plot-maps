@@ -432,11 +432,11 @@ export default function SettingsPage() {
           <div>
             <p className="text-sm font-medium text-on-surface">Re-geocode Missing Leads</p>
             <p className="text-xs text-secondary">
-              Find leads without map coordinates and geocode their addresses
+              Find leads without map coordinates and geocode them (uses geocode credits)
             </p>
           </div>
           <button
-            onClick={handleReGeocode}
+            onClick={() => { if (confirm('This will use geocode credits for each lead without coordinates. Continue?')) handleReGeocode(); }}
             disabled={geocoding}
             className="px-4 py-2 rounded-xl text-sm font-medium bg-surface-container text-on-surface hover:bg-surface-container-high transition-colors disabled:opacity-50"
           >

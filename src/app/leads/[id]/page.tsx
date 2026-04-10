@@ -19,11 +19,6 @@ const GROUPS = [
   'Hot Lead', 'Not Yet Interested', 'Trash', 'Warm Lead',
 ];
 
-interface CallGuidance {
-  opener: string;
-  talking_points: string[];
-  objection_responses: { objection: string; response: string }[];
-}
 
 interface ScriptQuestion { question: string; order: number }
 interface CallScript { id: string; category: string; questions: ScriptQuestion[] }
@@ -68,9 +63,6 @@ export default function LeadDetailPage() {
   const [savingChecklist, setSavingChecklist] = useState(false);
   const [previousResponses, setPreviousResponses] = useState<CallResponse[]>([]);
 
-  // AI guidance
-  const [guidance, setGuidance] = useState<CallGuidance | null>(null);
-  const [guidanceLoading, setGuidanceLoading] = useState(false);
 
   // Call outcome
   const [savingOutcome, setSavingOutcome] = useState(false);
@@ -217,15 +209,6 @@ export default function LeadDetailPage() {
     if (rRes.ok) setPreviousResponses(await rRes.json());
   };
 
-  const fetchGuidance = async () => {
-    if (!lead) return;
-    if (!isSubscribed) { setShowGate(true); return; }
-    setGuidanceLoading(true);
-    try {
-      const res = await fetch('/api/ai/call-guidance', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ leadId: lead.id }) });
-      if (res.ok) setGuidance(await res.json());
-    } finally { setGuidanceLoading(false); }
-  };
 
   // Map URL builder
   const getMapUrl = () => {
@@ -489,33 +472,6 @@ export default function LeadDetailPage() {
               </div>
             )}
 
-            {/* AI Guidance */}
-            <div className="bg-surface rounded-lg px-3 py-2.5 border border-card-border">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-[10px] font-bold text-secondary uppercase tracking-widest">AI Guidance</p>
-                <button
-                  onClick={fetchGuidance}
-                  disabled={guidanceLoading}
-                  className="flex items-center gap-1 px-2 py-1 rounded bg-amber-500/10 text-amber-400 text-[10px] font-bold hover:bg-amber-500/20 transition-colors disabled:opacity-50"
-                >
-                  <MaterialIcon icon="auto_awesome" className="text-[12px]" />
-                  {guidanceLoading ? 'Loading...' : guidance ? 'Refresh' : 'Generate'}
-                </button>
-              </div>
-              {guidance && (
-                <div className="space-y-2">
-                  <p className="text-xs text-on-surface-variant italic">&ldquo;{guidance.opener}&rdquo;</p>
-                  <ul className="space-y-1">
-                    {guidance.talking_points.map((pt, i) => (
-                      <li key={i} className="flex items-start gap-1.5 text-xs text-secondary">
-                        <MaterialIcon icon="check_circle" className="text-[12px] text-emerald-500 mt-0.5 shrink-0" />
-                        {pt}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
 
             {/* Notes */}
             <div className="bg-surface rounded-lg px-3 py-2.5 border border-card-border">

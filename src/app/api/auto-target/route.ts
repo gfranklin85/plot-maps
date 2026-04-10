@@ -3,8 +3,9 @@ import { getAuthUser } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase-server';
 
 const FREE_LIFETIME_LIMIT = 5;
-const STARTER_MONTHLY_LIMIT = 10;
-const PRO_MONTHLY_LIMIT = 25;
+const STARTER_MONTHLY_LIMIT = 15;
+const PRO_MONTHLY_LIMIT = 40;
+const OVERAGE_COST_DOLLARS = 2; // $2 per extra request
 
 const PRO_PRICE_ID = process.env.NEXT_PUBLIC_STRIPE_PRO_PRICE_ID || '';
 
@@ -28,7 +29,7 @@ async function getCredits(userId: string) {
   const { isActive, isPro } = await getSubscriptionInfo(userId);
 
   if (isActive) {
-    // Paid user: monthly limit
+    // Paid user: monthly included limit + unlimited overages at $2/ea
     const monthlyLimit = isPro ? PRO_MONTHLY_LIMIT : STARTER_MONTHLY_LIMIT;
     const month = getCurrentMonth();
     const startOfMonth = `${month}-01T00:00:00.000Z`;
@@ -41,16 +42,21 @@ async function getCredits(userId: string) {
       .gte('created_at', startOfMonth);
 
     const used = count || 0;
+    const included_remaining = Math.max(0, monthlyLimit - used);
     return {
-      allowed: used < monthlyLimit,
+      allowed: true, // paid users can always submit — overages charged
       used,
       limit: monthlyLimit,
+      included_remaining,
+      is_overage: used >= monthlyLimit,
+      overage_cost: OVERAGE_COST_DOLLARS,
       is_free: false,
+      can_buy_more: true,
       plan: isPro ? 'pro' : 'starter',
     };
   }
 
-  // Free user: lifetime limit
+  // Free user: lifetime limit, no overages
   const { count } = await supabaseAdmin
     .from('auto_target_requests')
     .select('*', { count: 'exact', head: true })
@@ -62,7 +68,11 @@ async function getCredits(userId: string) {
     allowed: used < FREE_LIFETIME_LIMIT,
     used,
     limit: FREE_LIFETIME_LIMIT,
+    included_remaining: Math.max(0, FREE_LIFETIME_LIMIT - used),
+    is_overage: false,
+    overage_cost: 0,
     is_free: true,
+    can_buy_more: false,
     plan: 'free',
   };
 }
@@ -83,8 +93,11 @@ export async function GET() {
     requests: requests || [],
     credits_used: credits.used,
     credits_limit: credits.limit,
-    credits_remaining: credits.limit - credits.used,
+    credits_remaining: credits.included_remaining,
     is_free: credits.is_free,
+    is_overage: credits.is_overage,
+    overage_cost: credits.overage_cost,
+    can_buy_more: credits.can_buy_more,
     plan: credits.plan,
   });
 }
@@ -111,13 +124,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Reference lead not found or missing coordinates' }, { status: 404 });
   }
 
-  // Credit check
+  // Credit check — free users blocked at limit, paid users get overages
   const credits = await getCredits(user.id);
   if (!credits.allowed) {
     return NextResponse.json({
       error: 'limit_reached',
       used: credits.used,
       limit: credits.limit,
+      can_buy_more: credits.can_buy_more,
     }, { status: 403 });
   }
 
@@ -153,10 +167,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Failed to create request' }, { status: 500 });
   }
 
+  const newRemaining = Math.max(0, credits.included_remaining - 1);
   return NextResponse.json({
     id: req.id,
     status: req.status,
     credits_used: credits.used + 1,
-    credits_remaining: credits.limit - credits.used - 1,
+    credits_remaining: newRemaining,
+    is_overage: credits.is_overage,
+    overage_cost: credits.is_overage ? credits.overage_cost : 0,
+    is_free: credits.is_free,
   });
 }

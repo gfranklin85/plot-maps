@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Lead, LISTING_STATUS_COLORS } from "@/types";
 import MaterialIcon from "@/components/ui/MaterialIcon";
 
@@ -29,6 +29,18 @@ export default function AutoTargetModal({ lead, onClose, onSubmitted }: Props) {
   const [state, setState] = useState<ModalState>("default");
   const [creditsInfo, setCreditsInfo] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
+  const [creditData, setCreditData] = useState<{
+    credits_remaining: number; is_free: boolean; is_overage: boolean;
+    overage_cost: number; credits_limit: number; plan: string;
+  } | null>(null);
+
+  // Load credit info on mount
+  useEffect(() => {
+    fetch("/api/auto-target")
+      .then(r => r.json())
+      .then(d => setCreditData(d))
+      .catch(() => {});
+  }, []);
 
   const price = lead.selling_price || lead.listing_price;
   const priceStr = price ? `$${price.toLocaleString()}` : "";
@@ -53,7 +65,9 @@ export default function AutoTargetModal({ lead, onClose, onSubmitted }: Props) {
 
       if (!res.ok) {
         if (data.error === "limit_reached") {
-          setErrorMsg(`You've used all ${data.limit} free prospect lists.`);
+          setErrorMsg(data.can_buy_more
+            ? `You've used all ${data.limit} included lists this month. Upgrade for more.`
+            : `You've used all ${data.limit} free prospect lists. Subscribe to get more.`);
           setState("error");
           return;
         }
@@ -68,8 +82,10 @@ export default function AutoTargetModal({ lead, onClose, onSubmitted }: Props) {
       }
 
       // Show credit info
-      if (data.credits_remaining != null) {
-        setCreditsInfo(`${data.credits_remaining} prospect lists remaining this ${data.is_free ? 'account' : 'month'}`);
+      if (data.is_overage) {
+        setCreditsInfo(`Overage request — $${data.overage_cost} will be charged`);
+      } else if (data.credits_remaining != null) {
+        setCreditsInfo(`${data.credits_remaining} included prospect lists remaining this ${data.is_free ? 'account' : 'month'}`);
       }
 
       setState("submitted");
@@ -149,13 +165,31 @@ export default function AutoTargetModal({ lead, onClose, onSubmitted }: Props) {
                 </p>
               </div>
 
+              {/* Credit usage line */}
+              {creditData && (
+                <div className="text-[11px] text-on-surface-variant/70 text-center">
+                  {creditData.is_overage ? (
+                    <span className="text-orange-400 font-semibold">
+                      Included lists used — this request costs ${creditData.overage_cost}
+                    </span>
+                  ) : creditData.credits_remaining > 0 ? (
+                    <span>
+                      {creditData.credits_remaining} of {creditData.credits_limit} included lists remaining
+                      {!creditData.is_free && ' this month'}
+                    </span>
+                  ) : null}
+                </div>
+              )}
+
               {/* CTA */}
               <button
                 onClick={handleSubmit}
                 className="w-full py-4 rounded-xl bg-gradient-to-br from-primary/80 to-primary text-white font-bold text-sm flex items-center justify-center gap-2 shadow-[0_8px_25px_-5px_hsl(var(--primary)/0.4)] hover:opacity-90 active:scale-[0.98] transition-all"
               >
                 <MaterialIcon icon="my_location" className="text-[18px]" />
-                Generate Prospect List
+                {creditData?.is_overage
+                  ? `Generate List — $${creditData.overage_cost}`
+                  : 'Generate Prospect List'}
               </button>
             </>
           )}

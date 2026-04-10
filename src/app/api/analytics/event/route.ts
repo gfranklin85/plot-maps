@@ -28,6 +28,20 @@ function parseUA(ua: string) {
   return { browser, os, device_type: deviceType };
 }
 
+// Free IP geolocation — no API key needed, 45 req/min
+async function geolocateIP(ip: string): Promise<{ country: string; region: string; city: string } | null> {
+  if (!ip || ip === '127.0.0.1' || ip === '::1') return null;
+  try {
+    const res = await fetch(`http://ip-api.com/json/${ip}?fields=country,regionName,city`, { signal: AbortSignal.timeout(2000) });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data.country) return { country: data.country, region: data.regionName || '', city: data.city || '' };
+    return null;
+  } catch {
+    return null; // Non-blocking — skip geo if service is slow/down
+  }
+}
+
 interface EventPayload {
   event_name: string;
   page_url?: string;
@@ -49,6 +63,7 @@ export async function POST(request: Request) {
     const headerStore = await headers();
     const ua = headerStore.get('user-agent') || '';
     const referer = headerStore.get('referer') || '';
+    const ip = (headerStore.get('x-forwarded-for')?.split(',')[0]?.trim()) || headerStore.get('x-real-ip') || '';
     const { browser, os, device_type } = parseUA(ua);
 
     // Separate page_view events from other events
@@ -77,9 +92,12 @@ export async function POST(request: Request) {
       if (error) console.error('Session update error:', error);
       sessionId = existing.id;
     } else {
-      // First visit — capture UTM, referrer, device info
+      // First visit — capture UTM, referrer, device info, geolocation
       const firstPageUrl = events[0]?.page_url || '';
       const url = firstPageUrl ? new URL(firstPageUrl, 'http://localhost') : null;
+
+      // Non-blocking geo lookup — doesn't fail the request if slow
+      const geo = await geolocateIP(ip);
 
       const { data: newSession, error } = await supabaseAdmin
         .from('anonymous_sessions')
@@ -95,6 +113,9 @@ export async function POST(request: Request) {
           browser,
           os,
           device_type,
+          country: geo?.country || null,
+          region: geo?.region || null,
+          city: geo?.city || null,
           total_pageviews: pageViews.length,
           total_events: otherEvents.length,
         })

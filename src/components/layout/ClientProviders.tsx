@@ -9,6 +9,8 @@ import { SidebarProvider } from '@/lib/sidebar-context';
 import { PhoneProvider } from '@/lib/phone-context';
 import PostHogProvider from '@/components/providers/PostHogProvider';
 import AnalyticsProvider from '@/components/providers/AnalyticsProvider';
+import MetaPixelProvider from '@/components/providers/MetaPixelProvider';
+import GoogleAdsProvider from '@/components/providers/GoogleAdsProvider';
 import CookieBanner from '@/components/ui/CookieBanner';
 import type { ReactNode } from 'react';
 
@@ -20,14 +22,18 @@ export default function ClientProviders({ children }: { children: ReactNode }) {
           <Suspense fallback={null}>
             <PostHogProvider>
               <AnalyticsProvider>
-                <ProfileProvider>
+                <MetaPixelProvider>
+                  <GoogleAdsProvider>
+                    <ProfileProvider>
                   <SidebarProvider>
                     <PhoneProvider>
                       {children}
                       <CookieBanner />
                     </PhoneProvider>
                   </SidebarProvider>
-                </ProfileProvider>
+                    </ProfileProvider>
+                  </GoogleAdsProvider>
+                </MetaPixelProvider>
               </AnalyticsProvider>
             </PostHogProvider>
           </Suspense>

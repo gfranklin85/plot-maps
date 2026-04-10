@@ -2,23 +2,55 @@ import { NextResponse } from 'next/server';
 import { getAuthUser } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase-server';
 
-const FREE_AUTO_TARGET_LIMIT = 10;
+const FREE_LIFETIME_LIMIT = 5;
+const STARTER_MONTHLY_LIMIT = 10;
+const PRO_MONTHLY_LIMIT = 25;
 
-async function isSubscribed(userId: string): Promise<boolean> {
+const PRO_PRICE_ID = process.env.NEXT_PUBLIC_STRIPE_PRO_PRICE_ID || '';
+
+async function getSubscriptionInfo(userId: string) {
   const { data } = await supabaseAdmin
     .from('profiles')
-    .select('subscription_status')
+    .select('subscription_status, stripe_price_id')
     .eq('id', userId)
     .single();
-  return data?.subscription_status === 'active';
+
+  const isActive = data?.subscription_status === 'active';
+  const isPro = isActive && data?.stripe_price_id === PRO_PRICE_ID;
+  return { isActive, isPro };
+}
+
+function getCurrentMonth(): string {
+  return new Date().toISOString().slice(0, 7); // '2026-04'
 }
 
 async function getCredits(userId: string) {
-  const subscribed = await isSubscribed(userId);
-  if (subscribed) {
-    return { allowed: true, used: 0, limit: -1, is_free: false };
+  const { isActive, isPro } = await getSubscriptionInfo(userId);
+
+  if (isActive) {
+    // Paid user: monthly limit
+    const monthlyLimit = isPro ? PRO_MONTHLY_LIMIT : STARTER_MONTHLY_LIMIT;
+    const month = getCurrentMonth();
+    const startOfMonth = `${month}-01T00:00:00.000Z`;
+
+    const { count } = await supabaseAdmin
+      .from('auto_target_requests')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .neq('status', 'cancelled')
+      .gte('created_at', startOfMonth);
+
+    const used = count || 0;
+    return {
+      allowed: used < monthlyLimit,
+      used,
+      limit: monthlyLimit,
+      is_free: false,
+      plan: isPro ? 'pro' : 'starter',
+    };
   }
 
+  // Free user: lifetime limit
   const { count } = await supabaseAdmin
     .from('auto_target_requests')
     .select('*', { count: 'exact', head: true })
@@ -27,10 +59,11 @@ async function getCredits(userId: string) {
 
   const used = count || 0;
   return {
-    allowed: used < FREE_AUTO_TARGET_LIMIT,
+    allowed: used < FREE_LIFETIME_LIMIT,
     used,
-    limit: FREE_AUTO_TARGET_LIMIT,
+    limit: FREE_LIFETIME_LIMIT,
     is_free: true,
+    plan: 'free',
   };
 }
 
@@ -50,8 +83,9 @@ export async function GET() {
     requests: requests || [],
     credits_used: credits.used,
     credits_limit: credits.limit,
-    credits_remaining: credits.is_free ? credits.limit - credits.used : -1,
+    credits_remaining: credits.limit - credits.used,
     is_free: credits.is_free,
+    plan: credits.plan,
   });
 }
 
@@ -123,6 +157,6 @@ export async function POST(request: Request) {
     id: req.id,
     status: req.status,
     credits_used: credits.used + 1,
-    credits_remaining: credits.is_free ? credits.limit - credits.used - 1 : -1,
+    credits_remaining: credits.limit - credits.used - 1,
   });
 }

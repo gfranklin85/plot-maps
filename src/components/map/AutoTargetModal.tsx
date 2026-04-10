@@ -68,8 +68,8 @@ export default function AutoTargetModal({ lead, onClose, onSubmitted }: Props) {
       }
 
       // Show credit info
-      if (data.credits_remaining >= 0) {
-        setCreditsInfo(`${data.credits_remaining} free prospect lists remaining`);
+      if (data.credits_remaining != null) {
+        setCreditsInfo(`${data.credits_remaining} prospect lists remaining this ${data.is_free ? 'account' : 'month'}`);
       }
 
       setState("submitted");

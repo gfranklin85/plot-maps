@@ -1,8 +1,11 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 
 export default function LandingPage() {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
   return (
     <div className="bg-[#0c1324] text-[#dce1fb] min-h-screen font-body selection:bg-indigo-500/30 scroll-smooth">
       {/* Top Navigation */}
@@ -15,10 +18,23 @@ export default function LandingPage() {
             <a href="#use-cases" className="text-slate-400 font-medium hover:text-indigo-200 transition-colors font-headline">Use Cases</a>
             <Link className="text-slate-400 font-medium hover:text-indigo-200 transition-colors font-headline" href="/login">Sign In</Link>
           </div>
-          <Link href="/signup" className="bg-gradient-to-br from-indigo-400 to-indigo-600 text-white px-4 sm:px-6 py-2 sm:py-2.5 rounded-lg font-bold font-headline text-sm sm:text-base scale-95 hover:scale-100 transition-all duration-300">
-            Get Access
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link href="/signup" className="bg-gradient-to-br from-indigo-400 to-indigo-600 text-white px-4 sm:px-6 py-2 sm:py-2.5 rounded-lg font-bold font-headline text-sm sm:text-base scale-95 hover:scale-100 transition-all duration-300">
+              Try the Map
+            </Link>
+            <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="md:hidden p-2 text-slate-400 hover:text-white transition-colors">
+              <span className="material-symbols-outlined text-[24px]">{mobileMenuOpen ? 'close' : 'menu'}</span>
+            </button>
+          </div>
         </nav>
+        {mobileMenuOpen && (
+          <div className="md:hidden bg-[#151b2d] border-t border-slate-700/20 px-5 py-4 space-y-1">
+            <a href="#features" onClick={() => setMobileMenuOpen(false)} className="block py-3 text-indigo-400 font-semibold font-headline">Features</a>
+            <a href="#pricing" onClick={() => setMobileMenuOpen(false)} className="block py-3 text-slate-400 font-headline">Pricing</a>
+            <a href="#use-cases" onClick={() => setMobileMenuOpen(false)} className="block py-3 text-slate-400 font-headline">Use Cases</a>
+            <Link href="/login" onClick={() => setMobileMenuOpen(false)} className="block py-3 text-slate-400 font-headline">Sign In</Link>
+          </div>
+        )}
       </header>
 
       <main>
@@ -39,7 +55,7 @@ export default function LandingPage() {
               </p>
               <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                 <Link href="/signup" className="bg-gradient-to-br from-indigo-400 to-indigo-600 text-white px-6 sm:px-8 py-3.5 sm:py-4 rounded-lg font-bold font-headline text-base sm:text-lg text-center hover:shadow-[0_0_20px_rgba(195,192,255,0.3)] transition-all">
-                  Start Prospecting Free
+                  Try the Map — Free
                 </Link>
                 <a href="#features" className="bg-[#23293c] border border-slate-700/20 text-[#dce1fb] px-6 sm:px-8 py-3.5 sm:py-4 rounded-lg font-bold font-headline text-base sm:text-lg text-center hover:bg-[#2e3447] transition-all flex items-center justify-center gap-2">
                   <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>visibility</span>
@@ -230,7 +246,7 @@ export default function LandingPage() {
                   ))}
                 </ul>
                 <Link href="/signup" className="block w-full text-center mt-6 sm:mt-8 py-3 rounded-xl bg-[#23293c] text-white font-bold hover:bg-[#2e3447] transition-colors text-sm sm:text-base">
-                  Get Started Free
+                  Start Free
                 </Link>
               </div>
               {/* Pro */}
@@ -264,7 +280,7 @@ export default function LandingPage() {
                   ))}
                 </ul>
                 <Link href="/signup" className="block w-full text-center mt-6 sm:mt-8 py-3 rounded-xl bg-gradient-to-br from-indigo-400 to-indigo-600 text-white font-bold hover:shadow-[0_0_20px_rgba(195,192,255,0.3)] transition-all text-sm sm:text-base">
-                  Get Started Free
+                  Start Free
                 </Link>
               </div>
             </div>
@@ -281,7 +297,7 @@ export default function LandingPage() {
             <p className="text-lg sm:text-2xl text-slate-400 mb-8 sm:mb-12">See the house. See the data. Make the call.</p>
             <div className="flex flex-col sm:flex-row flex-wrap justify-center gap-4 sm:gap-6">
               <Link href="/signup" className="bg-gradient-to-br from-indigo-400 to-indigo-600 text-white px-8 sm:px-10 py-4 sm:py-5 rounded-lg font-bold font-headline text-lg sm:text-xl shadow-xl hover:scale-105 transition-all text-center">
-                Get Access
+                Try the Map
               </Link>
               <Link href="/signup" className="bg-[#23293c] border border-slate-700/30 text-[#dce1fb] px-8 sm:px-10 py-4 sm:py-5 rounded-lg font-bold font-headline text-lg sm:text-xl hover:bg-[#2e3447] transition-all text-center">
                 Start Prospecting

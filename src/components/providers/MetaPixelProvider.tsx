@@ -21,7 +21,7 @@ export default function MetaPixelProvider({ children }: { children: ReactNode })
   // Load Meta Pixel script
   useEffect(() => {
     if (!consent.analytics || !PIXEL_ID) return;
-    if (window.fbq) return; // Already loaded
+    if (typeof window.fbq === 'function') return; // Already loaded
 
     /* eslint-disable */
     const f: any = window;
@@ -39,8 +39,8 @@ export default function MetaPixelProvider({ children }: { children: ReactNode })
     firstScript?.parentNode?.insertBefore(script, firstScript);
     /* eslint-enable */
 
-    window.fbq('init', PIXEL_ID);
-    window.fbq('track', 'PageView');
+    f.fbq('init', PIXEL_ID);
+    f.fbq('track', 'PageView');
   }, [consent.analytics]);
 
   // Track page views on route change

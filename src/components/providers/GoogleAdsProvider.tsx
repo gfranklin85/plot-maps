@@ -21,7 +21,7 @@ export default function GoogleAdsProvider({ children }: { children: ReactNode })
   // Load gtag script
   useEffect(() => {
     if (!consent.analytics || !GTAG_ID) return;
-    if (window.gtag) return; // Already loaded
+    if (typeof window.gtag === 'function') return; // Already loaded
 
     // Initialize dataLayer
     window.dataLayer = window.dataLayer || [];

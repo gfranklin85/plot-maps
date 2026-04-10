@@ -5,6 +5,7 @@ import { useAuth } from '@/lib/auth-context';
 import { useSidebar } from '@/lib/sidebar-context';
 import Sidebar from './Sidebar';
 import TopBar from './TopBar';
+import BottomNav from './BottomNav';
 import CallBar from '@/components/call/CallBar';
 import type { ReactNode } from 'react';
 
@@ -32,9 +33,10 @@ export default function AppShell({ children }: { children: ReactNode }) {
     <>
       <Sidebar />
       <TopBar />
-      <main className={`pt-16 min-h-screen transition-all duration-300 ${collapsed ? 'ml-16' : 'ml-64'}`}>
+      <main className={`pt-14 md:pt-16 pb-14 md:pb-0 min-h-screen transition-all duration-300 ml-0 ${collapsed ? 'md:ml-16' : 'md:ml-64'}`}>
         {children}
       </main>
+      <BottomNav />
       <CallBar />
     </>
   );

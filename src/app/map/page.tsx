@@ -48,7 +48,7 @@ export default function MapPage() {
   const [showGate, setShowGate] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [pinnedRef, setPinnedRef] = useState<Lead | null>(null);
-  const [expandedView, setExpandedView] = useState(false);
+  const [expandedLead, setExpandedLead] = useState<Lead | null>(null);
   const [pinMode, setPinMode] = useState<PinMode>('dots');
   const [prospectList, setProspectList] = useState<{ address: string; lat: number; lng: number; city: string | null; state: string | null; zip: string | null }[]>([]);
   const [showProspectPanel, setShowProspectPanel] = useState(false);
@@ -502,7 +502,7 @@ export default function MapPage() {
             leads={filteredLeads}
             mapType={mapType}
             pinMode={pinMode}
-            onLeadClick={(_id, lead) => { setSelectedLead(lead); setExpandedView(false); }}
+            onLeadClick={(_id, lead) => { setSelectedLead(lead); }}
             onCenterChanged={(c) => { setMapCenter(c); setHasUserPanned(true); }}
             center={mapCenter}
             onWalkHere={(lead) => {
@@ -536,7 +536,7 @@ export default function MapPage() {
 
       {/* ═══ PINNED REFERENCE SIDEBAR — persistent comp while prospecting ═══ */}
       {pinnedRef && !walkMode && (
-        <div className="absolute left-0 top-0 h-full w-full md:w-[400px] z-20 bg-card/95 backdrop-blur-xl border-r border-card-border shadow-2xl flex flex-col overflow-hidden">
+        <div className="absolute right-0 top-0 h-full w-full md:w-[400px] z-20 bg-card/95 backdrop-blur-xl border-l border-card-border shadow-2xl flex flex-col overflow-hidden">
           <div className="px-4 py-3 bg-primary/10 border-b border-card-border shrink-0">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-black uppercase tracking-[0.15em] text-primary">Reference Property</span>
@@ -565,7 +565,7 @@ export default function MapPage() {
 
       {/* ═══ ACTIVE SELECTION CARD — bottom, changes with each click ═══ */}
       {selectedLead && !walkMode && (
-        <div className={`absolute bottom-14 md:bottom-6 left-0 right-0 md:right-auto z-20 w-full md:w-[380px] rounded-t-2xl md:rounded-2xl bg-card border border-card-border shadow-2xl ${pinnedRef ? 'md:left-[416px]' : 'md:left-6'}`}>
+        <div className="absolute bottom-14 md:bottom-6 left-0 right-0 md:right-auto md:left-6 z-20 w-full md:w-[380px] rounded-t-2xl md:rounded-2xl bg-card border border-card-border shadow-2xl">
           <div className="flex items-center justify-between px-4 pt-3 pb-1">
             <div className="flex items-center gap-2">
               {/* Pin to sidebar as reference */}
@@ -578,7 +578,7 @@ export default function MapPage() {
                 Pin
               </button>
               <button
-                onClick={() => setExpandedView(true)}
+                onClick={() => { setExpandedLead(selectedLead); setSelectedLead(null); }}
                 className="flex items-center gap-1 text-[10px] font-bold text-primary uppercase tracking-widest hover:underline"
               >
                 <MaterialIcon icon="open_in_full" className="text-[14px]" />
@@ -606,28 +606,28 @@ export default function MapPage() {
       )}
 
       {/* ═══ EXPANDED FULL SIDEBAR — deep dive on selected property ═══ */}
-      {selectedLead && expandedView && !walkMode && (
+      {expandedLead && !walkMode && (
         <div className="absolute right-0 top-0 h-full w-full md:w-[440px] z-20 bg-card border-l border-card-border shadow-2xl flex flex-col">
           <div className="flex items-center justify-between px-4 py-3 border-b border-card-border shrink-0">
             <div className="flex items-center gap-3">
               <button
-                onClick={() => { setPinnedRef(selectedLead); setExpandedView(false); setSelectedLead(null); }}
+                onClick={() => { setPinnedRef(expandedLead); setExpandedLead(null); }}
                 className="flex items-center gap-1 text-[10px] font-bold text-primary uppercase tracking-widest hover:underline"
               >
                 <MaterialIcon icon="push_pin" className="text-[14px]" />
                 Pin as Reference
               </button>
-              <button onClick={() => setExpandedView(false)} className="text-[10px] font-bold text-secondary uppercase tracking-widest hover:underline">
+              <button onClick={() => setExpandedLead(null)} className="text-[10px] font-bold text-secondary uppercase tracking-widest hover:underline">
                 Collapse
               </button>
             </div>
-            <button onClick={() => { setSelectedLead(null); setExpandedView(false); }} className="text-secondary hover:text-on-surface transition-colors">
+            <button onClick={() => setExpandedLead(null)} className="text-secondary hover:text-on-surface transition-colors">
               <MaterialIcon icon="close" className="text-[18px]" />
             </button>
           </div>
           <div className="flex-1 overflow-y-auto">
             <PropertyPopup
-              lead={selectedLead}
+              lead={expandedLead}
               onUpdate={refetchLeads}
               onAddProspects={addToProspectList}
               onWalkHere={(lead) => {
@@ -635,8 +635,7 @@ export default function MapPage() {
                 if (lead.latitude && lead.longitude) {
                   setMapCenter({ lat: lead.latitude, lng: lead.longitude });
                   setWalkMode(true);
-                  setSelectedLead(null);
-                  setExpandedView(false);
+                  setExpandedLead(null);
                 }
               }}
             />

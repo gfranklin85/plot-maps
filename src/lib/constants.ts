@@ -48,8 +48,8 @@ export const TASK_TABS = [
   { label: "Recently Imported", key: "recently-imported" },
 ] as const;
 
-// Map default center (523 Puffin Lane, Lemoore CA 93245)
-export const MAP_CENTER: { lat: number; lng: number } = { lat: 36.2632, lng: -119.7988 };
+// Map default center — Lemoore, CA (centered on neighborhoods)
+export const MAP_CENTER: { lat: number; lng: number } = { lat: 36.3008, lng: -119.7828 };
 export const MAP_ZOOM = 14;
 
 // System fields for import column mapping

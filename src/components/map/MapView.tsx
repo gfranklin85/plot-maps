@@ -270,7 +270,7 @@ export default function MapView({ leads, onLeadClick, onCenterChanged, center, m
     <APIProvider apiKey={API_KEY} libraries={['places']}>
       <Map
         defaultCenter={center || MAP_CENTER}
-        defaultZoom={center ? 18 : MAP_ZOOM}
+        defaultZoom={MAP_ZOOM}
         className="h-full w-full"
         disableDefaultUI
         zoomControl

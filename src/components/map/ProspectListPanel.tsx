@@ -24,7 +24,7 @@ export default function ProspectListPanel({ addresses, onRemove, onClear, onClos
   const total = (addresses.length * PRICE_PER_ADDRESS).toFixed(2);
 
   return (
-    <div className="fixed right-0 top-0 h-full w-[400px] z-50 bg-card border-l border-card-border shadow-2xl flex flex-col">
+    <div className="fixed right-0 top-0 h-full w-full md:w-[400px] z-50 bg-card border-l border-card-border shadow-2xl flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between px-5 py-4 border-b border-card-border shrink-0">
         <div>

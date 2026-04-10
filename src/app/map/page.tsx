@@ -172,8 +172,10 @@ export default function MapPage() {
     return result;
   }, [leads, activeTab, search, selectedTags, selectedCity, selectedPriority, selectedSource, listingFilter]);
 
+  const [mobileControlsOpen, setMobileControlsOpen] = useState(false);
+
   return (
-    <div className="relative h-[calc(100vh-5rem)] w-full">
+    <div className="relative h-[calc(100vh-3.5rem)] md:h-[calc(100vh-5rem)] w-full">
       {/* ═══ CONTROLS ═══ */}
       {walkMode ? (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10">
@@ -186,105 +188,189 @@ export default function MapPage() {
           </button>
         </div>
       ) : (
-        <div className="absolute top-4 left-4 right-4 z-10 flex items-center gap-2">
-          {/* Search */}
-          <div className="flex-1 max-w-sm">
-            <PlacesSearch
-              onPlaceSelected={(place) => {
-                setMapCenter({ lat: place.lat, lng: place.lng });
-                setSearch(place.address);
-              }}
-              className="shadow-lg"
-            />
+        <>
+          {/* ── DESKTOP TOOLBAR ── */}
+          <div className="absolute top-4 left-4 right-4 z-10 hidden md:flex items-center gap-2">
+            {/* Search */}
+            <div className="flex-1 max-w-sm">
+              <PlacesSearch
+                onPlaceSelected={(place) => {
+                  setMapCenter({ lat: place.lat, lng: place.lng });
+                  setSearch(place.address);
+                }}
+                className="shadow-lg"
+              />
+            </div>
+
+            {/* Map type toggle */}
+            <div className="flex gap-0.5 bg-surface p-1 rounded-xl shadow-lg">
+              {(["roadmap", "satellite", "hybrid"] as const).map((type) => (
+                <button
+                  key={type}
+                  onClick={() => setMapType(type)}
+                  className={`px-3 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all ${
+                    mapType === type
+                      ? "bg-primary text-white"
+                      : "text-on-surface-variant hover:text-white"
+                  }`}
+                >
+                  {type === "roadmap" ? "Map" : type === "satellite" ? "Sat" : "Hybrid"}
+                </button>
+              ))}
+            </div>
+
+            {/* Listing filter */}
+            <div className="flex gap-0.5 bg-surface p-1 rounded-xl shadow-lg">
+              {[
+                { key: 'all', label: 'All', dot: 'bg-primary' },
+                { key: 'prospects', label: 'Prospects', dot: 'bg-orange-400' },
+                { key: 'Active', label: 'Active', dot: 'bg-green-500' },
+                { key: 'Sold', label: 'Sold', dot: 'bg-yellow-400' },
+                { key: 'Pending', label: 'Pending', dot: 'bg-purple-500' },
+              ].map((f) => (
+                <button
+                  key={f.key}
+                  onClick={() => setListingFilter(f.key)}
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all ${
+                    listingFilter === f.key
+                      ? 'bg-surface-container text-white'
+                      : 'text-on-surface-variant hover:text-white'
+                  }`}
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full ${f.dot}`} />
+                  {f.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Pins View Mode */}
+            <div className="flex items-center gap-0.5 bg-surface p-1 rounded-xl shadow-lg">
+              <span className="text-[9px] font-bold text-on-surface-variant uppercase tracking-wider px-2">Pins</span>
+              {([
+                { mode: 'dots' as PinMode, icon: 'fiber_manual_record', label: 'Dots' },
+                { mode: 'labels' as PinMode, icon: 'sell', label: 'Labels' },
+                { mode: 'detail' as PinMode, icon: 'view_agenda', label: 'Cards' },
+              ]).map(({ mode, icon, label }) => (
+                <button
+                  key={mode}
+                  onClick={() => setPinMode(mode)}
+                  title={label}
+                  className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1 ${
+                    pinMode === mode
+                      ? 'bg-primary text-white'
+                      : 'text-on-surface-variant hover:text-primary'
+                  }`}
+                >
+                  <MaterialIcon icon={icon} className="text-[14px]" />
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {/* Walk Mode */}
+            <button
+              onClick={() => isSubscribed ? setWalkMode(true) : setShowGate(true)}
+              title="Walk Mode"
+              className="w-10 h-10 flex items-center justify-center rounded-xl bg-surface text-on-surface-variant shadow-lg hover:text-primary transition-all"
+            >
+              <MaterialIcon icon="directions_walk" className="text-[20px]" />
+            </button>
+
+            {/* Filters */}
+            <button
+              onClick={() => setFiltersOpen((o) => !o)}
+              title="Filters"
+              className={`w-10 h-10 flex items-center justify-center rounded-xl shadow-lg transition-all ${
+                filtersOpen || hasActiveFilters
+                  ? "bg-primary text-white"
+                  : "bg-surface text-on-surface-variant hover:text-primary"
+              }`}
+            >
+              <MaterialIcon icon="tune" className="text-[20px]" />
+            </button>
           </div>
 
-          {/* Map type toggle */}
-          <div className="flex gap-0.5 bg-surface p-1 rounded-xl shadow-lg">
-            {(["roadmap", "satellite", "hybrid"] as const).map((type) => (
-              <button
-                key={type}
-                onClick={() => setMapType(type)}
-                className={`px-3 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all ${
-                  mapType === type
-                    ? "bg-primary text-white"
-                    : "text-on-surface-variant hover:text-white"
-                }`}
-              >
-                {type === "roadmap" ? "Map" : type === "satellite" ? "Sat" : "Hybrid"}
-              </button>
-            ))}
+          {/* ── MOBILE TOOLBAR ── */}
+          <div className="absolute top-2 left-2 right-2 z-10 flex items-center gap-2 md:hidden">
+            <div className="flex-1">
+              <PlacesSearch
+                onPlaceSelected={(place) => {
+                  setMapCenter({ lat: place.lat, lng: place.lng });
+                  setSearch(place.address);
+                }}
+                className="shadow-lg"
+              />
+            </div>
+            <button
+              onClick={() => setMobileControlsOpen(o => !o)}
+              className={`w-10 h-10 flex items-center justify-center rounded-xl shadow-lg transition-all ${
+                mobileControlsOpen ? 'bg-primary text-white' : 'bg-surface text-on-surface-variant'
+              }`}
+            >
+              <MaterialIcon icon="tune" className="text-[20px]" />
+            </button>
+            <button
+              onClick={() => isSubscribed ? setWalkMode(true) : setShowGate(true)}
+              className="w-10 h-10 flex items-center justify-center rounded-xl bg-surface text-on-surface-variant shadow-lg"
+            >
+              <MaterialIcon icon="directions_walk" className="text-[20px]" />
+            </button>
           </div>
 
-          {/* Listing filter */}
-          <div className="flex gap-0.5 bg-surface p-1 rounded-xl shadow-lg">
-            {[
-              { key: 'all', label: 'All', dot: 'bg-primary' },
-              { key: 'prospects', label: 'Prospects', dot: 'bg-orange-400' },
-              { key: 'Active', label: 'Active', dot: 'bg-green-500' },
-              { key: 'Sold', label: 'Sold', dot: 'bg-yellow-400' },
-              { key: 'Pending', label: 'Pending', dot: 'bg-purple-500' },
-            ].map((f) => (
-              <button
-                key={f.key}
-                onClick={() => setListingFilter(f.key)}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all ${
-                  listingFilter === f.key
-                    ? 'bg-surface-container text-white'
-                    : 'text-on-surface-variant hover:text-white'
-                }`}
-              >
-                <span className={`w-1.5 h-1.5 rounded-full ${f.dot}`} />
-                {f.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Pins View Mode */}
-          <div className="flex items-center gap-0.5 bg-surface p-1 rounded-xl shadow-lg">
-            <span className="text-[9px] font-bold text-on-surface-variant uppercase tracking-wider px-2">Pins</span>
-            {([
-              { mode: 'dots' as PinMode, icon: 'fiber_manual_record', label: 'Dots' },
-              { mode: 'labels' as PinMode, icon: 'sell', label: 'Labels' },
-              { mode: 'detail' as PinMode, icon: 'view_agenda', label: 'Cards' },
-            ]).map(({ mode, icon, label }) => (
-              <button
-                key={mode}
-                onClick={() => setPinMode(mode)}
-                title={label}
-                className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1 ${
-                  pinMode === mode
-                    ? 'bg-primary text-white'
-                    : 'text-on-surface-variant hover:text-primary'
-                }`}
-              >
-                <MaterialIcon icon={icon} className="text-[14px]" />
-                {label}
-              </button>
-            ))}
-          </div>
-
-          {/* Walk Mode */}
-          <button
-            onClick={() => isSubscribed ? setWalkMode(true) : setShowGate(true)}
-            title="Walk Mode"
-            className="w-10 h-10 flex items-center justify-center rounded-xl bg-surface text-on-surface-variant shadow-lg hover:text-primary transition-all"
-          >
-            <MaterialIcon icon="directions_walk" className="text-[20px]" />
-          </button>
-
-          {/* Filters */}
-          <button
-            onClick={() => setFiltersOpen((o) => !o)}
-            title="Filters"
-            className={`w-10 h-10 flex items-center justify-center rounded-xl shadow-lg transition-all ${
-              filtersOpen || hasActiveFilters
-                ? "bg-primary text-white"
-                : "bg-surface text-on-surface-variant hover:text-primary"
-            }`}
-          >
-            <MaterialIcon icon="tune" className="text-[20px]" />
-          </button>
-        </div>
+          {/* ── MOBILE CONTROLS SHEET ── */}
+          {mobileControlsOpen && (
+            <div className="absolute top-16 left-2 right-2 z-10 bg-surface rounded-2xl p-4 shadow-2xl border border-card-border space-y-4 md:hidden">
+              {/* Map type */}
+              <div>
+                <p className="text-[9px] font-bold text-on-surface-variant uppercase tracking-wider mb-2">Map Type</p>
+                <div className="flex gap-1">
+                  {(["roadmap", "satellite", "hybrid"] as const).map((type) => (
+                    <button key={type} onClick={() => setMapType(type)}
+                      className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${mapType === type ? 'bg-primary text-white' : 'bg-surface-container-high text-on-surface-variant'}`}>
+                      {type === "roadmap" ? "Map" : type === "satellite" ? "Sat" : "Hybrid"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {/* Listing filter */}
+              <div>
+                <p className="text-[9px] font-bold text-on-surface-variant uppercase tracking-wider mb-2">Show</p>
+                <div className="flex flex-wrap gap-1">
+                  {[
+                    { key: 'all', label: 'All', dot: 'bg-primary' },
+                    { key: 'prospects', label: 'Prospects', dot: 'bg-orange-400' },
+                    { key: 'Active', label: 'Active', dot: 'bg-green-500' },
+                    { key: 'Sold', label: 'Sold', dot: 'bg-yellow-400' },
+                    { key: 'Pending', label: 'Pending', dot: 'bg-purple-500' },
+                  ].map((f) => (
+                    <button key={f.key} onClick={() => setListingFilter(f.key)}
+                      className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-all ${listingFilter === f.key ? 'bg-surface-container text-white' : 'text-on-surface-variant'}`}>
+                      <span className={`w-2 h-2 rounded-full ${f.dot}`} />
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {/* Pin mode */}
+              <div>
+                <p className="text-[9px] font-bold text-on-surface-variant uppercase tracking-wider mb-2">Pin Style</p>
+                <div className="flex gap-1">
+                  {([
+                    { mode: 'dots' as PinMode, label: 'Dots' },
+                    { mode: 'labels' as PinMode, label: 'Labels' },
+                    { mode: 'detail' as PinMode, label: 'Cards' },
+                  ]).map(({ mode, label }) => (
+                    <button key={mode} onClick={() => setPinMode(mode)}
+                      className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${pinMode === mode ? 'bg-primary text-white' : 'bg-surface-container-high text-on-surface-variant'}`}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <button onClick={() => setMobileControlsOpen(false)} className="w-full py-2 text-xs font-bold text-primary">Done</button>
+            </div>
+          )}
+        </>
       )}
 
       {/* Collapsible filter panel */}
@@ -450,7 +536,7 @@ export default function MapPage() {
 
       {/* ═══ PINNED REFERENCE SIDEBAR — persistent comp while prospecting ═══ */}
       {pinnedRef && !walkMode && (
-        <div className="absolute left-0 top-0 h-full w-[400px] z-20 bg-card/95 backdrop-blur-xl border-r border-card-border shadow-2xl flex flex-col overflow-hidden">
+        <div className="absolute left-0 top-0 h-full w-full md:w-[400px] z-20 bg-card/95 backdrop-blur-xl border-r border-card-border shadow-2xl flex flex-col overflow-hidden">
           <div className="px-4 py-3 bg-primary/10 border-b border-card-border shrink-0">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-black uppercase tracking-[0.15em] text-primary">Reference Property</span>
@@ -479,7 +565,7 @@ export default function MapPage() {
 
       {/* ═══ ACTIVE SELECTION CARD — bottom, changes with each click ═══ */}
       {selectedLead && !walkMode && (
-        <div className={`absolute bottom-6 z-20 w-[380px] rounded-2xl bg-card border border-card-border shadow-2xl ${pinnedRef ? 'left-[416px]' : 'left-6'}`}>
+        <div className={`absolute bottom-14 md:bottom-6 left-0 right-0 md:right-auto z-20 w-full md:w-[380px] rounded-t-2xl md:rounded-2xl bg-card border border-card-border shadow-2xl ${pinnedRef ? 'md:left-[416px]' : 'md:left-6'}`}>
           <div className="flex items-center justify-between px-4 pt-3 pb-1">
             <div className="flex items-center gap-2">
               {/* Pin to sidebar as reference */}
@@ -521,7 +607,7 @@ export default function MapPage() {
 
       {/* ═══ EXPANDED FULL SIDEBAR — deep dive on selected property ═══ */}
       {selectedLead && expandedView && !walkMode && (
-        <div className="absolute right-0 top-0 h-full w-[440px] z-20 bg-card border-l border-card-border shadow-2xl flex flex-col">
+        <div className="absolute right-0 top-0 h-full w-full md:w-[440px] z-20 bg-card border-l border-card-border shadow-2xl flex flex-col">
           <div className="flex items-center justify-between px-4 py-3 border-b border-card-border shrink-0">
             <div className="flex items-center gap-3">
               <button
@@ -564,7 +650,7 @@ export default function MapPage() {
       {prospectList.length > 0 && !showProspectPanel && (
         <button
           onClick={() => setShowProspectPanel(true)}
-          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 bg-primary text-white px-5 py-3 rounded-xl shadow-2xl hover:bg-primary/90 transition-all"
+          className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 bg-primary text-white px-5 py-3 rounded-xl shadow-2xl hover:bg-primary/90 transition-all"
         >
           <MaterialIcon icon="format_list_bulleted" className="text-[18px]" />
           <span className="text-sm font-bold">{prospectList.length} addresses selected</span>

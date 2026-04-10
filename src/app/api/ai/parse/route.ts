@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { getAuthUser, isSubscribed } from '@/lib/auth';
+import { logCost } from '@/lib/cost-tracker';
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
 
@@ -67,6 +68,7 @@ export async function POST(request: Request) {
 
     const records = JSON.parse(jsonMatch[0]);
 
+    logCost(user.id, 'anthropic', 'ai_parse', 0.20, 1, { records: records.length });
     return NextResponse.json({ records, count: records.length });
   } catch (error: unknown) {
     console.error('AI parse error:', error);

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { getAuthUser, isSubscribed } from '@/lib/auth';
+import { logCost } from '@/lib/cost-tracker';
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
 
@@ -118,6 +119,7 @@ export async function POST() {
 
     const actions = JSON.parse(jsonMatch[0]);
 
+    logCost(user.id, 'anthropic', 'ai_action_list', 0.20, 1, { leads: uniqueLeads.length });
     return NextResponse.json({ actions, leadCount: uniqueLeads.length });
   } catch (error: unknown) {
     console.error('Action list error:', error);

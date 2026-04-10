@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { getAuthUser, isSubscribed } from '@/lib/auth';
+import { logCost } from '@/lib/cost-tracker';
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
 
@@ -89,6 +90,7 @@ Write the email as Greg Fisher, a real estate professional.`,
 
     const draft = JSON.parse(jsonMatch[0]);
 
+    logCost(user.id, 'anthropic', 'ai_email_draft', 0.10);
     return NextResponse.json({
       subject: draft.subject,
       body: draft.body,

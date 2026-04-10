@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getAuthUser } from '@/lib/auth';
+import { logCost } from '@/lib/cost-tracker';
 
 const GOOGLE_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || process.env.GOOGLE_MAPS_API_KEY!;
 
@@ -92,6 +93,7 @@ export async function POST(request: Request) {
     if (latlng) {
       const result = await reverseGeocode(latlng.lat, latlng.lng);
       if (!result) return NextResponse.json({ error: 'No address found at location' }, { status: 404 });
+      logCost(user.id, 'google_geocode', 'reverse_geocode', 0.005, 1);
       return NextResponse.json(result);
     }
 
@@ -103,6 +105,7 @@ export async function POST(request: Request) {
         results.push(result);
         if (i < latlngs.length - 1) await delay(50);
       }
+      logCost(user.id, 'google_geocode', 'reverse_geocode_batch', 0.005 * latlngs.length, latlngs.length);
       return NextResponse.json({ results: results.filter(Boolean) });
     }
 
@@ -119,6 +122,7 @@ export async function POST(request: Request) {
       if (!result) {
         return NextResponse.json({ error: 'Could not geocode address' }, { status: 404 });
       }
+      logCost(user.id, 'google_geocode', 'forward_geocode', 0.005, 1);
       return NextResponse.json(result);
     }
 
@@ -137,12 +141,12 @@ export async function POST(request: Request) {
         zip: result?.zip ?? null,
       });
 
-      // Rate limit: 100ms delay between requests
       if (i < addresses.length - 1) {
         await delay(100);
       }
     }
 
+    logCost(user.id, 'google_geocode', 'forward_geocode_batch', 0.005 * addresses.length, addresses.length);
     return NextResponse.json({ results });
   } catch (error: unknown) {
     console.error('Geocode error:', error);

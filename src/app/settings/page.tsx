@@ -61,7 +61,7 @@ export default function SettingsPage() {
     setTimeout(() => setSaved(false), 2000);
   }
 
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
 
   async function handleReGeocode() {
     setGeocoding(true);
@@ -472,6 +472,17 @@ export default function SettingsPage() {
           <span className="text-sm text-green-600 font-medium">Settings saved!</span>
         )}
       </div>
+
+      {/* Sign Out */}
+      <section className="glass-card rounded-2xl p-6">
+        <button
+          onClick={signOut}
+          className="flex items-center gap-2 text-red-400 hover:text-red-300 font-semibold transition-colors"
+        >
+          <MaterialIcon icon="logout" className="text-[20px]" />
+          Sign Out
+        </button>
+      </section>
       <p className="text-xs text-secondary -mt-4">Saves profile, map preferences, and script. Call scripts save automatically when edited.</p>
     </div>
   );

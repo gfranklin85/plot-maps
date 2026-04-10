@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getAuthUser } from '@/lib/auth';
+import { logCost } from '@/lib/cost-tracker';
 
 const GOOGLE_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
 
@@ -199,6 +200,10 @@ export async function POST(request: Request) {
     );
     addresses = addresses.slice(0, count || 12);
   }
+
+  // Log cost: each grid point was a reverse geocode call at $0.005
+  const apiCalls = Math.min(gridPoints.length, results.length + 1); // approximate calls made
+  logCost(user.id, 'google_geocode', 'nearby_addresses', 0.005 * apiCalls, apiCalls, { mode, returned: addresses.length });
 
   return NextResponse.json({
     addresses,

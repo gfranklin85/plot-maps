@@ -41,6 +41,7 @@ export default function AdminDashboard({ data, analyticsData }: Props) {
           users={adminData.users}
           hotProspects={analytics?.hotProspects || []}
           liveVisitors={analytics?.pulse?.liveVisitors || 0}
+          costs={(analytics as unknown as { costs?: { todayBurn: number; monthBurn: number; byService: { service: string; cost: number }[] } })?.costs}
         />
       )}
       {activeTab === 'markets' && (

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import twilio from 'twilio';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { getAuthUser } from '@/lib/auth';
+import { logCost } from '@/lib/cost-tracker';
 
 const client = twilio(
   process.env.TWILIO_ACCOUNT_SID!,
@@ -73,6 +74,7 @@ export async function POST(request: Request) {
       },
     });
 
+    logCost(user.id, 'twilio', 'call_initiate', 0.02, 1, { call_sid: call.sid });
     return NextResponse.json({ callSid: call.sid, status: call.status });
   } catch (error: unknown) {
     console.error('Call initiation error:', error);

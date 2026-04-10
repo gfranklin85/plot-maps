@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { getAuthUser, isSubscribed } from '@/lib/auth';
+import { logCost } from '@/lib/cost-tracker';
 
 const resend = new Resend(process.env.RESEND_API_KEY!);
 
@@ -59,6 +60,7 @@ export async function POST(request: Request) {
         .eq('id', leadId);
     }
 
+    logCost(user.id, 'resend', 'email_send', 0.0005);
     return NextResponse.json({ success: true, emailId: data?.id });
   } catch (error: unknown) {
     console.error('Email send error:', error);

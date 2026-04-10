@@ -160,6 +160,30 @@ export async function GET() {
     .map(([device, count]) => ({ device, count }))
     .sort((a, b) => b.count - a.count);
 
+  // ── Platform Costs ──
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+
+  const { data: costToday } = await supabaseAdmin
+    .from('cost_events')
+    .select('service, estimated_cost')
+    .gte('created_at', todayStart);
+
+  const { data: costMonth } = await supabaseAdmin
+    .from('cost_events')
+    .select('service, estimated_cost')
+    .gte('created_at', monthStart);
+
+  const todayBurn = (costToday || []).reduce((s, e) => s + (e.estimated_cost || 0), 0);
+  const monthBurn = (costMonth || []).reduce((s, e) => s + (e.estimated_cost || 0), 0);
+
+  const serviceBreakdown = new Map<string, number>();
+  (costMonth || []).forEach(e => {
+    serviceBreakdown.set(e.service, (serviceBreakdown.get(e.service) || 0) + (e.estimated_cost || 0));
+  });
+  const costByService = Array.from(serviceBreakdown.entries())
+    .map(([service, cost]) => ({ service, cost: Math.round(cost * 100) / 100 }))
+    .sort((a, b) => b.cost - a.cost);
+
   return NextResponse.json({
     pulse: {
       liveVisitors: liveVisitors || 0,
@@ -178,5 +202,10 @@ export async function GET() {
     utmBreakdown,
     dropOffPages,
     devices,
+    costs: {
+      todayBurn: Math.round(todayBurn * 100) / 100,
+      monthBurn: Math.round(monthBurn * 100) / 100,
+      byService: costByService,
+    },
   });
 }

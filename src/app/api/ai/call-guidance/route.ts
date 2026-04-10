@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { getAuthUser, isSubscribed } from '@/lib/auth';
+import { logCost } from '@/lib/cost-tracker';
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
 
@@ -87,6 +88,7 @@ Generate call guidance that feels natural and conversational. My name is Greg Fi
 
     const guidance = JSON.parse(jsonMatch[0]);
 
+    logCost(user.id, 'anthropic', 'ai_call_guidance', 0.10);
     return NextResponse.json({
       ...guidance,
       leadName: ownerName,

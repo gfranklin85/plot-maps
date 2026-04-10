@@ -20,14 +20,21 @@ interface AutoTargetRequest {
   created_at: string;
 }
 
+interface CostData {
+  todayBurn: number;
+  monthBurn: number;
+  byService: { service: string; cost: number }[];
+}
+
 interface Props {
   summary: Summary;
   users: UserRow[];
   hotProspects: HotProspect[];
   liveVisitors: number;
+  costs?: CostData | null;
 }
 
-export default function OverviewTab({ summary, users, hotProspects, liveVisitors }: Props) {
+export default function OverviewTab({ summary, users, hotProspects, liveVisitors, costs }: Props) {
   // ── Auto-target request queue state ──
   const [atRequests, setAtRequests] = useState<AutoTargetRequest[]>([]);
   const [atSelected, setAtSelected] = useState<AutoTargetRequest | null>(null);
@@ -111,6 +118,17 @@ export default function OverviewTab({ summary, users, hotProspects, liveVisitors
           )}
         </div>
       </div>
+
+      {/* Platform Costs */}
+      {costs && (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <SummaryCard label="Burn Today" value={`$${costs.todayBurn.toFixed(2)}`} sub="platform API costs" icon="local_fire_department" alert={costs.todayBurn > 5} />
+          <SummaryCard label="Burn This Month" value={`$${costs.monthBurn.toFixed(2)}`} sub={`$${summary.activeSubscribers > 0 ? (costs.monthBurn / summary.activeSubscribers).toFixed(2) : '0.00'}/subscriber`} icon="trending_up" />
+          {costs.byService.slice(0, 2).map(s => (
+            <SummaryCard key={s.service} label={s.service.replace('_', ' ')} value={`$${s.cost.toFixed(2)}`} sub="this month" icon="receipt_long" />
+          ))}
+        </div>
+      )}
 
       {/* People Table */}
       <PeopleTable users={users} hotProspects={hotProspects} />

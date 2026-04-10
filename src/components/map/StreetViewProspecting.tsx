@@ -44,12 +44,12 @@ function angleDiff(a: number, b: number): number {
 // Generate a floating name tag SVG — scale increases for closer properties
 function makeNameTagIcon(label: string, color: string, scale: number = 1): google.maps.Icon {
   const textLen = label.length;
-  const baseWidth = Math.max(70, textLen * 9 + 24);
-  const baseHeight = 36;
+  const baseWidth = Math.max(120, textLen * 16 + 40);
+  const baseHeight = 56;
   const width = Math.round(baseWidth * scale);
   const height = Math.round(baseHeight * scale);
-  const arrow = Math.round(9 * scale);
-  const fontSize = Math.round(12 * scale);
+  const arrow = Math.round(12 * scale);
+  const fontSize = Math.round(20 * scale);
 
   const svg = `
     <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height + arrow}">
@@ -106,20 +106,20 @@ function makeRichLabelIcon(lead: Lead, color: string, scale: number): google.map
   const recency = daysSinceStr(lead.selling_date || lead.listing_date);
   const subLine = [status, dom ? `${dom} DOM` : '', recency ? `${recency} ago` : ''].filter(Boolean).join(' · ');
 
-  const baseW = 130;
-  const baseH = subLine ? 42 : 30;
+  const baseW = 220;
+  const baseH = subLine ? 70 : 50;
   const w = Math.round(baseW * scale);
   const h = Math.round(baseH * scale);
-  const arrow = Math.round(8 * scale);
-  const fs1 = Math.round(13 * scale);
-  const fs2 = Math.round(8 * scale);
+  const arrow = Math.round(10 * scale);
+  const fs1 = Math.round(22 * scale);
+  const fs2 = Math.round(13 * scale);
 
   const svg = `
     <svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h + arrow}">
       <rect x="1" y="1" width="${w - 2}" height="${h - 2}" rx="${Math.round(8 * scale)}" fill="rgba(15,23,42,0.9)" stroke="${color}" stroke-width="${Math.round(1.5 * scale)}"/>
-      <circle cx="${Math.round(10 * scale)}" cy="${Math.round(13 * scale)}" r="${Math.round(3.5 * scale)}" fill="${color}"/>
-      <text x="${Math.round(18 * scale)}" y="${Math.round(14 * scale)}" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="${fs1}" font-weight="800" fill="white">${escapeXml(price || '—')}</text>
-      ${subLine ? `<text x="${Math.round(6 * scale)}" y="${Math.round(32 * scale)}" font-family="system-ui,sans-serif" font-size="${fs2}" font-weight="600" fill="${color}">${escapeXml(subLine)}</text>` : ''}
+      <circle cx="${Math.round(14 * scale)}" cy="${Math.round(22 * scale)}" r="${Math.round(5 * scale)}" fill="${color}"/>
+      <text x="${Math.round(26 * scale)}" y="${Math.round(24 * scale)}" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="${fs1}" font-weight="800" fill="white">${escapeXml(price || '—')}</text>
+      ${subLine ? `<text x="${Math.round(10 * scale)}" y="${Math.round(54 * scale)}" font-family="system-ui,sans-serif" font-size="${fs2}" font-weight="600" fill="${color}">${escapeXml(subLine)}</text>` : ''}
       <polygon points="${w / 2 - arrow},${h - 1} ${w / 2},${h + arrow - 1} ${w / 2 + arrow},${h - 1}" fill="rgba(15,23,42,0.9)"/>
     </svg>`;
 
@@ -131,6 +131,7 @@ function makeRichLabelIcon(lead: Lead, color: string, scale: number): google.map
 }
 
 // Detail card for walk mode — price, status badge, DOM, recency, sqft, year
+// Sized to be clearly readable at street level — roughly garage-height
 function makeDetailCardIcon(lead: Lead, color: string, scale: number): google.maps.Icon {
   const price = formatPriceK(lead.listing_price || lead.selling_price || null);
   const status = getStatusShort(lead);
@@ -141,23 +142,23 @@ function makeDetailCardIcon(lead: Lead, color: string, scale: number): google.ma
   const year = lead.year_built ? `${lead.year_built}` : '';
   const line3 = [sqft, year].filter(Boolean).join(' · ') || '';
 
-  const baseW = 155;
-  const baseH = 58;
+  const baseW = 280;
+  const baseH = 110;
   const w = Math.round(baseW * scale);
   const h = Math.round(baseH * scale);
-  const arrow = Math.round(8 * scale);
-  const fs1 = Math.round(14 * scale);
-  const fs2 = Math.round(8.5 * scale);
-  const fs3 = Math.round(9 * scale);
+  const arrow = Math.round(12 * scale);
+  const fs1 = Math.round(28 * scale);
+  const fs2 = Math.round(16 * scale);
+  const fs3 = Math.round(15 * scale);
 
   const svg = `
     <svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h + arrow}">
-      <rect x="1" y="1" width="${w - 2}" height="${h - 2}" rx="${Math.round(10 * scale)}" fill="rgba(15,23,42,0.92)" stroke="${color}" stroke-width="${Math.round(2 * scale)}"/>
-      ${status ? `<rect x="${w - Math.round(48 * scale)}" y="${Math.round(5 * scale)}" width="${Math.round(44 * scale)}" height="${Math.round(13 * scale)}" rx="${Math.round(6 * scale)}" fill="${color}"/>
-      <text x="${w - Math.round(26 * scale)}" y="${Math.round(12.5 * scale)}" dominant-baseline="central" text-anchor="middle" font-family="system-ui,sans-serif" font-size="${Math.round(7.5 * scale)}" font-weight="800" fill="white">${status}</text>` : ''}
-      <text x="${Math.round(10 * scale)}" y="${Math.round(19 * scale)}" font-family="system-ui,sans-serif" font-size="${fs1}" font-weight="800" fill="white">${escapeXml(price || '—')}</text>
-      <text x="${Math.round(10 * scale)}" y="${Math.round(34 * scale)}" font-family="system-ui,sans-serif" font-size="${fs2}" font-weight="600" fill="${color}">${escapeXml(line2)}</text>
-      ${line3 ? `<text x="${Math.round(10 * scale)}" y="${Math.round(48 * scale)}" font-family="system-ui,sans-serif" font-size="${fs3}" font-weight="500" fill="#94a3b8">${escapeXml(line3)}</text>` : ''}
+      <rect x="1" y="1" width="${w - 2}" height="${h - 2}" rx="${Math.round(12 * scale)}" fill="rgba(15,23,42,0.92)" stroke="${color}" stroke-width="${Math.round(3 * scale)}"/>
+      ${status ? `<rect x="${w - Math.round(80 * scale)}" y="${Math.round(8 * scale)}" width="${Math.round(72 * scale)}" height="${Math.round(24 * scale)}" rx="${Math.round(8 * scale)}" fill="${color}"/>
+      <text x="${w - Math.round(44 * scale)}" y="${Math.round(21 * scale)}" dominant-baseline="central" text-anchor="middle" font-family="system-ui,sans-serif" font-size="${Math.round(13 * scale)}" font-weight="800" fill="white">${status}</text>` : ''}
+      <text x="${Math.round(16 * scale)}" y="${Math.round(36 * scale)}" font-family="system-ui,sans-serif" font-size="${fs1}" font-weight="800" fill="white">${escapeXml(price || '—')}</text>
+      <text x="${Math.round(16 * scale)}" y="${Math.round(64 * scale)}" font-family="system-ui,sans-serif" font-size="${fs2}" font-weight="600" fill="${color}">${escapeXml(line2)}</text>
+      ${line3 ? `<text x="${Math.round(16 * scale)}" y="${Math.round(90 * scale)}" font-family="system-ui,sans-serif" font-size="${fs3}" font-weight="500" fill="#94a3b8">${escapeXml(line3)}</text>` : ''}
       <polygon points="${w / 2 - arrow},${h - 1} ${w / 2},${h + arrow - 1} ${w / 2 + arrow},${h - 1}" fill="rgba(15,23,42,0.92)"/>
     </svg>`;
 
@@ -229,9 +230,10 @@ function StreetViewInner({ leads, startPosition, onDataChanged, onPositionChange
       refreshMarkers(panorama, p.lat(), p.lng(), heading, walkPinModeRef.current);
     };
 
-    // Refresh on walk AND on pan/turn
+    // Refresh on walk, pan/turn, AND zoom (so cards scale with zoom)
     panorama.addListener("position_changed", refresh);
     panorama.addListener("pov_changed", refresh);
+    panorama.addListener("zoom_changed", refresh);
 
     setTimeout(refresh, 1000);
 
@@ -292,7 +294,11 @@ function StreetViewInner({ leads, startPosition, onDataChanged, onPositionChange
         ? (LISTING_STATUS_COLORS[lead.listing_status!] || "#6b7280")
         : (STATUS_COLORS[lead.status] || "#3b82f6");
 
-      const scale = dist < 30 ? 1.4 : dist < 60 ? 1.2 : 1.0;
+      // Scale by distance: closer = bigger. Also factor in SV zoom level.
+      const svZoom = panorama.getZoom() || 1;
+      const zoomBoost = 1 + (svZoom - 1) * 0.4; // zoom 1=1x, zoom 2=1.4x, zoom 3=1.8x, zoom 5=2.6x
+      const distScale = dist < 30 ? 1.6 : dist < 60 ? 1.3 : 1.0;
+      const scale = distScale * zoomBoost;
       const isContext = lead.record_type === 'context' || !lead.user_id || !!lead.listing_status;
 
       let icon;
@@ -328,7 +334,6 @@ function StreetViewInner({ leads, startPosition, onDataChanged, onPositionChange
   const PIN_OPTIONS: { mode: PinMode; label: string }[] = [
     { mode: 'detail', label: 'Cards' },
     { mode: 'labels', label: 'Labels' },
-    { mode: 'dots', label: 'Dots' },
   ];
 
   return (

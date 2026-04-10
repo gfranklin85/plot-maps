@@ -265,7 +265,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Access denied' }, { status: 403 });
   }
 
-  const { csvText, marketTag, format: requestedFormat } = await request.json();
+  const { csvText, marketTag, format: requestedFormat, userId: targetUserId } = await request.json();
   if (!csvText) {
     return NextResponse.json({ error: 'Data is required' }, { status: 400 });
   }
@@ -328,10 +328,10 @@ export async function POST(request: Request) {
         listing_date: prop.date,
         price_range: prop.price ? `$${prop.price.toLocaleString()}` : null,
         property_condition: prop.type,
-        source: 'RPR',
+        source: targetUserId ? 'auto-target' : 'RPR',
         status: 'new' as const,
-        record_type: 'context',
-        user_id: null,
+        record_type: targetUserId ? 'target' : 'context',
+        user_id: targetUserId || null,
         last_imported_at: now,
         seeded_market_tag: marketTag || null,
       };
@@ -441,10 +441,10 @@ export async function POST(request: Request) {
         listing_date: parseDateStr(getVal(row, 'listing_date')),
         selling_date: parseDateStr(getVal(row, 'selling_date')),
         price_range: sellingPrice ? `$${sellingPrice.toLocaleString()}` : listingPrice ? `$${listingPrice.toLocaleString()}` : null,
-        source: 'MLS',
+        source: targetUserId ? 'auto-target' : 'MLS',
         status: 'new' as const,
-        record_type: 'context',
-        user_id: null,
+        record_type: targetUserId ? 'target' : 'context',
+        user_id: targetUserId || null,
         last_imported_at: now,
         seeded_market_tag: marketTag || null,
       };

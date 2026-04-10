@@ -13,6 +13,8 @@ import { useAuth } from "@/lib/auth-context";
 import MaterialIcon from "@/components/ui/MaterialIcon";
 import UpgradeGate from "@/components/ui/UpgradeGate";
 import PropertyPopup from "@/components/map/PropertyPopup";
+import AutoTargetModal from "@/components/map/AutoTargetModal";
+import { useAutoTargetStatus } from "@/hooks/useAutoTargetStatus";
 
 const FILTER_TABS: { label: string; key: string; statuses: LeadStatus[] }[] = [
   { label: "All", key: "all", statuses: [] },
@@ -49,7 +51,17 @@ export default function MapPage() {
   const [pinnedRef, setPinnedRef] = useState<Lead | null>(null);
   const [expandedView, setExpandedView] = useState(false);
   const [pinMode, setPinMode] = useState<PinMode>('dots');
+  const [autoTargetLead, setAutoTargetLead] = useState<Lead | null>(null);
+  const [showAutoTargetGate, setShowAutoTargetGate] = useState(false);
+  const [autoTargetToast, setAutoTargetToast] = useState<string | null>(null);
   const isSubscribed = profile.subscriptionStatus === 'active';
+
+  // Poll for completed auto-target requests
+  useAutoTargetStatus((req) => {
+    setAutoTargetToast(`Prospect list ready: ${req.reference_address?.split(',')[0]} (${req.prospects_created} leads)`);
+    refetchLeads();
+    setTimeout(() => setAutoTargetToast(null), 6000);
+  });
 
   useEffect(() => {
     if (profile.defaultMapCenter && !hasUserPanned) {
@@ -445,6 +457,7 @@ export default function MapPage() {
             <PropertyPopup
               lead={pinnedRef}
               onUpdate={refetchLeads}
+              onAutoTarget={(lead) => setAutoTargetLead(lead)}
               onWalkHere={(lead) => {
                 if (!isSubscribed) { setShowGate(true); return; }
                 if (lead.latitude && lead.longitude) {
@@ -486,6 +499,7 @@ export default function MapPage() {
           <PropertyPopup
             lead={selectedLead}
             onUpdate={refetchLeads}
+            onAutoTarget={(lead) => setAutoTargetLead(lead)}
             onWalkHere={(lead) => {
               if (!isSubscribed) { setShowGate(true); return; }
               if (lead.latitude && lead.longitude) {
@@ -522,6 +536,7 @@ export default function MapPage() {
             <PropertyPopup
               lead={selectedLead}
               onUpdate={refetchLeads}
+              onAutoTarget={(lead) => setAutoTargetLead(lead)}
               onWalkHere={(lead) => {
                 if (!isSubscribed) { setShowGate(true); return; }
                 if (lead.latitude && lead.longitude) {
@@ -536,7 +551,27 @@ export default function MapPage() {
         </div>
       )}
 
+      {/* Auto-target completion toast */}
+      {autoTargetToast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-emerald-600 text-white px-5 py-3 rounded-xl shadow-2xl animate-in fade-in slide-in-from-bottom-4">
+          <span className="material-symbols-outlined text-[20px]">check_circle</span>
+          <span className="text-sm font-semibold">{autoTargetToast}</span>
+          <button onClick={() => setAutoTargetToast(null)} className="ml-2 opacity-70 hover:opacity-100">
+            <span className="material-symbols-outlined text-[16px]">close</span>
+          </button>
+        </div>
+      )}
+
       <UpgradeGate feature="walkMode" show={showGate} onClose={() => setShowGate(false)} />
+      <UpgradeGate feature="autoTarget" show={showAutoTargetGate} onClose={() => setShowAutoTargetGate(false)} />
+
+      {autoTargetLead && (
+        <AutoTargetModal
+          lead={autoTargetLead}
+          onClose={() => setAutoTargetLead(null)}
+          onSubmitted={() => refetchLeads()}
+        />
+      )}
     </div>
   );
 }

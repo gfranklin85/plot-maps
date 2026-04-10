@@ -16,6 +16,7 @@ interface Props {
   onUpdate?: () => void;
   walkMode?: boolean;
   onWalkHere?: (lead: Lead) => void;
+  onAutoTarget?: (lead: Lead) => void;
 }
 
 const OUTCOME_STATUS: Partial<Record<CallOutcome, LeadStatus>> = {
@@ -106,7 +107,7 @@ function generateTalkingPoints(lead: Lead): string[] {
   return points;
 }
 
-export default function PropertyPopup({ lead, onUpdate, walkMode = false, onWalkHere }: Props) {
+export default function PropertyPopup({ lead, onUpdate, walkMode = false, onWalkHere, onAutoTarget }: Props) {
   const { profile } = useProfile();
   const { user } = useAuth();
   const { makeCall, isDesktop } = usePhone();
@@ -190,16 +191,35 @@ export default function PropertyPopup({ lead, onUpdate, walkMode = false, onWalk
               <p className="text-xs text-on-surface-variant mt-0.5">{lead.owner_name || lead.name}</p>
             )}
           </div>
-          {/* Walk Here — demoted to small pill */}
-          {!walkMode && onWalkHere && lead.latitude != null && lead.longitude != null && (
-            <button
-              onClick={() => onWalkHere(lead)}
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-surface-container-high border border-card-border text-xs font-medium text-primary hover:bg-primary hover:text-white transition-all shrink-0"
-            >
-              <MaterialIcon icon="directions_walk" className="text-[14px]" />
-              Walk
-            </button>
-          )}
+          {/* Action pills */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            {/* Prospects — only on MLS reference records */}
+            {!walkMode && isMLS && lead.latitude != null && lead.longitude != null && onAutoTarget && (
+              <button
+                onClick={() => {
+                  if (isFree) {
+                    // Check credits — let the modal/gate handle it
+                    // For now, always open. The API will reject if over limit.
+                  }
+                  onAutoTarget(lead);
+                }}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-surface-container-high border border-card-border text-xs font-medium text-primary hover:bg-primary hover:text-white transition-all"
+              >
+                <MaterialIcon icon="my_location" className="text-[14px]" />
+                Prospects
+              </button>
+            )}
+            {/* Walk Here */}
+            {!walkMode && onWalkHere && lead.latitude != null && lead.longitude != null && (
+              <button
+                onClick={() => onWalkHere(lead)}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-surface-container-high border border-card-border text-xs font-medium text-primary hover:bg-primary hover:text-white transition-all"
+              >
+                <MaterialIcon icon="directions_walk" className="text-[14px]" />
+                Walk
+              </button>
+            )}
+          </div>
         </div>
 
         {/* 2. PRICE + STATUS (inline, not boxed) — blurred for free users on MLS data */}

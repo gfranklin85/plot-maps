@@ -75,6 +75,13 @@ const FEATURES: Record<string, FeatureConfig> = {
     bullets: ['Sold Prices & Days on Market', 'Price-per-Sqft Comps', 'Complete Property Details'],
     dismiss: 'Continue with limited view',
   },
+  autoTarget: {
+    title: 'Find Prospects Nearby',
+    icon: 'my_location',
+    description: 'One-click prospect lists around any reference property. Addresses + phone numbers, ready to dial.',
+    bullets: ['One-Click Prospect Discovery', 'Addresses + Phone Numbers', 'Ready-to-Dial Lists'],
+    dismiss: 'Maybe later',
+  },
 };
 
 interface Props {

@@ -40,27 +40,6 @@ const FEATURES: Record<string, FeatureConfig> = {
     bullets: ['Data-Driven Personalization', 'Contextual Property Insights', 'One-Click Send'],
     dismiss: 'Continue with manual draft',
   },
-  nearbyPlaces: {
-    title: 'See the Neighborhood Like a Pro',
-    icon: 'location_on',
-    description: 'Discover schools, grocery stores, and amenities near any property.',
-    bullets: ['Schools & Shopping', 'Transit & Services', 'Walkability Scores'],
-    dismiss: 'Skip for now',
-  },
-  aerial: {
-    title: 'Aerial Flyover Locked',
-    icon: 'flight',
-    description: 'View cinematic aerial tours of any property.',
-    bullets: ['4K Drone Footage', '360° Property Views', 'Neighborhood Context'],
-    dismiss: 'Skip for now',
-  },
-  driveTime: {
-    title: 'Unlock Drive Time Analysis',
-    icon: 'timer',
-    description: 'Calculate precise travel times to key locations using real-time traffic.',
-    bullets: ['Real-Time Traffic Data', 'Multi-Destination Routes', 'Commute Scoring'],
-    dismiss: 'Skip for now',
-  },
   dialer: {
     title: 'Power Dialer Included',
     icon: 'phone_in_talk',

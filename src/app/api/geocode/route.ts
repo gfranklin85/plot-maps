@@ -54,6 +54,28 @@ async function geocodeAddress(address: string): Promise<GeocodedResult | null> {
   };
 }
 
+async function reverseGeocode(lat: number, lng: number): Promise<GeocodedResult | null> {
+  const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&result_type=street_address&key=${GOOGLE_API_KEY}`;
+  const response = await fetch(url);
+  const data = await response.json();
+
+  if (data.status !== 'OK' || !data.results?.length) {
+    return null;
+  }
+
+  const result = data.results[0];
+  const { city, state, zip } = extractAddressComponents(result.address_components);
+
+  return {
+    formatted_address: result.formatted_address,
+    lat: result.geometry.location.lat,
+    lng: result.geometry.location.lng,
+    city,
+    state,
+    zip,
+  };
+}
+
 function delay(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
@@ -64,11 +86,29 @@ export async function POST(request: Request) {
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await request.json();
-    const { address, addresses } = body;
+    const { address, addresses, latlng, latlngs } = body;
+
+    // Reverse geocode: single
+    if (latlng) {
+      const result = await reverseGeocode(latlng.lat, latlng.lng);
+      if (!result) return NextResponse.json({ error: 'No address found at location' }, { status: 404 });
+      return NextResponse.json(result);
+    }
+
+    // Reverse geocode: batch
+    if (latlngs && Array.isArray(latlngs)) {
+      const results: (GeocodedResult | null)[] = [];
+      for (let i = 0; i < latlngs.length; i++) {
+        const result = await reverseGeocode(latlngs[i].lat, latlngs[i].lng);
+        results.push(result);
+        if (i < latlngs.length - 1) await delay(50);
+      }
+      return NextResponse.json({ results: results.filter(Boolean) });
+    }
 
     if (!address && !addresses) {
       return NextResponse.json(
-        { error: 'address or addresses is required' },
+        { error: 'address, addresses, latlng, or latlngs is required' },
         { status: 400 }
       );
     }

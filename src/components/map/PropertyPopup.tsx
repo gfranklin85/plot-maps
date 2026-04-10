@@ -11,12 +11,22 @@ import { useAuth } from "@/lib/auth-context";
 import { usePhone } from "@/lib/phone-context";
 import UpgradeGate from "@/components/ui/UpgradeGate";
 
+interface ProspectAddress {
+  address: string;
+  lat: number;
+  lng: number;
+  city: string | null;
+  state: string | null;
+  zip: string | null;
+}
+
 interface Props {
   lead: Lead;
   onUpdate?: () => void;
   walkMode?: boolean;
   onWalkHere?: (lead: Lead) => void;
   onAutoTarget?: (lead: Lead) => void;
+  onAddProspects?: (addresses: ProspectAddress[]) => void;
 }
 
 const OUTCOME_STATUS: Partial<Record<CallOutcome, LeadStatus>> = {
@@ -107,7 +117,7 @@ function generateTalkingPoints(lead: Lead): string[] {
   return points;
 }
 
-export default function PropertyPopup({ lead, onUpdate, walkMode = false, onWalkHere, onAutoTarget }: Props) {
+export default function PropertyPopup({ lead, onUpdate, walkMode = false, onWalkHere, onAutoTarget, onAddProspects }: Props) {
   const { profile } = useProfile();
   const { user } = useAuth();
   const { makeCall, isDesktop } = usePhone();
@@ -119,8 +129,45 @@ export default function PropertyPopup({ lead, onUpdate, walkMode = false, onWalk
   const [editingScript, setEditingScript] = useState(false);
   const [localScript, setLocalScript] = useState('');
   const [upgradeFeature, setUpgradeFeature] = useState<string | null>(null);
+  const [prospectPickerOpen, setProspectPickerOpen] = useState(false);
+  const [prospectMode, setProspectMode] = useState<'nearest' | 'street' | 'radius'>('nearest');
+  const [prospectCount, setProspectCount] = useState(12);
+  const [prospectRadius, setProspectRadius] = useState(0.25);
+  const [prospectLoading, setProspectLoading] = useState(false);
+  const [prospectResult, setProspectResult] = useState<string | null>(null);
 
   const isFree = profile.subscriptionStatus !== 'active';
+
+  async function grabProspects() {
+    if (lead.latitude == null || lead.longitude == null) return;
+    setProspectLoading(true);
+    setProspectResult(null);
+    try {
+      const res = await fetch('/api/nearby-addresses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          lat: lead.latitude,
+          lng: lead.longitude,
+          mode: prospectMode,
+          count: prospectCount,
+          radiusMiles: prospectRadius,
+          referenceStreet: lead.property_address?.split(',')[0]?.replace(/^\d+\s*/, '') || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (data.addresses?.length > 0) {
+        onAddProspects?.(data.addresses);
+        setProspectResult(`Added ${data.addresses.length} addresses`);
+        setTimeout(() => { setProspectResult(null); setProspectPickerOpen(false); }, 2000);
+      } else {
+        setProspectResult('No addresses found');
+      }
+    } catch {
+      setProspectResult('Error grabbing addresses');
+    }
+    setProspectLoading(false);
+  }
 
   const phones = [lead.phone, lead.phone_2, lead.phone_3].filter(Boolean) as string[];
   const isMLS = !!lead.listing_status;
@@ -194,16 +241,14 @@ export default function PropertyPopup({ lead, onUpdate, walkMode = false, onWalk
           {/* Action pills */}
           <div className="flex items-center gap-1.5 shrink-0">
             {/* Prospects — only on MLS reference records */}
-            {!walkMode && isMLS && lead.latitude != null && lead.longitude != null && onAutoTarget && (
+            {!walkMode && isMLS && lead.latitude != null && lead.longitude != null && onAddProspects && (
               <button
-                onClick={() => {
-                  if (isFree) {
-                    // Check credits — let the modal/gate handle it
-                    // For now, always open. The API will reject if over limit.
-                  }
-                  onAutoTarget(lead);
-                }}
-                className="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-surface-container-high border border-card-border text-xs font-medium text-primary hover:bg-primary hover:text-white transition-all"
+                onClick={() => setProspectPickerOpen(!prospectPickerOpen)}
+                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-full border text-xs font-medium transition-all ${
+                  prospectPickerOpen
+                    ? 'bg-primary text-white border-primary'
+                    : 'bg-surface-container-high border-card-border text-primary hover:bg-primary hover:text-white'
+                }`}
               >
                 <MaterialIcon icon="my_location" className="text-[14px]" />
                 Prospects
@@ -221,6 +266,110 @@ export default function PropertyPopup({ lead, onUpdate, walkMode = false, onWalk
             )}
           </div>
         </div>
+
+        {/* PROSPECT PICKER — inline expandable */}
+        {prospectPickerOpen && (
+          <div className="rounded-lg bg-surface-container-lowest border border-card-border p-3 space-y-3">
+            {/* Mode tabs */}
+            <div className="flex gap-1">
+              {([
+                { mode: 'nearest' as const, label: 'Nearest', icon: 'near_me' },
+                { mode: 'street' as const, label: 'Street', icon: 'add_road' },
+                { mode: 'radius' as const, label: 'Radius', icon: 'radar' },
+              ]).map(({ mode, label, icon }) => (
+                <button
+                  key={mode}
+                  onClick={() => setProspectMode(mode)}
+                  className={`flex-1 flex items-center justify-center gap-1 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider transition-all ${
+                    prospectMode === mode
+                      ? 'bg-primary text-white'
+                      : 'bg-surface-container-high text-on-surface-variant hover:text-on-surface'
+                  }`}
+                >
+                  <MaterialIcon icon={icon} className="text-[12px]" />
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {/* Mode-specific controls */}
+            {prospectMode === 'nearest' && (
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Count:</span>
+                <div className="flex gap-1">
+                  {[6, 12, 20].map(n => (
+                    <button
+                      key={n}
+                      onClick={() => setProspectCount(n)}
+                      className={`px-2.5 py-1 rounded text-xs font-semibold transition-all ${
+                        prospectCount === n ? 'bg-primary text-white' : 'bg-surface-container-high text-on-surface-variant'
+                      }`}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
+                <input
+                  type="number"
+                  value={prospectCount}
+                  onChange={e => setProspectCount(Math.max(1, Math.min(50, parseInt(e.target.value) || 6)))}
+                  className="w-14 rounded border border-card-border bg-surface-container-high px-2 py-1 text-xs text-on-surface text-center focus:ring-1 focus:ring-primary outline-none"
+                />
+              </div>
+            )}
+
+            {prospectMode === 'radius' && (
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Radius:</span>
+                <div className="flex gap-1">
+                  {[0.25, 0.5, 1].map(r => (
+                    <button
+                      key={r}
+                      onClick={() => setProspectRadius(r)}
+                      className={`px-2.5 py-1 rounded text-xs font-semibold transition-all ${
+                        prospectRadius === r ? 'bg-primary text-white' : 'bg-surface-container-high text-on-surface-variant'
+                      }`}
+                    >
+                      {r}mi
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {prospectMode === 'street' && (
+              <p className="text-[10px] text-on-surface-variant">
+                Grabs addresses along the same street as this property
+              </p>
+            )}
+
+            {/* Grab button */}
+            <button
+              onClick={grabProspects}
+              disabled={prospectLoading}
+              className="w-full py-2 rounded-lg bg-primary text-white text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-primary/90 active:scale-[0.98] transition-all disabled:opacity-50"
+            >
+              {prospectLoading ? (
+                <>
+                  <span className="h-3 w-3 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                  Grabbing...
+                </>
+              ) : (
+                <>
+                  <MaterialIcon icon="add_location_alt" className="text-[14px]" />
+                  Grab {prospectMode === 'nearest' ? `${prospectCount} Nearest` : prospectMode === 'street' ? 'Street' : `${prospectRadius}mi Radius`}
+                </>
+              )}
+            </button>
+
+            {/* Result feedback */}
+            {prospectResult && (
+              <p className={`text-[11px] font-semibold text-center ${prospectResult.startsWith('Added') ? 'text-emerald-500' : 'text-red-400'}`}>
+                {prospectResult}
+              </p>
+            )}
+          </div>
+        )}
 
         {/* 2. PRICE + STATUS (inline, not boxed) — blurred for free users on MLS data */}
         {(priceStr || statusText) && (

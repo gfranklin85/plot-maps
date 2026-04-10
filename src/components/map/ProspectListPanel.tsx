@@ -84,7 +84,7 @@ export default function ProspectListPanel({ addresses, onRemove, onClear, onClos
             <span className="font-bold text-on-surface">${total}</span>
           </div>
           <p className="text-[10px] text-on-surface-variant/60">
-            We'll get owner names + phone numbers for each address.
+            We&apos;ll get owner names + phone numbers for each address.
           </p>
           <button
             className="w-full py-3.5 rounded-xl bg-gradient-to-br from-primary/80 to-primary text-white font-bold text-sm flex items-center justify-center gap-2 shadow-[0_8px_25px_-5px_hsl(var(--primary)/0.4)] hover:opacity-90 active:scale-[0.98] transition-all"

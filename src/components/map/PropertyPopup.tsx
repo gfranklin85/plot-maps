@@ -25,7 +25,6 @@ interface Props {
   onUpdate?: () => void;
   walkMode?: boolean;
   onWalkHere?: (lead: Lead) => void;
-  onAutoTarget?: (lead: Lead) => void;
   onAddProspects?: (addresses: ProspectAddress[]) => void;
 }
 
@@ -117,7 +116,7 @@ function generateTalkingPoints(lead: Lead): string[] {
   return points;
 }
 
-export default function PropertyPopup({ lead, onUpdate, walkMode = false, onWalkHere, onAutoTarget, onAddProspects }: Props) {
+export default function PropertyPopup({ lead, onUpdate, walkMode = false, onWalkHere, onAddProspects }: Props) {
   const { profile } = useProfile();
   const { user } = useAuth();
   const { makeCall, isDesktop } = usePhone();

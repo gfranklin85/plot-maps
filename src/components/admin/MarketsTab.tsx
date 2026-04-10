@@ -1,0 +1,317 @@
+'use client';
+
+import { useState, useRef } from 'react';
+import MaterialIcon from '@/components/ui/MaterialIcon';
+import { SummaryCard, getCoverageBadge, timeAgo, titleCase, type Summary, type MarketRow } from './admin-utils';
+
+interface Props {
+  summary: Summary;
+  markets: MarketRow[];
+}
+
+export default function MarketsTab({ summary, markets }: Props) {
+  const seedingQueue = markets.filter(m => m.coverage_status === 'None' || m.coverage_status === 'Thin').slice(0, 10);
+
+  // Seed import state
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [seedMarketTag, setSeedMarketTag] = useState('');
+  const [seedMode, setSeedMode] = useState<'file' | 'paste'>('paste');
+  const [seedPasteText, setSeedPasteText] = useState('');
+  const [seeding, setSeeding] = useState(false);
+  const [seedResult, setSeedResult] = useState<{
+    inserted: number; updated: number; geocoded: number; errors: number; total: number;
+    format?: string; geocodeCost?: number;
+    incomplete?: { address: string; missing: string[] }[];
+    incompleteCount?: number; completeCount?: number;
+  } | null>(null);
+  const [seedPanelOpen, setSeedPanelOpen] = useState(false);
+
+  async function handleSeed(text: string, format?: string) {
+    setSeeding(true);
+    setSeedResult(null);
+    try {
+      const res = await fetch('/api/admin/seed', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ csvText: text, marketTag: seedMarketTag || null, format }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setSeedResult({
+        inserted: data.inserted, updated: data.updated, geocoded: data.geocoded || 0,
+        errors: data.errors, total: data.total, format: data.format, geocodeCost: data.geocodeCost || 0,
+        incomplete: data.incomplete || [], incompleteCount: data.incompleteCount || 0,
+        completeCount: data.completeCount || 0,
+      });
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Seed failed');
+    } finally {
+      setSeeding(false);
+    }
+  }
+
+  async function handleSeedFile(file: File) {
+    const text = await file.text();
+    await handleSeed(text);
+  }
+
+  return (
+    <div className="space-y-8">
+      {/* Summary row */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <SummaryCard label="Markets in Use" value={summary.marketsInUse} sub={`${summary.marketsNeedingAttention} need attention`} icon="map" />
+        <SummaryCard label="Seeded Records" value={summary.totalContext.toLocaleString()} sub="context properties" icon="layers" />
+        <SummaryCard label="Total Geocodes" value={summary.totalGeocodes.toLocaleString()} sub="API calls used" icon="pin_drop" />
+        <SummaryCard label="Needs Attention" value={summary.marketsNeedingAttention} sub="thin or no coverage" icon="warning" alert={summary.marketsNeedingAttention > 0} />
+      </div>
+
+      {/* Seed Button */}
+      <div className="flex justify-end">
+        <button
+          onClick={() => setSeedPanelOpen(!seedPanelOpen)}
+          className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-lg font-bold text-sm transition-all"
+        >
+          <MaterialIcon icon={seedPanelOpen ? 'close' : 'cloud_upload'} className="text-[18px]" />
+          {seedPanelOpen ? 'Close' : 'Seed Market Data'}
+        </button>
+      </div>
+
+      {/* Seed Panel */}
+      {seedPanelOpen && (
+        <div className="bg-card border border-card-border rounded-2xl p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="font-bold text-sm text-on-surface flex items-center gap-2">
+              <MaterialIcon icon="cloud_upload" className="text-[18px] text-primary" />
+              Seed Market Data
+            </h3>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setSeedMode('paste')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${seedMode === 'paste' ? 'bg-primary text-white' : 'bg-surface-container text-secondary'}`}
+              >
+                Paste RPR
+              </button>
+              <button
+                onClick={() => setSeedMode('file')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${seedMode === 'file' ? 'bg-primary text-white' : 'bg-surface-container text-secondary'}`}
+              >
+                Upload CSV
+              </button>
+            </div>
+          </div>
+
+          {seedResult && (
+            <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-5 space-y-3">
+              <div className="flex items-center gap-2">
+                <MaterialIcon icon="check_circle" className="text-[20px] text-emerald-400" />
+                <span className="font-bold text-emerald-400 text-sm">Seeding Complete</span>
+                <span className="text-xs text-secondary ml-auto">{seedResult.format === 'rpr' ? 'RPR Format' : 'CSV Format'}</span>
+              </div>
+              <div className="grid grid-cols-5 gap-3">
+                <div className="text-center">
+                  <p className="text-lg font-extrabold text-on-surface">{seedResult.total}</p>
+                  <p className="text-[10px] text-secondary uppercase tracking-wider">Total</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-lg font-extrabold text-primary">{seedResult.inserted}</p>
+                  <p className="text-[10px] text-secondary uppercase tracking-wider">New</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-lg font-extrabold text-amber-400">{seedResult.updated}</p>
+                  <p className="text-[10px] text-secondary uppercase tracking-wider">Updated</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-lg font-extrabold text-emerald-400">{seedResult.geocoded}</p>
+                  <p className="text-[10px] text-secondary uppercase tracking-wider">Geocoded</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-lg font-extrabold text-on-surface">${seedResult.geocodeCost?.toFixed(2) || '0.00'}</p>
+                  <p className="text-[10px] text-secondary uppercase tracking-wider">Cost</p>
+                </div>
+              </div>
+              {seedResult.errors > 0 && (
+                <p className="text-xs text-red-400">{seedResult.errors} records failed to process</p>
+              )}
+              {seedResult.incompleteCount && seedResult.incompleteCount > 0 ? (
+                <div className="border-t border-card-border pt-3 mt-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <MaterialIcon icon="warning" className="text-[16px] text-amber-400" />
+                    <span className="text-xs font-bold text-amber-400">{seedResult.incompleteCount} records with missing data</span>
+                    <span className="text-xs text-secondary ml-auto">{seedResult.completeCount} complete</span>
+                  </div>
+                  <div className="max-h-48 overflow-y-auto space-y-1">
+                    {seedResult.incomplete?.map((item, i) => (
+                      <div key={i} className="flex items-center justify-between text-xs py-1 border-b border-card-border/50 last:border-0">
+                        <span className="text-on-surface font-medium truncate max-w-[200px]">{item.address}</span>
+                        <div className="flex gap-1 flex-wrap justify-end">
+                          {item.missing.map(field => (
+                            <span key={field} className="px-1.5 py-0.5 bg-amber-500/10 text-amber-400 rounded text-[10px] font-bold uppercase">{field}</span>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                    {(seedResult.incompleteCount || 0) > 50 && (
+                      <p className="text-[10px] text-secondary italic">Showing first 50 of {seedResult.incompleteCount}</p>
+                    )}
+                  </div>
+                </div>
+              ) : null}
+              <button onClick={() => { setSeedResult(null); setSeedPasteText(''); }} className="text-xs text-primary font-bold hover:underline">
+                Seed Another Market
+              </button>
+            </div>
+          )}
+
+          {!seedResult && (
+            <>
+              <div className="flex items-center gap-3">
+                <input
+                  type="text"
+                  value={seedMarketTag}
+                  onChange={(e) => setSeedMarketTag(e.target.value)}
+                  placeholder="Market tag (e.g. Hanford)"
+                  className="bg-surface border border-card-border rounded-lg px-3 py-2 text-sm text-on-surface w-48 focus:ring-1 focus:ring-primary focus:outline-none placeholder:text-secondary"
+                />
+                {seeding && (
+                  <span className="text-xs text-primary font-bold flex items-center gap-2">
+                    <div className="w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                    Processing & geocoding...
+                  </span>
+                )}
+              </div>
+              {seedMode === 'paste' ? (
+                <div className="space-y-3">
+                  <textarea
+                    value={seedPasteText}
+                    onChange={(e) => setSeedPasteText(e.target.value)}
+                    rows={10}
+                    disabled={seeding}
+                    className="w-full bg-surface border border-card-border rounded-xl p-4 font-mono text-xs text-on-surface focus:ring-1 focus:ring-primary resize-none placeholder:text-secondary disabled:opacity-50"
+                    placeholder={"Paste RPR listing data here...\n\nCopy from RPR → Ctrl+A → Ctrl+C → Paste here\n\nActive  SFR  $450,000  3/15/26  123 Main St\nHanford, CA 93230  3  2  1,500  0.25 Acres  1995  $300"}
+                  />
+                  <button
+                    onClick={() => handleSeed(seedPasteText, 'rpr')}
+                    disabled={seeding || !seedPasteText.trim()}
+                    className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-6 py-2.5 rounded-lg font-bold text-sm transition-all disabled:opacity-50"
+                  >
+                    <MaterialIcon icon={seeding ? 'hourglass_empty' : 'rocket_launch'} className={`text-[18px] ${seeding ? 'animate-spin' : ''}`} />
+                    {seeding ? 'Seeding & Geocoding...' : 'Seed from Paste'}
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <input ref={fileRef} type="file" accept=".csv,.txt,.tsv" className="hidden" onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleSeedFile(file);
+                  }} />
+                  <button
+                    onClick={() => fileRef.current?.click()}
+                    disabled={seeding}
+                    className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-6 py-2.5 rounded-lg font-bold text-sm transition-all disabled:opacity-50"
+                  >
+                    <MaterialIcon icon={seeding ? 'hourglass_empty' : 'upload_file'} className={`text-[18px] ${seeding ? 'animate-spin' : ''}`} />
+                    {seeding ? 'Seeding & Geocoding...' : 'Upload CSV File'}
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Main Grid: Seeding Queue + Market Summary */}
+      <div className="grid grid-cols-12 gap-8">
+        <div className="col-span-12 xl:col-span-4 bg-card rounded-2xl border border-card-border flex flex-col max-h-[600px]">
+          <div className="p-5 border-b border-card-border flex justify-between items-center">
+            <h3 className="font-bold text-sm flex items-center gap-2 text-on-surface">
+              <MaterialIcon icon="queue" className="text-[18px] text-primary" />
+              Seeding Queue
+            </h3>
+            <span className="text-[10px] font-black px-2 py-1 bg-surface-container rounded-full text-on-surface-variant">{seedingQueue.length}</span>
+          </div>
+          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            {seedingQueue.length === 0 && (
+              <p className="text-sm text-secondary text-center py-8">All markets have coverage</p>
+            )}
+            {seedingQueue.map((m, i) => {
+              const borderColor = m.coverage_status === 'None' ? 'border-rose-500' : 'border-amber-500';
+              return (
+                <div key={i} className={`p-4 bg-surface rounded-xl border-l-4 ${borderColor} flex justify-between items-start`}>
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xs font-black text-on-surface">{titleCase(m.city)}</span>
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase ${m.coverage_status === 'None' ? 'bg-rose-500/10 text-rose-400' : 'bg-amber-500/10 text-amber-400'}`}>
+                        {m.coverage_status === 'None' ? 'No Coverage' : 'Thin'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-secondary mb-2">{m.state}</p>
+                    <div className="flex items-center gap-3 text-[10px] text-secondary">
+                      <span><b className="text-on-surface-variant">{m.user_count}</b> Users</span>
+                      <span><b className="text-on-surface-variant">{m.target_count}</b> Targets</span>
+                      <span><b className="text-on-surface-variant">{m.context_count}</b> Context</span>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-[10px] text-secondary uppercase mb-1">Priority</div>
+                    <div className={`text-lg font-black ${m.coverage_status === 'None' ? 'text-rose-400' : 'text-amber-400'}`}>{m.priority_score}</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Market Coverage Table */}
+        <div className="col-span-12 xl:col-span-8 bg-card rounded-2xl border border-card-border overflow-hidden">
+          <div className="p-5 border-b border-card-border">
+            <h3 className="font-bold text-sm flex items-center gap-2 text-on-surface">
+              <MaterialIcon icon="layers" className="text-[18px] text-primary" />
+              Market Coverage ({markets.length} markets)
+            </h3>
+          </div>
+          <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
+            <table className="w-full text-left">
+              <thead className="bg-surface/50 text-[10px] font-bold uppercase tracking-widest text-secondary sticky top-0">
+                <tr>
+                  <th className="px-5 py-3">City / State</th>
+                  <th className="px-5 py-3">Users</th>
+                  <th className="px-5 py-3">Targets</th>
+                  <th className="px-5 py-3">Context</th>
+                  <th className="px-5 py-3">Coverage</th>
+                  <th className="px-5 py-3">Freshness</th>
+                  <th className="px-5 py-3">Priority</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-card-border text-sm">
+                {markets.slice(0, 50).map((m, i) => {
+                  const badge = getCoverageBadge(m.coverage_status);
+                  return (
+                    <tr key={i} className="hover:bg-white/[0.02] transition-colors">
+                      <td className="px-5 py-3 font-semibold text-on-surface">{titleCase(m.city)}, {m.state}</td>
+                      <td className="px-5 py-3 text-on-surface-variant">{m.user_count}</td>
+                      <td className="px-5 py-3 text-on-surface-variant">{m.target_count}</td>
+                      <td className="px-5 py-3 text-on-surface-variant">{m.context_count}</td>
+                      <td className="px-5 py-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-12 bg-card-border h-1.5 rounded-full overflow-hidden">
+                            <div className={`h-full rounded-full ${badge.dotColor}`} style={{ width: `${m.coverage_pct}%` }} />
+                          </div>
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${badge.color}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${badge.dotColor}`} />
+                            {m.coverage_status}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-5 py-3 text-xs text-secondary">{timeAgo(m.freshness_date)}</td>
+                      <td className="px-5 py-3 font-black text-on-surface-variant">{m.priority_score}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

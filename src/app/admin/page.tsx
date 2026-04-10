@@ -7,26 +7,43 @@ import AdminDashboard from '@/components/admin/AdminDashboard';
 export default function AdminPage() {
   const router = useRouter();
   const [data, setData] = useState<Record<string, unknown> | null>(null);
+  const [analyticsData, setAnalyticsData] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    async function fetchStats() {
+    async function fetchData() {
       try {
-        const res = await fetch('/api/admin/stats');
-        if (res.status === 403 || res.status === 401) {
-          setError('Access Denied');
-          return;
+        // Fetch both APIs in parallel
+        const [statsRes, analyticsRes] = await Promise.allSettled([
+          fetch('/api/admin/stats'),
+          fetch('/api/admin/analytics'),
+        ]);
+
+        // Stats is required
+        if (statsRes.status === 'fulfilled') {
+          const res = statsRes.value;
+          if (res.status === 403 || res.status === 401) {
+            setError('Access Denied');
+            return;
+          }
+          if (!res.ok) throw new Error('Failed to load');
+          setData(await res.json());
+        } else {
+          throw new Error('Failed to load admin data');
         }
-        if (!res.ok) throw new Error('Failed to load');
-        setData(await res.json());
+
+        // Analytics is optional — graceful fallback
+        if (analyticsRes.status === 'fulfilled' && analyticsRes.value.ok) {
+          setAnalyticsData(await analyticsRes.value.json());
+        }
       } catch {
         setError('Failed to load admin data');
       } finally {
         setLoading(false);
       }
     }
-    fetchStats();
+    fetchData();
   }, []);
 
   if (loading) {
@@ -50,5 +67,5 @@ export default function AdminPage() {
     );
   }
 
-  return <AdminDashboard data={data} />;
+  return <AdminDashboard data={data} analyticsData={analyticsData} />;
 }

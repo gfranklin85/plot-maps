@@ -93,24 +93,26 @@ function FunnelBar({ label, count, max }: { label: string; count: number; max: n
   );
 }
 
-export default function WarRoom({ data }: { data: WarRoomData }) {
+export default function WarRoom({ data, embedded }: { data: WarRoomData; embedded?: boolean }) {
   const { pulse, funnel, hotProspects, topLandingPages, utmBreakdown, dropOffPages, devices } = data;
 
   return (
-    <div className="p-8 bg-surface min-h-[calc(100vh-4rem)] space-y-8">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-on-surface flex items-center gap-2">
-            <MaterialIcon icon="monitoring" className="text-primary" />
-            Analytics War Room
-          </h1>
-          <p className="text-sm text-on-surface-variant mt-1">Visitor intelligence and conversion tracking</p>
+    <div className={embedded ? 'space-y-8' : 'p-8 bg-surface min-h-[calc(100vh-4rem)] space-y-8'}>
+      {/* Header — hidden in embedded mode */}
+      {!embedded && (
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-on-surface flex items-center gap-2">
+              <MaterialIcon icon="monitoring" className="text-primary" />
+              Analytics War Room
+            </h1>
+            <p className="text-sm text-on-surface-variant mt-1">Visitor intelligence and conversion tracking</p>
+          </div>
+          <a href="/admin" className="text-sm text-primary hover:underline flex items-center gap-1">
+            <MaterialIcon icon="arrow_back" className="text-sm" /> Back to Admin
+          </a>
         </div>
-        <a href="/admin" className="text-sm text-primary hover:underline flex items-center gap-1">
-          <MaterialIcon icon="arrow_back" className="text-sm" /> Back to Admin
-        </a>
-      </div>
+      )}
 
       {/* Live Pulse Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

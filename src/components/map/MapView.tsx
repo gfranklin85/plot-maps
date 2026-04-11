@@ -18,9 +18,11 @@ interface Props {
   onDataChanged?: () => void;
   onCenterChanged?: (center: { lat: number; lng: number }) => void;
   onWalkHere?: (lead: Lead) => void;
+  onMapClick?: (latLng: { lat: number; lng: number }) => void;
   center?: { lat: number; lng: number } | null;
   mapType?: "roadmap" | "satellite" | "hybrid" | "terrain";
   pinMode?: PinMode;
+  prospectMode?: boolean;
 }
 
 const API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
@@ -258,7 +260,7 @@ function LeadMarkers({
   return null;
 }
 
-export default function MapView({ leads, onLeadClick, onCenterChanged, center, mapType = "roadmap", pinMode = "dots" }: Props) {
+export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClick, center, mapType = "roadmap", pinMode = "dots", prospectMode = false }: Props) {
   const isSatellite = mapType === "satellite" || mapType === "hybrid";
 
   const handleMarkerClick = useCallback(
@@ -266,12 +268,20 @@ export default function MapView({ leads, onLeadClick, onCenterChanged, center, m
     [onLeadClick]
   );
 
+  const handleMapClick = useCallback(
+    (e: { detail: { latLng: { lat: number; lng: number } | null } }) => {
+      if (!prospectMode || !onMapClick || !e.detail.latLng) return;
+      onMapClick({ lat: e.detail.latLng.lat, lng: e.detail.latLng.lng });
+    },
+    [prospectMode, onMapClick]
+  );
+
   return (
     <APIProvider apiKey={API_KEY} libraries={['places']}>
       <Map
         defaultCenter={center || MAP_CENTER}
         defaultZoom={MAP_ZOOM}
-        className="h-full w-full"
+        className={`h-full w-full ${prospectMode ? 'cursor-crosshair' : ''}`}
         disableDefaultUI
         zoomControl
         mapTypeControl={false}
@@ -281,6 +291,7 @@ export default function MapView({ leads, onLeadClick, onCenterChanged, center, m
         tilt={0}
         heading={0}
         styles={isSatellite ? undefined : MAP_STYLES}
+        onClick={handleMapClick}
       >
         <MapTypeSync mapType={mapType} />
         <CenterTracker onCenterChanged={onCenterChanged} />

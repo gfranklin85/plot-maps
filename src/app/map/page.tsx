@@ -52,6 +52,8 @@ export default function MapPage() {
   const [pinMode, setPinMode] = useState<PinMode>('dots');
   const [prospectList, setProspectList] = useState<{ address: string; lat: number; lng: number; city: string | null; state: string | null; zip: string | null }[]>([]);
   const [showProspectPanel, setShowProspectPanel] = useState(false);
+  const [prospectMode, setProspectMode] = useState(false);
+  const [prospectToast, setProspectToast] = useState<string | null>(null);
   const isSubscribed = profile.subscriptionStatus === 'active';
 
   function addToProspectList(addresses: { address: string; lat: number; lng: number; city: string | null; state: string | null; zip: string | null }[]) {
@@ -64,6 +66,48 @@ export default function MapPage() {
 
   function removeFromProspectList(address: string) {
     setProspectList(prev => prev.filter(a => a.address !== address));
+  }
+
+  async function handleMapClick(latLng: { lat: number; lng: number }) {
+    if (!prospectMode) return;
+    try {
+      const res = await fetch('/api/geocode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ latlng: latLng }),
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.formatted_address) {
+        addToProspectList([{
+          address: data.formatted_address,
+          lat: data.lat,
+          lng: data.lng,
+          city: data.city,
+          state: data.state,
+          zip: data.zip,
+        }]);
+        setProspectToast(data.formatted_address.split(',')[0]);
+        setTimeout(() => setProspectToast(null), 2000);
+      }
+    } catch { /* silent */ }
+  }
+
+  function handleLeadClickInProspectMode(lead: Lead) {
+    if (prospectMode && lead.property_address && lead.latitude != null && lead.longitude != null) {
+      addToProspectList([{
+        address: lead.property_address,
+        lat: lead.latitude,
+        lng: lead.longitude,
+        city: lead.city || null,
+        state: lead.state || null,
+        zip: lead.zip || null,
+      }]);
+      setProspectToast(lead.property_address.split(',')[0]);
+      setTimeout(() => setProspectToast(null), 2000);
+      return;
+    }
+    setSelectedLead(lead);
   }
 
   function clearProspectList() {
@@ -502,8 +546,10 @@ export default function MapPage() {
             leads={filteredLeads}
             mapType={mapType}
             pinMode={pinMode}
-            onLeadClick={(_id, lead) => { setSelectedLead(lead); }}
+            prospectMode={prospectMode}
+            onLeadClick={(_id, lead) => { handleLeadClickInProspectMode(lead); }}
             onCenterChanged={(c) => { setMapCenter(c); setHasUserPanned(true); }}
+            onMapClick={handleMapClick}
             center={mapCenter}
             onWalkHere={(lead) => {
               if (!isSubscribed) { setShowGate(true); return; }
@@ -550,7 +596,8 @@ export default function MapPage() {
             <PropertyPopup
               lead={pinnedRef}
               onUpdate={refetchLeads}
-              onAddProspects={addToProspectList}
+              onToggleProspectMode={() => setProspectMode(p => !p)}
+              prospectMode={prospectMode}
               onWalkHere={(lead) => {
                 if (!isSubscribed) { setShowGate(true); return; }
                 if (lead.latitude && lead.longitude) {
@@ -592,7 +639,8 @@ export default function MapPage() {
           <PropertyPopup
             lead={selectedLead}
             onUpdate={refetchLeads}
-            onAddProspects={addToProspectList}
+            onToggleProspectMode={() => setProspectMode(p => !p)}
+              prospectMode={prospectMode}
             onWalkHere={(lead) => {
               if (!isSubscribed) { setShowGate(true); return; }
               if (lead.latitude && lead.longitude) {
@@ -629,7 +677,8 @@ export default function MapPage() {
             <PropertyPopup
               lead={expandedLead}
               onUpdate={refetchLeads}
-              onAddProspects={addToProspectList}
+              onToggleProspectMode={() => setProspectMode(p => !p)}
+              prospectMode={prospectMode}
               onWalkHere={(lead) => {
                 if (!isSubscribed) { setShowGate(true); return; }
                 if (lead.latitude && lead.longitude) {
@@ -644,6 +693,27 @@ export default function MapPage() {
       )}
 
       <UpgradeGate feature="walkMode" show={showGate} onClose={() => setShowGate(false)} />
+
+      {/* Prospect mode indicator */}
+      {prospectMode && !walkMode && (
+        <div className="fixed top-16 sm:top-20 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 bg-primary text-white px-5 py-2.5 rounded-xl shadow-2xl">
+          <MaterialIcon icon="ads_click" className="text-[18px]" />
+          <span className="text-sm font-bold">Click houses to add to list</span>
+          <button
+            onClick={() => setProspectMode(false)}
+            className="ml-2 px-3 py-1 rounded-lg bg-white/20 text-xs font-bold hover:bg-white/30 transition-colors"
+          >
+            Done
+          </button>
+        </div>
+      )}
+
+      {/* Prospect toast */}
+      {prospectToast && (
+        <div className="fixed top-28 sm:top-32 left-1/2 -translate-x-1/2 z-50 bg-emerald-500 text-white px-4 py-2 rounded-lg shadow-xl text-sm font-semibold animate-in fade-in slide-in-from-top-2">
+          + {prospectToast}
+        </div>
+      )}
 
       {/* Prospect list badge */}
       {prospectList.length > 0 && !showProspectPanel && (

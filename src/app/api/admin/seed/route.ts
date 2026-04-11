@@ -297,12 +297,14 @@ export async function POST(request: Request) {
         const state = comps.find((c: { types: string[] }) => c.types.includes('administrative_area_level_1'))?.short_name || null;
         const zip = comps.find((c: { types: string[] }) => c.types.includes('postal_code'))?.long_name || null;
 
-        // Store in cache
-        supabaseAdmin.from('geocode_cache').upsert({
-          address_key: key,
-          formatted_address: data.results[0].formatted_address || address,
-          lat: loc.lat, lng: loc.lng, city, state, zip,
-        }, { onConflict: 'address_key' }).catch(() => {});
+        // Store in cache (fire and forget)
+        try {
+          await supabaseAdmin.from('geocode_cache').upsert({
+            address_key: key,
+            formatted_address: data.results[0].formatted_address || address,
+            lat: loc.lat, lng: loc.lng, city, state, zip,
+          }, { onConflict: 'address_key' });
+        } catch { /* non-fatal */ }
 
         return loc;
       }

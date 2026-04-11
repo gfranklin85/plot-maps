@@ -2,6 +2,16 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─── Mobile App Feel ─── */
+html, body {
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+:root {
+  --app-height: 100dvh;
+}
+
 /* ─── Light Theme ─── */
 :root {
   --color-primary: 0 88 190;

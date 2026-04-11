@@ -120,6 +120,24 @@ export default function MapPage() {
     }
   }, [profile.defaultMapCenter, hasUserPanned]);
 
+  // Nudge mobile browser chrome away on first interaction
+  useEffect(() => {
+    let nudged = false;
+    const handleFirstTouch = () => {
+      if (nudged) return;
+      nudged = true;
+      setTimeout(() => window.scrollTo(0, 1), 50);
+      window.removeEventListener('touchstart', handleFirstTouch);
+      window.removeEventListener('pointerdown', handleFirstTouch);
+    };
+    window.addEventListener('touchstart', handleFirstTouch, { passive: true });
+    window.addEventListener('pointerdown', handleFirstTouch, { passive: true });
+    return () => {
+      window.removeEventListener('touchstart', handleFirstTouch);
+      window.removeEventListener('pointerdown', handleFirstTouch);
+    };
+  }, []);
+
   useEffect(() => {
     async function fetchLeads() {
       if (!user) return;

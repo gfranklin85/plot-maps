@@ -1,0 +1,25 @@
+{
+  "name": "Plot Maps",
+  "short_name": "Plot",
+  "description": "Visual prospecting — know exactly who to call",
+  "display": "standalone",
+  "start_url": "/",
+  "scope": "/",
+  "background_color": "#0b1020",
+  "theme_color": "#0b1020",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icons/icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

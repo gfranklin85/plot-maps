@@ -77,35 +77,35 @@ function daysSince(dateStr: string | null): string {
   return `${Math.round(days / 365)}yr`;
 }
 
-// Label mode: compact rich pin — price + status + DOM + recency
+// Label mode: compact rich pin — price + status + recency
 function createLabelIcon(lead: Lead): google.maps.Icon {
   const color = getStatusColor(lead);
   const price = formatPriceShort(lead.listing_price || lead.selling_price || null);
   const statusLabel = getStatusLabel(lead);
   const dom = lead.dom != null ? `${lead.dom}d` : '';
   const recency = daysSince(lead.selling_date || lead.listing_date);
-  const subLine = [statusLabel, dom ? `${dom} DOM` : '', recency ? `${recency} ago` : ''].filter(Boolean).join(' · ');
+  const subLine = [statusLabel, dom ? `${dom} DOM` : '', recency].filter(Boolean).join(' · ');
 
-  const width = 120;
-  const height = subLine ? 38 : 28;
+  const width = 100;
+  const height = subLine ? 34 : 26;
 
   const svg = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height + 8}">
-      <rect x="0" y="0" width="${width}" height="${height}" rx="8" fill="rgba(15,23,42,0.9)" stroke="${color}" stroke-width="1.5"/>
-      <circle cx="10" cy="12" r="3.5" fill="${color}"/>
-      <text x="18" y="13" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="800" fill="white">${price || '—'}</text>
-      ${subLine ? `<text x="6" y="30" font-family="system-ui,sans-serif" font-size="8" font-weight="600" fill="${color}">${subLine}</text>` : ''}
-      <polygon points="${width / 2 - 4},${height} ${width / 2},${height + 7} ${width / 2 + 4},${height}" fill="rgba(15,23,42,0.9)"/>
+    <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height + 7}">
+      <rect x="0" y="0" width="${width}" height="${height}" rx="8" fill="rgba(10,16,32,0.92)" stroke="${color}" stroke-width="1.5"/>
+      <circle cx="9" cy="11" r="3" fill="${color}"/>
+      <text x="16" y="12" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="800" fill="white">${price || '—'}</text>
+      ${subLine ? `<text x="5" y="27" font-family="system-ui,sans-serif" font-size="7.5" font-weight="700" fill="${color}">${subLine}</text>` : ''}
+      <polygon points="${width / 2 - 3},${height} ${width / 2},${height + 6} ${width / 2 + 3},${height}" fill="rgba(10,16,32,0.92)"/>
     </svg>`;
 
   return {
     url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
-    scaledSize: new google.maps.Size(width, height + 8),
-    anchor: new google.maps.Point(width / 2, height + 8),
+    scaledSize: new google.maps.Size(width, height + 7),
+    anchor: new google.maps.Point(width / 2, height + 7),
   };
 }
 
-// Detail mode: full card — price, status, DOM, recency, sqft, year, pricing insight
+// Detail mode: compact card — price, status badge, meta line, detail line
 function createDetailIcon(lead: Lead): google.maps.Icon {
   const color = getStatusColor(lead);
   const price = formatPriceShort(lead.listing_price || lead.selling_price || null);
@@ -114,27 +114,27 @@ function createDetailIcon(lead: Lead): google.maps.Icon {
   const recency = daysSince(lead.selling_date || lead.listing_date);
   const sqft = lead.sqft ? `${lead.sqft.toLocaleString()}sf` : '';
   const year = lead.year_built ? `${lead.year_built}` : '';
-  const line2 = [statusLabel, dom, recency ? `${recency} ago` : ''].filter(Boolean).join(' · ');
-  const line3 = [sqft, year].filter(Boolean).join(' · ') || lead.property_address?.split(',')[0]?.substring(0, 22) || '';
+  const line2 = [dom, recency].filter(Boolean).join(' · ');
+  const line3 = [sqft, year].filter(Boolean).join(' · ') || lead.property_address?.split(',')[0]?.substring(0, 18) || '';
 
-  const width = 150;
-  const height = 56;
+  const width = 125;
+  const height = 48;
 
   const svg = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height + 10}">
-      <rect x="1" y="1" width="${width - 2}" height="${height - 2}" rx="10" fill="rgba(15,23,42,0.92)" stroke="${color}" stroke-width="2"/>
-      ${statusLabel ? `<rect x="${width - 48}" y="5" width="44" height="13" rx="6" fill="${color}"/>
-      <text x="${width - 26}" y="12.5" dominant-baseline="central" text-anchor="middle" font-family="system-ui,sans-serif" font-size="7.5" font-weight="800" fill="white">${statusLabel}</text>` : ''}
-      <text x="10" y="18" font-family="system-ui,sans-serif" font-size="14" font-weight="800" fill="white">${price || '—'}</text>
-      <text x="10" y="32" font-family="system-ui,sans-serif" font-size="8.5" font-weight="600" fill="${color}">${line2}</text>
-      <text x="10" y="46" font-family="system-ui,sans-serif" font-size="9" font-weight="500" fill="#94a3b8">${line3}</text>
-      <polygon points="${width / 2 - 5},${height - 2} ${width / 2},${height + 8} ${width / 2 + 5},${height - 2}" fill="rgba(15,23,42,0.92)"/>
+    <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height + 9}">
+      <rect x="1" y="1" width="${width - 2}" height="${height - 2}" rx="10" fill="rgba(10,16,32,0.95)" stroke="${color}" stroke-width="1.5"/>
+      ${statusLabel ? `<rect x="${width - 40}" y="5" width="36" height="13" rx="6" fill="${color}"/>
+      <text x="${width - 22}" y="12" dominant-baseline="central" text-anchor="middle" font-family="system-ui,sans-serif" font-size="7" font-weight="800" fill="white">${statusLabel}</text>` : ''}
+      <text x="8" y="17" font-family="system-ui,sans-serif" font-size="12" font-weight="800" fill="white">${price || '—'}</text>
+      <text x="8" y="30" font-family="system-ui,sans-serif" font-size="8" font-weight="700" fill="${color}">${line2}</text>
+      <text x="8" y="41" font-family="system-ui,sans-serif" font-size="8" font-weight="500" fill="#94a3b8">${line3}</text>
+      <polygon points="${width / 2 - 4},${height - 2} ${width / 2},${height + 7} ${width / 2 + 4},${height - 2}" fill="rgba(10,16,32,0.95)"/>
     </svg>`;
 
   return {
     url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
-    scaledSize: new google.maps.Size(width, height + 10),
-    anchor: new google.maps.Point(width / 2, height + 10),
+    scaledSize: new google.maps.Size(width, height + 9),
+    anchor: new google.maps.Point(width / 2, height + 9),
   };
 }
 

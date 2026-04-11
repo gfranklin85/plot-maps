@@ -69,10 +69,11 @@ export async function GET() {
 
   for (const lead of allLeads) {
     const city = lead.city.trim();
-    const key = `${city}|${lead.state || ''}`;
+    const key = `${city.toLowerCase()}|${(lead.state || '').toLowerCase()}`;
     if (!marketMap.has(key)) {
+      const displayCity = city.replace(/\w\S*/g, (t: string) => t.charAt(0).toUpperCase() + t.substring(1).toLowerCase());
       marketMap.set(key, {
-        city, state: lead.state || '',
+        city: displayCity, state: (lead.state || '').toUpperCase(),
         user_ids: new Set(),
         target_count: 0, context_count: 0,
         freshness_date: lead.last_imported_at || lead.created_at,

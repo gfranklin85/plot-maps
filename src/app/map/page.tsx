@@ -41,7 +41,7 @@ export default function MapPage() {
   const [selectedSource, setSelectedSource] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [mapType, setMapType] = useState<'roadmap' | 'satellite' | 'hybrid'>('hybrid');
-  const [listingFilter, setListingFilter] = useState<string>('all');
+  const [listingFilters, setListingFilters] = useState<Set<string>>(new Set());
   const [walkMode, setWalkMode] = useState(false);
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(profile.defaultMapCenter);
   const [hasUserPanned, setHasUserPanned] = useState(false);
@@ -119,6 +119,15 @@ export default function MapPage() {
       setMapCenter(profile.defaultMapCenter);
     }
   }, [profile.defaultMapCenter, hasUserPanned]);
+
+  function toggleListingFilter(key: string) {
+    setListingFilters(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
 
   // Expand map — nudge mobile browser chrome away
   function expandMap() {
@@ -213,14 +222,16 @@ export default function MapPage() {
     if (selectedPriority) result = result.filter((l) => l.priority === selectedPriority);
     if (selectedSource) result = result.filter((l) => l.source === selectedSource);
 
-    if (listingFilter === 'prospects') {
-      result = result.filter((l) => !l.listing_status);
-    } else if (listingFilter === 'Sold' || listingFilter === 'Active' || listingFilter === 'Pending') {
-      result = result.filter((l) => l.listing_status === listingFilter);
+    if (listingFilters.size > 0) {
+      result = result.filter((l) => {
+        if (listingFilters.has('prospects') && !l.listing_status) return true;
+        if (l.listing_status && listingFilters.has(l.listing_status)) return true;
+        return false;
+      });
     }
 
     return result;
-  }, [leads, activeTab, search, selectedTags, selectedCity, selectedPriority, selectedSource, listingFilter]);
+  }, [leads, activeTab, search, selectedTags, selectedCity, selectedPriority, selectedSource, listingFilters]);
 
   const [mobileControlsOpen, setMobileControlsOpen] = useState(false);
 
@@ -269,10 +280,9 @@ export default function MapPage() {
               ))}
             </div>
 
-            {/* Listing filter */}
+            {/* Listing filter — multi-select toggles */}
             <div className="flex gap-0.5 bg-surface p-1 rounded-xl shadow-lg">
               {[
-                { key: 'all', label: 'All', dot: 'bg-primary' },
                 { key: 'prospects', label: 'Prospects', dot: 'bg-orange-400' },
                 { key: 'Active', label: 'Active', dot: 'bg-green-500' },
                 { key: 'Sold', label: 'Sold', dot: 'bg-yellow-400' },
@@ -280,14 +290,16 @@ export default function MapPage() {
               ].map((f) => (
                 <button
                   key={f.key}
-                  onClick={() => setListingFilter(f.key)}
+                  onClick={() => toggleListingFilter(f.key)}
                   className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all ${
-                    listingFilter === f.key
+                    listingFilters.has(f.key)
                       ? 'bg-surface-container text-white'
-                      : 'text-on-surface-variant hover:text-white'
+                      : listingFilters.size === 0
+                        ? 'text-on-surface-variant/60 hover:text-white'
+                        : 'text-on-surface-variant/30 hover:text-white'
                   }`}
                 >
-                  <span className={`w-1.5 h-1.5 rounded-full ${f.dot}`} />
+                  <span className={`w-1.5 h-1.5 rounded-full ${listingFilters.size === 0 || listingFilters.has(f.key) ? f.dot : 'bg-on-surface-variant/20'}`} />
                   {f.label}
                 </button>
               ))}
@@ -382,20 +394,19 @@ export default function MapPage() {
                   ))}
                 </div>
               </div>
-              {/* Listing filter */}
+              {/* Listing filter — multi-select toggles */}
               <div>
                 <p className="text-[9px] font-bold text-on-surface-variant uppercase tracking-wider mb-2">Show</p>
                 <div className="flex flex-wrap gap-1">
                   {[
-                    { key: 'all', label: 'All', dot: 'bg-primary' },
                     { key: 'prospects', label: 'Prospects', dot: 'bg-orange-400' },
                     { key: 'Active', label: 'Active', dot: 'bg-green-500' },
                     { key: 'Sold', label: 'Sold', dot: 'bg-yellow-400' },
                     { key: 'Pending', label: 'Pending', dot: 'bg-purple-500' },
                   ].map((f) => (
-                    <button key={f.key} onClick={() => setListingFilter(f.key)}
-                      className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-all ${listingFilter === f.key ? 'bg-surface-container text-white' : 'text-on-surface-variant'}`}>
-                      <span className={`w-2 h-2 rounded-full ${f.dot}`} />
+                    <button key={f.key} onClick={() => toggleListingFilter(f.key)}
+                      className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-all ${listingFilters.has(f.key) ? 'bg-surface-container text-white' : 'text-on-surface-variant/50'}`}>
+                      <span className={`w-2 h-2 rounded-full ${listingFilters.size === 0 || listingFilters.has(f.key) ? f.dot : 'bg-on-surface-variant/20'}`} />
                       {f.label}
                     </button>
                   ))}

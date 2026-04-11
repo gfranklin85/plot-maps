@@ -4,6 +4,7 @@ import { getAuthUser } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase-server';
 
 const COST_PER_ADDRESS_CENTS = 18; // $0.18
+const MIN_ORDER_SIZE = 10;
 
 interface AddressItem {
   address: string;

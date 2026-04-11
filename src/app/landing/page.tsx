@@ -5,6 +5,7 @@ import Link from 'next/link';
 
 export default function LandingPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [featureTab, setFeatureTab] = useState<'map' | 'walk' | 'intel'>('map');
 
   return (
     <div className="bg-[#0c1324] text-[#dce1fb] min-h-screen font-body selection:bg-indigo-500/30 scroll-smooth">
@@ -38,24 +39,43 @@ export default function LandingPage() {
       </header>
 
       <main>
-        {/* Hero Section — mobile-first: text + CTA above fold, image hidden on small screens */}
+        {/* Hero Section */}
         <section className="relative pt-24 sm:pt-40 pb-16 sm:pb-32 overflow-hidden">
+          {/* Subtle glow */}
+          <div className="absolute inset-0 -z-10" style={{ background: 'radial-gradient(circle at center, rgba(79,70,229,0.08) 0%, transparent 70%)' }} />
+
           <div className="max-w-7xl mx-auto px-5 sm:px-8 grid lg:grid-cols-2 gap-8 lg:gap-16 items-center">
             <div className="relative z-10">
+              {/* Hero badge */}
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#23293c] border border-slate-700/20 mb-6">
+                <span className="material-symbols-outlined text-indigo-400 text-[16px]" style={{ fontVariationSettings: "'FILL' 1" }}>verified</span>
+                <span className="text-xs font-bold uppercase tracking-wider text-indigo-400">Precision Prospecting</span>
+              </div>
+
               <h1 className="text-3xl sm:text-5xl lg:text-7xl font-headline font-extrabold tracking-tight leading-[1.1] mb-4 sm:mb-8">
                 Know exactly who to call — <span className="text-indigo-400">and why.</span>
               </h1>
               <p className="text-base sm:text-xl text-slate-400 leading-relaxed mb-6 sm:mb-8 max-w-xl">
                 See every property on a map with comps, owner data, and talking points. Stop calling blind — prospect with full context from street level.
               </p>
-              {/* Trust signal */}
-              <p className="text-sm text-indigo-300/80 mb-6 sm:mb-8 flex items-center gap-2">
-                <span className="material-symbols-outlined text-emerald-400 text-[16px]" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
-                50 free geocodes. No credit card required.
-              </p>
+
+              {/* Trust checkmarks */}
+              <div className="space-y-3 mb-8">
+                {[
+                  'See the house before you call — Street View prospecting',
+                  'Comps, owner data, and talking points on every property',
+                  'Start free — 50 geocodes, no credit card required',
+                ].map((point) => (
+                  <div key={point} className="flex items-center gap-3">
+                    <span className="material-symbols-outlined text-emerald-400 text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
+                    <span className="text-sm sm:text-base text-slate-300 font-medium">{point}</span>
+                  </div>
+                ))}
+              </div>
+
               <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                 <Link href="/signup" className="bg-gradient-to-br from-indigo-400 to-indigo-600 text-white px-6 sm:px-8 py-3.5 sm:py-4 rounded-lg font-bold font-headline text-base sm:text-lg text-center hover:shadow-[0_0_20px_rgba(195,192,255,0.3)] transition-all">
-                  Try the Map — Free
+                  Claim My 50 Free Credits
                 </Link>
                 <a href="#features" className="bg-[#23293c] border border-slate-700/20 text-[#dce1fb] px-6 sm:px-8 py-3.5 sm:py-4 rounded-lg font-bold font-headline text-base sm:text-lg text-center hover:bg-[#2e3447] transition-all flex items-center justify-center gap-2">
                   <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>visibility</span>
@@ -95,96 +115,73 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* Solution Section */}
-        <section className="py-20 sm:py-32 relative overflow-hidden">
-          <div className="max-w-7xl mx-auto px-5 sm:px-8">
-            <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-20">
-              <div className="flex-1 order-2 lg:order-1">
-                <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                  {[
-                    { icon: 'upload_file', label: 'Upload List' },
-                    { icon: 'map', label: 'Instantly Mapped' },
-                    { icon: 'phone_forwarded', label: 'Click to Call' },
-                    { icon: 'analytics', label: 'Live Comps' },
-                  ].map((item) => (
-                    <div key={item.label} className="aspect-square bg-[#23293c] rounded-2xl p-4 sm:p-6 flex flex-col justify-end border border-slate-700/10">
-                      <span className="material-symbols-outlined text-indigo-400 mb-3 sm:mb-4" style={{ fontSize: '28px' }}>{item.icon}</span>
-                      <div className="font-bold text-sm sm:text-base">{item.label}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div className="flex-1 order-1 lg:order-2">
-                <h2 className="text-3xl sm:text-4xl lg:text-6xl font-headline font-extrabold mb-6 sm:mb-8 leading-tight">One system. One view. <br /><span className="text-indigo-400">Total context.</span></h2>
-                <p className="text-base sm:text-xl text-slate-400 mb-8 sm:mb-10 leading-relaxed">
-                  Upload your list from any source — PropWire, BatchLeads, or your MLS — and see it instantly geocoded on a beautiful, fast interface designed for action.
-                </p>
-                <ul className="space-y-4 sm:space-y-6">
-                  <li className="flex items-start gap-3 sm:gap-4">
-                    <div className="mt-1 w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-indigo-400/20 flex items-center justify-center flex-shrink-0">
-                      <span className="material-symbols-outlined text-indigo-400 text-xs sm:text-sm">check</span>
-                    </div>
-                    <span className="text-base sm:text-lg">No more data silos. Your workflow lives inside the map.</span>
-                  </li>
-                  <li className="flex items-start gap-3 sm:gap-4">
-                    <div className="mt-1 w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-indigo-400/20 flex items-center justify-center flex-shrink-0">
-                      <span className="material-symbols-outlined text-indigo-400 text-xs sm:text-sm">check</span>
-                    </div>
-                    <span className="text-base sm:text-lg">Prospect at 3x the speed with integrated street-view workflows.</span>
-                  </li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Features Grid */}
+        {/* Tabbed Features Section */}
         <section id="features" className="py-16 sm:py-24 bg-[#070d1f]">
-          <div className="max-w-7xl mx-auto px-5 sm:px-8">
-            <div className="text-center mb-12 sm:mb-20">
+          <div className="max-w-4xl mx-auto px-5 sm:px-8">
+            <div className="text-center mb-10 sm:mb-14">
               <h2 className="text-2xl sm:text-3xl lg:text-5xl font-headline font-extrabold mb-3 sm:mb-4">Built for Precision Prospecting</h2>
               <p className="text-slate-400 text-sm sm:text-base">Know who to call, why to call, and what to say.</p>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-6 gap-4 sm:gap-6">
-              <div className="md:col-span-3 bg-[#23293c] rounded-2xl p-6 sm:p-8 flex flex-col border border-slate-700/5">
+
+            {/* Tab Switcher */}
+            <div className="flex bg-[#0c1324] p-1 rounded-xl mb-8 border border-slate-700/10">
+              {([
+                { key: 'map' as const, label: 'Map CRM' },
+                { key: 'walk' as const, label: 'Walk Mode' },
+                { key: 'intel' as const, label: 'Market Intel' },
+              ]).map(({ key, label }) => (
+                <button
+                  key={key}
+                  onClick={() => setFeatureTab(key)}
+                  className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all ${
+                    featureTab === key
+                      ? 'bg-indigo-600 text-white shadow-lg'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {/* Tab Content */}
+            <div className="bg-[#23293c]/40 backdrop-blur rounded-2xl border border-slate-700/20 p-6 sm:p-8 min-h-[400px]">
+              {featureTab === 'map' && (
                 <div>
-                  <span className="bg-indigo-400/10 text-indigo-400 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest">Visual First</span>
-                  <h3 className="text-xl sm:text-2xl font-bold mt-4 mb-3 sm:mb-4">Map-Based CRM</h3>
-                  <p className="text-slate-400 text-sm sm:text-base">Every property becomes a clickable pin. Track your entire pipeline geographically. See patterns others miss.</p>
+                  <div className="mb-6">
+                    <span className="bg-indigo-400/10 text-indigo-400 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest">Visual First</span>
+                    <h3 className="text-xl sm:text-2xl font-bold mt-4 mb-3">Map-Based CRM</h3>
+                    <p className="text-slate-400 text-sm sm:text-base leading-relaxed">Every property becomes a clickable pin. Track your entire pipeline geographically. See patterns others miss. Upload from PropWire, BatchLeads, or your MLS — mapped instantly.</p>
+                  </div>
+                  <div className="overflow-hidden rounded-xl h-48 sm:h-64 bg-[#0c1324]">
+                    <img className="w-full h-full object-cover" alt="Plot Maps aerial map with property popup and script" src="/feature-aerial-popup.png" loading="lazy" />
+                  </div>
                 </div>
-                <div className="mt-6 sm:mt-8 overflow-hidden rounded-xl h-36 sm:h-48 bg-[#0c1324]">
-                  <img className="w-full h-full object-cover" alt="Plot Maps aerial map with property popup and script" src="/feature-aerial-popup.png" loading="lazy" />
-                </div>
-              </div>
-              <div className="md:col-span-3 bg-[#23293c] rounded-2xl p-6 sm:p-8 flex flex-col border border-slate-700/5">
+              )}
+              {featureTab === 'walk' && (
                 <div>
-                  <span className="bg-orange-400/10 text-orange-400 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest">Context</span>
-                  <h3 className="text-xl sm:text-2xl font-bold mt-4 mb-3 sm:mb-4">Call With Confidence</h3>
-                  <p className="text-slate-400 text-sm sm:text-base">See nearby comps, talking points, and owner data before you dial. Every call starts with context, not a cold open.</p>
+                  <div className="mb-6">
+                    <span className="bg-indigo-400/10 text-indigo-400 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest">The Game Changer</span>
+                    <h3 className="text-xl sm:text-2xl font-bold mt-4 mb-3">Walk Mode</h3>
+                    <p className="text-slate-400 text-sm sm:text-base leading-relaxed">Virtually walk neighborhoods with Street View. See the house, the yard, the neighborhood — then call with visual context that sets you apart from every other prospector.</p>
+                  </div>
+                  <div className="overflow-hidden rounded-xl h-48 sm:h-64 bg-[#0c1324]">
+                    <img className="w-full h-full object-cover object-center" alt="Plot Maps Walk Mode on Eagle Street" src="/hero-walkmode-eagle.png" loading="lazy" />
+                  </div>
                 </div>
-                <div className="mt-6 sm:mt-8 overflow-hidden rounded-xl h-36 sm:h-48 bg-[#0c1324]">
-                  <img className="w-full h-full object-cover" alt="Plot Maps sold property popup with talking points" src="/feature-sold-popup.png" loading="lazy" />
+              )}
+              {featureTab === 'intel' && (
+                <div>
+                  <div className="mb-6">
+                    <span className="bg-orange-400/10 text-orange-400 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest">Context</span>
+                    <h3 className="text-xl sm:text-2xl font-bold mt-4 mb-3">Market Intelligence</h3>
+                    <p className="text-slate-400 text-sm sm:text-base leading-relaxed">See nearby solds, actives, and pendings overlaid on your map. Every property card shows comps, talking points, and owner data — so every call starts with context, not a cold open.</p>
+                  </div>
+                  <div className="overflow-hidden rounded-xl h-48 sm:h-64 bg-[#0c1324]">
+                    <img className="w-full h-full object-cover" alt="Plot Maps sold property popup with talking points" src="/feature-sold-popup.png" loading="lazy" />
+                  </div>
                 </div>
-              </div>
-              <div className="md:col-span-2 bg-gradient-to-br from-indigo-600/40 to-[#23293c] rounded-2xl p-6 sm:p-8 border border-indigo-500/10 flex flex-col">
-                <span className="bg-white/10 text-white px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest">The Game Changer</span>
-                <h3 className="text-xl sm:text-2xl font-bold mt-4 mb-3 sm:mb-4">Walk Mode</h3>
-                <p className="text-slate-400 text-sm sm:text-base mb-4">Virtually walk neighborhoods with Street View. Call while you &quot;stroll&quot; to add visual detail to every pitch.</p>
-                <div className="mt-auto overflow-hidden rounded-xl h-28 sm:h-36 bg-[#0c1324]">
-                  <img className="w-full h-full object-cover object-center" alt="Plot Maps Walk Mode on Eagle Street" src="/hero-walkmode-eagle.png" loading="lazy" />
-                </div>
-              </div>
-              <div className="md:col-span-2 bg-[#23293c] rounded-2xl p-6 sm:p-8 border border-slate-700/5 flex flex-col">
-                <h3 className="text-lg sm:text-xl font-bold mb-3 sm:mb-4">Market Intelligence</h3>
-                <p className="text-slate-400 text-sm mb-4">See nearby solds and actives instantly. Be the expert on every block without checking Zillow.</p>
-                <div className="mt-auto overflow-hidden rounded-xl h-28 sm:h-36 bg-[#0c1324]">
-                  <img className="w-full h-full object-cover object-top" alt="Plot Maps aerial sold property data" src="/feature-aerial-sold.png" loading="lazy" />
-                </div>
-              </div>
-              <div className="md:col-span-2 bg-[#23293c] rounded-2xl p-6 sm:p-8 border border-slate-700/5">
-                <h3 className="text-lg sm:text-xl font-bold mb-3 sm:mb-4">AI Follow-Up</h3>
-                <p className="text-slate-400 text-sm">Know who to call next based on property signals and engagement history.</p>
-              </div>
+              )}
             </div>
           </div>
         </section>
@@ -233,7 +230,6 @@ export default function LandingPage() {
                     'Import your own property lists',
                     'MLS data overlay (Sold / Active / Pending)',
                     'Call scripts & notes',
-                    'AI follow-up suggestions',
                     'Manual dialing (use your phone)',
                     '500 geocodes / month',
                     '1,000 street view loads / month',
@@ -297,7 +293,7 @@ export default function LandingPage() {
             <p className="text-lg sm:text-2xl text-slate-400 mb-8 sm:mb-12">See the house. See the data. Make the call.</p>
             <div className="flex flex-col sm:flex-row flex-wrap justify-center gap-4 sm:gap-6">
               <Link href="/signup" className="bg-gradient-to-br from-indigo-400 to-indigo-600 text-white px-8 sm:px-10 py-4 sm:py-5 rounded-lg font-bold font-headline text-lg sm:text-xl shadow-xl hover:scale-105 transition-all text-center">
-                Try the Map
+                Claim My Free Credits
               </Link>
               <Link href="/signup" className="bg-[#23293c] border border-slate-700/30 text-[#dce1fb] px-8 sm:px-10 py-4 sm:py-5 rounded-lg font-bold font-headline text-lg sm:text-xl hover:bg-[#2e3447] transition-all text-center">
                 Start Prospecting
@@ -346,7 +342,7 @@ export default function LandingPage() {
         </div>
 
         <div className="max-w-7xl mx-auto mt-8 sm:mt-10 pt-6 border-t border-slate-800 flex flex-col md:flex-row justify-between gap-4 text-xs text-slate-500">
-          <p>© 2026 Plot Maps by Plot Solutions. All rights reserved.</p>
+          <p>&copy; 2026 Plot Maps by Plot Solutions. All rights reserved.</p>
           <p>
             Support:{' '}
             <a href="mailto:gregfranklin523@gmail.com" className="hover:text-indigo-400 transition-colors">

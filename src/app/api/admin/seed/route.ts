@@ -275,13 +275,36 @@ export async function POST(request: Request) {
   let inserted = 0, updated = 0, errors = 0, total = 0, geocoded = 0;
   const GOOGLE_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
 
-  // Geocode a single address — only for new records
+  // Geocode with cache — check geocode_cache first, only call Google on miss
   async function geocodeAddress(address: string): Promise<{ lat: number; lng: number } | null> {
+    const key = address.trim().toLowerCase().replace(/[.,#]/g, '').replace(/\s+/g, ' ');
     try {
+      // Check cache
+      const { data: cached } = await supabaseAdmin
+        .from('geocode_cache')
+        .select('lat, lng')
+        .eq('address_key', key)
+        .single();
+      if (cached) return { lat: cached.lat, lng: cached.lng };
+
+      // Cache miss — call Google
       const res = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${GOOGLE_API_KEY}`);
       const data = await res.json();
       if (data.results?.[0]?.geometry?.location) {
-        return data.results[0].geometry.location;
+        const loc = data.results[0].geometry.location;
+        const comps = data.results[0].address_components || [];
+        const city = comps.find((c: { types: string[] }) => c.types.includes('locality'))?.long_name || null;
+        const state = comps.find((c: { types: string[] }) => c.types.includes('administrative_area_level_1'))?.short_name || null;
+        const zip = comps.find((c: { types: string[] }) => c.types.includes('postal_code'))?.long_name || null;
+
+        // Store in cache
+        supabaseAdmin.from('geocode_cache').upsert({
+          address_key: key,
+          formatted_address: data.results[0].formatted_address || address,
+          lat: loc.lat, lng: loc.lng, city, state, zip,
+        }, { onConflict: 'address_key' }).catch(() => {});
+
+        return loc;
       }
     } catch { /* non-fatal */ }
     return null;

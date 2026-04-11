@@ -120,23 +120,11 @@ export default function MapPage() {
     }
   }, [profile.defaultMapCenter, hasUserPanned]);
 
-  // Nudge mobile browser chrome away on first interaction
-  useEffect(() => {
-    let nudged = false;
-    const handleFirstTouch = () => {
-      if (nudged) return;
-      nudged = true;
-      setTimeout(() => window.scrollTo(0, 1), 50);
-      window.removeEventListener('touchstart', handleFirstTouch);
-      window.removeEventListener('pointerdown', handleFirstTouch);
-    };
-    window.addEventListener('touchstart', handleFirstTouch, { passive: true });
-    window.addEventListener('pointerdown', handleFirstTouch, { passive: true });
-    return () => {
-      window.removeEventListener('touchstart', handleFirstTouch);
-      window.removeEventListener('pointerdown', handleFirstTouch);
-    };
-  }, []);
+  // Expand map — nudge mobile browser chrome away
+  function expandMap() {
+    window.scrollTo(0, 1);
+    try { document.documentElement.requestFullscreen?.(); } catch { /* not supported on all browsers */ }
+  }
 
   useEffect(() => {
     async function fetchLeads() {
@@ -711,6 +699,17 @@ export default function MapPage() {
       )}
 
       <UpgradeGate feature="walkMode" show={showGate} onClose={() => setShowGate(false)} />
+
+      {/* Expand map — hides mobile browser chrome */}
+      {!walkMode && (
+        <button
+          onClick={expandMap}
+          className="md:hidden fixed bottom-20 right-4 z-30 w-9 h-9 rounded-full bg-surface-container/80 backdrop-blur border border-card-border shadow-lg flex items-center justify-center text-on-surface-variant active:scale-90 transition-transform"
+          aria-label="Expand map"
+        >
+          <MaterialIcon icon="fullscreen" className="text-[20px]" />
+        </button>
+      )}
 
       {/* Prospect mode indicator */}
       {prospectMode && !walkMode && (

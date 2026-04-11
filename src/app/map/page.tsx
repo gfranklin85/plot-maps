@@ -723,15 +723,13 @@ export default function MapPage() {
       <UpgradeGate feature="walkMode" show={showGate} onClose={() => setShowGate(false)} />
 
       {/* Expand map — hides mobile browser chrome */}
-      {!walkMode && (
-        <button
-          onClick={expandMap}
-          className="md:hidden fixed bottom-20 right-4 z-30 w-9 h-9 rounded-full bg-surface-container/80 backdrop-blur border border-card-border shadow-lg flex items-center justify-center text-on-surface-variant active:scale-90 transition-transform"
-          aria-label="Expand map"
-        >
-          <MaterialIcon icon="fullscreen" className="text-[20px]" />
-        </button>
-      )}
+      <button
+        onClick={expandMap}
+        className="md:hidden fixed bottom-20 right-4 z-30 w-9 h-9 rounded-full bg-surface-container/80 backdrop-blur border border-card-border shadow-lg flex items-center justify-center text-on-surface-variant active:scale-90 transition-transform"
+        aria-label="Expand map"
+      >
+        <MaterialIcon icon="fullscreen" className="text-[20px]" />
+      </button>
 
       {/* Prospect mode indicator */}
       {prospectMode && !walkMode && (

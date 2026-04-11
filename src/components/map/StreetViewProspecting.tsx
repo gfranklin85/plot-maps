@@ -193,8 +193,8 @@ function StreetViewInner({ leads, startPosition, onDataChanged, onPositionChange
   const markersRef = useRef<google.maps.Marker[]>([]);
   const leadsRef = useRef<Lead[]>([]);
   const visibleLeadIdsRef = useRef<Set<string>>(new Set());
-  const [walkPinMode, setWalkPinMode] = useState<PinMode>('detail');
-  const walkPinModeRef = useRef<PinMode>('detail');
+  const [walkPinMode] = useState<PinMode>('labels');
+  const walkPinModeRef = useRef<PinMode>('labels');
   // Split: reference at bottom (context), lead at top (call workflow)
   const [walkReference, setWalkReference] = useState<Lead | null>(null);
   const [walkActiveLead, setWalkActiveLead] = useState<Lead | null>(null);
@@ -215,6 +215,8 @@ function StreetViewInner({ leads, startPosition, onDataChanged, onPositionChange
       panControl: true,
       enableCloseButton: false,
       fullscreenControl: true,
+      motionTracking: false,
+      motionTrackingControl: true,
     });
 
     panoramaRef.current = panorama;
@@ -332,32 +334,9 @@ function StreetViewInner({ leads, startPosition, onDataChanged, onPositionChange
     visibleLeadIdsRef.current = currentlyVisible;
   }
 
-  const PIN_OPTIONS: { mode: PinMode; label: string }[] = [
-    { mode: 'detail', label: 'Cards' },
-    { mode: 'labels', label: 'Labels' },
-  ];
-
   return (
     <div className="relative h-full w-full">
       <div ref={containerRef} className="h-full w-full" />
-
-      {/* Walk Mode Pin Toggle — moves up when reference card is open */}
-      <div className={`absolute left-4 z-40 flex items-center gap-1 rounded-full bg-slate-900/80 backdrop-blur-sm border border-slate-700 px-1 py-1 transition-all ${walkReference ? 'bottom-[45vh]' : 'bottom-6'}`}>
-        <span className="material-symbols-outlined text-[14px] text-slate-400 ml-2 mr-1">push_pin</span>
-        {PIN_OPTIONS.map(({ mode, label }) => (
-          <button
-            key={mode}
-            onClick={() => setWalkPinMode(mode)}
-            className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
-              walkPinMode === mode
-                ? 'bg-primary text-white'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
 
       {/* ── LEAD / PROSPECT — top of screen (call workflow) ── */}
       {walkActiveLead && (

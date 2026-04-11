@@ -251,15 +251,13 @@ export default function MapPage() {
     <div className="relative h-[calc(100vh-3.5rem)] md:h-[calc(100vh-5rem)] w-full">
       {/* ═══ CONTROLS ═══ */}
       {walkMode ? (
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10">
-          <button
-            onClick={() => setWalkMode(false)}
-            className="group flex items-center gap-2 bg-surface text-white px-5 py-2.5 rounded-full shadow-2xl border border-card-border hover:bg-primary/20 transition-all"
-          >
-            <MaterialIcon icon="map" className="text-[18px] text-primary" />
-            <span className="text-xs font-bold uppercase tracking-widest">Back to Map</span>
-          </button>
-        </div>
+        <button
+          onClick={() => setWalkMode(false)}
+          className="absolute top-4 left-4 z-10 w-10 h-10 flex items-center justify-center rounded-xl bg-surface/90 backdrop-blur-sm text-primary shadow-lg hover:bg-primary hover:text-white transition-all"
+          title="Back to Map"
+        >
+          <MaterialIcon icon="map" className="text-[20px]" />
+        </button>
       ) : (
         <>
           {/* ── DESKTOP TOOLBAR ── */}
@@ -757,7 +755,7 @@ export default function MapPage() {
       )}
 
       {/* Prospect list badge */}
-      {prospectList.length > 0 && !showProspectPanel && (
+      {prospectList.length > 0 && !showProspectPanel && !walkMode && (
         <button
           onClick={() => setShowProspectPanel(true)}
           className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 bg-primary text-white px-5 py-3 rounded-xl shadow-2xl hover:bg-primary/90 transition-all"

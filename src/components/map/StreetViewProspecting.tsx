@@ -294,9 +294,9 @@ function StreetViewInner({ leads, startPosition, onDataChanged, onPositionChange
 
       // Scale by distance: closer = bigger. Also factor in SV zoom level.
       const svZoom = panorama.getZoom() || 1;
-      const zoomBoost = 1 + (svZoom - 1) * 0.4; // zoom 1=1x, zoom 2=1.4x, zoom 3=1.8x, zoom 5=2.6x
-      const distScale = dist < 30 ? 1.6 : dist < 60 ? 1.3 : 1.0;
-      const scale = distScale * zoomBoost;
+      const zoomBoost = 1 + (svZoom - 1) * 0.3; // zoom 1=1x, zoom 2=1.3x, zoom 3=1.6x
+      const distScale = dist < 30 ? 1.4 : dist < 60 ? 1.15 : 1.0;
+      const scale = Math.min(distScale * zoomBoost, 2.2); // cap max scale to prevent blinking
       const isContext = lead.record_type === 'context' || !lead.user_id || !!lead.listing_status;
 
       let icon;

@@ -265,7 +265,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Access denied' }, { status: 403 });
   }
 
-  const { csvText, marketTag, format: requestedFormat, userId: targetUserId, skipGeocoding } = await request.json();
+  const { csvText, marketTag, format: requestedFormat, userId: targetUserId } = await request.json();
   if (!csvText) {
     return NextResponse.json({ error: 'Data is required' }, { status: 400 });
   }
@@ -297,14 +297,12 @@ export async function POST(request: Request) {
         const state = comps.find((c: { types: string[] }) => c.types.includes('administrative_area_level_1'))?.short_name || null;
         const zip = comps.find((c: { types: string[] }) => c.types.includes('postal_code'))?.long_name || null;
 
-        // Store in cache (fire and forget)
-        try {
-          await supabaseAdmin.from('geocode_cache').upsert({
-            address_key: key,
-            formatted_address: data.results[0].formatted_address || address,
-            lat: loc.lat, lng: loc.lng, city, state, zip,
-          }, { onConflict: 'address_key' });
-        } catch { /* non-fatal */ }
+        // Store in cache (fire and forget — don't await)
+        supabaseAdmin.from('geocode_cache').upsert({
+          address_key: key,
+          formatted_address: data.results[0].formatted_address || address,
+          lat: loc.lat, lng: loc.lng, city, state, zip,
+        }, { onConflict: 'address_key' }).then(() => {});
 
         return loc;
       }
@@ -383,7 +381,7 @@ export async function POST(request: Request) {
             .select('latitude')
             .eq('id', existing[0].id)
             .single();
-          if (!coordCheck?.latitude && !skipGeocoding) {
+          if (!coordCheck?.latitude) {
             const geo = await geocodeAddress(prop.address);
             if (geo) {
               await supabaseAdmin.from('leads').update({
@@ -399,14 +397,12 @@ export async function POST(request: Request) {
         if (error) { errors++; }
         else {
           inserted++;
-          if (!skipGeocoding) {
-            const geo = await geocodeAddress(prop.address);
-            if (geo && insertedData) {
-              await supabaseAdmin.from('leads').update({
-                latitude: geo.lat, longitude: geo.lng, geocoded_at: now,
-              }).eq('id', insertedData.id);
-              geocoded++;
-            }
+          const geo = await geocodeAddress(prop.address);
+          if (geo && insertedData) {
+            await supabaseAdmin.from('leads').update({
+              latitude: geo.lat, longitude: geo.lng, geocoded_at: now,
+            }).eq('id', insertedData.id);
+            geocoded++;
           }
         }
       }

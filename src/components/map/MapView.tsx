@@ -78,7 +78,7 @@ function daysSince(dateStr: string | null): string {
   return `${Math.round(days / 365)}yr`;
 }
 
-// Label mode: compact rich pin — price + status + recency
+// Label mode: compact rich pin — price + status + recency (auto-width)
 function createLabelIcon(lead: Lead): google.maps.Icon {
   const color = getStatusColor(lead);
   const price = formatPriceShort(lead.listing_price || lead.selling_price || null);
@@ -87,7 +87,12 @@ function createLabelIcon(lead: Lead): google.maps.Icon {
   const recency = daysSince(lead.selling_date || lead.listing_date);
   const subLine = [statusLabel, dom ? `${dom} DOM` : '', recency].filter(Boolean).join(' · ');
 
-  const width = 100;
+  // Auto-width based on content
+  const priceLen = (price || '—').length;
+  const subLen = subLine.length;
+  const topW = 20 + priceLen * 8; // circle + price text
+  const botW = subLen * 5.5 + 10;
+  const width = Math.max(topW, botW, 50);
   const height = subLine ? 34 : 26;
 
   const svg = `
@@ -106,7 +111,7 @@ function createLabelIcon(lead: Lead): google.maps.Icon {
   };
 }
 
-// Detail mode: compact card — price, status badge, meta line, detail line
+// Detail mode: compact card — price, status badge, meta line, detail line (auto-width)
 function createDetailIcon(lead: Lead): google.maps.Icon {
   const color = getStatusColor(lead);
   const price = formatPriceShort(lead.listing_price || lead.selling_price || null);
@@ -118,7 +123,13 @@ function createDetailIcon(lead: Lead): google.maps.Icon {
   const line2 = [dom, recency].filter(Boolean).join(' · ');
   const line3 = [sqft, year].filter(Boolean).join(' · ') || lead.property_address?.split(',')[0]?.substring(0, 18) || '';
 
-  const width = 125;
+  // Auto-width: measure longest line
+  const priceW = (price || '—').length * 8 + 16;
+  const badgeW = statusLabel ? 44 : 0;
+  const topW = priceW + badgeW + 8;
+  const line2W = line2.length * 5.5 + 16;
+  const line3W = line3.length * 5.5 + 16;
+  const width = Math.max(topW, line2W, line3W, 60);
   const height = 48;
 
   const svg = `

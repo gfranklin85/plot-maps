@@ -98,7 +98,7 @@ function getStatusShort(lead: Lead): string {
   return '';
 }
 
-// Rich label for walk mode — price + status + DOM + recency
+// Rich label for walk mode — price + status + DOM + recency (auto-width)
 function makeRichLabelIcon(lead: Lead, color: string, scale: number): google.maps.Icon {
   const price = formatPriceK(lead.listing_price || lead.selling_price || null);
   const status = getStatusShort(lead);
@@ -106,7 +106,12 @@ function makeRichLabelIcon(lead: Lead, color: string, scale: number): google.map
   const recency = daysSinceStr(lead.selling_date || lead.listing_date);
   const subLine = [status, dom ? `${dom} DOM` : '', recency ? `${recency} ago` : ''].filter(Boolean).join(' · ');
 
-  const baseW = 220;
+  // Auto-width based on content
+  const priceLen = (price || '—').length;
+  const subLen = subLine.length;
+  const topW = 30 + priceLen * 14; // circle + price
+  const botW = subLen * 9 + 16;
+  const baseW = Math.max(topW, botW, 80);
   const baseH = subLine ? 70 : 50;
   const w = Math.round(baseW * scale);
   const h = Math.round(baseH * scale);
@@ -130,8 +135,7 @@ function makeRichLabelIcon(lead: Lead, color: string, scale: number): google.map
   };
 }
 
-// Detail card for walk mode — price, status badge, DOM, recency, sqft, year
-// Sized to be clearly readable at street level — roughly garage-height
+// Detail card for walk mode — price, status badge, DOM, recency, sqft, year (auto-width)
 function makeDetailCardIcon(lead: Lead, color: string, scale: number): google.maps.Icon {
   const price = formatPriceK(lead.listing_price || lead.selling_price || null);
   const status = getStatusShort(lead);
@@ -142,7 +146,13 @@ function makeDetailCardIcon(lead: Lead, color: string, scale: number): google.ma
   const year = lead.year_built ? `${lead.year_built}` : '';
   const line3 = [sqft, year].filter(Boolean).join(' · ') || '';
 
-  const baseW = 280;
+  // Auto-width based on content
+  const priceW = (price || '—').length * 18 + 20;
+  const badgeW = status ? 84 : 0;
+  const topW = priceW + badgeW + 12;
+  const line2W = line2.length * 10 + 20;
+  const line3W = line3.length * 10 + 20;
+  const baseW = Math.max(topW, line2W, line3W, 100);
   const baseH = 110;
   const w = Math.round(baseW * scale);
   const h = Math.round(baseH * scale);

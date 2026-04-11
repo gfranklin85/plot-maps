@@ -195,10 +195,9 @@ function StreetViewInner({ leads, startPosition, onDataChanged, onPositionChange
   const visibleLeadIdsRef = useRef<Set<string>>(new Set());
   const [walkPinMode, setWalkPinMode] = useState<PinMode>('detail');
   const walkPinModeRef = useRef<PinMode>('detail');
-  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
-  const [popupPos, setPopupPos] = useState({ x: 16, y: 80 });
-  const [dragging, setDragging] = useState(false);
-  const dragOffset = useRef({ x: 0, y: 0 });
+  // Split: reference at bottom (context), lead at top (call workflow)
+  const [walkReference, setWalkReference] = useState<Lead | null>(null);
+  const [walkActiveLead, setWalkActiveLead] = useState<Lead | null>(null);
 
   leadsRef.current = leads;
 
@@ -320,8 +319,12 @@ function StreetViewInner({ leads, startPosition, onDataChanged, onPositionChange
       });
 
       marker.addListener("click", () => {
-        setSelectedLead(lead);
-        setPopupPos({ x: 16, y: 80 });
+        const isRef = !!lead.listing_status;
+        if (isRef) {
+          setWalkReference(lead);
+        } else {
+          setWalkActiveLead(lead);
+        }
       });
       markersRef.current.push(marker);
     });
@@ -338,8 +341,8 @@ function StreetViewInner({ leads, startPosition, onDataChanged, onPositionChange
     <div className="relative h-full w-full">
       <div ref={containerRef} className="h-full w-full" />
 
-      {/* Walk Mode Pin Toggle — positioned bottom-left to avoid Google's address bar */}
-      <div className="absolute bottom-6 left-4 z-40 flex items-center gap-1 rounded-full bg-slate-900/80 backdrop-blur-sm border border-slate-700 px-1 py-1">
+      {/* Walk Mode Pin Toggle — moves up when reference card is open */}
+      <div className={`absolute left-4 z-40 flex items-center gap-1 rounded-full bg-slate-900/80 backdrop-blur-sm border border-slate-700 px-1 py-1 transition-all ${walkReference ? 'bottom-[45vh]' : 'bottom-6'}`}>
         <span className="material-symbols-outlined text-[14px] text-slate-400 ml-2 mr-1">push_pin</span>
         {PIN_OPTIONS.map(({ mode, label }) => (
           <button
@@ -356,35 +359,33 @@ function StreetViewInner({ leads, startPosition, onDataChanged, onPositionChange
         ))}
       </div>
 
-      {selectedLead && (
-        <div
-          className="fixed z-50 w-[340px] rounded-2xl shadow-2xl border border-card-border bg-card select-none overflow-hidden"
-          style={{ right: `${popupPos.x}px`, top: `${popupPos.y}px` }}
-          onMouseDown={(e) => {
-            const rect = e.currentTarget.getBoundingClientRect();
-            if (e.clientY - rect.top > 50) return; // drag from top 50px of card
-            setDragging(true);
-            dragOffset.current = { x: e.clientX + popupPos.x, y: e.clientY - popupPos.y };
-            e.preventDefault();
-          }}
-          onMouseMove={(e) => {
-            if (!dragging) return;
-            setPopupPos({ x: dragOffset.current.x - e.clientX, y: e.clientY - dragOffset.current.y });
-          }}
-          onMouseUp={() => setDragging(false)}
-          onMouseLeave={() => setDragging(false)}
-        >
-          {/* Close button — integrated into card */}
-          {/* Close button */}
+      {/* ── LEAD / PROSPECT — top of screen (call workflow) ── */}
+      {walkActiveLead && (
+        <div className="absolute top-4 right-4 z-50 w-[340px] max-h-[45vh] overflow-y-auto rounded-2xl shadow-2xl border border-card-border bg-card">
           <div className="absolute top-2 right-2 z-10">
             <button
-              onClick={() => setSelectedLead(null)}
+              onClick={() => setWalkActiveLead(null)}
               className="w-7 h-7 flex items-center justify-center rounded-full bg-surface/80 backdrop-blur-sm text-on-surface-variant hover:text-red-400 hover:bg-red-500/10 transition-all"
             >
               <span className="material-symbols-outlined text-[14px]">close</span>
             </button>
           </div>
-          <PropertyPopup lead={selectedLead} onUpdate={() => onDataChanged?.()} walkMode />
+          <PropertyPopup lead={walkActiveLead} onUpdate={() => onDataChanged?.()} walkMode />
+        </div>
+      )}
+
+      {/* ── REFERENCE PROPERTY — bottom of screen (persistent context) ── */}
+      {walkReference && (
+        <div className="absolute bottom-4 left-4 right-4 md:left-auto md:right-4 z-50 w-auto md:w-[380px] max-h-[40vh] overflow-y-auto rounded-2xl shadow-2xl border border-card-border bg-card/95 backdrop-blur-xl">
+          <div className="absolute top-2 right-2 z-10">
+            <button
+              onClick={() => setWalkReference(null)}
+              className="w-7 h-7 flex items-center justify-center rounded-full bg-surface/80 backdrop-blur-sm text-on-surface-variant hover:text-red-400 hover:bg-red-500/10 transition-all"
+            >
+              <span className="material-symbols-outlined text-[14px]">close</span>
+            </button>
+          </div>
+          <PropertyPopup lead={walkReference} onUpdate={() => onDataChanged?.()} walkMode />
         </div>
       )}
     </div>

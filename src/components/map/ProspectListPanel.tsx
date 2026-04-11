@@ -21,6 +21,7 @@ interface Props {
 }
 
 const PRICE_PER_ADDRESS = 0.18;
+const MIN_ORDER_SIZE = 10;
 
 export default function ProspectListPanel({ addresses, onRemove, onClear, onClose, onOrderComplete }: Props) {
   const total = (addresses.length * PRICE_PER_ADDRESS).toFixed(2);
@@ -146,9 +147,15 @@ export default function ProspectListPanel({ addresses, onRemove, onClear, onClos
             </div>
           )}
 
+          {addresses.length < MIN_ORDER_SIZE && (
+            <p className="text-[10px] text-on-surface-variant/60 text-center">
+              Minimum order: {MIN_ORDER_SIZE} addresses ({MIN_ORDER_SIZE - addresses.length} more needed)
+            </p>
+          )}
+
           <button
             onClick={handleOrder}
-            disabled={ordering}
+            disabled={ordering || addresses.length < MIN_ORDER_SIZE}
             className="w-full py-3.5 rounded-xl bg-gradient-to-br from-primary/80 to-primary text-white font-bold text-sm flex items-center justify-center gap-2 shadow-[0_8px_25px_-5px_hsl(var(--primary)/0.4)] hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50"
           >
             {ordering ? (

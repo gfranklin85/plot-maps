@@ -25,6 +25,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'addresses required' }, { status: 400 });
   }
 
+  if (addresses.length < MIN_ORDER_SIZE) {
+    return NextResponse.json({ error: `Minimum order is ${MIN_ORDER_SIZE} addresses`, min: MIN_ORDER_SIZE }, { status: 400 });
+  }
+
   const addressCount = addresses.length;
   const amountCents = addressCount * COST_PER_ADDRESS_CENTS;
 

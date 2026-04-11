@@ -27,8 +27,18 @@ export async function POST(request: Request) {
   switch (event.type) {
     case 'checkout.session.completed': {
       const session = event.data.object as Stripe.Checkout.Session;
+
+      // Skip trace order payment completed
+      if (session.metadata?.order_type === 'skip_traces' && session.metadata?.order_id) {
+        await supabaseAdmin
+          .from('prospect_orders')
+          .update({ status: 'paid' })
+          .eq('id', session.metadata.order_id);
+        break;
+      }
+
+      // Subscription checkout
       if (session.customer && session.subscription) {
-        // Look up the subscription to get the price ID (Starter vs Pro)
         const sub = await stripe.subscriptions.retrieve(session.subscription as string);
         const priceId = sub.items.data[0]?.price?.id || null;
 

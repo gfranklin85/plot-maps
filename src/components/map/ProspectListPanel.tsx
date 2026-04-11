@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import MaterialIcon from "@/components/ui/MaterialIcon";
 
 interface Address {
@@ -16,12 +17,64 @@ interface Props {
   onRemove: (address: string) => void;
   onClear: () => void;
   onClose: () => void;
+  onOrderComplete?: () => void;
 }
 
 const PRICE_PER_ADDRESS = 0.18;
 
-export default function ProspectListPanel({ addresses, onRemove, onClear, onClose }: Props) {
+export default function ProspectListPanel({ addresses, onRemove, onClear, onClose, onOrderComplete }: Props) {
   const total = (addresses.length * PRICE_PER_ADDRESS).toFixed(2);
+  const [ordering, setOrdering] = useState(false);
+  const [orderResult, setOrderResult] = useState<{ success: boolean; message: string } | null>(null);
+
+  async function handleOrder() {
+    setOrdering(true);
+    setOrderResult(null);
+
+    try {
+      const res = await fetch('/api/stripe/order-skip-traces', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ addresses }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        if (data.require_subscription) {
+          setOrderResult({ success: false, message: 'Subscribe to a plan to order skip traces.' });
+        } else {
+          setOrderResult({ success: false, message: data.error || 'Order failed' });
+        }
+        setOrdering(false);
+        return;
+      }
+
+      // Immediate charge succeeded
+      if (data.success) {
+        setOrderResult({ success: true, message: `Order placed! $${data.charged.toFixed(2)} charged. We&apos;ll have your data ready shortly.` });
+        setTimeout(() => {
+          onOrderComplete?.();
+          onClear();
+          onClose();
+        }, 3000);
+        setOrdering(false);
+        return;
+      }
+
+      // Redirect to Stripe checkout
+      if (data.checkout_url) {
+        window.location.href = data.checkout_url;
+        return;
+      }
+
+      setOrderResult({ success: false, message: 'Unexpected response' });
+    } catch {
+      setOrderResult({ success: false, message: 'Network error. Please try again.' });
+    }
+
+    setOrdering(false);
+  }
 
   return (
     <div className="fixed right-0 top-0 h-full w-full md:w-[400px] z-50 bg-card border-l border-card-border shadow-2xl flex flex-col">
@@ -86,11 +139,23 @@ export default function ProspectListPanel({ addresses, onRemove, onClear, onClos
           <p className="text-[10px] text-on-surface-variant/60">
             We&apos;ll get owner names + phone numbers for each address.
           </p>
+
+          {orderResult && (
+            <div className={`rounded-lg p-3 text-xs font-semibold ${orderResult.success ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
+              {orderResult.message}
+            </div>
+          )}
+
           <button
-            className="w-full py-3.5 rounded-xl bg-gradient-to-br from-primary/80 to-primary text-white font-bold text-sm flex items-center justify-center gap-2 shadow-[0_8px_25px_-5px_hsl(var(--primary)/0.4)] hover:opacity-90 active:scale-[0.98] transition-all"
+            onClick={handleOrder}
+            disabled={ordering}
+            className="w-full py-3.5 rounded-xl bg-gradient-to-br from-primary/80 to-primary text-white font-bold text-sm flex items-center justify-center gap-2 shadow-[0_8px_25px_-5px_hsl(var(--primary)/0.4)] hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50"
           >
-            <MaterialIcon icon="shopping_cart" className="text-[18px]" />
-            Order Skip Traces — ${total}
+            {ordering ? (
+              <><span className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" /> Processing...</>
+            ) : (
+              <><MaterialIcon icon="shopping_cart" className="text-[18px]" /> Order Skip Traces — ${total}</>
+            )}
           </button>
         </div>
       )}

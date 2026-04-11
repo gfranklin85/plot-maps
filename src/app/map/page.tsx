@@ -54,7 +54,19 @@ export default function MapPage() {
   const [showProspectPanel, setShowProspectPanel] = useState(false);
   const [prospectMode, setProspectMode] = useState(false);
   const [prospectToast, setProspectToast] = useState<string | null>(null);
+  const [mapZoom, setMapZoom] = useState<number | null>(null);
   const isSubscribed = profile.subscriptionStatus === 'active';
+
+  function handleToggleProspectMode(lead?: Lead) {
+    const entering = !prospectMode;
+    setProspectMode(entering);
+    if (entering && lead?.latitude && lead?.longitude) {
+      setMapCenter({ lat: lead.latitude, lng: lead.longitude });
+      setMapZoom(19); // zoom to house level
+    } else if (!entering) {
+      setMapZoom(null); // reset to user-controlled zoom
+    }
+  }
 
   function addToProspectList(addresses: { address: string; lat: number; lng: number; city: string | null; state: string | null; zip: string | null }[]) {
     setProspectList(prev => {
@@ -564,6 +576,7 @@ export default function MapPage() {
             mapType={mapType}
             pinMode={pinMode}
             prospectMode={prospectMode}
+            zoom={mapZoom}
             onLeadClick={(_id, lead) => { handleLeadClickInProspectMode(lead); }}
             onCenterChanged={(c) => { setMapCenter(c); setHasUserPanned(true); }}
             onMapClick={handleMapClick}
@@ -613,7 +626,7 @@ export default function MapPage() {
             <PropertyPopup
               lead={pinnedRef}
               onUpdate={refetchLeads}
-              onToggleProspectMode={() => setProspectMode(p => !p)}
+              onToggleProspectMode={() => handleToggleProspectMode(pinnedRef)}
               prospectMode={prospectMode}
               onWalkHere={(lead) => {
                 if (!isSubscribed) { setShowGate(true); return; }
@@ -656,8 +669,8 @@ export default function MapPage() {
           <PropertyPopup
             lead={selectedLead}
             onUpdate={refetchLeads}
-            onToggleProspectMode={() => setProspectMode(p => !p)}
-              prospectMode={prospectMode}
+            onToggleProspectMode={() => handleToggleProspectMode(selectedLead)}
+            prospectMode={prospectMode}
             onWalkHere={(lead) => {
               if (!isSubscribed) { setShowGate(true); return; }
               if (lead.latitude && lead.longitude) {
@@ -694,7 +707,7 @@ export default function MapPage() {
             <PropertyPopup
               lead={expandedLead}
               onUpdate={refetchLeads}
-              onToggleProspectMode={() => setProspectMode(p => !p)}
+              onToggleProspectMode={() => handleToggleProspectMode(expandedLead)}
               prospectMode={prospectMode}
               onWalkHere={(lead) => {
                 if (!isSubscribed) { setShowGate(true); return; }
@@ -728,7 +741,7 @@ export default function MapPage() {
           <MaterialIcon icon="ads_click" className="text-[18px]" />
           <span className="text-sm font-bold">Click houses to add to list</span>
           <button
-            onClick={() => setProspectMode(false)}
+            onClick={() => handleToggleProspectMode()}
             className="ml-2 px-3 py-1 rounded-lg bg-white/20 text-xs font-bold hover:bg-white/30 transition-colors"
           >
             Done

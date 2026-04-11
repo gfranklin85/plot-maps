@@ -20,6 +20,7 @@ interface Props {
   onWalkHere?: (lead: Lead) => void;
   onMapClick?: (latLng: { lat: number; lng: number }) => void;
   center?: { lat: number; lng: number } | null;
+  zoom?: number | null;
   mapType?: "roadmap" | "satellite" | "hybrid" | "terrain";
   pinMode?: PinMode;
   prospectMode?: boolean;
@@ -174,6 +175,12 @@ function MapTypeSync({ mapType }: { mapType: string }) {
   return null;
 }
 
+function ZoomController({ zoom }: { zoom?: number | null }) {
+  const map = useMap();
+  useEffect(() => { if (map && zoom != null) map.setZoom(zoom); }, [map, zoom]);
+  return null;
+}
+
 function CenterTracker({ onCenterChanged }: { onCenterChanged?: (c: { lat: number; lng: number }) => void }) {
   const map = useMap();
   useEffect(() => {
@@ -260,7 +267,7 @@ function LeadMarkers({
   return null;
 }
 
-export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClick, center, mapType = "roadmap", pinMode = "dots", prospectMode = false }: Props) {
+export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClick, center, zoom, mapType = "roadmap", pinMode = "dots", prospectMode = false }: Props) {
   const isSatellite = mapType === "satellite" || mapType === "hybrid";
 
   const handleMarkerClick = useCallback(
@@ -294,6 +301,7 @@ export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClic
         onClick={handleMapClick}
       >
         <MapTypeSync mapType={mapType} />
+        <ZoomController zoom={zoom} />
         <CenterTracker onCenterChanged={onCenterChanged} />
         <LeadMarkers leads={leads} onMarkerClick={handleMarkerClick} pinMode={pinMode} />
       </Map>

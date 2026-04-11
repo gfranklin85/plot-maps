@@ -25,6 +25,7 @@ export default function MarketsTab({ summary, markets }: Props) {
     incompleteCount?: number; completeCount?: number;
   } | null>(null);
   const [seedPanelOpen, setSeedPanelOpen] = useState(false);
+  const [skipGeo, setSkipGeo] = useState(false);
 
   async function handleSeed(text: string, format?: string) {
     setSeeding(true);
@@ -33,7 +34,7 @@ export default function MarketsTab({ summary, markets }: Props) {
       const res = await fetch('/api/admin/seed', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ csvText: text, marketTag: seedMarketTag || null, format }),
+        body: JSON.stringify({ csvText: text, marketTag: seedMarketTag || null, format, skipGeocoding: skipGeo }),
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
@@ -172,6 +173,16 @@ export default function MarketsTab({ summary, markets }: Props) {
                   placeholder="Market tag (e.g. Hanford)"
                   className="bg-surface border border-card-border rounded-lg px-3 py-2 text-sm text-on-surface w-48 focus:ring-1 focus:ring-primary focus:outline-none placeholder:text-secondary"
                 />
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <button
+                    type="button"
+                    onClick={() => setSkipGeo(!skipGeo)}
+                    className={`relative h-5 w-9 rounded-full transition-colors ${skipGeo ? 'bg-amber-500' : 'bg-surface-container-high'}`}
+                  >
+                    <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${skipGeo ? 'left-[18px]' : 'left-0.5'}`} />
+                  </button>
+                  <span className="text-xs text-on-surface-variant font-medium">Skip geocoding (faster for large seeds)</span>
+                </label>
                 {seeding && (
                   <span className="text-xs text-primary font-bold flex items-center gap-2">
                     <div className="w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />

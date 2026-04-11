@@ -265,7 +265,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Access denied' }, { status: 403 });
   }
 
-  const { csvText, marketTag, format: requestedFormat, userId: targetUserId } = await request.json();
+  const { csvText, marketTag, format: requestedFormat, userId: targetUserId, skipGeocoding } = await request.json();
   if (!csvText) {
     return NextResponse.json({ error: 'Data is required' }, { status: 400 });
   }
@@ -383,7 +383,7 @@ export async function POST(request: Request) {
             .select('latitude')
             .eq('id', existing[0].id)
             .single();
-          if (!coordCheck?.latitude) {
+          if (!coordCheck?.latitude && !skipGeocoding) {
             const geo = await geocodeAddress(prop.address);
             if (geo) {
               await supabaseAdmin.from('leads').update({
@@ -399,13 +399,14 @@ export async function POST(request: Request) {
         if (error) { errors++; }
         else {
           inserted++;
-          // Geocode the new record
-          const geo = await geocodeAddress(prop.address);
-          if (geo && insertedData) {
-            await supabaseAdmin.from('leads').update({
-              latitude: geo.lat, longitude: geo.lng, geocoded_at: now,
-            }).eq('id', insertedData.id);
-            geocoded++;
+          if (!skipGeocoding) {
+            const geo = await geocodeAddress(prop.address);
+            if (geo && insertedData) {
+              await supabaseAdmin.from('leads').update({
+                latitude: geo.lat, longitude: geo.lng, geocoded_at: now,
+              }).eq('id', insertedData.id);
+              geocoded++;
+            }
           }
         }
       }

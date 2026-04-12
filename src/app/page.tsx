@@ -189,18 +189,31 @@ export default function Dashboard() {
 
 
   return (
-    <div className="p-8">
-      {/* Page header */}
-      <div className="mb-8">
-        <h2 className="font-headline text-3xl font-extrabold text-on-surface">
-          Daily Action Feed
-        </h2>
-        <p className="mt-1 text-secondary text-sm">
-          {todayFormatted}
-        </p>
-      </div>
+    <div className="p-4 md:p-8 space-y-6">
+      {/* ── HERO: Go to Map ── */}
+      <a
+        href="/map"
+        className="block relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/20 to-surface-container-high border border-card-border hover:border-primary/40 shadow-lg hover:shadow-xl transition-all group"
+      >
+        <div className="flex items-center justify-between p-6 md:p-8">
+          <div>
+            <h2 className="font-headline text-2xl md:text-3xl font-extrabold text-on-surface group-hover:text-primary transition-colors">
+              Open the Map
+            </h2>
+            <p className="text-sm md:text-base text-secondary mt-1">
+              See your market, find prospects, start calling.
+            </p>
+          </div>
+          <div className="w-14 h-14 md:w-16 md:h-16 rounded-2xl bg-primary/20 flex items-center justify-center group-hover:bg-primary/30 transition-colors shrink-0">
+            <MaterialIcon icon="map" className="text-[32px] md:text-[36px] text-primary" />
+          </div>
+        </div>
+      </a>
 
-      {/* Main Content: Action Feed + Stats */}
+      {/* ── MARKET ACTIVITY: Recent listings to prospect around ── */}
+      <MarketActivity />
+
+      {/* ── STATS + ACTION FEED ── */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
         {/* Left: Leads Needing Attention */}
         <div className="lg:col-span-8">
@@ -213,7 +226,6 @@ export default function Dashboard() {
 
         {/* Right: Quick Stats + Scorecard */}
         <div className="lg:col-span-4 space-y-4">
-          {/* Quick stats inline */}
           <div className="grid grid-cols-3 gap-3">
             <div className="bg-surface-container-lowest rounded-xl p-4 text-center">
               <p className="text-2xl font-extrabold text-on-surface">{loading ? '--' : totalLeads}</p>
@@ -238,6 +250,95 @@ export default function Dashboard() {
       </div>
 
       <UpgradeGate feature="ai" show={showGate} onClose={() => setShowGate(false)} />
+    </div>
+  );
+}
+
+/* ── Market Activity — recent listings to prospect around ── */
+function MarketActivity() {
+  const { user } = useAuth();
+  const [listings, setListings] = useState<Lead[]>([]);
+
+  useEffect(() => {
+    if (!user) return;
+    async function fetch() {
+      // Get recent MLS context records visible to this user
+      const { data } = await supabase
+        .from('leads')
+        .select('*')
+        .not('listing_status', 'is', null)
+        .not('latitude', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(6);
+      if (data) setListings(data as Lead[]);
+    }
+    fetch();
+  }, [user]);
+
+  if (listings.length === 0) return null;
+
+  const statusColors: Record<string, string> = {
+    Active: 'text-green-400 bg-green-400/10',
+    Sold: 'text-yellow-400 bg-yellow-400/10',
+    Pending: 'text-purple-400 bg-purple-400/10',
+  };
+
+  const statusVerbs: Record<string, string> = {
+    Active: 'just listed',
+    Sold: 'just sold',
+    Pending: 'went pending',
+  };
+
+  function daysSince(dateStr: string | null): string {
+    if (!dateStr) return '';
+    const days = Math.floor((Date.now() - new Date(dateStr + 'T00:00:00').getTime()) / 86400000);
+    if (days <= 0) return 'today';
+    if (days === 1) return 'yesterday';
+    return `${days}d ago`;
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-headline text-lg font-bold text-on-surface">Market Activity</h3>
+        <a href="/map" className="text-xs font-bold text-primary hover:underline">View all on map →</a>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {listings.map((lead) => {
+          const address = lead.property_address?.split(',')[0] || 'Unknown';
+          const status = lead.listing_status || '';
+          const price = lead.selling_price || lead.listing_price;
+          const priceStr = price ? `$${price.toLocaleString()}` : '';
+          const date = lead.selling_date || lead.pending_date || lead.listing_date;
+          const recency = daysSince(date);
+          const verb = statusVerbs[status] || 'listed';
+          const colorClass = statusColors[status] || 'text-on-surface-variant bg-surface-container-high';
+
+          return (
+            <a
+              key={lead.id}
+              href={`/map?lat=${lead.latitude}&lng=${lead.longitude}&zoom=19`}
+              className="flex items-start gap-3 p-4 rounded-xl bg-card border border-card-border hover:border-primary/30 hover:bg-surface-container-high/50 transition-all group"
+            >
+              <div className={`shrink-0 w-10 h-10 rounded-lg flex items-center justify-center ${colorClass}`}>
+                <MaterialIcon icon={status === 'Sold' ? 'sell' : status === 'Pending' ? 'pending' : 'home'} className="text-[20px]" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-on-surface truncate group-hover:text-primary transition-colors">{address}</p>
+                <p className="text-xs text-secondary mt-0.5">
+                  {priceStr && <span className="font-semibold">{priceStr}</span>}
+                  {priceStr && ' · '}
+                  <span className={statusColors[status]?.split(' ')[0] || ''}>{verb}</span>
+                  {recency && ` ${recency}`}
+                </p>
+                <p className="text-[10px] text-primary font-bold mt-1.5 uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-opacity">
+                  Call the neighbors →
+                </p>
+              </div>
+            </a>
+          );
+        })}
+      </div>
     </div>
   );
 }

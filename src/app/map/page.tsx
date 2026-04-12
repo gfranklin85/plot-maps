@@ -252,8 +252,8 @@ export default function MapPage() {
       {/* ═══ CONTROLS ═══ */}
       {walkMode ? (
         <button
-          onClick={() => setWalkMode(false)}
-          className="absolute top-4 left-4 z-10 w-10 h-10 flex items-center justify-center rounded-xl bg-surface/90 backdrop-blur-sm text-primary shadow-lg hover:bg-primary hover:text-white transition-all"
+          onClick={() => { setWalkMode(false); setMapZoom(18); }}
+          className="absolute top-1/2 -translate-y-1/2 right-4 z-10 w-10 h-10 flex items-center justify-center rounded-xl bg-surface/90 backdrop-blur-sm text-primary shadow-lg hover:bg-primary hover:text-white transition-all"
           title="Back to Map"
         >
           <MaterialIcon icon="map" className="text-[20px]" />

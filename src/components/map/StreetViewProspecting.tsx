@@ -219,6 +219,11 @@ function StreetViewInner({ leads, startPosition, onDataChanged, onPositionChange
   // Split: reference at bottom (context), lead at top (call workflow)
   const [walkReference, setWalkReference] = useState<Lead | null>(null);
   const [walkActiveLead, setWalkActiveLead] = useState<Lead | null>(null);
+  // Reference card: draggable + expandable + pinnable (desktop)
+  const [refCardPos, setRefCardPos] = useState<{ x: number; y: number } | null>(null);
+  const [refCardExpanded, setRefCardExpanded] = useState(false);
+  const [refCardPinned, setRefCardPinned] = useState(false);
+  const dragRef = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
 
   leadsRef.current = leads;
 
@@ -345,6 +350,8 @@ function StreetViewInner({ leads, startPosition, onDataChanged, onPositionChange
         const isRef = !!lead.listing_status;
         if (isRef) {
           setWalkReference(lead);
+          setRefCardPos(null); // reset position for new reference
+          setRefCardExpanded(false);
         } else {
           setWalkActiveLead(lead);
         }
@@ -356,7 +363,7 @@ function StreetViewInner({ leads, startPosition, onDataChanged, onPositionChange
   }
 
   return (
-    <div className="relative h-full w-full">
+    <div className="relative h-full w-full overflow-hidden" style={{ touchAction: 'none' }}>
       <div ref={containerRef} className="h-full w-full" />
 
       {/* ── LEAD / PROSPECT — top of screen (call workflow) ── */}
@@ -374,12 +381,67 @@ function StreetViewInner({ leads, startPosition, onDataChanged, onPositionChange
         </div>
       )}
 
-      {/* ── REFERENCE PROPERTY — bottom of screen (persistent context) ── */}
+      {/* ── REFERENCE PROPERTY — draggable on desktop, bottom sheet on mobile ── */}
       {walkReference && (
-        <div className="absolute bottom-4 left-4 right-4 md:left-auto md:right-4 z-50 w-auto md:w-[380px] max-h-[40vh] overflow-y-auto rounded-2xl shadow-2xl border border-card-border bg-card/95 backdrop-blur-xl">
-          <div className="absolute top-2 right-2 z-10">
+        <div
+          className={`absolute z-50 ${
+            refCardPos
+              ? '' // positioned by inline style when dragged
+              : 'bottom-4 left-4 right-4 md:left-auto md:right-4'
+          } w-auto md:w-[380px] ${refCardExpanded ? 'max-h-[70vh]' : 'max-h-[40vh]'} overflow-y-auto rounded-2xl shadow-2xl bg-card/95 backdrop-blur-xl transition-[max-height] duration-200`}
+          style={refCardPos ? { left: refCardPos.x, top: refCardPos.y, right: 'auto', bottom: 'auto' } : undefined}
+        >
+          {/* Drag handle + controls (desktop only) */}
+          <div
+            className="hidden md:flex items-center justify-between px-3 py-2 cursor-grab active:cursor-grabbing select-none border-b border-card-border/50"
+            onMouseDown={(e) => {
+              const card = e.currentTarget.parentElement;
+              if (!card) return;
+              const rect = card.getBoundingClientRect();
+              dragRef.current = { startX: e.clientX, startY: e.clientY, origX: rect.left, origY: rect.top };
+              const onMove = (ev: MouseEvent) => {
+                if (!dragRef.current) return;
+                setRefCardPos({
+                  x: dragRef.current.origX + (ev.clientX - dragRef.current.startX),
+                  y: dragRef.current.origY + (ev.clientY - dragRef.current.startY),
+                });
+              };
+              const onUp = () => { dragRef.current = null; window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+              window.addEventListener('mousemove', onMove);
+              window.addEventListener('mouseup', onUp);
+            }}
+          >
+            <div className="flex items-center gap-1">
+              <span className="material-symbols-outlined text-[14px] text-on-surface-variant/50">drag_indicator</span>
+              <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Reference</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setRefCardExpanded(!refCardExpanded)}
+                className="w-6 h-6 flex items-center justify-center rounded text-on-surface-variant hover:text-primary transition-colors"
+                title={refCardExpanded ? 'Collapse' : 'Expand'}
+              >
+                <span className="material-symbols-outlined text-[14px]">{refCardExpanded ? 'collapse_content' : 'expand_content'}</span>
+              </button>
+              <button
+                onClick={() => setRefCardPinned(!refCardPinned)}
+                className={`w-6 h-6 flex items-center justify-center rounded transition-colors ${refCardPinned ? 'text-primary' : 'text-on-surface-variant hover:text-primary'}`}
+                title={refCardPinned ? 'Unpin' : 'Pin'}
+              >
+                <span className="material-symbols-outlined text-[14px]" style={refCardPinned ? { fontVariationSettings: "'FILL' 1" } : undefined}>push_pin</span>
+              </button>
+              <button
+                onClick={() => { if (!refCardPinned) { setWalkReference(null); setRefCardPos(null); setRefCardExpanded(false); } }}
+                className="w-6 h-6 flex items-center justify-center rounded text-on-surface-variant hover:text-red-400 transition-colors"
+              >
+                <span className="material-symbols-outlined text-[14px]">close</span>
+              </button>
+            </div>
+          </div>
+          {/* Mobile close button */}
+          <div className="md:hidden absolute top-2 right-2 z-10">
             <button
-              onClick={() => setWalkReference(null)}
+              onClick={() => { setWalkReference(null); setRefCardPos(null); }}
               className="w-7 h-7 flex items-center justify-center rounded-full bg-surface/80 backdrop-blur-sm text-on-surface-variant hover:text-red-400 hover:bg-red-500/10 transition-all"
             >
               <span className="material-symbols-outlined text-[14px]">close</span>

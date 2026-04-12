@@ -85,7 +85,7 @@ function daysSince(dateStr: string | null): string {
   return `${Math.round(days / 365)}yr`;
 }
 
-// Label mode: compact rich pin — price + status + recency (auto-width, theme-aware)
+// Label mode: compact rich pin — price + status + recency
 function createLabelIcon(lead: Lead, isDark = true): google.maps.Icon {
   const color = getStatusColor(lead);
   const t = isDark ? PIN_THEME.dark : PIN_THEME.light;
@@ -97,17 +97,17 @@ function createLabelIcon(lead: Lead, isDark = true): google.maps.Icon {
 
   const priceLen = (price || '—').length;
   const subLen = subLine.length;
-  const topW = 20 + priceLen * 8;
-  const botW = subLen * 5.5 + 10;
-  const width = Math.max(topW, botW, 50);
-  const height = subLine ? 34 : 26;
+  const topW = 24 + priceLen * 9;
+  const botW = subLen * 6 + 12;
+  const width = Math.max(topW, botW, 55);
+  const height = subLine ? 36 : 28;
 
   const svg = `
     <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height + 7}">
       <rect x="0" y="0" width="${width}" height="${height}" rx="8" fill="${t.bg}" stroke="${color}" stroke-width="1.5"/>
-      <circle cx="9" cy="11" r="3" fill="${color}"/>
-      <text x="16" y="12" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="800" fill="${t.text}">${price || '—'}</text>
-      ${subLine ? `<text x="5" y="27" font-family="system-ui,sans-serif" font-size="7.5" font-weight="700" fill="${color}">${subLine}</text>` : ''}
+      <circle cx="10" cy="12" r="3.5" fill="${color}"/>
+      <text x="18" y="13" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="13" font-weight="800" fill="${t.text}">${price || '—'}</text>
+      ${subLine ? `<text x="6" y="29" font-family="system-ui,sans-serif" font-size="8" font-weight="700" fill="${color}">${subLine}</text>` : ''}
       <polygon points="${width / 2 - 3},${height} ${width / 2},${height + 6} ${width / 2 + 3},${height}" fill="${t.bg}"/>
     </svg>`;
 
@@ -118,7 +118,7 @@ function createLabelIcon(lead: Lead, isDark = true): google.maps.Icon {
   };
 }
 
-// Detail mode: compact card — price, status badge, meta line, detail line (auto-width, theme-aware)
+// Detail mode: full property card — noticeably bigger than labels, readable at a glance
 function createDetailIcon(lead: Lead, isDark = true): google.maps.Icon {
   const color = getStatusColor(lead);
   const t = isDark ? PIN_THEME.dark : PIN_THEME.light;
@@ -129,24 +129,24 @@ function createDetailIcon(lead: Lead, isDark = true): google.maps.Icon {
   const sqft = lead.sqft ? `${lead.sqft.toLocaleString()}sf` : '';
   const year = lead.year_built ? `${lead.year_built}` : '';
   const line2 = [dom, recency].filter(Boolean).join(' · ');
-  const line3 = [sqft, year].filter(Boolean).join(' · ') || lead.property_address?.split(',')[0]?.substring(0, 18) || '';
+  const line3 = [sqft, year].filter(Boolean).join(' · ') || lead.property_address?.split(',')[0]?.substring(0, 20) || '';
 
-  const priceW = (price || '—').length * 8 + 16;
-  const badgeW = statusLabel ? 44 : 0;
-  const topW = priceW + badgeW + 8;
-  const line2W = line2.length * 5.5 + 16;
-  const line3W = line3.length * 5.5 + 16;
-  const width = Math.max(topW, line2W, line3W, 60);
-  const height = 48;
+  const priceW = (price || '—').length * 11 + 20;
+  const badgeW = statusLabel ? 52 : 0;
+  const topW = priceW + badgeW + 12;
+  const line2W = line2.length * 7 + 20;
+  const line3W = line3.length * 6.5 + 20;
+  const width = Math.max(topW, line2W, line3W, 100);
+  const height = 62;
 
   const svg = `
     <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height + 9}">
-      <rect x="1" y="1" width="${width - 2}" height="${height - 2}" rx="10" fill="${t.bgStrong}" stroke="${color}" stroke-width="1.5"/>
-      ${statusLabel ? `<rect x="${width - 40}" y="5" width="36" height="13" rx="6" fill="${color}"/>
-      <text x="${width - 22}" y="12" dominant-baseline="central" text-anchor="middle" font-family="system-ui,sans-serif" font-size="7" font-weight="800" fill="white">${statusLabel}</text>` : ''}
-      <text x="8" y="17" font-family="system-ui,sans-serif" font-size="12" font-weight="800" fill="${t.text}">${price || '—'}</text>
-      <text x="8" y="30" font-family="system-ui,sans-serif" font-size="8" font-weight="700" fill="${color}">${line2}</text>
-      <text x="8" y="41" font-family="system-ui,sans-serif" font-size="8" font-weight="500" fill="${t.subText}">${line3}</text>
+      <rect x="1" y="1" width="${width - 2}" height="${height - 2}" rx="12" fill="${t.bgStrong}" stroke="${color}" stroke-width="2"/>
+      ${statusLabel ? `<rect x="${width - 48}" y="6" width="44" height="16" rx="8" fill="${color}"/>
+      <text x="${width - 26}" y="15" dominant-baseline="central" text-anchor="middle" font-family="system-ui,sans-serif" font-size="9" font-weight="800" fill="white">${statusLabel}</text>` : ''}
+      <text x="10" y="22" font-family="system-ui,sans-serif" font-size="16" font-weight="800" fill="${t.text}">${price || '—'}</text>
+      <text x="10" y="38" font-family="system-ui,sans-serif" font-size="10" font-weight="700" fill="${color}">${line2}</text>
+      <text x="10" y="52" font-family="system-ui,sans-serif" font-size="9.5" font-weight="500" fill="${t.subText}">${line3}</text>
       <polygon points="${width / 2 - 4},${height - 2} ${width / 2},${height + 7} ${width / 2 + 4},${height - 2}" fill="${t.bgStrong}"/>
     </svg>`;
 

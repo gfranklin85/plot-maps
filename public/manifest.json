@@ -1,7 +1,7 @@
 {
   "name": "Plot Maps",
   "short_name": "Plot",
-  "description": "Visual prospecting — know exactly who to call",
+  "description": "Circle prospecting, reimagined — see the listing, call the neighbors",
   "display": "standalone",
   "start_url": "/",
   "scope": "/",
@@ -10,15 +10,15 @@
   "orientation": "portrait",
   "icons": [
     {
-      "src": "/icons/icon-192.svg",
+      "src": "/icons/icon-192.png",
       "sizes": "192x192",
-      "type": "image/svg+xml",
+      "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/icons/icon-512.svg",
+      "src": "/icons/icon-512.png",
       "sizes": "512x512",
-      "type": "image/svg+xml",
+      "type": "image/png",
       "purpose": "any maskable"
     }
   ]

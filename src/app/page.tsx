@@ -137,12 +137,6 @@ export default function Dashboard() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, totalLeads, isSubscribed]);
 
-  const todayFormatted = new Date().toLocaleDateString('en-US', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-  });
 
   const avgCallsDay = callsToday > 0 ? callsToday : 0;
 

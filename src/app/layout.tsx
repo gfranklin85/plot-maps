@@ -5,9 +5,13 @@ import ClientProviders from "@/components/layout/ClientProviders";
 import AppShell from "@/components/layout/AppShell";
 
 export const metadata: Metadata = {
-  title: "Plot Maps | Visual Prospecting CRM",
-  description: "Know exactly who to call — and why.",
+  title: "Plot Maps | Circle Prospecting Tool",
+  description: "See the listing. Call the neighbors. Circle prospect with full context from the map.",
   manifest: "/manifest.json",
+  icons: {
+    icon: "/icons/icon-192.png",
+    apple: "/icons/icon-192.png",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",

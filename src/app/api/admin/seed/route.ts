@@ -483,10 +483,38 @@ export async function POST(request: Request) {
           .from('leads')
           .update({ ...leadData, property_address: undefined })
           .eq('id', existing[0].id);
-        if (error) errors++; else updated++;
+        if (error) { errors++; }
+        else {
+          updated++;
+          // Geocode if existing record has no coordinates
+          const { data: coordCheck } = await supabaseAdmin
+            .from('leads')
+            .select('latitude')
+            .eq('id', existing[0].id)
+            .single();
+          if (!coordCheck?.latitude) {
+            const geo = await geocodeAddress(address);
+            if (geo) {
+              await supabaseAdmin.from('leads').update({
+                latitude: geo.lat, longitude: geo.lng, geocoded_at: now,
+              }).eq('id', existing[0].id);
+              geocoded++;
+            }
+          }
+        }
       } else {
-        const { error } = await supabaseAdmin.from('leads').insert(leadData);
-        if (error) errors++; else inserted++;
+        const { data: insertedData, error } = await supabaseAdmin.from('leads').insert(leadData).select('id').single();
+        if (error) { errors++; }
+        else {
+          inserted++;
+          const geo = await geocodeAddress(address);
+          if (geo && insertedData) {
+            await supabaseAdmin.from('leads').update({
+              latitude: geo.lat, longitude: geo.lng, geocoded_at: now,
+            }).eq('id', insertedData.id);
+            geocoded++;
+          }
+        }
       }
     }
   }

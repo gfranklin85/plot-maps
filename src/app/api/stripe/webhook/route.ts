@@ -28,7 +28,36 @@ export async function POST(request: Request) {
     case 'checkout.session.completed': {
       const session = event.data.object as Stripe.Checkout.Session;
 
-      // Skip trace order payment completed
+      // Wallet top-up completed
+      if (session.metadata?.type === 'wallet_topup' && session.metadata?.user_id) {
+        const userId = session.metadata.user_id;
+        const amountCents = parseInt(session.metadata.amount_cents || '0');
+        if (amountCents > 0) {
+          // Get or create wallet
+          let { data: wallet } = await supabaseAdmin.from('wallets').select('*').eq('user_id', userId).single();
+          if (!wallet) {
+            const { data: created } = await supabaseAdmin.from('wallets').insert({ user_id: userId }).select('*').single();
+            wallet = created;
+          }
+          if (wallet) {
+            const newBalance = wallet.balance_cents + amountCents;
+            await supabaseAdmin.from('wallets').update({
+              balance_cents: newBalance,
+              total_deposited_cents: wallet.total_deposited_cents + amountCents,
+              updated_at: new Date().toISOString(),
+            }).eq('id', wallet.id);
+            await supabaseAdmin.from('wallet_transactions').insert({
+              user_id: userId, type: 'deposit', amount_cents: amountCents,
+              balance_after_cents: newBalance,
+              description: `Wallet top-up — $${(amountCents / 100).toFixed(2)}`,
+              stripe_payment_intent_id: session.payment_intent as string || null,
+            });
+          }
+        }
+        break;
+      }
+
+      // Skip trace order payment completed (legacy)
       if (session.metadata?.order_type === 'skip_traces' && session.metadata?.order_id) {
         await supabaseAdmin
           .from('prospect_orders')

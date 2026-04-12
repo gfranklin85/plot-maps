@@ -5,7 +5,8 @@ import { supabaseAdmin } from '@/lib/supabase-server';
 import { Resend } from 'resend';
 
 const resend = new Resend(process.env.RESEND_API_KEY!);
-const ADMIN_EMAIL = process.env.FROM_EMAIL || 'greg@plot.solutions';
+const FROM_EMAIL = process.env.FROM_EMAIL || 'greg@plot.solutions';
+const ADMIN_NOTIFY_EMAIL = process.env.ADMIN_NOTIFICATION_EMAIL || 'gregfranklin523@gmail.com';
 const COST_PER_ADDRESS_CENTS = 18; // $0.18
 const MIN_ORDER_SIZE = 10;
 
@@ -13,8 +14,8 @@ async function notifyAdmin(orderId: string, addressCount: number, addresses: { a
   try {
     const addressList = addresses.map(a => a.address.split(',')[0]).join('\n• ');
     await resend.emails.send({
-      from: `Plot Maps <${ADMIN_EMAIL}>`,
-      to: ADMIN_EMAIL,
+      from: `Plot Maps <${FROM_EMAIL}>`,
+      to: ADMIN_NOTIFY_EMAIL,
       subject: `New Skip Trace Order — ${addressCount} addresses`,
       text: `New order from ${userEmail}\n\nOrder ID: ${orderId}\nAddresses: ${addressCount}\nAmount: $${(addressCount * COST_PER_ADDRESS_CENTS / 100).toFixed(2)}\n\nAddresses:\n• ${addressList}\n\nGo to admin dashboard to fulfill.`,
     });

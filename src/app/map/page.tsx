@@ -762,7 +762,9 @@ export default function MapPage() {
       {(prospectMode || prospectList.length > 0) && !walkMode && !showProspectPanel && (
         <div className="fixed bottom-16 md:bottom-4 left-2 right-2 md:left-auto md:right-4 md:w-auto z-40 flex items-center gap-2 bg-primary text-white px-4 py-2.5 rounded-xl shadow-2xl">
           <MaterialIcon icon="ads_click" className="text-[16px]" />
-          <span className="text-sm font-bold flex-1">{prospectList.length} addresses</span>
+          <span className="text-sm font-bold">{prospectList.length} addresses</span>
+          <span className="text-xs opacity-80">· ${(prospectList.length * 0.25).toFixed(2)}</span>
+          <span className="flex-1" />
           {prospectList.length > 0 && (
             <button
               onClick={() => setShowProspectPanel(true)}

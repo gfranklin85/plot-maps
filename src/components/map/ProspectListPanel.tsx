@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import MaterialIcon from "@/components/ui/MaterialIcon";
+import WalletTopup from "@/components/ui/WalletTopup";
 
 interface Address {
   address: string;
@@ -20,20 +21,28 @@ interface Props {
   onOrderComplete?: () => void;
 }
 
-const PRICE_PER_ADDRESS = 0.18;
-const MIN_ORDER_SIZE = 10;
+const COST_PER_ADDRESS = 0.25;
 
 export default function ProspectListPanel({ addresses, onRemove, onClear, onClose, onOrderComplete }: Props) {
-  const total = (addresses.length * PRICE_PER_ADDRESS).toFixed(2);
+  const total = (addresses.length * COST_PER_ADDRESS).toFixed(2);
+  const [walletBalance, setWalletBalance] = useState<number | null>(null);
   const [ordering, setOrdering] = useState(false);
   const [orderResult, setOrderResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [showTopup, setShowTopup] = useState(false);
 
-  async function handleOrder() {
+  useEffect(() => {
+    fetch('/api/wallet').then(r => r.json()).then(d => setWalletBalance(d.balance_cents)).catch(() => {});
+  }, []);
+
+  const totalCents = addresses.length * 25;
+  const hasBalance = walletBalance !== null && walletBalance >= totalCents;
+
+  async function handleConfirm() {
     setOrdering(true);
     setOrderResult(null);
 
     try {
-      const res = await fetch('/api/stripe/order-skip-traces', {
+      const res = await fetch('/api/wallet/spend', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ addresses }),
@@ -42,8 +51,8 @@ export default function ProspectListPanel({ addresses, onRemove, onClear, onClos
       const data = await res.json();
 
       if (!res.ok) {
-        if (data.require_subscription) {
-          setOrderResult({ success: false, message: 'Subscribe to a plan to order skip traces.' });
+        if (data.error === 'insufficient_balance') {
+          setOrderResult({ success: false, message: `Insufficient balance. You need $${(data.required_cents / 100).toFixed(2)} but have $${(data.balance_cents / 100).toFixed(2)}.` });
         } else {
           setOrderResult({ success: false, message: data.error || 'Order failed' });
         }
@@ -51,25 +60,14 @@ export default function ProspectListPanel({ addresses, onRemove, onClear, onClos
         return;
       }
 
-      // Immediate charge succeeded
-      if (data.success) {
-        setOrderResult({ success: true, message: `Order placed! $${data.charged.toFixed(2)} charged. We&apos;ll have your data ready shortly.` });
-        setTimeout(() => {
-          onOrderComplete?.();
-          onClear();
-          onClose();
-        }, 3000);
-        setOrdering(false);
-        return;
-      }
+      setWalletBalance(data.balance_cents);
+      setOrderResult({ success: true, message: `Confirmed! $${(data.spent_cents / 100).toFixed(2)} spent. Balance: $${data.balance}` });
 
-      // Redirect to Stripe checkout
-      if (data.checkout_url) {
-        window.location.href = data.checkout_url;
-        return;
-      }
-
-      setOrderResult({ success: false, message: 'Unexpected response' });
+      setTimeout(() => {
+        onOrderComplete?.();
+        onClear();
+        onClose();
+      }, 2500);
     } catch {
       setOrderResult({ success: false, message: 'Network error. Please try again.' });
     }
@@ -87,10 +85,7 @@ export default function ProspectListPanel({ addresses, onRemove, onClear, onClos
         </div>
         <div className="flex items-center gap-2">
           {addresses.length > 0 && (
-            <button
-              onClick={onClear}
-              className="text-[10px] font-bold text-red-400 uppercase tracking-widest hover:underline"
-            >
+            <button onClick={onClear} className="text-[10px] font-bold text-red-400 uppercase tracking-widest hover:underline">
               Clear All
             </button>
           )}
@@ -106,7 +101,7 @@ export default function ProspectListPanel({ addresses, onRemove, onClear, onClos
           <div className="flex flex-col items-center justify-center h-full text-center px-8">
             <MaterialIcon icon="location_searching" className="text-[40px] text-on-surface-variant/30 mb-3" />
             <p className="text-sm text-on-surface-variant">No addresses selected yet</p>
-            <p className="text-xs text-on-surface-variant/60 mt-1">Use the Prospects tool on reference properties to build your list</p>
+            <p className="text-xs text-on-surface-variant/60 mt-1">Click houses on the map to build your list</p>
           </div>
         ) : (
           <div className="divide-y divide-card-border/50">
@@ -130,16 +125,21 @@ export default function ProspectListPanel({ addresses, onRemove, onClear, onClos
         )}
       </div>
 
-      {/* Footer: pricing + order CTA */}
+      {/* Footer: wallet balance + confirm */}
       {addresses.length > 0 && (
         <div className="border-t border-card-border px-5 py-4 space-y-3 shrink-0">
           <div className="flex items-center justify-between text-sm">
-            <span className="text-on-surface-variant">{addresses.length} addresses × ${PRICE_PER_ADDRESS.toFixed(2)}</span>
+            <span className="text-on-surface-variant">{addresses.length} × ${COST_PER_ADDRESS.toFixed(2)}</span>
             <span className="font-bold text-on-surface">${total}</span>
           </div>
-          <p className="text-[10px] text-on-surface-variant/60">
-            We&apos;ll get owner names + phone numbers for each address.
-          </p>
+
+          {/* Wallet balance */}
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-on-surface-variant">Wallet balance</span>
+            <span className={`font-bold ${hasBalance ? 'text-emerald-400' : 'text-red-400'}`}>
+              ${walletBalance !== null ? (walletBalance / 100).toFixed(2) : '—'}
+            </span>
+          </div>
 
           {orderResult && (
             <div className={`rounded-lg p-3 text-xs font-semibold ${orderResult.success ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
@@ -147,24 +147,43 @@ export default function ProspectListPanel({ addresses, onRemove, onClear, onClos
             </div>
           )}
 
-          {addresses.length < MIN_ORDER_SIZE && (
-            <p className="text-[10px] text-on-surface-variant/60 text-center">
-              Minimum order: {MIN_ORDER_SIZE} addresses ({MIN_ORDER_SIZE - addresses.length} more needed)
-            </p>
+          {hasBalance ? (
+            <button
+              onClick={handleConfirm}
+              disabled={ordering}
+              className="w-full py-3.5 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 text-white font-bold text-sm flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50"
+            >
+              {ordering ? (
+                <><span className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" /> Processing...</>
+              ) : (
+                <><MaterialIcon icon="check_circle" className="text-[18px]" /> Confirm — ${total} from wallet</>
+              )}
+            </button>
+          ) : (
+            <button
+              onClick={() => setShowTopup(true)}
+              className="w-full py-3.5 rounded-xl bg-gradient-to-br from-primary/80 to-primary text-white font-bold text-sm flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition-all"
+            >
+              <MaterialIcon icon="add" className="text-[18px]" />
+              Add Funds to Wallet
+            </button>
           )}
 
-          <button
-            onClick={handleOrder}
-            disabled={ordering || addresses.length < MIN_ORDER_SIZE}
-            className="w-full py-3.5 rounded-xl bg-gradient-to-br from-primary/80 to-primary text-white font-bold text-sm flex items-center justify-center gap-2 shadow-[0_8px_25px_-5px_hsl(var(--primary)/0.4)] hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50"
-          >
-            {ordering ? (
-              <><span className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" /> Processing...</>
-            ) : (
-              <><MaterialIcon icon="shopping_cart" className="text-[18px]" /> Order Skip Traces — ${total}</>
-            )}
-          </button>
+          <p className="text-[10px] text-on-surface-variant/50 text-center">
+            We&apos;ll get owner names + phone numbers for each address.
+          </p>
         </div>
+      )}
+
+      {showTopup && (
+        <WalletTopup
+          onClose={() => {
+            setShowTopup(false);
+            // Refresh balance
+            fetch('/api/wallet').then(r => r.json()).then(d => setWalletBalance(d.balance_cents)).catch(() => {});
+          }}
+          currentBalance={walletBalance !== null ? (walletBalance / 100).toFixed(2) : undefined}
+        />
       )}
     </div>
   );

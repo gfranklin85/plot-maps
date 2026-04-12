@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useProfile } from '@/lib/profile-context';
@@ -26,7 +26,26 @@ export default function TopBar() {
   const [results, setResults] = useState<SearchResult[]>([]);
   const [showResults, setShowResults] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+  const [walletBalance, setWalletBalance] = useState<string | null>(null);
   const searchRef = useRef<HTMLDivElement>(null);
+
+  // Fetch wallet balance
+  const fetchWallet = useCallback(async () => {
+    try {
+      const res = await fetch('/api/wallet');
+      if (res.ok) {
+        const data = await res.json();
+        setWalletBalance(data.balance);
+      }
+    } catch { /* silent */ }
+  }, []);
+
+  useEffect(() => {
+    fetchWallet();
+    // Refresh every 30s in case of top-ups
+    const interval = setInterval(fetchWallet, 30000);
+    return () => clearInterval(interval);
+  }, [fetchWallet]);
 
   // Search leads as user types
   useEffect(() => {
@@ -121,6 +140,18 @@ export default function TopBar() {
       {/* Right side */}
       <div className="flex items-center gap-2 md:gap-4">
         <ThemeToggle />
+
+        {/* Wallet balance */}
+        {walletBalance !== null && (
+          <button
+            onClick={() => router.push('/map?wallet=topup')}
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 transition-colors"
+            title="Wallet balance — click to add funds"
+          >
+            <span className="material-symbols-outlined text-[16px]">account_balance_wallet</span>
+            <span className="text-xs font-bold">${walletBalance}</span>
+          </button>
+        )}
 
         <button className="relative p-2 text-on-surface-variant hover:text-primary transition-colors" title="Notifications coming soon">
           <span className="material-symbols-outlined text-[22px]">notifications</span>

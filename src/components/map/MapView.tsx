@@ -66,12 +66,17 @@ function getStatusLabel(lead: Lead): string {
 }
 
 // Dot mode: simple colored circles/diamonds
+// MLS = diamond, Leads with phone = green circle, Leads without phone = blue circle
 function createDotIcon(lead: Lead): google.maps.Icon | google.maps.Symbol {
   const isMLS = !!lead.listing_status;
-  const color = getStatusColor(lead);
-  return isMLS
-    ? { path: "M 0,-12 L 8,0 L 0,12 L -8,0 Z", scale: 1, fillColor: color, fillOpacity: 1, strokeColor: "#ffffff", strokeWeight: 2 }
-    : { path: google.maps.SymbolPath.CIRCLE, scale: 10, fillColor: color, fillOpacity: 1, strokeColor: "#ffffff", strokeWeight: 3 };
+  if (isMLS) {
+    const color = getStatusColor(lead);
+    return { path: "M 0,-12 L 8,0 L 0,12 L -8,0 Z", scale: 1, fillColor: color, fillOpacity: 1, strokeColor: "#ffffff", strokeWeight: 2 };
+  }
+  // Target leads: green if has phone (fulfilled), blue if address only
+  const hasPhone = !!(lead.phone);
+  const color = hasPhone ? '#22c55e' : '#3b82f6';
+  return { path: google.maps.SymbolPath.CIRCLE, scale: 10, fillColor: color, fillOpacity: 1, strokeColor: "#ffffff", strokeWeight: 3 };
 }
 
 // Helper: days since a date

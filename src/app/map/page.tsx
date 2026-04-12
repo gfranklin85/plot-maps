@@ -348,6 +348,17 @@ export default function MapPage() {
               <MaterialIcon icon="directions_walk" className="text-[20px]" />
             </button>
 
+            {/* Prospect Selection Mode */}
+            <button
+              onClick={() => handleToggleProspectMode()}
+              title={prospectMode ? 'Exit prospect selection' : 'Select prospects'}
+              className={`w-10 h-10 flex items-center justify-center rounded-xl shadow-lg transition-all ${
+                prospectMode ? 'bg-primary text-white' : 'bg-surface text-on-surface-variant hover:text-primary'
+              }`}
+            >
+              <MaterialIcon icon="ads_click" className="text-[20px]" />
+            </button>
+
             {/* Filters */}
             <button
               onClick={() => setFiltersOpen((o) => !o)}
@@ -386,6 +397,14 @@ export default function MapPage() {
               className="w-10 h-10 flex items-center justify-center rounded-xl bg-surface text-on-surface-variant shadow-lg"
             >
               <MaterialIcon icon="directions_walk" className="text-[20px]" />
+            </button>
+            <button
+              onClick={() => handleToggleProspectMode()}
+              className={`w-10 h-10 flex items-center justify-center rounded-xl shadow-lg transition-all ${
+                prospectMode ? 'bg-primary text-white' : 'bg-surface text-on-surface-variant'
+              }`}
+            >
+              <MaterialIcon icon="ads_click" className="text-[20px]" />
             </button>
           </div>
 
@@ -731,36 +750,35 @@ export default function MapPage() {
         <MaterialIcon icon="fullscreen" className="text-[20px]" />
       </button>
 
-      {/* Prospect mode indicator */}
-      {prospectMode && !walkMode && (
-        <div className="fixed top-16 sm:top-20 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 bg-primary text-white px-5 py-2.5 rounded-xl shadow-2xl">
-          <MaterialIcon icon="ads_click" className="text-[18px]" />
-          <span className="text-sm font-bold">Click houses to add to list</span>
-          <button
-            onClick={() => handleToggleProspectMode()}
-            className="ml-2 px-3 py-1 rounded-lg bg-white/20 text-xs font-bold hover:bg-white/30 transition-colors"
-          >
-            Done
-          </button>
-        </div>
-      )}
-
       {/* Prospect toast */}
       {prospectToast && (
-        <div className="fixed top-28 sm:top-32 left-1/2 -translate-x-1/2 z-50 bg-emerald-500 text-white px-4 py-2 rounded-lg shadow-xl text-sm font-semibold animate-in fade-in slide-in-from-top-2">
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-emerald-500 text-white px-4 py-2 rounded-lg shadow-xl text-sm font-semibold">
           + {prospectToast}
         </div>
       )}
 
-      {/* Prospect list badge */}
-      {prospectList.length > 0 && !showProspectPanel && !walkMode && (
-        <button
-          onClick={() => setShowProspectPanel(true)}
-          className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 bg-primary text-white px-5 py-3 rounded-xl shadow-2xl hover:bg-primary/90 transition-all"
-        >
-          <MaterialIcon icon="format_list_bulleted" className="text-[18px]" />
-          <span className="text-sm font-bold">{prospectList.length} addresses selected</span>
-        </button>
+      {/* Compact prospect bar — single row at bottom */}
+      {(prospectMode || prospectList.length > 0) && !walkMode && !showProspectPanel && (
+        <div className="fixed bottom-16 md:bottom-4 left-2 right-2 md:left-auto md:right-4 md:w-auto z-40 flex items-center gap-2 bg-primary text-white px-4 py-2.5 rounded-xl shadow-2xl">
+          <MaterialIcon icon="ads_click" className="text-[16px]" />
+          <span className="text-sm font-bold flex-1">{prospectList.length} addresses</span>
+          {prospectList.length > 0 && (
+            <button
+              onClick={() => setShowProspectPanel(true)}
+              className="px-3 py-1 rounded-lg bg-white/20 text-xs font-bold hover:bg-white/30 transition-colors"
+            >
+              Review
+            </button>
+          )}
+          {prospectMode && (
+            <button
+              onClick={() => handleToggleProspectMode()}
+              className="px-3 py-1 rounded-lg bg-white/20 text-xs font-bold hover:bg-white/30 transition-colors"
+            >
+              Done
+            </button>
+          )}
+        </div>
       )}
 
       {/* Prospect list panel */}

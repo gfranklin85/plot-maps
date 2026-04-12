@@ -9,6 +9,13 @@ import {
 import { MarkerClusterer, Renderer, Cluster } from "@googlemaps/markerclusterer";
 import { Lead, STATUS_COLORS, LISTING_STATUS_COLORS } from "@/types";
 import { MAP_CENTER, MAP_ZOOM } from "@/lib/constants";
+import { useTheme } from "next-themes";
+
+// Theme-aware pin colors
+const PIN_THEME = {
+  dark: { bg: 'rgba(10,16,32,0.92)', bgStrong: 'rgba(10,16,32,0.95)', text: 'white', subText: '#94a3b8' },
+  light: { bg: 'rgba(255,255,255,0.95)', bgStrong: 'rgba(255,255,255,0.97)', text: '#1e293b', subText: '#64748b' },
+};
 
 export type PinMode = "dots" | "labels" | "detail";
 
@@ -78,30 +85,30 @@ function daysSince(dateStr: string | null): string {
   return `${Math.round(days / 365)}yr`;
 }
 
-// Label mode: compact rich pin — price + status + recency (auto-width)
-function createLabelIcon(lead: Lead): google.maps.Icon {
+// Label mode: compact rich pin — price + status + recency (auto-width, theme-aware)
+function createLabelIcon(lead: Lead, isDark = true): google.maps.Icon {
   const color = getStatusColor(lead);
+  const t = isDark ? PIN_THEME.dark : PIN_THEME.light;
   const price = formatPriceShort(lead.listing_price || lead.selling_price || null);
   const statusLabel = getStatusLabel(lead);
   const dom = lead.dom != null ? `${lead.dom}d` : '';
   const recency = daysSince(lead.selling_date || lead.listing_date);
   const subLine = [statusLabel, dom ? `${dom} DOM` : '', recency].filter(Boolean).join(' · ');
 
-  // Auto-width based on content
   const priceLen = (price || '—').length;
   const subLen = subLine.length;
-  const topW = 20 + priceLen * 8; // circle + price text
+  const topW = 20 + priceLen * 8;
   const botW = subLen * 5.5 + 10;
   const width = Math.max(topW, botW, 50);
   const height = subLine ? 34 : 26;
 
   const svg = `
     <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height + 7}">
-      <rect x="0" y="0" width="${width}" height="${height}" rx="8" fill="rgba(10,16,32,0.92)" stroke="${color}" stroke-width="1.5"/>
+      <rect x="0" y="0" width="${width}" height="${height}" rx="8" fill="${t.bg}" stroke="${color}" stroke-width="1.5"/>
       <circle cx="9" cy="11" r="3" fill="${color}"/>
-      <text x="16" y="12" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="800" fill="white">${price || '—'}</text>
+      <text x="16" y="12" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="800" fill="${t.text}">${price || '—'}</text>
       ${subLine ? `<text x="5" y="27" font-family="system-ui,sans-serif" font-size="7.5" font-weight="700" fill="${color}">${subLine}</text>` : ''}
-      <polygon points="${width / 2 - 3},${height} ${width / 2},${height + 6} ${width / 2 + 3},${height}" fill="rgba(10,16,32,0.92)"/>
+      <polygon points="${width / 2 - 3},${height} ${width / 2},${height + 6} ${width / 2 + 3},${height}" fill="${t.bg}"/>
     </svg>`;
 
   return {
@@ -111,9 +118,10 @@ function createLabelIcon(lead: Lead): google.maps.Icon {
   };
 }
 
-// Detail mode: compact card — price, status badge, meta line, detail line (auto-width)
-function createDetailIcon(lead: Lead): google.maps.Icon {
+// Detail mode: compact card — price, status badge, meta line, detail line (auto-width, theme-aware)
+function createDetailIcon(lead: Lead, isDark = true): google.maps.Icon {
   const color = getStatusColor(lead);
+  const t = isDark ? PIN_THEME.dark : PIN_THEME.light;
   const price = formatPriceShort(lead.listing_price || lead.selling_price || null);
   const statusLabel = getStatusLabel(lead);
   const dom = lead.dom != null ? `${lead.dom}d DOM` : '';
@@ -123,7 +131,6 @@ function createDetailIcon(lead: Lead): google.maps.Icon {
   const line2 = [dom, recency].filter(Boolean).join(' · ');
   const line3 = [sqft, year].filter(Boolean).join(' · ') || lead.property_address?.split(',')[0]?.substring(0, 18) || '';
 
-  // Auto-width: measure longest line
   const priceW = (price || '—').length * 8 + 16;
   const badgeW = statusLabel ? 44 : 0;
   const topW = priceW + badgeW + 8;
@@ -134,13 +141,13 @@ function createDetailIcon(lead: Lead): google.maps.Icon {
 
   const svg = `
     <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height + 9}">
-      <rect x="1" y="1" width="${width - 2}" height="${height - 2}" rx="10" fill="rgba(10,16,32,0.95)" stroke="${color}" stroke-width="1.5"/>
+      <rect x="1" y="1" width="${width - 2}" height="${height - 2}" rx="10" fill="${t.bgStrong}" stroke="${color}" stroke-width="1.5"/>
       ${statusLabel ? `<rect x="${width - 40}" y="5" width="36" height="13" rx="6" fill="${color}"/>
       <text x="${width - 22}" y="12" dominant-baseline="central" text-anchor="middle" font-family="system-ui,sans-serif" font-size="7" font-weight="800" fill="white">${statusLabel}</text>` : ''}
-      <text x="8" y="17" font-family="system-ui,sans-serif" font-size="12" font-weight="800" fill="white">${price || '—'}</text>
+      <text x="8" y="17" font-family="system-ui,sans-serif" font-size="12" font-weight="800" fill="${t.text}">${price || '—'}</text>
       <text x="8" y="30" font-family="system-ui,sans-serif" font-size="8" font-weight="700" fill="${color}">${line2}</text>
-      <text x="8" y="41" font-family="system-ui,sans-serif" font-size="8" font-weight="500" fill="#94a3b8">${line3}</text>
-      <polygon points="${width / 2 - 4},${height - 2} ${width / 2},${height + 7} ${width / 2 + 4},${height - 2}" fill="rgba(10,16,32,0.95)"/>
+      <text x="8" y="41" font-family="system-ui,sans-serif" font-size="8" font-weight="500" fill="${t.subText}">${line3}</text>
+      <polygon points="${width / 2 - 4},${height - 2} ${width / 2},${height + 7} ${width / 2 + 4},${height - 2}" fill="${t.bgStrong}"/>
     </svg>`;
 
   return {
@@ -209,10 +216,12 @@ function LeadMarkers({
   leads,
   onMarkerClick,
   pinMode = "dots",
+  isDark = true,
 }: {
   leads: Lead[];
   onMarkerClick: (lead: Lead) => void;
   pinMode: PinMode;
+  isDark: boolean;
 }) {
   const map = useMap();
   const markersRef = useRef<google.maps.Marker[]>([]);
@@ -235,9 +244,9 @@ function LeadMarkers({
       const isContext = lead.record_type === 'context' || !lead.user_id || !!lead.listing_status;
       let icon: google.maps.Icon | google.maps.Symbol;
       if (isContext && pinMode === 'detail') {
-        icon = createDetailIcon(lead);
+        icon = createDetailIcon(lead, isDark);
       } else if (isContext && pinMode === 'labels') {
-        icon = createLabelIcon(lead);
+        icon = createLabelIcon(lead, isDark);
       } else {
         icon = createDotIcon(lead);
       }
@@ -273,12 +282,14 @@ function LeadMarkers({
       markersRef.current.forEach((m) => m.setMap(null));
       markersRef.current = [];
     };
-  }, [map, leads, onMarkerClick, pinMode]);
+  }, [map, leads, onMarkerClick, pinMode, isDark]);
 
   return null;
 }
 
 export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClick, center, zoom, mapType = "roadmap", pinMode = "dots", prospectMode = false }: Props) {
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme !== 'light';
   const isSatellite = mapType === "satellite" || mapType === "hybrid";
 
   const handleMarkerClick = useCallback(
@@ -314,7 +325,7 @@ export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClic
         <MapTypeSync mapType={mapType} />
         <ZoomController zoom={zoom} />
         <CenterTracker onCenterChanged={onCenterChanged} />
-        <LeadMarkers leads={leads} onMarkerClick={handleMarkerClick} pinMode={pinMode} />
+        <LeadMarkers leads={leads} onMarkerClick={handleMarkerClick} pinMode={pinMode} isDark={isDark} />
       </Map>
     </APIProvider>
   );

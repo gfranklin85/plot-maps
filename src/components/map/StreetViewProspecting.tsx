@@ -3,7 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import { APIProvider, useApiIsLoaded } from "@vis.gl/react-google-maps";
 import { Lead, STATUS_COLORS, LISTING_STATUS_COLORS } from "@/types";
+import { useTheme } from "next-themes";
 import PropertyPopup from "./PropertyPopup";
+
+const SV_PIN_THEME = {
+  dark: { bg: 'rgba(15,23,42,0.9)', bgStrong: 'rgba(15,23,42,0.92)', text: 'white', subText: '#94a3b8' },
+  light: { bg: 'rgba(255,255,255,0.93)', bgStrong: 'rgba(255,255,255,0.95)', text: '#1e293b', subText: '#64748b' },
+};
 
 type PinMode = "dots" | "labels" | "detail";
 
@@ -42,7 +48,7 @@ function angleDiff(a: number, b: number): number {
 }
 
 // Generate a floating name tag SVG — scale increases for closer properties
-function makeNameTagIcon(label: string, color: string, scale: number = 1): google.maps.Icon {
+function makeNameTagIcon(label: string, color: string, scale: number = 1, isDark = true): google.maps.Icon {
   const textLen = label.length;
   const baseWidth = Math.max(120, textLen * 16 + 40);
   const baseHeight = 56;
@@ -98,8 +104,8 @@ function getStatusShort(lead: Lead): string {
   return '';
 }
 
-// Rich label for walk mode — price + status + DOM + recency (auto-width)
-function makeRichLabelIcon(lead: Lead, color: string, scale: number): google.maps.Icon {
+// Rich label for walk mode — price + status + DOM + recency (auto-width, theme-aware)
+function makeRichLabelIcon(lead: Lead, color: string, scale: number, isDark = true): google.maps.Icon {
   const price = formatPriceK(lead.listing_price || lead.selling_price || null);
   const status = getStatusShort(lead);
   const dom = lead.dom != null ? `${lead.dom}d` : '';
@@ -111,6 +117,7 @@ function makeRichLabelIcon(lead: Lead, color: string, scale: number): google.map
   const subLen = subLine.length;
   const topW = 30 + priceLen * 14; // circle + price
   const botW = subLen * 9 + 16;
+  const t = isDark ? SV_PIN_THEME.dark : SV_PIN_THEME.light;
   const baseW = Math.max(topW, botW, 80);
   const baseH = subLine ? 70 : 50;
   const w = Math.round(baseW * scale);
@@ -121,11 +128,11 @@ function makeRichLabelIcon(lead: Lead, color: string, scale: number): google.map
 
   const svg = `
     <svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h + arrow}">
-      <rect x="1" y="1" width="${w - 2}" height="${h - 2}" rx="${Math.round(8 * scale)}" fill="rgba(15,23,42,0.9)" stroke="${color}" stroke-width="${Math.round(1.5 * scale)}"/>
+      <rect x="1" y="1" width="${w - 2}" height="${h - 2}" rx="${Math.round(8 * scale)}" fill="${t.bg}" stroke="${color}" stroke-width="${Math.round(1.5 * scale)}"/>
       <circle cx="${Math.round(14 * scale)}" cy="${Math.round(22 * scale)}" r="${Math.round(5 * scale)}" fill="${color}"/>
-      <text x="${Math.round(26 * scale)}" y="${Math.round(24 * scale)}" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="${fs1}" font-weight="800" fill="white">${escapeXml(price || '—')}</text>
+      <text x="${Math.round(26 * scale)}" y="${Math.round(24 * scale)}" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="${fs1}" font-weight="800" fill="${t.text}">${escapeXml(price || '—')}</text>
       ${subLine ? `<text x="${Math.round(10 * scale)}" y="${Math.round(54 * scale)}" font-family="system-ui,sans-serif" font-size="${fs2}" font-weight="600" fill="${color}">${escapeXml(subLine)}</text>` : ''}
-      <polygon points="${w / 2 - arrow},${h - 1} ${w / 2},${h + arrow - 1} ${w / 2 + arrow},${h - 1}" fill="rgba(15,23,42,0.9)"/>
+      <polygon points="${w / 2 - arrow},${h - 1} ${w / 2},${h + arrow - 1} ${w / 2 + arrow},${h - 1}" fill="${t.bg}"/>
     </svg>`;
 
   return {
@@ -135,8 +142,8 @@ function makeRichLabelIcon(lead: Lead, color: string, scale: number): google.map
   };
 }
 
-// Detail card for walk mode — price, status badge, DOM, recency, sqft, year (auto-width)
-function makeDetailCardIcon(lead: Lead, color: string, scale: number): google.maps.Icon {
+// Detail card for walk mode — price, status badge, DOM, recency, sqft, year (auto-width, theme-aware)
+function makeDetailCardIcon(lead: Lead, color: string, scale: number, isDark = true): google.maps.Icon {
   const price = formatPriceK(lead.listing_price || lead.selling_price || null);
   const status = getStatusShort(lead);
   const dom = lead.dom != null ? `${lead.dom}d DOM` : '';
@@ -152,6 +159,7 @@ function makeDetailCardIcon(lead: Lead, color: string, scale: number): google.ma
   const topW = priceW + badgeW + 12;
   const line2W = line2.length * 10 + 20;
   const line3W = line3.length * 10 + 20;
+  const t = isDark ? SV_PIN_THEME.dark : SV_PIN_THEME.light;
   const baseW = Math.max(topW, line2W, line3W, 100);
   const baseH = 110;
   const w = Math.round(baseW * scale);
@@ -163,13 +171,13 @@ function makeDetailCardIcon(lead: Lead, color: string, scale: number): google.ma
 
   const svg = `
     <svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h + arrow}">
-      <rect x="1" y="1" width="${w - 2}" height="${h - 2}" rx="${Math.round(12 * scale)}" fill="rgba(15,23,42,0.92)" stroke="${color}" stroke-width="${Math.round(3 * scale)}"/>
+      <rect x="1" y="1" width="${w - 2}" height="${h - 2}" rx="${Math.round(12 * scale)}" fill="${t.bgStrong}" stroke="${color}" stroke-width="${Math.round(3 * scale)}"/>
       ${status ? `<rect x="${w - Math.round(80 * scale)}" y="${Math.round(8 * scale)}" width="${Math.round(72 * scale)}" height="${Math.round(24 * scale)}" rx="${Math.round(8 * scale)}" fill="${color}"/>
       <text x="${w - Math.round(44 * scale)}" y="${Math.round(21 * scale)}" dominant-baseline="central" text-anchor="middle" font-family="system-ui,sans-serif" font-size="${Math.round(13 * scale)}" font-weight="800" fill="white">${status}</text>` : ''}
-      <text x="${Math.round(16 * scale)}" y="${Math.round(36 * scale)}" font-family="system-ui,sans-serif" font-size="${fs1}" font-weight="800" fill="white">${escapeXml(price || '—')}</text>
+      <text x="${Math.round(16 * scale)}" y="${Math.round(36 * scale)}" font-family="system-ui,sans-serif" font-size="${fs1}" font-weight="800" fill="${t.text}">${escapeXml(price || '—')}</text>
       <text x="${Math.round(16 * scale)}" y="${Math.round(64 * scale)}" font-family="system-ui,sans-serif" font-size="${fs2}" font-weight="600" fill="${color}">${escapeXml(line2)}</text>
-      ${line3 ? `<text x="${Math.round(16 * scale)}" y="${Math.round(90 * scale)}" font-family="system-ui,sans-serif" font-size="${fs3}" font-weight="500" fill="#94a3b8">${escapeXml(line3)}</text>` : ''}
-      <polygon points="${w / 2 - arrow},${h - 1} ${w / 2},${h + arrow - 1} ${w / 2 + arrow},${h - 1}" fill="rgba(15,23,42,0.92)"/>
+      ${line3 ? `<text x="${Math.round(16 * scale)}" y="${Math.round(90 * scale)}" font-family="system-ui,sans-serif" font-size="${fs3}" font-weight="500" fill="${t.subText}">${escapeXml(line3)}</text>` : ''}
+      <polygon points="${w / 2 - arrow},${h - 1} ${w / 2},${h + arrow - 1} ${w / 2 + arrow},${h - 1}" fill="${t.bgStrong}"/>
     </svg>`;
 
   return {
@@ -197,6 +205,8 @@ function getLabel(lead: Lead): string {
 }
 
 function StreetViewInner({ leads, startPosition, onDataChanged, onPositionChanged }: Props) {
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme !== 'light';
   const apiLoaded = useApiIsLoaded();
   const containerRef = useRef<HTMLDivElement>(null);
   const panoramaRef = useRef<google.maps.StreetViewPanorama | null>(null);
@@ -312,14 +322,14 @@ function StreetViewInner({ leads, startPosition, onDataChanged, onPositionChange
 
       let icon;
       if (isContext && pinMode === 'detail') {
-        icon = makeDetailCardIcon(lead, color, scale);
+        icon = makeDetailCardIcon(lead, color, scale, isDark);
       } else if (isContext && pinMode === 'labels') {
-        icon = makeRichLabelIcon(lead, color, scale);
+        icon = makeRichLabelIcon(lead, color, scale, isDark);
       } else if (pinMode === 'dots') {
-        icon = { path: google.maps.SymbolPath.CIRCLE, scale: Math.round(6 * scale), fillColor: color, fillOpacity: 1, strokeColor: '#ffffff', strokeWeight: 2 } as google.maps.Symbol;
+        icon = { path: google.maps.SymbolPath.CIRCLE, scale: Math.round(6 * scale), fillColor: color, fillOpacity: 1, strokeColor: isDark ? '#ffffff' : '#1e293b', strokeWeight: 2 } as google.maps.Symbol;
       } else {
         const label = getLabel(lead);
-        icon = makeNameTagIcon(label, color, scale);
+        icon = makeNameTagIcon(label, color, scale, isDark);
       }
 
       const marker = new google.maps.Marker({

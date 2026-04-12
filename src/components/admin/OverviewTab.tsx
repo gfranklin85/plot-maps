@@ -5,19 +5,17 @@ import MaterialIcon from '@/components/ui/MaterialIcon';
 import { SummaryCard, timeAgo, type Summary, type UserRow, type HotProspect } from './admin-utils';
 import PeopleTable from './PeopleTable';
 
-interface AutoTargetRequest {
+interface ProspectOrder {
   id: string;
   user_id: string;
   user_name: string;
   user_email: string;
-  reference_address: string;
-  reference_lat: number;
-  reference_lng: number;
-  radius_miles: number;
   status: string;
-  prospects_created: number;
-  admin_notes: string | null;
+  address_count: number;
+  amount_cents: number;
+  addresses: { address: string; lat: number; lng: number }[];
   created_at: string;
+  completed_at: string | null;
 }
 
 interface CostData {
@@ -35,46 +33,51 @@ interface Props {
 }
 
 export default function OverviewTab({ summary, users, hotProspects, liveVisitors, costs }: Props) {
-  // ── Auto-target request queue state ──
-  const [atRequests, setAtRequests] = useState<AutoTargetRequest[]>([]);
-  const [atSelected, setAtSelected] = useState<AutoTargetRequest | null>(null);
-  const [atProspects, setAtProspects] = useState('');
-  const [atNotes, setAtNotes] = useState('');
-  const [atUpdating, setAtUpdating] = useState(false);
+  // ── Skip trace orders state ──
+  const [orders, setOrders] = useState<ProspectOrder[]>([]);
+  const [selectedOrder, setSelectedOrder] = useState<ProspectOrder | null>(null);
+  const [orderUpdating, setOrderUpdating] = useState(false);
 
-  const fetchAutoTargets = useCallback(async () => {
+  const fetchOrders = useCallback(async () => {
     try {
-      const res = await fetch('/api/admin/auto-target');
+      const res = await fetch('/api/admin/orders');
       if (res.ok) {
         const data = await res.json();
-        setAtRequests(data.requests || []);
+        setOrders(data.orders || []);
       }
     } catch { /* silent */ }
   }, []);
 
   useEffect(() => {
-    fetchAutoTargets();
-  }, [fetchAutoTargets]);
+    fetchOrders();
+  }, [fetchOrders]);
 
-  async function updateAutoTarget(requestId: string, status: string) {
-    setAtUpdating(true);
+  async function updateOrder(orderId: string, status: string) {
+    setOrderUpdating(true);
     try {
-      await fetch('/api/admin/auto-target', {
+      await fetch('/api/admin/orders', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          requestId,
-          status,
-          prospects_created: status === 'completed' ? parseInt(atProspects) || 0 : undefined,
-          admin_notes: atNotes || undefined,
-        }),
+        body: JSON.stringify({ orderId, status }),
       });
-      await fetchAutoTargets();
-      setAtSelected(null);
-      setAtProspects('');
-      setAtNotes('');
+      await fetchOrders();
+      setSelectedOrder(null);
     } catch { /* silent */ }
-    setAtUpdating(false);
+    setOrderUpdating(false);
+  }
+
+  function exportOrderCSV(order: ProspectOrder) {
+    const rows = ['Address,Lat,Lng'];
+    for (const a of order.addresses) {
+      rows.push(`"${a.address}",${a.lat},${a.lng}`);
+    }
+    const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `order-${order.id.slice(0, 8)}-${order.address_count}addresses.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
   }
 
   return (
@@ -133,142 +136,141 @@ export default function OverviewTab({ summary, users, hotProspects, liveVisitors
       {/* People Table */}
       <PeopleTable users={users} hotProspects={hotProspects} />
 
-      {/* ═══ AUTO-TARGET REQUEST QUEUE ═══ */}
+      {/* ═══ SKIP TRACE ORDERS ═══ */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-extrabold text-on-surface font-headline tracking-tight">
-            <MaterialIcon icon="my_location" className="text-[18px] text-primary mr-2" />
-            Prospect Requests
-            {atRequests.length > 0 && (
-              <span className="ml-2 text-sm font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full">{atRequests.length}</span>
+            <MaterialIcon icon="shopping_cart" className="text-[18px] text-primary mr-2" />
+            Skip Trace Orders
+            {orders.filter(o => o.status === 'paid').length > 0 && (
+              <span className="ml-2 text-sm font-bold text-orange-400 bg-orange-400/10 px-2 py-0.5 rounded-full">
+                {orders.filter(o => o.status === 'paid').length} to fulfill
+              </span>
             )}
           </h2>
-          <button onClick={fetchAutoTargets} className="text-secondary hover:text-on-surface transition-colors">
+          <button onClick={fetchOrders} className="text-secondary hover:text-on-surface transition-colors">
             <MaterialIcon icon="refresh" className="text-[18px]" />
           </button>
         </div>
 
-        {atRequests.length === 0 ? (
+        {orders.length === 0 ? (
           <div className="bg-card border border-card-border rounded-xl p-8 text-center">
-            <MaterialIcon icon="check_circle" className="text-[32px] text-emerald-500 mb-2" />
-            <p className="text-sm text-secondary">No pending prospect requests</p>
+            <MaterialIcon icon="inbox" className="text-[32px] text-secondary mb-2" />
+            <p className="text-sm text-secondary">No orders yet</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-            {/* Queue Table */}
+            {/* Orders Table */}
             <div className="lg:col-span-7 bg-card border border-card-border rounded-xl overflow-hidden">
               <table className="w-full text-left">
                 <thead>
                   <tr className="text-[10px] uppercase tracking-widest text-secondary border-b border-card-border">
                     <th className="px-4 py-3">User</th>
-                    <th className="px-4 py-3">Reference Address</th>
+                    <th className="px-4 py-3">Addresses</th>
+                    <th className="px-4 py-3">Amount</th>
                     <th className="px-4 py-3">Status</th>
                     <th className="px-4 py-3">Time</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-card-border/50">
-                  {atRequests.map(req => (
+                  {orders.map(order => (
                     <tr
-                      key={req.id}
-                      onClick={() => { setAtSelected(req); setAtProspects(''); setAtNotes(req.admin_notes || ''); }}
-                      className={`cursor-pointer hover:bg-surface-container-high/50 transition-colors ${atSelected?.id === req.id ? 'bg-primary/5' : ''}`}
+                      key={order.id}
+                      onClick={() => setSelectedOrder(order)}
+                      className={`cursor-pointer hover:bg-surface-container-high/50 transition-colors ${selectedOrder?.id === order.id ? 'bg-primary/5' : ''}`}
                     >
                       <td className="px-4 py-3">
-                        <div className="font-semibold text-on-surface text-sm">{req.user_name}</div>
-                        <div className="text-[10px] text-secondary">{req.user_email}</div>
+                        <div className="font-semibold text-on-surface text-sm">{order.user_name}</div>
+                        <div className="text-[10px] text-secondary">{order.user_email}</div>
                       </td>
-                      <td className="px-4 py-3 text-sm text-on-surface">{req.reference_address?.split(',')[0]}</td>
+                      <td className="px-4 py-3 text-sm font-bold text-on-surface">{order.address_count}</td>
+                      <td className="px-4 py-3 text-sm text-on-surface">${(order.amount_cents / 100).toFixed(2)}</td>
                       <td className="px-4 py-3">
                         <span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider">
-                          {req.status === 'processing' && <span className="w-2 h-2 rounded-full bg-orange-400 animate-pulse" />}
-                          {req.status === 'pending' && <span className="w-2 h-2 rounded-full bg-yellow-400" />}
-                          <span className={req.status === 'processing' ? 'text-orange-400' : 'text-secondary'}>{req.status}</span>
+                          {order.status === 'paid' && <span className="w-2 h-2 rounded-full bg-orange-400 animate-pulse" />}
+                          {order.status === 'completed' && <span className="w-2 h-2 rounded-full bg-emerald-500" />}
+                          {order.status === 'pending' && <span className="w-2 h-2 rounded-full bg-yellow-400" />}
+                          <span className={
+                            order.status === 'paid' ? 'text-orange-400' :
+                            order.status === 'completed' ? 'text-emerald-400' :
+                            'text-secondary'
+                          }>{order.status}</span>
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-xs text-secondary">{timeAgo(req.created_at)}</td>
+                      <td className="px-4 py-3 text-xs text-secondary">{timeAgo(order.created_at)}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
 
-            {/* Detail Panel */}
+            {/* Order Detail Panel */}
             <div className="lg:col-span-5">
-              {atSelected ? (
+              {selectedOrder ? (
                 <div className="bg-card border border-card-border rounded-xl p-5 space-y-4 sticky top-24">
                   <div className="flex items-center justify-between">
-                    <h3 className="font-headline font-bold text-on-surface">Request Detail</h3>
-                    <span className="text-[10px] font-mono text-secondary">{atSelected.id.slice(0, 8)}</span>
-                  </div>
-
-                  <div className="bg-surface-container-lowest p-3 rounded-lg border border-card-border space-y-1">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-secondary">Reference Property</p>
-                    <p className="font-bold text-on-surface">{atSelected.reference_address}</p>
-                    <p className="text-[10px] font-mono text-secondary">
-                      {atSelected.reference_lat.toFixed(4)}, {atSelected.reference_lng.toFixed(4)} · {atSelected.radius_miles}mi radius
-                    </p>
+                    <h3 className="font-headline font-bold text-on-surface">Order Detail</h3>
+                    <span className="text-[10px] font-mono text-secondary">{selectedOrder.id.slice(0, 8)}</span>
                   </div>
 
                   <div className="bg-surface-container-lowest p-3 rounded-lg border border-card-border space-y-1">
                     <p className="text-[10px] font-bold uppercase tracking-widest text-secondary">User</p>
-                    <p className="text-sm text-on-surface">{atSelected.user_name}</p>
-                    <p className="text-[10px] text-secondary">{atSelected.user_email}</p>
+                    <p className="text-sm font-semibold text-on-surface">{selectedOrder.user_name}</p>
+                    <p className="text-[10px] text-secondary">{selectedOrder.user_email}</p>
                   </div>
 
+                  <div className="flex gap-3">
+                    <div className="flex-1 bg-surface-container-lowest p-3 rounded-lg border border-card-border text-center">
+                      <p className="text-lg font-bold text-on-surface">{selectedOrder.address_count}</p>
+                      <p className="text-[9px] text-secondary uppercase tracking-wider">Addresses</p>
+                    </div>
+                    <div className="flex-1 bg-surface-container-lowest p-3 rounded-lg border border-card-border text-center">
+                      <p className="text-lg font-bold text-on-surface">${(selectedOrder.amount_cents / 100).toFixed(2)}</p>
+                      <p className="text-[9px] text-secondary uppercase tracking-wider">Paid</p>
+                    </div>
+                  </div>
+
+                  {/* Address list */}
                   <div>
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-secondary block mb-1">Admin Notes</label>
-                    <textarea
-                      value={atNotes}
-                      onChange={(e) => setAtNotes(e.target.value)}
-                      rows={2}
-                      className="w-full rounded-lg border border-card-border bg-surface-container-lowest px-3 py-2 text-xs text-on-surface focus:ring-1 focus:ring-primary outline-none resize-none"
-                      placeholder="Notes about fulfillment..."
-                    />
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-secondary mb-2">Addresses</p>
+                    <div className="max-h-48 overflow-y-auto space-y-1">
+                      {selectedOrder.addresses.map((a, i) => (
+                        <p key={i} className="text-xs text-on-surface">{a.address.split(',')[0]}</p>
+                      ))}
+                    </div>
                   </div>
 
-                  <div>
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-secondary block mb-1">Prospects Created</label>
-                    <input
-                      type="number"
-                      value={atProspects}
-                      onChange={(e) => setAtProspects(e.target.value)}
-                      className="w-full rounded-lg border border-card-border bg-surface-container-lowest px-3 py-2 text-xs text-on-surface focus:ring-1 focus:ring-primary outline-none"
-                      placeholder="Number of leads uploaded"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    {atSelected.status === 'pending' && (
-                      <button
-                        onClick={() => updateAutoTarget(atSelected.id, 'processing')}
-                        disabled={atUpdating}
-                        className="py-2.5 rounded-lg bg-orange-500/20 text-orange-400 text-xs font-bold hover:bg-orange-500/30 transition-colors"
-                      >
-                        Mark Processing
-                      </button>
-                    )}
-                    <button
-                      onClick={() => updateAutoTarget(atSelected.id, 'cancelled')}
-                      disabled={atUpdating}
-                      className="py-2.5 rounded-lg bg-surface-container-high text-secondary text-xs font-bold hover:bg-surface-container-highest transition-colors"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-
+                  {/* Actions */}
                   <button
-                    onClick={() => updateAutoTarget(atSelected.id, 'completed')}
-                    disabled={atUpdating}
-                    className="w-full py-3.5 rounded-xl bg-gradient-to-br from-primary/80 to-primary text-white font-bold text-sm flex items-center justify-center gap-2 shadow-[0_8px_25px_-5px_hsl(var(--primary)/0.4)] hover:opacity-90 active:scale-[0.98] transition-all"
+                    onClick={() => exportOrderCSV(selectedOrder)}
+                    className="w-full py-2.5 rounded-lg bg-surface-container-high text-on-surface text-xs font-bold hover:bg-surface-container-highest transition-colors flex items-center justify-center gap-2"
                   >
-                    <MaterialIcon icon="task_alt" className="text-[18px]" />
-                    Mark as Fulfilled
+                    <MaterialIcon icon="download" className="text-[16px]" />
+                    Export CSV for PropWire
                   </button>
+
+                  {selectedOrder.status !== 'completed' && (
+                    <button
+                      onClick={() => updateOrder(selectedOrder.id, 'completed')}
+                      disabled={orderUpdating}
+                      className="w-full py-3.5 rounded-xl bg-gradient-to-br from-primary/80 to-primary text-white font-bold text-sm flex items-center justify-center gap-2 shadow-[0_8px_25px_-5px_hsl(var(--primary)/0.4)] hover:opacity-90 active:scale-[0.98] transition-all"
+                    >
+                      <MaterialIcon icon="task_alt" className="text-[18px]" />
+                      Mark as Fulfilled
+                    </button>
+                  )}
+
+                  {selectedOrder.status === 'completed' && (
+                    <div className="flex items-center justify-center gap-2 py-2 text-emerald-400">
+                      <MaterialIcon icon="check_circle" className="text-[18px]" />
+                      <span className="text-xs font-bold">Fulfilled</span>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="bg-card border border-card-border rounded-xl p-8 text-center">
                   <MaterialIcon icon="touch_app" className="text-[28px] text-secondary mb-2" />
-                  <p className="text-sm text-secondary">Select a request to view details</p>
+                  <p className="text-sm text-secondary">Select an order to view details</p>
                 </div>
               )}
             </div>

@@ -593,6 +593,7 @@ export default function MapPage() {
             mapType={mapType}
             pinMode={pinMode}
             prospectMode={prospectMode}
+            prospectPins={prospectList.map(a => ({ lat: a.lat, lng: a.lng }))}
             zoom={mapZoom}
             onLeadClick={(_id, lead) => { handleLeadClickInProspectMode(lead); }}
             onCenterChanged={(c) => { setMapCenter(c); setHasUserPanned(true); }}

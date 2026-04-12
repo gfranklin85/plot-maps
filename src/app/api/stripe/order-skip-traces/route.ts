@@ -2,9 +2,26 @@ import { NextResponse } from 'next/server';
 import { stripe } from '@/lib/stripe';
 import { getAuthUser } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase-server';
+import { Resend } from 'resend';
 
+const resend = new Resend(process.env.RESEND_API_KEY!);
+const ADMIN_EMAIL = process.env.FROM_EMAIL || 'greg@plot.solutions';
 const COST_PER_ADDRESS_CENTS = 18; // $0.18
 const MIN_ORDER_SIZE = 10;
+
+async function notifyAdmin(orderId: string, addressCount: number, addresses: { address: string }[], userEmail: string) {
+  try {
+    const addressList = addresses.map(a => a.address.split(',')[0]).join('\n• ');
+    await resend.emails.send({
+      from: `Plot Maps <${ADMIN_EMAIL}>`,
+      to: ADMIN_EMAIL,
+      subject: `New Skip Trace Order — ${addressCount} addresses`,
+      text: `New order from ${userEmail}\n\nOrder ID: ${orderId}\nAddresses: ${addressCount}\nAmount: $${(addressCount * COST_PER_ADDRESS_CENTS / 100).toFixed(2)}\n\nAddresses:\n• ${addressList}\n\nGo to admin dashboard to fulfill.`,
+    });
+  } catch (e) {
+    console.error('Admin notification email failed:', e);
+  }
+}
 
 interface AddressItem {
   address: string;
@@ -109,6 +126,9 @@ export async function POST(request: Request) {
             stripe_payment_intent_id: paymentIntent.id,
           })
           .eq('id', order.id);
+
+        // Notify admin
+        await notifyAdmin(order.id, addressCount, addresses, user.email || '');
 
         return NextResponse.json({
           success: true,

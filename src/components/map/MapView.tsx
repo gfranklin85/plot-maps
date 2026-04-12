@@ -31,6 +31,7 @@ interface Props {
   mapType?: "roadmap" | "satellite" | "hybrid" | "terrain";
   pinMode?: PinMode;
   prospectMode?: boolean;
+  prospectPins?: { lat: number; lng: number }[];
 }
 
 const API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
@@ -292,7 +293,42 @@ function LeadMarkers({
   return null;
 }
 
-export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClick, center, zoom, mapType = "roadmap", pinMode = "dots", prospectMode = false }: Props) {
+function ProspectPins({ pins }: { pins: { lat: number; lng: number }[] }) {
+  const map = useMap();
+  const markersRef = useRef<google.maps.Marker[]>([]);
+
+  useEffect(() => {
+    if (!map) return;
+    markersRef.current.forEach(m => m.setMap(null));
+    markersRef.current = [];
+
+    pins.forEach(pin => {
+      const marker = new google.maps.Marker({
+        position: pin,
+        map,
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 12,
+          fillColor: '#f97316',
+          fillOpacity: 0.9,
+          strokeColor: '#ffffff',
+          strokeWeight: 3,
+        },
+        zIndex: 999,
+      });
+      markersRef.current.push(marker);
+    });
+
+    return () => {
+      markersRef.current.forEach(m => m.setMap(null));
+      markersRef.current = [];
+    };
+  }, [map, pins]);
+
+  return null;
+}
+
+export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClick, center, zoom, mapType = "roadmap", pinMode = "dots", prospectMode = false, prospectPins = [] }: Props) {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme !== 'light';
   const isSatellite = mapType === "satellite" || mapType === "hybrid";
@@ -331,6 +367,7 @@ export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClic
         <ZoomController zoom={zoom} />
         <CenterTracker onCenterChanged={onCenterChanged} />
         <LeadMarkers leads={leads} onMarkerClick={handleMarkerClick} pinMode={pinMode} isDark={isDark} />
+        {prospectPins.length > 0 && <ProspectPins pins={prospectPins} />}
       </Map>
     </APIProvider>
   );

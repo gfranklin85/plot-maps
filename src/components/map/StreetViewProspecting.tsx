@@ -48,7 +48,8 @@ function angleDiff(a: number, b: number): number {
 }
 
 // Generate a floating name tag SVG — scale increases for closer properties
-function makeNameTagIcon(label: string, color: string, scale: number = 1, isDark = true): google.maps.Icon {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function makeNameTagIcon(label: string, color: string, scale: number = 1, _isDark = true): google.maps.Icon {
   const textLen = label.length;
   const baseWidth = Math.max(120, textLen * 16 + 40);
   const baseHeight = 56;

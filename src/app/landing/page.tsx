@@ -48,23 +48,23 @@ export default function LandingPage() {
             <div className="relative z-10">
               {/* Hero badge */}
               <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#23293c] border border-slate-700/20 mb-6">
-                <span className="material-symbols-outlined text-indigo-400 text-[16px]" style={{ fontVariationSettings: "'FILL' 1" }}>verified</span>
-                <span className="text-xs font-bold uppercase tracking-wider text-indigo-400">Precision Prospecting</span>
+                <span className="material-symbols-outlined text-indigo-400 text-[16px]" style={{ fontVariationSettings: "'FILL' 1" }}>my_location</span>
+                <span className="text-xs font-bold uppercase tracking-wider text-indigo-400">Circle Prospecting, Reimagined</span>
               </div>
 
               <h1 className="text-3xl sm:text-5xl lg:text-7xl font-headline font-extrabold tracking-tight leading-[1.1] mb-4 sm:mb-8">
-                Know exactly who to call — <span className="text-indigo-400">and why.</span>
+                See the listing.<br /><span className="text-indigo-400">Call the neighbors.</span>
               </h1>
               <p className="text-base sm:text-xl text-slate-400 leading-relaxed mb-6 sm:mb-8 max-w-xl">
-                See every property on a map with comps, owner data, and talking points. Stop calling blind — prospect with full context from street level.
+                Active, Pending, and Just Sold — overlaid on your map with owner data and comps. Click a listing. Call the block. Circle prospect with full context.
               </p>
 
               {/* Trust checkmarks */}
               <div className="space-y-3 mb-8">
                 {[
-                  'See the house before you call — Street View prospecting',
-                  'Comps, owner data, and talking points on every property',
-                  'Start free — 50 geocodes, no credit card required',
+                  'Solds, Actives & Pendings live on your map — see what just happened',
+                  'Click any listing, see every neighbor with owner data and comps',
+                  'Walk the block in Street View before you dial',
                 ].map((point) => (
                   <div key={point} className="flex items-center gap-3">
                     <span className="material-symbols-outlined text-emerald-400 text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
@@ -289,8 +289,8 @@ export default function LandingPage() {
             <img className="w-full h-full object-cover" alt="" src="/hero-map.jpg" loading="lazy" />
           </div>
           <div className="max-w-4xl mx-auto px-5 sm:px-8 relative z-10 text-center">
-            <h2 className="text-3xl sm:text-4xl lg:text-6xl font-headline font-extrabold mb-4 sm:mb-6">Stop prospecting blind.</h2>
-            <p className="text-lg sm:text-2xl text-slate-400 mb-8 sm:mb-12">See the house. See the data. Make the call.</p>
+            <h2 className="text-3xl sm:text-4xl lg:text-6xl font-headline font-extrabold mb-4 sm:mb-6">Circle prospect like nobody else.</h2>
+            <p className="text-lg sm:text-2xl text-slate-400 mb-8 sm:mb-12">See the listing. See the neighbors. Make the call.</p>
             <div className="flex flex-col sm:flex-row flex-wrap justify-center gap-4 sm:gap-6">
               <Link href="/signup" className="bg-gradient-to-br from-indigo-400 to-indigo-600 text-white px-8 sm:px-10 py-4 sm:py-5 rounded-lg font-bold font-headline text-lg sm:text-xl shadow-xl hover:scale-105 transition-all text-center">
                 Claim My Free Credits

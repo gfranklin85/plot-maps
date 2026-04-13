@@ -452,24 +452,28 @@ export default function ImportsPage() {
               <MaterialIcon icon="layers" className="text-[20px] text-primary" />
               <h2 className="text-sm uppercase tracking-wide sm:tracking-widest font-black text-on-surface">Market Layer (MLS / Comps)</h2>
             </div>
-            <div className="group flex flex-col h-full bg-surface-container-lowest border border-card-border rounded-2xl p-5 sm:p-6 md:p-10 hover:border-indigo-500/40 transition-all">
-              <div className="w-12 h-12 rounded-xl bg-indigo-500/10 flex items-center justify-center mb-6">
-                <MaterialIcon icon="map" className="text-[24px] text-primary" />
+            <div className="group relative flex flex-col h-full border border-card-border rounded-2xl p-5 sm:p-6 md:p-10 hover:border-indigo-500/40 transition-all overflow-hidden">
+              <img src="/import-mls.png" alt="" className="absolute inset-0 w-full h-full object-cover opacity-10 group-hover:opacity-20 transition-opacity" loading="lazy" />
+              <div className="absolute inset-0 bg-gradient-to-t from-surface-container-lowest via-surface-container-lowest/90 to-surface-container-lowest/60" />
+              <div className="relative">
+                <div className="w-12 h-12 rounded-xl bg-indigo-500/10 flex items-center justify-center mb-6">
+                  <MaterialIcon icon="map" className="text-[24px] text-primary" />
+                </div>
+                <h3 className="text-lg sm:text-2xl font-headline font-bold text-on-surface mb-3 sm:mb-4">Build your market view first</h3>
+                <p className="text-secondary text-sm leading-relaxed mb-6">
+                  Download a current snapshot of your market — active, pending, or recent sold listings — and upload it here. We&apos;ll place them on the map with full property cards so you can see what&apos;s happening in real time.
+                </p>
+                <p className="text-[11px] font-bold text-primary/70 uppercase tracking-wide mb-8 mt-auto">
+                  Think of this as your live comp layer while you&apos;re calling
+                </p>
+                <button
+                  onClick={() => setUploadType('context')}
+                  className="w-full bg-surface-container-high text-on-surface py-3.5 rounded-xl font-bold text-sm border border-card-border hover:bg-primary hover:text-white hover:border-primary transition-all"
+                >
+                  Upload Market Snapshot
+                </button>
+                <p className="text-center text-[10px] text-secondary mt-2">CSV or paste data</p>
               </div>
-              <h3 className="text-lg sm:text-2xl font-headline font-bold text-on-surface mb-3 sm:mb-4">Build your market view first</h3>
-              <p className="text-secondary text-sm leading-relaxed mb-6">
-                Download a current snapshot of your market — active, pending, or recent sold listings — and upload it here. We&apos;ll place them on the map with full property cards so you can see what&apos;s happening in real time.
-              </p>
-              <p className="text-[11px] font-bold text-primary/70 uppercase tracking-wide mb-8 mt-auto">
-                Think of this as your live comp layer while you&apos;re calling
-              </p>
-              <button
-                onClick={() => setUploadType('context')}
-                className="w-full bg-surface-container-high text-on-surface py-3.5 rounded-xl font-bold text-sm border border-card-border hover:bg-primary hover:text-white hover:border-primary transition-all"
-              >
-                Upload Market Snapshot
-              </button>
-              <p className="text-center text-[10px] text-secondary mt-2">CSV or paste data</p>
             </div>
           </div>
 
@@ -479,24 +483,28 @@ export default function ImportsPage() {
               <MaterialIcon icon="target" className="text-[20px] text-orange-400" />
               <h2 className="text-sm uppercase tracking-widest font-black text-on-surface">Your Leads (Targets)</h2>
             </div>
-            <div className="group flex flex-col h-full bg-card border border-card-border rounded-2xl p-5 sm:p-6 md:p-10 hover:border-orange-500/40 transition-all">
-              <div className="w-12 h-12 rounded-xl bg-orange-500/10 flex items-center justify-center mb-6">
-                <MaterialIcon icon="person_search" className="text-[24px] text-orange-400" />
+            <div className="group relative flex flex-col h-full border border-card-border rounded-2xl p-5 sm:p-6 md:p-10 hover:border-orange-500/40 transition-all overflow-hidden">
+              <img src="/import-leads.png" alt="" className="absolute inset-0 w-full h-full object-cover opacity-10 group-hover:opacity-20 transition-opacity" loading="lazy" />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#0c1324] via-[#0c1324]/90 to-[#0c1324]/60" />
+              <div className="relative">
+                <div className="w-12 h-12 rounded-xl bg-orange-500/10 flex items-center justify-center mb-6">
+                  <MaterialIcon icon="person_search" className="text-[24px] text-orange-400" />
+                </div>
+                <h3 className="text-lg sm:text-2xl font-headline font-bold text-on-surface mb-3 sm:mb-4">Bring your leads in</h3>
+                <p className="text-secondary text-sm leading-relaxed mb-6">
+                  Upload your lists from any source — PropStream, BatchLeads, county data, or your own notes. We automatically structure the data into property cards, then map them so you can see and work them directly.
+                </p>
+                <p className="text-[11px] font-bold text-orange-400 uppercase tracking-wide mb-8 mt-auto">
+                  Your data becomes something you can actually act on
+                </p>
+                <button
+                  onClick={() => setUploadType('target')}
+                  className="w-full bg-orange-500 text-white py-3.5 rounded-xl font-bold text-sm hover:bg-orange-600 transition-all shadow-lg shadow-orange-500/10"
+                >
+                  Upload Lead List
+                </button>
+                <p className="text-center text-[10px] text-secondary mt-2">Paste, CSV, or raw text</p>
               </div>
-              <h3 className="text-lg sm:text-2xl font-headline font-bold text-on-surface mb-3 sm:mb-4">Bring your leads in</h3>
-              <p className="text-secondary text-sm leading-relaxed mb-6">
-                Upload your lists from any source — PropStream, BatchLeads, county data, or your own notes. We automatically structure the data into property cards, then map them so you can see and work them directly.
-              </p>
-              <p className="text-[11px] font-bold text-orange-400 uppercase tracking-wide mb-8 mt-auto">
-                Your data becomes something you can actually act on
-              </p>
-              <button
-                onClick={() => setUploadType('target')}
-                className="w-full bg-orange-500 text-white py-3.5 rounded-xl font-bold text-sm hover:bg-orange-600 transition-all shadow-lg shadow-orange-500/10"
-              >
-                Upload Lead List
-              </button>
-              <p className="text-center text-[10px] text-secondary mt-2">Paste, CSV, or raw text</p>
             </div>
           </div>
         </div>

@@ -72,6 +72,23 @@ export default function Sidebar() {
             </Link>
           );
         })}
+
+        {/* Admin link — only for admins */}
+        {profile.isAdmin && (
+          <Link
+            href="/admin"
+            onClick={() => setMobileOpen(false)}
+            title={collapsed && !mobileOpen ? 'Admin' : undefined}
+            className={`flex items-center gap-3 ${collapsed && !mobileOpen ? 'justify-center px-2' : 'px-4'} py-3 rounded-lg transition-colors mt-2 border-t border-card-border/50 pt-4 ${
+              pathname.startsWith('/admin')
+                ? 'text-primary font-bold border-r-4 border-primary bg-surface-container'
+                : 'text-secondary hover:bg-surface-container/50'
+            }`}
+          >
+            <span className="material-symbols-outlined text-[20px]">admin_panel_settings</span>
+            {(!collapsed || mobileOpen) && <span className="text-sm">Admin</span>}
+          </Link>
+        )}
       </nav>
 
       {/* Upgrade prompt for free users */}

@@ -8,7 +8,7 @@ const resend = new Resend(process.env.RESEND_API_KEY!);
 const FROM_EMAIL = process.env.FROM_EMAIL || 'greg@plot.solutions';
 const ADMIN_NOTIFY_EMAIL = process.env.ADMIN_NOTIFICATION_EMAIL || 'gregfranklin523@gmail.com';
 const COST_PER_ADDRESS_CENTS = 25; // $0.25
-const MIN_ORDER_SIZE = 20;
+const MIN_ORDER_SIZE = 1; // no minimum
 
 interface AddressItem {
   address: string;

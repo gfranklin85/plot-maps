@@ -22,7 +22,7 @@ interface Props {
 }
 
 const COST_PER_ADDRESS = 0.25;
-const MIN_ORDER_SIZE = 20;
+const MIN_ORDER_SIZE = 1;
 
 export default function ProspectListPanel({ addresses, onRemove, onClear, onClose, onOrderComplete }: Props) {
   const total = (addresses.length * COST_PER_ADDRESS).toFixed(2);

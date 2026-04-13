@@ -27,9 +27,9 @@ export async function GET() {
   }
 
   return NextResponse.json({
-    balance_cents: wallet.balance_cents,
-    balance: (wallet.balance_cents / 100).toFixed(2),
-    total_deposited: (wallet.total_deposited_cents / 100).toFixed(2),
-    total_spent: (wallet.total_spent_cents / 100).toFixed(2),
+    balance_cents: wallet.balance_cents || 0,
+    balance: ((wallet.balance_cents || 0) / 100).toFixed(2),
+    total_deposited: ((wallet.total_deposited_cents || 0) / 100).toFixed(2),
+    total_spent: ((wallet.total_spent_cents || 0) / 100).toFixed(2),
   });
 }

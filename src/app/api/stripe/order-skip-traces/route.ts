@@ -8,7 +8,7 @@ const resend = new Resend(process.env.RESEND_API_KEY!);
 const FROM_EMAIL = process.env.FROM_EMAIL || 'greg@plot.solutions';
 const ADMIN_NOTIFY_EMAIL = process.env.ADMIN_NOTIFICATION_EMAIL || 'gregfranklin523@gmail.com';
 const COST_PER_ADDRESS_CENTS = 18; // $0.18
-const MIN_ORDER_SIZE = 10;
+const MIN_ORDER_SIZE = 1;
 
 async function notifyAdmin(orderId: string, addressCount: number, addresses: { address: string }[], userEmail: string) {
   try {

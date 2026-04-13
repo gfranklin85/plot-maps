@@ -354,7 +354,7 @@ export async function POST(request: Request) {
         source: targetUserId ? 'auto-target' : 'RPR',
         status: 'new' as const,
         record_type: targetUserId ? 'target' : 'context',
-        user_id: targetUserId || null,
+        user_id: targetUserId || user.id,
         last_imported_at: now,
         seeded_market_tag: marketTag || null,
       };
@@ -466,7 +466,7 @@ export async function POST(request: Request) {
         source: targetUserId ? 'auto-target' : 'MLS',
         status: 'new' as const,
         record_type: targetUserId ? 'target' : 'context',
-        user_id: targetUserId || null,
+        user_id: targetUserId || user.id,
         last_imported_at: now,
         seeded_market_tag: marketTag || null,
       };

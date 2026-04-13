@@ -152,11 +152,11 @@ export default function MapPage() {
     async function fetchLeads() {
       if (!user) return;
 
-      // Fetch user's own leads + shared context records
+      // Fetch user's own leads only (no shared data)
       const { data } = await supabase
         .from("leads")
         .select("*")
-        .or(`user_id.eq.${user.id},record_type.eq.context`)
+        .eq("user_id", user.id)
         .not("latitude", "is", null)
         .not("longitude", "is", null);
 
@@ -169,7 +169,7 @@ export default function MapPage() {
   function refetchLeads() {
     if (!user) return;
     supabase.from("leads").select("*")
-      .or(`user_id.eq.${user.id},record_type.eq.context`)
+      .eq("user_id", user.id)
       .not("latitude", "is", null).not("longitude", "is", null)
       .then(({ data }) => { if (data) setLeads(data as Lead[]); });
   }

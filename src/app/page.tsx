@@ -256,10 +256,11 @@ function MarketActivity() {
   useEffect(() => {
     if (!user) return;
     async function fetch() {
-      // Get recent MLS context records visible to this user
+      // Get user's own MLS records for market activity
       const { data } = await supabase
         .from('leads')
         .select('*')
+        .eq('user_id', user!.id)
         .not('listing_status', 'is', null)
         .not('latitude', 'is', null)
         .order('created_at', { ascending: false })

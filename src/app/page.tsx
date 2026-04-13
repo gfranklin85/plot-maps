@@ -184,25 +184,41 @@ export default function Dashboard() {
 
   return (
     <div className="p-4 md:p-8 space-y-6">
-      {/* ── HERO: Go to Map ── */}
-      <a
-        href="/map"
-        className="block relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/20 to-surface-container-high border border-card-border hover:border-primary/40 shadow-lg hover:shadow-xl transition-all group"
-      >
-        <div className="flex items-center justify-between p-6 md:p-8">
-          <div>
-            <h2 className="font-headline text-2xl md:text-3xl font-extrabold text-on-surface group-hover:text-primary transition-colors">
-              Open the Map
-            </h2>
-            <p className="text-sm md:text-base text-secondary mt-1">
-              See your market, find prospects, start calling.
-            </p>
+      {/* ── ACTION CARDS: Guide users into core workflows ── */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <a
+          href="/imports"
+          className="block rounded-2xl bg-gradient-to-br from-emerald-500/10 to-surface-container-high border border-card-border hover:border-emerald-500/40 shadow-lg hover:shadow-xl transition-all group p-5"
+        >
+          <div className="w-11 h-11 rounded-xl bg-emerald-500/20 flex items-center justify-center mb-3 group-hover:bg-emerald-500/30 transition-colors">
+            <MaterialIcon icon="real_estate_agent" className="text-[24px] text-emerald-400" />
           </div>
-          <div className="w-14 h-14 md:w-16 md:h-16 rounded-2xl bg-primary/20 flex items-center justify-center group-hover:bg-primary/30 transition-colors shrink-0">
-            <MaterialIcon icon="map" className="text-[32px] md:text-[36px] text-primary" />
+          <h3 className="font-headline text-base font-bold text-on-surface group-hover:text-emerald-400 transition-colors">Import MLS Data</h3>
+          <p className="text-xs text-secondary mt-1">Upload Solds, Actives & Pendings to circle prospect around listings.</p>
+        </a>
+
+        <a
+          href="/imports"
+          className="block rounded-2xl bg-gradient-to-br from-indigo-500/10 to-surface-container-high border border-card-border hover:border-indigo-500/40 shadow-lg hover:shadow-xl transition-all group p-5"
+        >
+          <div className="w-11 h-11 rounded-xl bg-indigo-500/20 flex items-center justify-center mb-3 group-hover:bg-indigo-500/30 transition-colors">
+            <MaterialIcon icon="upload_file" className="text-[24px] text-indigo-400" />
           </div>
-        </div>
-      </a>
+          <h3 className="font-headline text-base font-bold text-on-surface group-hover:text-indigo-400 transition-colors">Import Lead List</h3>
+          <p className="text-xs text-secondary mt-1">Upload your prospect list with phone numbers and start calling.</p>
+        </a>
+
+        <a
+          href="/map"
+          className="block rounded-2xl bg-gradient-to-br from-primary/10 to-surface-container-high border border-card-border hover:border-primary/40 shadow-lg hover:shadow-xl transition-all group p-5"
+        >
+          <div className="w-11 h-11 rounded-xl bg-primary/20 flex items-center justify-center mb-3 group-hover:bg-primary/30 transition-colors">
+            <MaterialIcon icon="map" className="text-[24px] text-primary" />
+          </div>
+          <h3 className="font-headline text-base font-bold text-on-surface group-hover:text-primary transition-colors">Open the Map</h3>
+          <p className="text-xs text-secondary mt-1">See your market, walk neighborhoods, and prospect from the map.</p>
+        </a>
+      </div>
 
       {/* ── MARKET ACTIVITY: Recent listings to prospect around ── */}
       <MarketActivity />

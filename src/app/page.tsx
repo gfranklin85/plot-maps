@@ -184,8 +184,15 @@ export default function Dashboard() {
 
   return (
     <div className="p-4 md:p-8 space-y-6">
-      {/* ── ACTION CARDS: Guide users into core workflows ── */}
+      {/* ── GET STARTED HEADER ── */}
+      <div className="text-center md:text-left">
+        <h2 className="font-headline text-xl md:text-2xl font-extrabold text-on-surface">Get Started in 3 Steps</h2>
+        <p className="text-sm text-secondary mt-1">Upload your listings, set up your dialer, open the map.</p>
+      </div>
+
+      {/* ── 3 ACTION CARDS ── */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* 1. Upload Your Inventory */}
         <a
           href="/imports"
           className="block relative rounded-2xl border border-card-border hover:border-emerald-500/40 shadow-lg hover:shadow-xl transition-all group overflow-hidden"
@@ -193,29 +200,39 @@ export default function Dashboard() {
           <img src="/card-mls.png" alt="" className="absolute inset-0 w-full h-full object-cover opacity-15 group-hover:opacity-25 transition-opacity" loading="lazy" />
           <div className="absolute inset-0 bg-gradient-to-t from-surface-container-high via-surface-container-high/80 to-transparent" />
           <div className="relative p-5">
-            <div className="w-11 h-11 rounded-xl bg-emerald-500/20 flex items-center justify-center mb-3 group-hover:bg-emerald-500/30 transition-colors">
-              <MaterialIcon icon="real_estate_agent" className="text-[24px] text-emerald-400" />
+            <div className="flex items-center gap-2 mb-3">
+              <span className="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400 text-xs font-bold">1</span>
+              <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Step One</span>
             </div>
-            <h3 className="font-headline text-base font-bold text-on-surface group-hover:text-emerald-400 transition-colors">Import MLS Data</h3>
-            <p className="text-xs text-secondary mt-1">Upload Solds, Actives & Pendings to circle prospect around listings.</p>
+            <div className="w-11 h-11 rounded-xl bg-emerald-500/20 flex items-center justify-center mb-3 group-hover:bg-emerald-500/30 transition-colors">
+              <MaterialIcon icon="upload_file" className="text-[24px] text-emerald-400" />
+            </div>
+            <h3 className="font-headline text-base font-bold text-on-surface group-hover:text-emerald-400 transition-colors">Upload Your Inventory</h3>
+            <p className="text-xs text-secondary mt-1">Paste MLS data, lead lists, or any property data. We auto-detect and map everything.</p>
           </div>
         </a>
 
+        {/* 2. Set Up Your Dialer */}
         <a
-          href="/imports"
-          className="block relative rounded-2xl border border-card-border hover:border-indigo-500/40 shadow-lg hover:shadow-xl transition-all group overflow-hidden"
+          href="/setup-number"
+          className="block relative rounded-2xl border border-card-border hover:border-orange-500/40 shadow-lg hover:shadow-xl transition-all group overflow-hidden"
         >
-          <img src="/card-leads.png" alt="" className="absolute inset-0 w-full h-full object-cover opacity-15 group-hover:opacity-25 transition-opacity" loading="lazy" />
+          <img src="/ChatGPT Image Apr 13, 2026, 02_15_59 PM.png" alt="" className="absolute inset-0 w-full h-full object-cover opacity-20 group-hover:opacity-30 transition-opacity" loading="lazy" />
           <div className="absolute inset-0 bg-gradient-to-t from-surface-container-high via-surface-container-high/80 to-transparent" />
           <div className="relative p-5">
-            <div className="w-11 h-11 rounded-xl bg-indigo-500/20 flex items-center justify-center mb-3 group-hover:bg-indigo-500/30 transition-colors">
-              <MaterialIcon icon="upload_file" className="text-[24px] text-indigo-400" />
+            <div className="flex items-center gap-2 mb-3">
+              <span className="w-6 h-6 rounded-full bg-orange-500/20 flex items-center justify-center text-orange-400 text-xs font-bold">2</span>
+              <span className="text-[10px] font-bold text-orange-400 uppercase tracking-wider">Step Two</span>
             </div>
-            <h3 className="font-headline text-base font-bold text-on-surface group-hover:text-indigo-400 transition-colors">Import Lead List</h3>
-            <p className="text-xs text-secondary mt-1">Upload your prospect list with phone numbers and start calling.</p>
+            <div className="w-11 h-11 rounded-xl bg-orange-500/20 flex items-center justify-center mb-3 group-hover:bg-orange-500/30 transition-colors">
+              <MaterialIcon icon="phone_in_talk" className="text-[24px] text-orange-400" />
+            </div>
+            <h3 className="font-headline text-base font-bold text-on-surface group-hover:text-orange-400 transition-colors">Set Up Your Dialer</h3>
+            <p className="text-xs text-secondary mt-1">Get a local phone number and start calling prospects directly from the map.</p>
           </div>
         </a>
 
+        {/* 3. Open the Map */}
         <a
           href="/map"
           className="block relative rounded-2xl border border-card-border hover:border-primary/40 shadow-lg hover:shadow-xl transition-all group overflow-hidden"
@@ -223,11 +240,15 @@ export default function Dashboard() {
           <img src="/card-map.png" alt="" className="absolute inset-0 w-full h-full object-cover opacity-15 group-hover:opacity-25 transition-opacity" loading="lazy" />
           <div className="absolute inset-0 bg-gradient-to-t from-surface-container-high via-surface-container-high/80 to-transparent" />
           <div className="relative p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-primary text-xs font-bold">3</span>
+              <span className="text-[10px] font-bold text-primary uppercase tracking-wider">Step Three</span>
+            </div>
             <div className="w-11 h-11 rounded-xl bg-primary/20 flex items-center justify-center mb-3 group-hover:bg-primary/30 transition-colors">
               <MaterialIcon icon="map" className="text-[24px] text-primary" />
             </div>
             <h3 className="font-headline text-base font-bold text-on-surface group-hover:text-primary transition-colors">Open the Map</h3>
-            <p className="text-xs text-secondary mt-1">See your market, walk neighborhoods, and prospect from the map.</p>
+            <p className="text-xs text-secondary mt-1">See your market, walk neighborhoods, find prospects, and start calling.</p>
           </div>
         </a>
       </div>

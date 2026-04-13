@@ -445,9 +445,9 @@ export default function ImportsPage() {
 
       {/* ═══ IDLE: Two-door entry ═══ */}
       {phase === 'idle' && !uploadType && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-10">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-10">
           {/* Market Layer (Left) */}
-          <div className="space-y-6">
+          <div className="space-y-4">
             <div className="flex items-center gap-3 px-1">
               <MaterialIcon icon="layers" className="text-[20px] text-primary" />
               <h2 className="text-sm uppercase tracking-wide sm:tracking-widest font-black text-on-surface">Market Layer (MLS / Comps)</h2>
@@ -478,7 +478,7 @@ export default function ImportsPage() {
           </div>
 
           {/* Your Leads (Right) */}
-          <div className="space-y-6">
+          <div className="space-y-4">
             <div className="flex items-center gap-3 px-1">
               <MaterialIcon icon="target" className="text-[20px] text-orange-400" />
               <h2 className="text-sm uppercase tracking-widest font-black text-on-surface">Your Leads (Targets)</h2>

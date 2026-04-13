@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getAuthUser } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase-server';
+import { batchTrace } from '@/lib/tracerfy';
 import { Resend } from 'resend';
 
 const resend = new Resend(process.env.RESEND_API_KEY!);
@@ -73,8 +74,8 @@ export async function POST(request: Request) {
       metadata: { address_count: addresses.length },
     });
 
-  // Create prospect order for admin fulfillment
-  await supabaseAdmin
+  // Create prospect order
+  const { data: order } = await supabaseAdmin
     .from('prospect_orders')
     .insert({
       user_id: user.id,
@@ -82,7 +83,40 @@ export async function POST(request: Request) {
       address_count: addresses.length,
       amount_cents: totalCost,
       addresses,
-    });
+    })
+    .select('id')
+    .single();
+
+  // Auto-submit to Tracerfy for skip tracing
+  let tracerfyQueued = false;
+  if (order) {
+    try {
+      const traceResult = await batchTrace(
+        addresses.map(a => ({
+          address: a.address,
+          city: a.city || '',
+          state: a.state || 'CA',
+          zip: a.zip || '',
+        })),
+        'advanced' // finds owner automatically
+      );
+
+      // Update order with Tracerfy queue ID and set to processing
+      await supabaseAdmin
+        .from('prospect_orders')
+        .update({
+          status: 'processing',
+          tracerfy_queue_id: traceResult.queue_id,
+          tracerfy_trace_type: traceResult.trace_type,
+        })
+        .eq('id', order.id);
+
+      tracerfyQueued = true;
+    } catch (err) {
+      // Tracerfy failed — order stays as 'paid' for manual fulfillment
+      console.error('Tracerfy batch trace failed:', err);
+    }
+  }
 
   // Notify admin
   try {
@@ -90,8 +124,8 @@ export async function POST(request: Request) {
     await resend.emails.send({
       from: `Plot Maps <${FROM_EMAIL}>`,
       to: ADMIN_NOTIFY_EMAIL,
-      subject: `New Skip Trace Order — ${addresses.length} addresses`,
-      text: `New order from ${user.email}\n\nAddresses: ${addresses.length}\nCost: $${(totalCost / 100).toFixed(2)}\n\nAddresses:\n• ${addressList}\n\nGo to admin dashboard to fulfill.`,
+      subject: `${tracerfyQueued ? '🟢 Auto-traced' : '🟠 Manual fulfillment'} — ${addresses.length} addresses`,
+      text: `New order from ${user.email}\n\nAddresses: ${addresses.length}\nCost: $${(totalCost / 100).toFixed(2)}\nTracerfy: ${tracerfyQueued ? 'Submitted (auto-processing)' : 'FAILED — needs manual fulfillment'}\n\nAddresses:\n• ${addressList}`,
     });
   } catch { /* non-fatal */ }
 
@@ -100,5 +134,6 @@ export async function POST(request: Request) {
     spent_cents: totalCost,
     balance_cents: newBalance,
     balance: (newBalance / 100).toFixed(2),
+    tracerfy_queued: tracerfyQueued,
   });
 }

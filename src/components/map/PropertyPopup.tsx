@@ -137,6 +137,8 @@ export default function PropertyPopup({ lead, onUpdate, walkMode = false, onWalk
   const [upgradeFeature, setUpgradeFeature] = useState<string | null>(null);
   const [contextPaste, setContextPaste] = useState('');
   const [contextSaved, setContextSaved] = useState(false);
+  const [lookupLoading, setLookupLoading] = useState(false);
+  const [lookupResult, setLookupResult] = useState<{ hit: boolean; owner_name?: string; phones?: string[]; error?: string } | null>(null);
 
   const isFree = profile.subscriptionStatus !== 'active';
 
@@ -335,6 +337,70 @@ export default function PropertyPopup({ lead, onUpdate, walkMode = false, onWalk
                     className="flex items-center gap-1 text-[11px] font-bold text-emerald-500 hover:underline">
                     <MaterialIcon icon="call" className="text-[12px]" />
                     {formatPhone(phone)}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Get Owner Info — skip trace lookup for leads without phone */}
+            {!isCallable && !isReference && !lookupResult && (
+              <button
+                onClick={async () => {
+                  if (isFree) { setUpgradeFeature('dialer'); return; }
+                  setLookupLoading(true);
+                  setLookupResult(null);
+                  try {
+                    const addr = lead.property_address || '';
+                    const res = await fetch('/api/skip-trace/lookup', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        leadId: lead.id,
+                        address: addr,
+                        city: lead.city || addr.split(',')[1]?.trim() || '',
+                        state: lead.state || 'CA',
+                        zip: lead.zip || '',
+                      }),
+                    });
+                    const data = await res.json();
+                    if (data.error === 'insufficient_balance') {
+                      setLookupResult({ hit: false, error: 'Add funds to your wallet first' });
+                    } else if (data.hit) {
+                      setLookupResult({ hit: true, owner_name: data.owner_name, phones: data.phones });
+                      onUpdate?.(); // refresh lead data
+                    } else {
+                      setLookupResult({ hit: false, error: 'No owner data found' });
+                    }
+                  } catch {
+                    setLookupResult({ hit: false, error: 'Lookup failed' });
+                  }
+                  setLookupLoading(false);
+                }}
+                disabled={lookupLoading}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-indigo-500/10 text-indigo-400 text-xs font-bold hover:bg-indigo-500/20 transition-all disabled:opacity-50"
+              >
+                {lookupLoading ? (
+                  <><span className="w-3 h-3 border-2 border-indigo-400/30 border-t-indigo-400 rounded-full animate-spin" /> Looking up owner...</>
+                ) : (
+                  <><MaterialIcon icon="person_search" className="text-[14px]" /> Get Owner Info — $0.50</>
+                )}
+              </button>
+            )}
+            {lookupResult && !lookupResult.hit && (
+              <p className="text-xs text-red-400">{lookupResult.error || 'No data found'}</p>
+            )}
+            {lookupResult?.hit && (
+              <div className="text-xs space-y-1">
+                {lookupResult.owner_name && <p className="font-semibold text-on-surface">{lookupResult.owner_name}</p>}
+                {lookupResult.phones?.map((p, i) => (
+                  <button key={i}
+                    onClick={() => {
+                      if (isDesktop) makeCall(p, lookupResult.owner_name || 'Unknown', lead.id);
+                      else window.location.href = `tel:${p}`;
+                    }}
+                    className="flex items-center gap-1 text-[11px] font-bold text-emerald-500 hover:underline">
+                    <MaterialIcon icon="call" className="text-[12px]" />
+                    {formatPhone(p)}
                   </button>
                 ))}
               </div>

@@ -30,9 +30,10 @@ interface Props {
   hotProspects: HotProspect[];
   liveVisitors: number;
   costs?: CostData | null;
+  tracerfyBalance?: number | null;
 }
 
-export default function OverviewTab({ summary, users, hotProspects, liveVisitors, costs }: Props) {
+export default function OverviewTab({ summary, users, hotProspects, liveVisitors, costs, tracerfyBalance }: Props) {
   // ── Skip trace orders state ──
   const [orders, setOrders] = useState<ProspectOrder[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<ProspectOrder | null>(null);
@@ -122,12 +123,17 @@ export default function OverviewTab({ summary, users, hotProspects, liveVisitors
         </div>
       </div>
 
-      {/* Platform Costs */}
-      {costs && (
+      {/* Platform Costs + Vendor Balances */}
+      {(costs || tracerfyBalance != null) && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <SummaryCard label="Burn Today" value={`$${costs.todayBurn.toFixed(2)}`} sub="platform API costs" icon="local_fire_department" alert={costs.todayBurn > 5} />
-          <SummaryCard label="Burn This Month" value={`$${costs.monthBurn.toFixed(2)}`} sub={`$${summary.activeSubscribers > 0 ? (costs.monthBurn / summary.activeSubscribers).toFixed(2) : '0.00'}/subscriber`} icon="trending_up" />
-          {costs.byService.slice(0, 2).map(s => (
+          {costs && <>
+            <SummaryCard label="Burn Today" value={`$${costs.todayBurn.toFixed(2)}`} sub="platform API costs" icon="local_fire_department" alert={costs.todayBurn > 5} />
+            <SummaryCard label="Burn This Month" value={`$${costs.monthBurn.toFixed(2)}`} sub={`$${summary.activeSubscribers > 0 ? (costs.monthBurn / summary.activeSubscribers).toFixed(2) : '0.00'}/subscriber`} icon="trending_up" />
+          </>}
+          {tracerfyBalance != null && (
+            <SummaryCard label="Tracerfy Credits" value={tracerfyBalance.toLocaleString()} sub={`$${(tracerfyBalance * 0.02).toFixed(2)} value`} icon="person_search" alert={tracerfyBalance < 100} />
+          )}
+          {costs?.byService.slice(0, 1).map(s => (
             <SummaryCard key={s.service} label={s.service.replace('_', ' ')} value={`$${s.cost.toFixed(2)}`} sub="this month" icon="receipt_long" />
           ))}
         </div>

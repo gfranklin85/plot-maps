@@ -184,6 +184,14 @@ export async function GET() {
     .map(([service, cost]) => ({ service, cost: Math.round(cost * 100) / 100 }))
     .sort((a, b) => b.cost - a.cost);
 
+  // ── Tracerfy balance ──
+  let tracerfyBalance: number | null = null;
+  try {
+    const { getAnalytics } = await import('@/lib/tracerfy');
+    const analytics = await getAnalytics();
+    tracerfyBalance = analytics.balance;
+  } catch { /* non-fatal — Tracerfy may not be configured */ }
+
   return NextResponse.json({
     pulse: {
       liveVisitors: liveVisitors || 0,
@@ -207,5 +215,6 @@ export async function GET() {
       monthBurn: Math.round(monthBurn * 100) / 100,
       byService: costByService,
     },
+    tracerfyBalance,
   });
 }

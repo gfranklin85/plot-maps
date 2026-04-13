@@ -249,7 +249,7 @@ const FIELD_MATCHERS: { field: string; test: (h: string) => boolean }[] = [
   { field: 'price_range', test: (h) => /price|value|estimated/i.test(h) },
 ];
 
-const STATUS_MAP: Record<string, string> = { S: 'Sold', A: 'Active', T: 'Pending' };
+const STATUS_MAP: Record<string, string> = { S: 'Sold', A: 'Active', P: 'Pending', T: 'Pending' };
 
 export async function POST(request: Request) {
   const user = await getAuthUser();

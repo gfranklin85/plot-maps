@@ -103,9 +103,9 @@ function createLabelIcon(lead: Lead, isDark = true): google.maps.Icon {
 
   const priceLen = (price || '—').length;
   const subLen = subLine.length;
-  const topW = 24 + priceLen * 9;
-  const botW = subLen * 6 + 12;
-  const width = Math.max(topW, botW, 55);
+  const topW = 22 + priceLen * 8;
+  const botW = subLen * 4.8 + 10;
+  const width = Math.max(topW, botW, 50);
   const height = subLine ? 36 : 28;
 
   const svg = `
@@ -137,12 +137,12 @@ function createDetailIcon(lead: Lead, isDark = true): google.maps.Icon {
   const line2 = [dom, recency].filter(Boolean).join(' · ');
   const line3 = [sqft, year].filter(Boolean).join(' · ') || lead.property_address?.split(',')[0]?.substring(0, 20) || '';
 
-  const priceW = (price || '—').length * 11 + 20;
-  const badgeW = statusLabel ? 52 : 0;
-  const topW = priceW + badgeW + 12;
-  const line2W = line2.length * 7 + 20;
-  const line3W = line3.length * 6.5 + 20;
-  const width = Math.max(topW, line2W, line3W, 100);
+  const priceW = (price || '—').length * 10 + 16;
+  const badgeW = statusLabel ? 48 : 0;
+  const topW = priceW + badgeW + 8;
+  const line2W = line2.length * 6 + 16;
+  const line3W = line3.length * 5.5 + 16;
+  const width = Math.max(topW, line2W, line3W, 80);
   const height = 62;
 
   const svg = `

@@ -436,27 +436,27 @@ export default function ImportsPage() {
   const formatLabel = format === 'mls' ? 'MLS Listing Data' : format === 'propwire' ? 'Property List (PropWire format)' : 'Property Data';
 
   return (
-    <div className="max-w-6xl mx-auto px-10 py-12 space-y-16">
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 md:px-10 py-6 md:py-12 space-y-8 md:space-y-16">
       {/* Header */}
       <div className="max-w-3xl">
-        <h1 className="text-4xl font-headline font-extrabold tracking-tight mb-2">Build your map before you make your calls</h1>
-        <p className="text-secondary text-lg leading-relaxed">Upload your market data and your leads to get started</p>
+        <h1 className="text-2xl sm:text-3xl lg:text-4xl font-headline font-extrabold tracking-tight mb-2">Build your map before you make your calls</h1>
+        <p className="text-secondary text-sm sm:text-lg leading-relaxed">Upload your market data and your leads to get started</p>
       </div>
 
       {/* ═══ IDLE: Two-door entry ═══ */}
       {phase === 'idle' && !uploadType && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-10">
           {/* Market Layer (Left) */}
           <div className="space-y-6">
             <div className="flex items-center gap-3 px-1">
               <MaterialIcon icon="layers" className="text-[20px] text-primary" />
-              <h2 className="text-sm uppercase tracking-widest font-black text-on-surface">Market Layer (MLS / Comps)</h2>
+              <h2 className="text-sm uppercase tracking-wide sm:tracking-widest font-black text-on-surface">Market Layer (MLS / Comps)</h2>
             </div>
-            <div className="group flex flex-col h-full bg-surface-container-lowest border border-card-border rounded-2xl p-10 hover:border-indigo-500/40 transition-all">
+            <div className="group flex flex-col h-full bg-surface-container-lowest border border-card-border rounded-2xl p-5 sm:p-6 md:p-10 hover:border-indigo-500/40 transition-all">
               <div className="w-12 h-12 rounded-xl bg-indigo-500/10 flex items-center justify-center mb-6">
                 <MaterialIcon icon="map" className="text-[24px] text-primary" />
               </div>
-              <h3 className="text-2xl font-headline font-bold text-on-surface mb-4">Build your market view first</h3>
+              <h3 className="text-lg sm:text-2xl font-headline font-bold text-on-surface mb-3 sm:mb-4">Build your market view first</h3>
               <p className="text-secondary text-sm leading-relaxed mb-6">
                 Download a current snapshot of your market — active, pending, or recent sold listings — and upload it here. We&apos;ll place them on the map with full property cards so you can see what&apos;s happening in real time.
               </p>
@@ -479,11 +479,11 @@ export default function ImportsPage() {
               <MaterialIcon icon="target" className="text-[20px] text-orange-400" />
               <h2 className="text-sm uppercase tracking-widest font-black text-on-surface">Your Leads (Targets)</h2>
             </div>
-            <div className="group flex flex-col h-full bg-card border border-card-border rounded-2xl p-10 hover:border-orange-500/40 transition-all">
+            <div className="group flex flex-col h-full bg-card border border-card-border rounded-2xl p-5 sm:p-6 md:p-10 hover:border-orange-500/40 transition-all">
               <div className="w-12 h-12 rounded-xl bg-orange-500/10 flex items-center justify-center mb-6">
                 <MaterialIcon icon="person_search" className="text-[24px] text-orange-400" />
               </div>
-              <h3 className="text-2xl font-headline font-bold text-on-surface mb-4">Bring your leads in</h3>
+              <h3 className="text-lg sm:text-2xl font-headline font-bold text-on-surface mb-3 sm:mb-4">Bring your leads in</h3>
               <p className="text-secondary text-sm leading-relaxed mb-6">
                 Upload your lists from any source — PropStream, BatchLeads, county data, or your own notes. We automatically structure the data into property cards, then map them so you can see and work them directly.
               </p>
@@ -521,7 +521,7 @@ export default function ImportsPage() {
             {/* Drop Zone */}
             <div
               className={cn(
-                'group relative flex flex-col items-center justify-center border-2 border-dashed rounded-2xl p-12 transition-all cursor-pointer',
+                'group relative flex flex-col items-center justify-center border-2 border-dashed rounded-2xl p-6 sm:p-8 md:p-12 transition-all cursor-pointer',
                 dragActive
                   ? (uploadType === 'context' ? 'border-indigo-500 bg-indigo-500/5' : 'border-orange-500 bg-orange-500/5')
                   : 'border-outline-variant/30 hover:border-outline-variant/50 bg-surface-container-lowest'
@@ -543,7 +543,7 @@ export default function ImportsPage() {
               <div className="w-16 h-16 rounded-full bg-surface-container/50 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                 <MaterialIcon icon="cloud_upload" className={`text-[32px] ${uploadType === 'context' ? 'text-primary' : 'text-orange-400'}`} />
               </div>
-              <p className="text-xl font-semibold text-on-surface mb-2">Drop CSV or Excel</p>
+              <p className="text-base sm:text-xl font-semibold text-on-surface mb-2">Drop CSV or Excel</p>
               <p className="text-sm text-secondary mb-6">
                 {uploadType === 'context' ? 'MLS exports, recent solds, active listings' : 'PropWire, BatchLeads, county records, any format'}
               </p>
@@ -613,7 +613,7 @@ export default function ImportsPage() {
           </div>
 
           {/* Field grid */}
-          <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 sm:gap-3">
             {mappedFields.map((f) => (
               <div key={f.systemField} className="bg-surface/50 p-4 rounded-xl border border-card-border flex flex-col gap-2">
                 <MaterialIcon icon="task_alt" className="text-[14px] text-primary" />
@@ -716,7 +716,7 @@ export default function ImportsPage() {
 
           {/* Right: Summary */}
           <div className="lg:col-span-5">
-            <div className="bg-surface-container/30 p-8 rounded-3xl border border-card-border">
+            <div className="bg-surface-container/30 p-4 sm:p-6 md:p-8 rounded-2xl sm:rounded-3xl border border-card-border">
               <h3 className="text-lg font-bold text-on-surface mb-8">Import Summary</h3>
               <div className="space-y-6">
                 {result.inserted > 0 && (

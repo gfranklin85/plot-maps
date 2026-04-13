@@ -173,7 +173,7 @@ export default function LeadsPage() {
 
   const SortHeader = ({ column, label }: { column: SortColumn; label: string }) => (
     <th
-      className="px-4 py-3 font-semibold text-on-surface-variant cursor-pointer select-none hover:text-on-surface transition-colors"
+      className="px-2 sm:px-3 md:px-4 py-2 sm:py-3 font-semibold text-on-surface-variant cursor-pointer select-none hover:text-on-surface transition-colors text-xs sm:text-sm"
       onClick={() => handleSort(column)}
     >
       <div className="flex items-center gap-1">
@@ -191,9 +191,9 @@ export default function LeadsPage() {
   return (
     <div className="p-6 lg:p-8 space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-extrabold tracking-tight text-on-surface">Leads</h1>
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between">
+        <h1 className="text-xl sm:text-3xl font-extrabold tracking-tight text-on-surface">Leads</h1>
+        <div className="flex items-center gap-2 sm:gap-3">
           <a href="/imports" className="flex items-center gap-2 px-4 py-2 bg-surface-container text-on-surface font-semibold rounded-lg hover:bg-surface-container-high transition-colors text-sm">
             <MaterialIcon icon="upload" className="text-[16px]" />
             Import
@@ -209,7 +209,7 @@ export default function LeadsPage() {
       </div>
 
       {/* Filter Bar */}
-      <div className="flex items-center gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
         <SearchInput
           placeholder="Search address, owner, phone..."
           onChange={setSearchTerm}
@@ -258,7 +258,7 @@ export default function LeadsPage() {
           <table className="w-full text-sm text-left">
             <thead>
               <tr className="border-b border-card-border bg-surface-container-low">
-                <th className="w-10 px-6 py-4">
+                <th className="w-10 px-2 sm:px-4 md:px-6 py-3">
                   <input type="checkbox" checked={selectedIds.size === leads.length && leads.length > 0} onChange={toggleAll} className="rounded border-card-border" />
                 </th>
                 <SortHeader column="property_address" label="Address / Contact" />
@@ -274,7 +274,7 @@ export default function LeadsPage() {
               {loading
                 ? Array.from({ length: 8 }).map((_, i) => (
                     <tr key={i}>
-                      <td className="px-6 py-4" colSpan={8}>
+                      <td className="px-2 sm:px-4 md:px-6 py-3" colSpan={8}>
                         <div className="h-4 w-full animate-pulse rounded bg-surface-container" />
                       </td>
                     </tr>
@@ -285,31 +285,31 @@ export default function LeadsPage() {
                       onClick={() => router.push(`/leads/${lead.id}`)}
                       className="cursor-pointer hover:bg-surface-container-low transition-colors"
                     >
-                      <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                      <td className="px-2 sm:px-4 md:px-6 py-3" onClick={(e) => e.stopPropagation()}>
                         <input type="checkbox" checked={selectedIds.has(lead.id)} onChange={() => toggleSelect(lead.id)} className="rounded border-card-border" />
                       </td>
-                      <td className="px-6 py-4">
-                        <p className="font-semibold text-on-surface">{lead.property_address || 'No address'}</p>
+                      <td className="px-2 sm:px-4 md:px-6 py-3">
+                        <p className="font-semibold text-on-surface truncate max-w-[150px] sm:max-w-[250px] md:max-w-none">{lead.property_address || 'No address'}</p>
                         <p className="text-xs text-secondary">{formatPhone(lead.phone)}</p>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-2 sm:px-4 md:px-6 py-3">
                         <p className="font-medium text-on-surface">{lead.owner_name || lead.name || '--'}</p>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-2 sm:px-4 md:px-6 py-3">
                         <Badge status={lead.status} />
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-2 sm:px-4 md:px-6 py-3">
                         {lead.priority ? (
                           <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize ${PRIORITY_COLORS[lead.priority]}`}>
                             {lead.priority}
                           </span>
                         ) : <span className="text-xs text-on-surface-variant">--</span>}
                       </td>
-                      <td className="px-6 py-4 text-secondary text-sm">{lead.source ?? '--'}</td>
-                      <td className="px-6 py-4 text-sm text-secondary">
+                      <td className="px-2 sm:px-4 md:px-6 py-3 text-secondary text-sm">{lead.source ?? '--'}</td>
+                      <td className="px-2 sm:px-4 md:px-6 py-3 text-sm text-secondary">
                         {lead.last_contact_date ? timeAgo(lead.last_contact_date) : 'Never'}
                       </td>
-                      <td className="px-6 py-4 text-sm text-secondary">
+                      <td className="px-2 sm:px-4 md:px-6 py-3 text-sm text-secondary">
                         {lead.follow_up_date ? formatDate(lead.follow_up_date) : '--'}
                       </td>
                     </tr>

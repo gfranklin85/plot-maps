@@ -143,10 +143,10 @@ export default function Dashboard() {
   // New user onboarding — no leads yet
   if (!loading && totalLeads === 0) {
     return (
-      <div className="p-8 flex flex-col items-center justify-center min-h-[60vh]">
+      <div className="p-4 md:p-8 flex flex-col items-center justify-center min-h-[60vh]">
         <div className="max-w-lg text-center">
-          <MaterialIcon icon="rocket_launch" className="text-[72px] text-blue-500 mb-4" />
-          <h2 className="font-headline text-3xl font-extrabold text-on-surface mb-3">
+          <MaterialIcon icon="rocket_launch" className="text-[48px] sm:text-[72px] text-blue-500 mb-4" />
+          <h2 className="font-headline text-xl sm:text-3xl font-extrabold text-on-surface mb-3">
             Welcome{profile.fullName ? `, ${profile.fullName.split(' ')[0]}` : ''}!
           </h2>
 
@@ -250,15 +250,15 @@ export default function Dashboard() {
         <div className="lg:col-span-4 space-y-4">
           <div className="grid grid-cols-3 gap-3">
             <div className="bg-surface-container-lowest rounded-xl p-4 text-center">
-              <p className="text-2xl font-extrabold text-on-surface">{loading ? '--' : totalLeads}</p>
+              <p className="text-xl sm:text-2xl font-extrabold text-on-surface">{loading ? '--' : totalLeads}</p>
               <p className="text-[10px] text-secondary font-bold uppercase tracking-wider">Leads</p>
             </div>
             <div className="bg-surface-container-lowest rounded-xl p-4 text-center">
-              <p className="text-2xl font-extrabold text-on-surface">{loading ? '--' : newThisWeek}</p>
+              <p className="text-xl sm:text-2xl font-extrabold text-on-surface">{loading ? '--' : newThisWeek}</p>
               <p className="text-[10px] text-secondary font-bold uppercase tracking-wider">New</p>
             </div>
             <div className="bg-surface-container-lowest rounded-xl p-4 text-center">
-              <p className="text-2xl font-extrabold text-on-surface">{loading ? '--' : avgCallsDay}</p>
+              <p className="text-xl sm:text-2xl font-extrabold text-on-surface">{loading ? '--' : avgCallsDay}</p>
               <p className="text-[10px] text-secondary font-bold uppercase tracking-wider">Calls</p>
             </div>
           </div>

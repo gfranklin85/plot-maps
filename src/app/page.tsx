@@ -217,7 +217,7 @@ export default function Dashboard() {
           href="/setup-number"
           className="block relative rounded-2xl border border-card-border hover:border-orange-500/40 shadow-lg hover:shadow-xl transition-all group overflow-hidden"
         >
-          <img src="/ChatGPT Image Apr 13, 2026, 02_15_59 PM.png" alt="" className="absolute inset-0 w-full h-full object-cover opacity-20 group-hover:opacity-30 transition-opacity" loading="lazy" />
+          <img src="/card-dialer.png" alt="" className="absolute inset-0 w-full h-full object-cover opacity-20 group-hover:opacity-30 transition-opacity" loading="lazy" />
           <div className="absolute inset-0 bg-gradient-to-t from-surface-container-high via-surface-container-high/80 to-transparent" />
           <div className="relative p-5">
             <div className="flex items-center gap-2 mb-3">

@@ -188,35 +188,47 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <a
           href="/imports"
-          className="block rounded-2xl bg-gradient-to-br from-emerald-500/10 to-surface-container-high border border-card-border hover:border-emerald-500/40 shadow-lg hover:shadow-xl transition-all group p-5"
+          className="block relative rounded-2xl border border-card-border hover:border-emerald-500/40 shadow-lg hover:shadow-xl transition-all group overflow-hidden"
         >
-          <div className="w-11 h-11 rounded-xl bg-emerald-500/20 flex items-center justify-center mb-3 group-hover:bg-emerald-500/30 transition-colors">
-            <MaterialIcon icon="real_estate_agent" className="text-[24px] text-emerald-400" />
+          <img src="/card-mls.png" alt="" className="absolute inset-0 w-full h-full object-cover opacity-15 group-hover:opacity-25 transition-opacity" loading="lazy" />
+          <div className="absolute inset-0 bg-gradient-to-t from-surface-container-high via-surface-container-high/80 to-transparent" />
+          <div className="relative p-5">
+            <div className="w-11 h-11 rounded-xl bg-emerald-500/20 flex items-center justify-center mb-3 group-hover:bg-emerald-500/30 transition-colors">
+              <MaterialIcon icon="real_estate_agent" className="text-[24px] text-emerald-400" />
+            </div>
+            <h3 className="font-headline text-base font-bold text-on-surface group-hover:text-emerald-400 transition-colors">Import MLS Data</h3>
+            <p className="text-xs text-secondary mt-1">Upload Solds, Actives & Pendings to circle prospect around listings.</p>
           </div>
-          <h3 className="font-headline text-base font-bold text-on-surface group-hover:text-emerald-400 transition-colors">Import MLS Data</h3>
-          <p className="text-xs text-secondary mt-1">Upload Solds, Actives & Pendings to circle prospect around listings.</p>
         </a>
 
         <a
           href="/imports"
-          className="block rounded-2xl bg-gradient-to-br from-indigo-500/10 to-surface-container-high border border-card-border hover:border-indigo-500/40 shadow-lg hover:shadow-xl transition-all group p-5"
+          className="block relative rounded-2xl border border-card-border hover:border-indigo-500/40 shadow-lg hover:shadow-xl transition-all group overflow-hidden"
         >
-          <div className="w-11 h-11 rounded-xl bg-indigo-500/20 flex items-center justify-center mb-3 group-hover:bg-indigo-500/30 transition-colors">
-            <MaterialIcon icon="upload_file" className="text-[24px] text-indigo-400" />
+          <img src="/card-leads.png" alt="" className="absolute inset-0 w-full h-full object-cover opacity-15 group-hover:opacity-25 transition-opacity" loading="lazy" />
+          <div className="absolute inset-0 bg-gradient-to-t from-surface-container-high via-surface-container-high/80 to-transparent" />
+          <div className="relative p-5">
+            <div className="w-11 h-11 rounded-xl bg-indigo-500/20 flex items-center justify-center mb-3 group-hover:bg-indigo-500/30 transition-colors">
+              <MaterialIcon icon="upload_file" className="text-[24px] text-indigo-400" />
+            </div>
+            <h3 className="font-headline text-base font-bold text-on-surface group-hover:text-indigo-400 transition-colors">Import Lead List</h3>
+            <p className="text-xs text-secondary mt-1">Upload your prospect list with phone numbers and start calling.</p>
           </div>
-          <h3 className="font-headline text-base font-bold text-on-surface group-hover:text-indigo-400 transition-colors">Import Lead List</h3>
-          <p className="text-xs text-secondary mt-1">Upload your prospect list with phone numbers and start calling.</p>
         </a>
 
         <a
           href="/map"
-          className="block rounded-2xl bg-gradient-to-br from-primary/10 to-surface-container-high border border-card-border hover:border-primary/40 shadow-lg hover:shadow-xl transition-all group p-5"
+          className="block relative rounded-2xl border border-card-border hover:border-primary/40 shadow-lg hover:shadow-xl transition-all group overflow-hidden"
         >
-          <div className="w-11 h-11 rounded-xl bg-primary/20 flex items-center justify-center mb-3 group-hover:bg-primary/30 transition-colors">
-            <MaterialIcon icon="map" className="text-[24px] text-primary" />
+          <img src="/card-map.png" alt="" className="absolute inset-0 w-full h-full object-cover opacity-15 group-hover:opacity-25 transition-opacity" loading="lazy" />
+          <div className="absolute inset-0 bg-gradient-to-t from-surface-container-high via-surface-container-high/80 to-transparent" />
+          <div className="relative p-5">
+            <div className="w-11 h-11 rounded-xl bg-primary/20 flex items-center justify-center mb-3 group-hover:bg-primary/30 transition-colors">
+              <MaterialIcon icon="map" className="text-[24px] text-primary" />
+            </div>
+            <h3 className="font-headline text-base font-bold text-on-surface group-hover:text-primary transition-colors">Open the Map</h3>
+            <p className="text-xs text-secondary mt-1">See your market, walk neighborhoods, and prospect from the map.</p>
           </div>
-          <h3 className="font-headline text-base font-bold text-on-surface group-hover:text-primary transition-colors">Open the Map</h3>
-          <p className="text-xs text-secondary mt-1">See your market, walk neighborhoods, and prospect from the map.</p>
         </a>
       </div>
 

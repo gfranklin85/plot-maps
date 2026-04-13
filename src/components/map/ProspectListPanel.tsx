@@ -22,6 +22,7 @@ interface Props {
 }
 
 const COST_PER_ADDRESS = 0.25;
+const MIN_ORDER_SIZE = 20;
 
 export default function ProspectListPanel({ addresses, onRemove, onClear, onClose, onOrderComplete }: Props) {
   const total = (addresses.length * COST_PER_ADDRESS).toFixed(2);
@@ -147,7 +148,13 @@ export default function ProspectListPanel({ addresses, onRemove, onClear, onClos
             </div>
           )}
 
-          {hasBalance ? (
+          {addresses.length < MIN_ORDER_SIZE && (
+            <p className="text-[10px] text-on-surface-variant/60 text-center">
+              Minimum {MIN_ORDER_SIZE} properties ({MIN_ORDER_SIZE - addresses.length} more needed)
+            </p>
+          )}
+
+          {hasBalance && addresses.length >= MIN_ORDER_SIZE ? (
             <button
               onClick={handleConfirm}
               disabled={ordering}
@@ -159,13 +166,20 @@ export default function ProspectListPanel({ addresses, onRemove, onClear, onClos
                 <><MaterialIcon icon="check_circle" className="text-[18px]" /> Confirm — ${total} from wallet</>
               )}
             </button>
-          ) : (
+          ) : !hasBalance ? (
             <button
               onClick={() => setShowTopup(true)}
               className="w-full py-3.5 rounded-xl bg-gradient-to-br from-primary/80 to-primary text-white font-bold text-sm flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition-all"
             >
               <MaterialIcon icon="add" className="text-[18px]" />
               Add Funds to Wallet
+            </button>
+          ) : (
+            <button
+              disabled
+              className="w-full py-3.5 rounded-xl bg-surface-container-high text-on-surface-variant font-bold text-sm flex items-center justify-center gap-2 opacity-50"
+            >
+              Select {MIN_ORDER_SIZE - addresses.length} more properties
             </button>
           )}
 

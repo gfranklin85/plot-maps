@@ -14,6 +14,7 @@ import MaterialIcon from "@/components/ui/MaterialIcon";
 import UpgradeGate from "@/components/ui/UpgradeGate";
 import PropertyPopup from "@/components/map/PropertyPopup";
 import ProspectListPanel from "@/components/map/ProspectListPanel";
+import OnboardingTooltips from "@/components/ui/OnboardingTooltips";
 
 const FILTER_TABS: { label: string; key: string; statuses: LeadStatus[] }[] = [
   { label: "All", key: "all", statuses: [] },
@@ -793,6 +794,8 @@ export default function MapPage() {
           onClose={() => setShowProspectPanel(false)}
         />
       )}
+
+      <OnboardingTooltips />
     </div>
   );
 }

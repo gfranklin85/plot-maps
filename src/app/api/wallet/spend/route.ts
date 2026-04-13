@@ -7,6 +7,7 @@ const resend = new Resend(process.env.RESEND_API_KEY!);
 const FROM_EMAIL = process.env.FROM_EMAIL || 'greg@plot.solutions';
 const ADMIN_NOTIFY_EMAIL = process.env.ADMIN_NOTIFICATION_EMAIL || 'gregfranklin523@gmail.com';
 const COST_PER_ADDRESS_CENTS = 25; // $0.25
+const MIN_ORDER_SIZE = 20;
 
 interface AddressItem {
   address: string;
@@ -25,6 +26,10 @@ export async function POST(request: Request) {
 
   if (!addresses || addresses.length === 0) {
     return NextResponse.json({ error: 'addresses required' }, { status: 400 });
+  }
+
+  if (addresses.length < MIN_ORDER_SIZE) {
+    return NextResponse.json({ error: `Minimum order is ${MIN_ORDER_SIZE} properties`, min: MIN_ORDER_SIZE }, { status: 400 });
   }
 
   const totalCost = addresses.length * COST_PER_ADDRESS_CENTS;

@@ -21,3 +21,16 @@ export async function isSubscribed(userId: string): Promise<boolean> {
     .single();
   return data?.subscription_status === 'active';
 }
+
+/**
+ * Get the user's tier config based on their subscription.
+ */
+export async function getTierForUser(userId: string) {
+  const { getTier } = await import('./tier-config');
+  const { data } = await supabaseAdmin
+    .from('profiles')
+    .select('subscription_status, stripe_price_id')
+    .eq('id', userId)
+    .single();
+  return getTier(data?.subscription_status || null, data?.stripe_price_id || null);
+}

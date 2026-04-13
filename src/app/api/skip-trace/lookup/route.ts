@@ -1,19 +1,19 @@
 import { NextResponse } from 'next/server';
-import { getAuthUser, isSubscribed } from '@/lib/auth';
+import { getAuthUser, getTierForUser } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { instantLookup } from '@/lib/tracerfy';
 import { logCost } from '@/lib/cost-tracker';
 
-const LOOKUP_COST_CENTS = 50; // $0.50 charged to user wallet per lookup
+function getCurrentMonth(): string {
+  return new Date().toISOString().slice(0, 7);
+}
 
 export async function POST(request: Request) {
   try {
     const user = await getAuthUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    if (!await isSubscribed(user.id)) {
-      return NextResponse.json({ error: 'Subscription required' }, { status: 403 });
-    }
+    const tier = await getTierForUser(user.id);
 
     const { leadId, address, city, state, zip } = await request.json();
 
@@ -21,46 +21,108 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'address, city, and state required' }, { status: 400 });
     }
 
-    // Check wallet balance
-    const { data: wallet } = await supabaseAdmin
-      .from('wallets')
-      .select('id, balance_cents, total_spent_cents')
-      .eq('user_id', user.id)
-      .single();
+    // Check monthly skip trace allocation
+    const month = getCurrentMonth();
+    const isFree = tier.key === 'free';
 
-    if (!wallet || wallet.balance_cents < LOOKUP_COST_CENTS) {
-      return NextResponse.json({
-        error: 'insufficient_balance',
-        balance_cents: wallet?.balance_cents || 0,
-        required_cents: LOOKUP_COST_CENTS,
-      }, { status: 402 });
+    let usedThisMonth = 0;
+    if (isFree) {
+      // Free: check lifetime total
+      const { data: allUsage } = await supabaseAdmin
+        .from('usage_tracking')
+        .select('skip_traces_used')
+        .eq('user_id', user.id);
+      usedThisMonth = (allUsage || []).reduce((s, r) => s + (r.skip_traces_used || 0), 0);
+    } else {
+      const { data: usage } = await supabaseAdmin
+        .from('usage_tracking')
+        .select('skip_traces_used')
+        .eq('user_id', user.id)
+        .eq('month', month)
+        .single();
+      usedThisMonth = usage?.skip_traces_used || 0;
+    }
+
+    if (usedThisMonth >= tier.skipTraces) {
+      // Over monthly limit — check if they can buy overages via wallet
+      if (tier.overageSkipTraceCents > 0) {
+        const { data: wallet } = await supabaseAdmin
+          .from('wallets')
+          .select('balance_cents')
+          .eq('user_id', user.id)
+          .single();
+
+        if (!wallet || wallet.balance_cents < tier.overageSkipTraceCents) {
+          return NextResponse.json({
+            error: 'limit_reached',
+            message: `You've used all ${tier.skipTraces} skip traces this month. Add wallet funds for overages ($${(tier.overageSkipTraceCents / 100).toFixed(2)} each).`,
+            skip_traces_used: usedThisMonth,
+            skip_traces_limit: tier.skipTraces,
+          }, { status: 402 });
+        }
+        // Has wallet funds — will charge overage below
+      } else {
+        return NextResponse.json({
+          error: 'limit_reached',
+          message: `You've used all ${tier.skipTraces} skip traces. Upgrade your plan for more.`,
+          skip_traces_used: usedThisMonth,
+          skip_traces_limit: tier.skipTraces,
+        }, { status: 402 });
+      }
     }
 
     // Call Tracerfy instant lookup
     const result = await instantLookup(address, city, state, zip);
 
-    // Only charge if we got a hit
     if (result.hit && result.persons.length > 0) {
-      // Deduct from wallet
-      const newBalance = wallet.balance_cents - LOOKUP_COST_CENTS;
-      await supabaseAdmin
-        .from('wallets')
-        .update({
-          balance_cents: newBalance,
-          total_spent_cents: wallet.total_spent_cents + LOOKUP_COST_CENTS,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', wallet.id);
+      // Increment skip trace usage
+      const usageRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/usage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Cookie': '' },
+        body: JSON.stringify({ type: 'skip_trace', count: 1 }),
+      }).catch(() => null);
+      // Fallback: direct DB increment if internal fetch fails
+      if (!usageRes?.ok) {
+        const { data: usage } = await supabaseAdmin
+          .from('usage_tracking')
+          .select('id, skip_traces_used')
+          .eq('user_id', user.id)
+          .eq('month', month)
+          .single();
+        if (usage) {
+          await supabaseAdmin.from('usage_tracking')
+            .update({ skip_traces_used: (usage.skip_traces_used || 0) + 1 })
+            .eq('id', usage.id);
+        } else {
+          await supabaseAdmin.from('usage_tracking')
+            .insert({ user_id: user.id, month, skip_traces_used: 1, geocodes_limit: tier.geocodes, skip_traces_limit: tier.skipTraces });
+        }
+      }
 
-      await supabaseAdmin.from('wallet_transactions').insert({
-        user_id: user.id,
-        type: 'spend',
-        amount_cents: LOOKUP_COST_CENTS,
-        balance_after_cents: newBalance,
-        description: `Owner lookup — ${address.split(',')[0]}`,
-      });
+      // Charge wallet overage if over monthly limit
+      const isOverage = usedThisMonth >= tier.skipTraces;
+      if (isOverage && tier.overageSkipTraceCents > 0) {
+        const { data: wallet } = await supabaseAdmin
+          .from('wallets')
+          .select('id, balance_cents, total_spent_cents')
+          .eq('user_id', user.id)
+          .single();
+        if (wallet) {
+          const newBalance = wallet.balance_cents - tier.overageSkipTraceCents;
+          await supabaseAdmin.from('wallets').update({
+            balance_cents: newBalance,
+            total_spent_cents: wallet.total_spent_cents + tier.overageSkipTraceCents,
+          }).eq('id', wallet.id);
+          await supabaseAdmin.from('wallet_transactions').insert({
+            user_id: user.id, type: 'spend',
+            amount_cents: tier.overageSkipTraceCents,
+            balance_after_cents: newBalance,
+            description: `Skip trace overage — ${address.split(',')[0]}`,
+          });
+        }
+      }
 
-      // Extract best data from the first person result
+      // Extract best data
       const person = result.persons[0];
       const phones = person.phones
         ?.filter(p => p.number && !p.dnc)
@@ -73,23 +135,18 @@ export async function POST(request: Request) {
         ? [person.mailing_address.street, person.mailing_address.city, person.mailing_address.state, person.mailing_address.zip].filter(Boolean).join(', ')
         : null;
 
-      // Update the lead record if leadId provided
+      // Update lead record
       if (leadId) {
-        await supabaseAdmin
-          .from('leads')
-          .update({
-            owner_name: ownerName || undefined,
-            phone: phones[0] || undefined,
-            phone_2: phones[1] || undefined,
-            phone_3: phones[2] || undefined,
-            email: email || undefined,
-            mailing_address: mailingAddr || undefined,
-          })
-          .eq('id', leadId)
-          .eq('user_id', user.id);
+        await supabaseAdmin.from('leads').update({
+          owner_name: ownerName || undefined,
+          phone: phones[0] || undefined,
+          phone_2: phones[1] || undefined,
+          phone_3: phones[2] || undefined,
+          email: email || undefined,
+          mailing_address: mailingAddr || undefined,
+        }).eq('id', leadId).eq('user_id', user.id);
       }
 
-      // Log cost
       logCost(user.id, 'tracerfy', 'instant_lookup', 0.10, 1, { hit: true, address });
 
       return NextResponse.json({
@@ -99,8 +156,8 @@ export async function POST(request: Request) {
         email,
         mailing_address: mailingAddr,
         persons: result.persons,
-        charged_cents: LOOKUP_COST_CENTS,
-        balance_cents: newBalance,
+        is_overage: isOverage,
+        overage_charged_cents: isOverage ? tier.overageSkipTraceCents : 0,
       });
     }
 
@@ -110,8 +167,6 @@ export async function POST(request: Request) {
       owner_name: null,
       phones: [],
       email: null,
-      charged_cents: 0,
-      balance_cents: wallet.balance_cents,
     });
   } catch (err) {
     console.error('Skip trace lookup error:', err);

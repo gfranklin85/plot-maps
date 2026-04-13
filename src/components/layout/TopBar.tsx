@@ -27,25 +27,38 @@ export default function TopBar() {
   const [showResults, setShowResults] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [walletBalance, setWalletBalance] = useState<string | null>(null);
+  const [usage, setUsage] = useState<{ skip_traces_used: number; skip_traces_limit: number; geocodes_used: number; geocodes_limit: number; tier_label: string } | null>(null);
   const searchRef = useRef<HTMLDivElement>(null);
 
-  // Fetch wallet balance
-  const fetchWallet = useCallback(async () => {
+  // Fetch wallet + usage
+  const fetchData = useCallback(async () => {
     try {
-      const res = await fetch('/api/wallet');
-      if (res.ok) {
-        const data = await res.json();
+      const [walletRes, usageRes] = await Promise.allSettled([
+        fetch('/api/wallet'),
+        fetch('/api/usage'),
+      ]);
+      if (walletRes.status === 'fulfilled' && walletRes.value.ok) {
+        const data = await walletRes.value.json();
         setWalletBalance(data.balance);
+      }
+      if (usageRes.status === 'fulfilled' && usageRes.value.ok) {
+        const data = await usageRes.value.json();
+        setUsage({
+          skip_traces_used: data.skip_traces_used || 0,
+          skip_traces_limit: data.skip_traces_limit || 0,
+          geocodes_used: data.geocodes_used || 0,
+          geocodes_limit: data.geocodes_limit || 0,
+          tier_label: data.tier_label || 'Free',
+        });
       }
     } catch { /* silent */ }
   }, []);
 
   useEffect(() => {
-    fetchWallet();
-    // Refresh every 30s in case of top-ups
-    const interval = setInterval(fetchWallet, 30000);
+    fetchData();
+    const interval = setInterval(fetchData, 30000);
     return () => clearInterval(interval);
-  }, [fetchWallet]);
+  }, [fetchData]);
 
   // Search leads as user types
   useEffect(() => {
@@ -140,6 +153,20 @@ export default function TopBar() {
       {/* Right side */}
       <div className="flex items-center gap-2 md:gap-4">
         <ThemeToggle />
+
+        {/* Usage counters — desktop only */}
+        {usage && (
+          <div className="hidden md:flex items-center gap-2">
+            <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[10px] font-bold" title="Skip traces remaining this month">
+              <span className="material-symbols-outlined text-[14px]">person_search</span>
+              {usage.skip_traces_limit - usage.skip_traces_used}/{usage.skip_traces_limit}
+            </div>
+            <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-sky-500/10 border border-sky-500/20 text-sky-400 text-[10px] font-bold" title="Geocodes remaining this month">
+              <span className="material-symbols-outlined text-[14px]">pin_drop</span>
+              {usage.geocodes_limit - usage.geocodes_used}/{usage.geocodes_limit}
+            </div>
+          </div>
+        )}
 
         {/* Wallet balance */}
         {walletBalance !== null && (

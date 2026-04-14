@@ -6,35 +6,49 @@ import { supabase } from '@/lib/supabase';
 
 const PLANS = [
   {
-    name: 'Starter',
-    price: 49,
-    priceId: process.env.NEXT_PUBLIC_STRIPE_STARTER_PRICE_ID || '',
+    name: 'Basic',
+    price: 79,
+    priceId: process.env.NEXT_PUBLIC_STRIPE_BASIC_PRICE_ID || '',
     features: [
-      'Walk Mode — Street View Prospecting',
-      'AI-powered action lists & call guidance',
-      'AI email drafts & outreach',
-      'Nearby places & drive time analysis',
-      '500 geocodes/month',
-      '1,000 street view loads/month',
-      '$0.01/geocode overage available',
+      '50 skip traces / month',
+      '500 geocodes / month',
+      'Interactive Map + Walk Mode',
+      'MLS overlay (Solds, Actives, Pendings)',
+      'Call scripts & notes',
+      'Manual dialing (use your phone)',
+      '500 Street View loads / month',
     ],
     highlighted: false,
   },
   {
-    name: 'Pro',
-    price: 79,
-    priceId: process.env.NEXT_PUBLIC_STRIPE_PRO_PRICE_ID || '',
+    name: 'Standard',
+    price: 99,
+    priceId: process.env.NEXT_PUBLIC_STRIPE_STANDARD_PRICE_ID || '',
     features: [
-      'Everything in Starter, plus:',
-      'Browser Dialer — click to call from the app',
+      '150 skip traces / month',
+      '1,500 geocodes / month',
+      'Browser Dialer — call from the app',
       'Local phone number included',
-      'Call recording & analytics',
-      '1,000 calling minutes/month',
-      '2,000 geocodes/month',
-      'Unlimited street view loads',
-      'Priority support',
+      '500 calling minutes / month',
+      'Unlimited Street View loads',
+      'Everything in Basic',
     ],
     highlighted: true,
+  },
+  {
+    name: 'Pro',
+    price: 149,
+    priceId: process.env.NEXT_PUBLIC_STRIPE_PRO_PRICE_ID || '',
+    features: [
+      '500 skip traces / month',
+      '5,000 geocodes / month',
+      'Browser Dialer + 1,000 minutes',
+      'Local phone number included',
+      'Unlimited Street View loads',
+      'Priority support',
+      'Everything in Standard',
+    ],
+    highlighted: false,
   },
 ];
 
@@ -87,11 +101,11 @@ export default function SubscribePage() {
       <main className="relative z-10 max-w-5xl mx-auto px-6 py-20">
         {/* Hero */}
         <section className="text-center mb-16">
-          <h1 className="text-5xl md:text-6xl font-extrabold tracking-tight text-white mb-6 font-headline">
-            Free to Map. <span className="text-primary italic">Paid to Move.</span>
+          <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-on-surface mb-6 font-headline">
+            Choose Your Plan
           </h1>
           <p className="text-secondary text-lg md:text-xl max-w-2xl mx-auto leading-relaxed">
-            Visualize your properties for free. Unlock Walk Mode, AI tools, and advanced analytics when you&apos;re ready to close deals.
+            Start free with 10 skip traces and 50 geocodes. Upgrade when you&apos;re ready for more.
           </p>
         </section>
 
@@ -107,7 +121,7 @@ export default function SubscribePage() {
         )}
 
         {/* Pricing Cards */}
-        <div className="grid md:grid-cols-2 gap-8 mb-16">
+        <div className="grid md:grid-cols-3 gap-6 mb-16">
           {PLANS.map((plan) => (
             <div
               key={plan.name}

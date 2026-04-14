@@ -210,72 +210,97 @@ export default function LandingPage() {
 
         {/* Pricing */}
         <section id="pricing" className="py-16 sm:py-24 bg-[#151b2d]">
-          <div className="max-w-5xl mx-auto px-5 sm:px-8">
+          <div className="max-w-6xl mx-auto px-5 sm:px-8">
             <div className="text-center mb-10 sm:mb-16">
               <h2 className="text-2xl sm:text-3xl lg:text-5xl font-headline font-extrabold mb-3 sm:mb-4">Simple pricing. No surprises.</h2>
-              <p className="text-slate-400 text-base sm:text-lg">Start free with 50 geocodes. No credit card required.</p>
+              <p className="text-slate-400 text-base sm:text-lg">Start free with 10 skip traces and 50 geocodes. No credit card required.</p>
             </div>
-            <div className="grid md:grid-cols-2 gap-6 sm:gap-8">
-              {/* Starter */}
-              <div className="bg-[#0c1324] rounded-2xl p-6 sm:p-8 border border-slate-700/10">
-                <h3 className="text-xl sm:text-2xl font-bold">Starter</h3>
-                <div className="mt-3 sm:mt-4 flex items-baseline gap-1">
-                  <span className="text-4xl sm:text-5xl font-extrabold">$49</span>
-                  <span className="text-slate-500">/month</span>
+            <div className="grid md:grid-cols-3 gap-4 sm:gap-6">
+              {/* Basic */}
+              <div className="bg-[#0c1324] rounded-2xl p-5 sm:p-7 border border-slate-700/10">
+                <h3 className="text-lg sm:text-xl font-bold">Basic</h3>
+                <div className="mt-3 flex items-baseline gap-1">
+                  <span className="text-3xl sm:text-4xl font-extrabold">$79</span>
+                  <span className="text-slate-500">/mo</span>
                 </div>
-                <ul className="mt-6 sm:mt-8 space-y-3 sm:space-y-4">
+                <ul className="mt-5 sm:mt-6 space-y-2.5 sm:space-y-3">
                   {[
-                    'Interactive 3D Map View',
-                    'Walk Mode — Street View Prospecting',
-                    'Import your own property lists',
-                    'MLS data overlay (Sold / Active / Pending)',
+                    '50 skip traces / month',
+                    '500 geocodes / month',
+                    'Interactive Map + Walk Mode',
+                    'MLS overlay (Solds, Actives, Pendings)',
                     'Call scripts & notes',
                     'Manual dialing (use your phone)',
-                    '500 geocodes / month',
-                    '1,000 street view loads / month',
-                    '$0.01/geocode overage available',
+                    '500 Street View loads / month',
                   ].map((f) => (
-                    <li key={f} className="flex items-start gap-2 sm:gap-3 text-xs sm:text-sm">
-                      <span className="material-symbols-outlined text-emerald-400 text-[14px] sm:text-[16px] mt-0.5 shrink-0">check_circle</span>
+                    <li key={f} className="flex items-start gap-2 text-xs sm:text-sm">
+                      <span className="material-symbols-outlined text-emerald-400 text-[14px] mt-0.5 shrink-0">check_circle</span>
                       <span className="text-slate-300">{f}</span>
                     </li>
                   ))}
                 </ul>
-                <Link href="/signup" className="block w-full text-center mt-6 sm:mt-8 py-3 rounded-xl bg-[#23293c] text-white font-bold hover:bg-[#2e3447] transition-colors text-sm sm:text-base">
+                <Link href="/signup" className="block w-full text-center mt-5 sm:mt-7 py-3 rounded-xl bg-[#23293c] text-white font-bold hover:bg-[#2e3447] transition-colors text-sm">
+                  Start Free
+                </Link>
+              </div>
+              {/* Standard — Most Popular */}
+              <div className="bg-[#0c1324] rounded-2xl p-5 sm:p-7 border-2 border-indigo-500 relative">
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-indigo-600 text-white text-[10px] font-bold px-3 py-1 rounded-full">
+                  Most Popular
+                </div>
+                <h3 className="text-lg sm:text-xl font-bold">Standard</h3>
+                <div className="mt-3 flex items-baseline gap-1">
+                  <span className="text-3xl sm:text-4xl font-extrabold">$99</span>
+                  <span className="text-slate-500">/mo</span>
+                </div>
+                <ul className="mt-5 sm:mt-6 space-y-2.5 sm:space-y-3">
+                  {[
+                    '150 skip traces / month',
+                    '1,500 geocodes / month',
+                    'Browser Dialer — call from the app',
+                    'Local phone number included',
+                    '500 calling minutes / month',
+                    'Unlimited Street View loads',
+                    'Everything in Basic',
+                  ].map((f, i) => (
+                    <li key={f} className="flex items-start gap-2 text-xs sm:text-sm">
+                      <span className={`material-symbols-outlined text-[14px] mt-0.5 shrink-0 ${i === 6 ? 'text-indigo-400' : 'text-emerald-400'}`}>
+                        {i === 6 ? 'star' : 'check_circle'}
+                      </span>
+                      <span className={i === 6 ? 'text-white font-bold' : 'text-slate-300'}>{f}</span>
+                    </li>
+                  ))}
+                </ul>
+                <Link href="/signup" className="block w-full text-center mt-5 sm:mt-7 py-3 rounded-xl bg-gradient-to-br from-indigo-400 to-indigo-600 text-white font-bold hover:shadow-[0_0_20px_rgba(195,192,255,0.3)] transition-all text-sm">
                   Start Free
                 </Link>
               </div>
               {/* Pro */}
-              <div className="bg-[#0c1324] rounded-2xl p-6 sm:p-8 border-2 border-indigo-500 relative">
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-indigo-600 text-white text-xs font-bold px-4 py-1 rounded-full">
-                  Most Popular
+              <div className="bg-[#0c1324] rounded-2xl p-5 sm:p-7 border border-slate-700/10">
+                <h3 className="text-lg sm:text-xl font-bold">Pro</h3>
+                <div className="mt-3 flex items-baseline gap-1">
+                  <span className="text-3xl sm:text-4xl font-extrabold">$149</span>
+                  <span className="text-slate-500">/mo</span>
                 </div>
-                <h3 className="text-xl sm:text-2xl font-bold">Pro</h3>
-                <div className="mt-3 sm:mt-4 flex items-baseline gap-1">
-                  <span className="text-4xl sm:text-5xl font-extrabold">$79</span>
-                  <span className="text-slate-500">/month</span>
-                </div>
-                <ul className="mt-6 sm:mt-8 space-y-3 sm:space-y-4">
+                <ul className="mt-5 sm:mt-6 space-y-2.5 sm:space-y-3">
                   {[
-                    'Everything in Starter, plus:',
-                    'Browser Dialer — click to call from the app',
+                    '500 skip traces / month',
+                    '5,000 geocodes / month',
+                    'Browser Dialer + 1,000 minutes',
                     'Local phone number included',
-                    'Call recording',
-                    'Full call analytics dashboard',
-                    '1,000 calling minutes / month',
-                    '2,000 geocodes / month',
-                    'Unlimited street view loads',
+                    'Unlimited Street View loads',
                     'Priority support',
+                    'Everything in Standard',
                   ].map((f, i) => (
-                    <li key={f} className="flex items-start gap-2 sm:gap-3 text-xs sm:text-sm">
-                      <span className={`material-symbols-outlined text-[14px] sm:text-[16px] mt-0.5 shrink-0 ${i === 0 ? 'text-indigo-400' : 'text-emerald-400'}`}>
-                        {i === 0 ? 'star' : 'check_circle'}
+                    <li key={f} className="flex items-start gap-2 text-xs sm:text-sm">
+                      <span className={`material-symbols-outlined text-[14px] mt-0.5 shrink-0 ${i === 6 ? 'text-indigo-400' : 'text-emerald-400'}`}>
+                        {i === 6 ? 'star' : 'check_circle'}
                       </span>
-                      <span className={i === 0 ? 'text-white font-bold' : 'text-slate-300'}>{f}</span>
+                      <span className={i === 6 ? 'text-white font-bold' : 'text-slate-300'}>{f}</span>
                     </li>
                   ))}
                 </ul>
-                <Link href="/signup" className="block w-full text-center mt-6 sm:mt-8 py-3 rounded-xl bg-gradient-to-br from-indigo-400 to-indigo-600 text-white font-bold hover:shadow-[0_0_20px_rgba(195,192,255,0.3)] transition-all text-sm sm:text-base">
+                <Link href="/signup" className="block w-full text-center mt-5 sm:mt-7 py-3 rounded-xl bg-[#23293c] text-white font-bold hover:bg-[#2e3447] transition-colors text-sm">
                   Start Free
                 </Link>
               </div>

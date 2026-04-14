@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getAuthUser } from '@/lib/auth';
+import { getAuthUser, getTierForUser } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { batchTrace } from '@/lib/tracerfy';
 import { Resend } from 'resend';
@@ -7,8 +7,10 @@ import { Resend } from 'resend';
 const resend = new Resend(process.env.RESEND_API_KEY!);
 const FROM_EMAIL = process.env.FROM_EMAIL || 'greg@plot.solutions';
 const ADMIN_NOTIFY_EMAIL = process.env.ADMIN_NOTIFICATION_EMAIL || 'gregfranklin523@gmail.com';
-const COST_PER_ADDRESS_CENTS = 25; // $0.25
-const MIN_ORDER_SIZE = 1; // no minimum
+
+function getCurrentMonth(): string {
+  return new Date().toISOString().slice(0, 7);
+}
 
 interface AddressItem {
   address: string;
@@ -29,50 +31,58 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'addresses required' }, { status: 400 });
   }
 
-  if (addresses.length < MIN_ORDER_SIZE) {
-    return NextResponse.json({ error: `Minimum order is ${MIN_ORDER_SIZE} properties`, min: MIN_ORDER_SIZE }, { status: 400 });
+  const tier = await getTierForUser(user.id);
+  const month = getCurrentMonth();
+  const isFree = tier.key === 'free';
+
+  // Check monthly skip trace allocation
+  let usedCount = 0;
+  if (isFree) {
+    const { data: allUsage } = await supabaseAdmin
+      .from('usage_tracking')
+      .select('skip_traces_used')
+      .eq('user_id', user.id);
+    usedCount = (allUsage || []).reduce((s, r) => s + (r.skip_traces_used || 0), 0);
+  } else {
+    const { data: usage } = await supabaseAdmin
+      .from('usage_tracking')
+      .select('skip_traces_used')
+      .eq('user_id', user.id)
+      .eq('month', month)
+      .single();
+    usedCount = usage?.skip_traces_used || 0;
   }
 
-  const totalCost = addresses.length * COST_PER_ADDRESS_CENTS;
+  const remaining = tier.skipTraces - usedCount;
 
-  // Get wallet
-  const { data: wallet } = await supabaseAdmin
-    .from('wallets')
-    .select('*')
-    .eq('user_id', user.id)
-    .single();
-
-  if (!wallet || wallet.balance_cents < totalCost) {
+  if (addresses.length > remaining) {
     return NextResponse.json({
-      error: 'insufficient_balance',
-      balance_cents: wallet?.balance_cents || 0,
-      required_cents: totalCost,
+      error: 'limit_exceeded',
+      message: `You have ${remaining} skip traces remaining this month. This order needs ${addresses.length}.`,
+      upgrade: true,
+      tier: tier.key,
+      skip_traces_remaining: remaining,
+      skip_traces_limit: tier.skipTraces,
+      order_size: addresses.length,
     }, { status: 402 });
   }
 
-  const newBalance = wallet.balance_cents - totalCost;
+  // Increment skip trace usage
+  const { data: usage } = await supabaseAdmin
+    .from('usage_tracking')
+    .select('id, skip_traces_used')
+    .eq('user_id', user.id)
+    .eq('month', month)
+    .single();
 
-  // Deduct from wallet
-  await supabaseAdmin
-    .from('wallets')
-    .update({
-      balance_cents: newBalance,
-      total_spent_cents: wallet.total_spent_cents + totalCost,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', wallet.id);
-
-  // Record transaction
-  await supabaseAdmin
-    .from('wallet_transactions')
-    .insert({
-      user_id: user.id,
-      type: 'spend',
-      amount_cents: totalCost,
-      balance_after_cents: newBalance,
-      description: `Skip traces — ${addresses.length} addresses`,
-      metadata: { address_count: addresses.length },
-    });
+  if (usage) {
+    await supabaseAdmin.from('usage_tracking')
+      .update({ skip_traces_used: (usage.skip_traces_used || 0) + addresses.length, updated_at: new Date().toISOString() })
+      .eq('id', usage.id);
+  } else {
+    await supabaseAdmin.from('usage_tracking')
+      .insert({ user_id: user.id, month, skip_traces_used: addresses.length, geocodes_used: 0, geocodes_limit: tier.geocodes, skip_traces_limit: tier.skipTraces });
+  }
 
   // Create prospect order
   const { data: order } = await supabaseAdmin
@@ -81,13 +91,13 @@ export async function POST(request: Request) {
       user_id: user.id,
       status: 'paid',
       address_count: addresses.length,
-      amount_cents: totalCost,
+      amount_cents: 0, // included in plan
       addresses,
     })
     .select('id')
     .single();
 
-  // Auto-submit to Tracerfy for skip tracing
+  // Auto-submit to Tracerfy
   let tracerfyQueued = false;
   if (order) {
     try {
@@ -98,10 +108,9 @@ export async function POST(request: Request) {
           state: a.state || 'CA',
           zip: a.zip || '',
         })),
-        'advanced' // finds owner automatically
+        'advanced'
       );
 
-      // Update order with Tracerfy queue ID and set to processing
       await supabaseAdmin
         .from('prospect_orders')
         .update({
@@ -113,7 +122,6 @@ export async function POST(request: Request) {
 
       tracerfyQueued = true;
     } catch (err) {
-      // Tracerfy failed — order stays as 'paid' for manual fulfillment
       console.error('Tracerfy batch trace failed:', err);
     }
   }
@@ -125,15 +133,14 @@ export async function POST(request: Request) {
       from: `Plot Maps <${FROM_EMAIL}>`,
       to: ADMIN_NOTIFY_EMAIL,
       subject: `${tracerfyQueued ? '🟢 Auto-traced' : '🟠 Manual fulfillment'} — ${addresses.length} addresses`,
-      text: `New order from ${user.email}\n\nAddresses: ${addresses.length}\nCost: $${(totalCost / 100).toFixed(2)}\nTracerfy: ${tracerfyQueued ? 'Submitted (auto-processing)' : 'FAILED — needs manual fulfillment'}\n\nAddresses:\n• ${addressList}`,
+      text: `New order from ${user.email}\n\nAddresses: ${addresses.length}\nPlan: ${tier.label}\nTracerfy: ${tracerfyQueued ? 'Submitted' : 'FAILED'}\n\nAddresses:\n• ${addressList}`,
     });
   } catch { /* non-fatal */ }
 
   return NextResponse.json({
     success: true,
-    spent_cents: totalCost,
-    balance_cents: newBalance,
-    balance: (newBalance / 100).toFixed(2),
+    addresses_traced: addresses.length,
+    skip_traces_remaining: remaining - addresses.length,
     tracerfy_queued: tracerfyQueued,
   });
 }

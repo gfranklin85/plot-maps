@@ -92,25 +92,89 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* Problem Section */}
+        {/* Benefits Section — 6 cards, 2 rows of 3 */}
         <section className="py-16 sm:py-24 bg-[#151b2d]">
           <div className="max-w-7xl mx-auto px-5 sm:px-8">
-            <div className="text-center mb-12 sm:mb-16">
-              <h2 className="text-2xl sm:text-3xl lg:text-5xl font-headline font-extrabold mb-4 sm:mb-6">Prospecting shouldn&apos;t require 5 different tools.</h2>
-              <p className="text-slate-400 text-base sm:text-lg">The old way is slow, fragmented, and costs you deals.</p>
+            <div className="text-center mb-10 sm:mb-14">
+              <h2 className="text-2xl sm:text-3xl lg:text-5xl font-headline font-extrabold mb-3 sm:mb-4">See Everything Before You Dial</h2>
+              <p className="text-slate-400 text-base sm:text-lg">Everything you need to circle prospect — in one place.</p>
             </div>
-            <div className="grid md:grid-cols-3 gap-6 sm:gap-8">
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
               {[
-                { icon: 'tab_unselected', title: 'Context Switching', desc: 'Constant jumping between your CRM, MLS, Google Maps, and dialer kills your momentum.' },
-                { icon: 'wrong_location', title: 'Blind Outreach', desc: 'Calling owners without seeing the condition of the house or the surrounding comps in real-time.' },
-                { icon: 'link_off', title: 'Disconnected Data', desc: 'Property info is in one sheet, owner data in another. Nothing talks to each other.' },
+                { icon: 'layers', title: 'Live Market Overlay', desc: 'Solds, Actives, and Pendings right on your map. See what just happened in your farm.' },
+                { icon: 'streetview', title: 'Street-Level Prospecting', desc: 'Walk the block in Street View. See the house, the yard, the neighborhood before you call.' },
+                { icon: 'person_search', title: 'Instant Owner Lookup', desc: 'Get the owner\'s name and phone number in one click. No separate skip trace tool needed.' },
+                { icon: 'my_location', title: 'Circle Prospect Any Listing', desc: 'Click a Just Sold or Active listing, see every neighbor, and start calling the block.' },
+                { icon: 'call', title: 'Call With Context', desc: 'Comps, talking points, and property data on every card. Never cold call blind again.' },
+                { icon: 'task_alt', title: 'Track Every Interaction', desc: 'Log outcomes, set follow-ups, take notes — all from the map without switching apps.' },
               ].map((item) => (
-                <div key={item.title} className="p-6 sm:p-8 bg-[#0c1324] rounded-xl border border-slate-700/10">
-                  <span className="material-symbols-outlined text-orange-400 mb-4 sm:mb-6" style={{ fontSize: '36px' }}>{item.icon}</span>
-                  <h3 className="text-lg sm:text-xl font-bold mb-3 sm:mb-4">{item.title}</h3>
-                  <p className="text-slate-400 leading-relaxed text-sm sm:text-base">{item.desc}</p>
+                <div key={item.title} className="p-5 sm:p-6 bg-[#0c1324] rounded-xl border border-slate-700/10 hover:border-indigo-500/20 transition-colors">
+                  <span className="material-symbols-outlined text-indigo-400 mb-3 sm:mb-4" style={{ fontSize: '28px' }}>{item.icon}</span>
+                  <h3 className="text-base sm:text-lg font-bold mb-2 sm:mb-3">{item.title}</h3>
+                  <p className="text-slate-400 leading-relaxed text-xs sm:text-sm">{item.desc}</p>
                 </div>
               ))}
+            </div>
+          </div>
+        </section>
+
+        {/* How It Works — 2-step process */}
+        <section className="py-16 sm:py-24 bg-[#0c1324]">
+          <div className="max-w-5xl mx-auto px-5 sm:px-8">
+            <div className="text-center mb-10 sm:mb-14">
+              <h2 className="text-2xl sm:text-3xl lg:text-5xl font-headline font-extrabold mb-3 sm:mb-4">How It Works</h2>
+              <p className="text-slate-400 text-base sm:text-lg">Two steps. That&apos;s it.</p>
+            </div>
+            <div className="space-y-12 sm:space-y-16">
+              {/* Step 1 */}
+              <div className="grid lg:grid-cols-2 gap-8 items-center">
+                <div>
+                  <div className="flex items-center gap-3 mb-4">
+                    <span className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 text-sm font-bold">1</span>
+                    <span className="text-xs font-bold text-indigo-400 uppercase tracking-wider">Step One</span>
+                  </div>
+                  <h3 className="text-xl sm:text-2xl font-headline font-bold mb-3">Upload Your Inventory</h3>
+                  <p className="text-slate-400 text-sm sm:text-base leading-relaxed mb-4">
+                    Drop in your Actives, Solds, Pendings, or your lead list from any source. We auto-detect the format, geocode every address, and place them on the map instantly.
+                  </p>
+                  <div className="flex items-center gap-2 text-xs text-slate-500">
+                    <span className="material-symbols-outlined text-emerald-400 text-[16px]" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
+                    CSV, MLS exports, PropWire, BatchLeads — any format
+                  </div>
+                </div>
+                <div className="bg-[#151b2d] rounded-xl border border-slate-700/10 overflow-hidden h-48 sm:h-64 flex items-center justify-center">
+                  {/* Screenshot placeholder — replace with actual import page screenshot */}
+                  <div className="text-center text-slate-500">
+                    <span className="material-symbols-outlined text-[48px] mb-2">upload_file</span>
+                    <p className="text-xs">Import page screenshot</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Step 2 */}
+              <div className="grid lg:grid-cols-2 gap-8 items-center">
+                <div className="order-2 lg:order-1 bg-[#151b2d] rounded-xl border border-slate-700/10 overflow-hidden h-48 sm:h-64 flex items-center justify-center">
+                  {/* Screenshot placeholder — replace with map + property popup screenshot */}
+                  <div className="text-center text-slate-500">
+                    <span className="material-symbols-outlined text-[48px] mb-2">map</span>
+                    <p className="text-xs">Map prospecting screenshot</p>
+                  </div>
+                </div>
+                <div className="order-1 lg:order-2">
+                  <div className="flex items-center gap-3 mb-4">
+                    <span className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400 text-sm font-bold">2</span>
+                    <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider">Step Two</span>
+                  </div>
+                  <h3 className="text-xl sm:text-2xl font-headline font-bold mb-3">See It. Select It. Call It.</h3>
+                  <p className="text-slate-400 text-sm sm:text-base leading-relaxed mb-4">
+                    Click any listing on the map. See every neighbor with comps, owner data, and talking points. Get the phone number and call — right from the property card.
+                  </p>
+                  <div className="flex items-center gap-2 text-xs text-slate-500">
+                    <span className="material-symbols-outlined text-emerald-400 text-[16px]" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
+                    Skip trace, call, log outcome — all without leaving the map
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </section>

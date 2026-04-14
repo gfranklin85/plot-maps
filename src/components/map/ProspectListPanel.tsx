@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import MaterialIcon from "@/components/ui/MaterialIcon";
-import WalletTopup from "@/components/ui/WalletTopup";
 
 interface Address {
   address: string;
@@ -21,22 +20,22 @@ interface Props {
   onOrderComplete?: () => void;
 }
 
-const COST_PER_ADDRESS = 0.25;
-const MIN_ORDER_SIZE = 1;
-
 export default function ProspectListPanel({ addresses, onRemove, onClear, onClose, onOrderComplete }: Props) {
-  const total = (addresses.length * COST_PER_ADDRESS).toFixed(2);
-  const [walletBalance, setWalletBalance] = useState<number | null>(null);
+  const [remaining, setRemaining] = useState<number | null>(null);
+  const [limit, setLimit] = useState<number>(0);
+  const [, setTier] = useState<string>('free');
   const [ordering, setOrdering] = useState(false);
   const [orderResult, setOrderResult] = useState<{ success: boolean; message: string } | null>(null);
-  const [showTopup, setShowTopup] = useState(false);
 
   useEffect(() => {
-    fetch('/api/wallet').then(r => r.json()).then(d => setWalletBalance(d.balance_cents)).catch(() => {});
+    fetch('/api/usage').then(r => r.json()).then(d => {
+      setRemaining(d.skip_traces_remaining ?? 0);
+      setLimit(d.skip_traces_limit ?? 0);
+      setTier(d.tier || 'free');
+    }).catch(() => {});
   }, []);
 
-  const totalCents = addresses.length * 25;
-  const hasBalance = walletBalance !== null && walletBalance >= totalCents;
+  const canOrder = remaining !== null && addresses.length <= remaining && addresses.length > 0;
 
   async function handleConfirm() {
     setOrdering(true);
@@ -52,17 +51,18 @@ export default function ProspectListPanel({ addresses, onRemove, onClear, onClos
       const data = await res.json();
 
       if (!res.ok) {
-        if (data.error === 'insufficient_balance') {
-          setOrderResult({ success: false, message: `Insufficient balance. You need $${(data.required_cents / 100).toFixed(2)} but have $${(data.balance_cents / 100).toFixed(2)}.` });
+        if (data.error === 'limit_exceeded') {
+          setOrderResult({ success: false, message: data.message });
+          setRemaining(data.skip_traces_remaining ?? 0);
         } else {
-          setOrderResult({ success: false, message: data.error || 'Order failed' });
+          setOrderResult({ success: false, message: data.error || data.message || 'Order failed' });
         }
         setOrdering(false);
         return;
       }
 
-      setWalletBalance(data.balance_cents);
-      setOrderResult({ success: true, message: `Confirmed! $${(data.spent_cents / 100).toFixed(2)} spent. Balance: $${data.balance}` });
+      setRemaining(data.skip_traces_remaining ?? 0);
+      setOrderResult({ success: true, message: `Done! ${addresses.length} addresses submitted for skip tracing.` });
 
       setTimeout(() => {
         onOrderComplete?.();
@@ -126,19 +126,18 @@ export default function ProspectListPanel({ addresses, onRemove, onClear, onClos
         )}
       </div>
 
-      {/* Footer: wallet balance + confirm */}
+      {/* Footer: allocation check + confirm */}
       {addresses.length > 0 && (
         <div className="border-t border-card-border px-5 py-4 space-y-3 shrink-0">
+          {/* Skip trace allocation */}
           <div className="flex items-center justify-between text-sm">
-            <span className="text-on-surface-variant">{addresses.length} × ${COST_PER_ADDRESS.toFixed(2)}</span>
-            <span className="font-bold text-on-surface">${total}</span>
+            <span className="text-on-surface-variant">Skip traces this order</span>
+            <span className="font-bold text-on-surface">{addresses.length}</span>
           </div>
-
-          {/* Wallet balance */}
           <div className="flex items-center justify-between text-sm">
-            <span className="text-on-surface-variant">Wallet balance</span>
-            <span className={`font-bold ${hasBalance ? 'text-emerald-400' : 'text-red-400'}`}>
-              ${walletBalance !== null ? (walletBalance / 100).toFixed(2) : '—'}
+            <span className="text-on-surface-variant">Remaining this month</span>
+            <span className={`font-bold ${canOrder ? 'text-emerald-400' : 'text-red-400'}`}>
+              {remaining !== null ? `${remaining} / ${limit}` : '—'}
             </span>
           </div>
 
@@ -148,13 +147,7 @@ export default function ProspectListPanel({ addresses, onRemove, onClear, onClos
             </div>
           )}
 
-          {addresses.length < MIN_ORDER_SIZE && (
-            <p className="text-[10px] text-on-surface-variant/60 text-center">
-              Minimum {MIN_ORDER_SIZE} properties ({MIN_ORDER_SIZE - addresses.length} more needed)
-            </p>
-          )}
-
-          {hasBalance && addresses.length >= MIN_ORDER_SIZE ? (
+          {canOrder ? (
             <button
               onClick={handleConfirm}
               disabled={ordering}
@@ -163,41 +156,28 @@ export default function ProspectListPanel({ addresses, onRemove, onClear, onClos
               {ordering ? (
                 <><span className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" /> Processing...</>
               ) : (
-                <><MaterialIcon icon="check_circle" className="text-[18px]" /> Confirm — ${total} from wallet</>
+                <><MaterialIcon icon="person_search" className="text-[18px]" /> Skip Trace {addresses.length} Addresses</>
               )}
             </button>
-          ) : !hasBalance ? (
-            <button
-              onClick={() => setShowTopup(true)}
-              className="w-full py-3.5 rounded-xl bg-gradient-to-br from-primary/80 to-primary text-white font-bold text-sm flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition-all"
-            >
-              <MaterialIcon icon="add" className="text-[18px]" />
-              Add Funds to Wallet
-            </button>
-          ) : (
-            <button
-              disabled
-              className="w-full py-3.5 rounded-xl bg-surface-container-high text-on-surface-variant font-bold text-sm flex items-center justify-center gap-2 opacity-50"
-            >
-              Select {MIN_ORDER_SIZE - addresses.length} more properties
-            </button>
-          )}
+          ) : remaining !== null && addresses.length > remaining ? (
+            <div className="space-y-2">
+              <p className="text-xs text-red-400 text-center">
+                You need {addresses.length} but only have {remaining} remaining.
+              </p>
+              <a
+                href="/subscribe"
+                className="w-full py-3.5 rounded-xl bg-gradient-to-br from-primary/80 to-primary text-white font-bold text-sm flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition-all"
+              >
+                <MaterialIcon icon="upgrade" className="text-[18px]" />
+                Upgrade for More Skip Traces
+              </a>
+            </div>
+          ) : null}
 
           <p className="text-[10px] text-on-surface-variant/50 text-center">
-            We&apos;ll get owner names + phone numbers for each address.
+            Included in your plan. We&apos;ll get owner names + phone numbers for each address.
           </p>
         </div>
-      )}
-
-      {showTopup && (
-        <WalletTopup
-          onClose={() => {
-            setShowTopup(false);
-            // Refresh balance
-            fetch('/api/wallet').then(r => r.json()).then(d => setWalletBalance(d.balance_cents)).catch(() => {});
-          }}
-          currentBalance={walletBalance !== null ? (walletBalance / 100).toFixed(2) : undefined}
-        />
       )}
     </div>
   );

@@ -26,23 +26,15 @@ export default function TopBar() {
   const [results, setResults] = useState<SearchResult[]>([]);
   const [showResults, setShowResults] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
-  const [walletBalance, setWalletBalance] = useState<string | null>(null);
   const [usage, setUsage] = useState<{ skip_traces_used: number; skip_traces_limit: number; geocodes_used: number; geocodes_limit: number; tier_label: string } | null>(null);
   const searchRef = useRef<HTMLDivElement>(null);
 
-  // Fetch wallet + usage
+  // Fetch usage
   const fetchData = useCallback(async () => {
     try {
-      const [walletRes, usageRes] = await Promise.allSettled([
-        fetch('/api/wallet'),
-        fetch('/api/usage'),
-      ]);
-      if (walletRes.status === 'fulfilled' && walletRes.value.ok) {
-        const data = await walletRes.value.json();
-        setWalletBalance(data.balance);
-      }
-      if (usageRes.status === 'fulfilled' && usageRes.value.ok) {
-        const data = await usageRes.value.json();
+      const res = await fetch('/api/usage');
+      if (res.ok) {
+        const data = await res.json();
         setUsage({
           skip_traces_used: data.skip_traces_used || 0,
           skip_traces_limit: data.skip_traces_limit || 0,
@@ -168,17 +160,6 @@ export default function TopBar() {
           </div>
         )}
 
-        {/* Wallet balance */}
-        {walletBalance !== null && (
-          <button
-            onClick={() => router.push('/map?wallet=topup')}
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 transition-colors"
-            title="Wallet balance — click to add funds"
-          >
-            <span className="material-symbols-outlined text-[16px]">account_balance_wallet</span>
-            <span className="text-xs font-bold">${walletBalance}</span>
-          </button>
-        )}
 
         <button className="relative p-2 text-on-surface-variant hover:text-primary transition-colors" title="Notifications coming soon">
           <span className="material-symbols-outlined text-[22px]">notifications</span>

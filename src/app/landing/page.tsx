@@ -42,9 +42,16 @@ export default function LandingPage() {
         {/* Hero Section — full bleed background */}
         <section className="relative pt-24 sm:pt-40 pb-16 sm:pb-32 overflow-hidden">
           {/* Background image — visible on right side, gradient fade on left */}
-          <div className="absolute inset-0 -z-10">
-            <img src="/hero-bg.png" alt="" className="absolute inset-0 w-full h-full object-cover object-right opacity-40 lg:opacity-70" loading="eager" />
-            <div className="absolute inset-0 bg-gradient-to-r from-[#0c1324] via-[#0c1324]/90 to-[#0c1324]/40 lg:via-[#0c1324]/70 lg:to-[#0c1324]/10" />
+          <div
+            className="absolute inset-0 -z-10"
+            style={{
+              backgroundImage: 'url(/hero-bg.png)',
+              backgroundSize: 'cover',
+              backgroundPosition: 'right center',
+              backgroundRepeat: 'no-repeat',
+            }}
+          >
+            <div className="absolute inset-0 bg-gradient-to-r from-[#0c1324] from-30% via-[#0c1324]/80 via-50% to-transparent" />
           </div>
 
           <div className="max-w-7xl mx-auto px-5 sm:px-8">

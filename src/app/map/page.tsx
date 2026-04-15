@@ -268,7 +268,7 @@ export default function MapPage() {
               <PlacesSearch
                 onPlaceSelected={(place) => {
                   setMapCenter({ lat: place.lat, lng: place.lng });
-                  setSearch(place.address);
+                  setMapZoom(17);
                 }}
                 className="shadow-lg"
               />
@@ -380,7 +380,7 @@ export default function MapPage() {
               <PlacesSearch
                 onPlaceSelected={(place) => {
                   setMapCenter({ lat: place.lat, lng: place.lng });
-                  setSearch(place.address);
+                  setMapZoom(17);
                 }}
                 className="shadow-lg"
               />

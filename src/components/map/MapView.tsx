@@ -208,6 +208,12 @@ function ZoomController({ zoom }: { zoom?: number | null }) {
   return null;
 }
 
+function CenterController({ center }: { center?: { lat: number; lng: number } | null }) {
+  const map = useMap();
+  useEffect(() => { if (map && center) map.panTo(center); }, [map, center]);
+  return null;
+}
+
 function CenterTracker({ onCenterChanged }: { onCenterChanged?: (c: { lat: number; lng: number }) => void }) {
   const map = useMap();
   useEffect(() => {
@@ -368,6 +374,7 @@ export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClic
       >
         <MapTypeSync mapType={mapType} />
         <ZoomController zoom={zoom} />
+        <CenterController center={center} />
         <CenterTracker onCenterChanged={onCenterChanged} />
         <LeadMarkers leads={leads} onMarkerClick={handleMarkerClick} pinMode={pinMode} isDark={isDark} />
         {prospectPins.length > 0 && <ProspectPins pins={prospectPins} />}

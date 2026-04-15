@@ -27,6 +27,7 @@ interface Props {
   onWalkHere?: (lead: Lead) => void;
   onMapClick?: (latLng: { lat: number; lng: number }) => void;
   center?: { lat: number; lng: number } | null;
+  navigateTo?: { lat: number; lng: number } | null;
   zoom?: number | null;
   mapType?: "roadmap" | "satellite" | "hybrid" | "terrain";
   pinMode?: PinMode;
@@ -337,7 +338,7 @@ function ProspectPins({ pins }: { pins: { lat: number; lng: number }[] }) {
   return null;
 }
 
-export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClick, center, zoom, mapType = "roadmap", pinMode = "dots", prospectMode = false, prospectPins = [] }: Props) {
+export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClick, center, navigateTo, zoom, mapType = "roadmap", pinMode = "dots", prospectMode = false, prospectPins = [] }: Props) {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme !== 'light';
   const isSatellite = mapType === "satellite" || mapType === "hybrid";
@@ -374,7 +375,7 @@ export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClic
       >
         <MapTypeSync mapType={mapType} />
         <ZoomController zoom={zoom} />
-        <CenterController center={center} />
+        <CenterController center={navigateTo} />
         <CenterTracker onCenterChanged={onCenterChanged} />
         <LeadMarkers leads={leads} onMarkerClick={handleMarkerClick} pinMode={pinMode} isDark={isDark} />
         {prospectPins.length > 0 && <ProspectPins pins={prospectPins} />}

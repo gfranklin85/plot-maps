@@ -56,13 +56,14 @@ export default function MapPage() {
   const [prospectMode, setProspectMode] = useState(false);
   const [prospectToast, setProspectToast] = useState<string | null>(null);
   const [mapZoom, setMapZoom] = useState<number | null>(null);
+  const [navigateTarget, setNavigateTarget] = useState<{ lat: number; lng: number } | null>(null);
   const isSubscribed = profile.subscriptionStatus === 'active';
 
   function handleToggleProspectMode(lead?: Lead) {
     const entering = !prospectMode;
     setProspectMode(entering);
     if (entering && lead?.latitude && lead?.longitude) {
-      setMapCenter({ lat: lead.latitude, lng: lead.longitude });
+      setNavigateTarget({ lat: lead.latitude, lng: lead.longitude });
       setMapZoom(19); // zoom to house level
     } else if (!entering) {
       setMapZoom(null); // reset to user-controlled zoom
@@ -267,7 +268,7 @@ export default function MapPage() {
             <div className="flex-1 max-w-sm">
               <PlacesSearch
                 onPlaceSelected={(place) => {
-                  setMapCenter({ lat: place.lat, lng: place.lng });
+                  setNavigateTarget({ lat: place.lat, lng: place.lng });
                   setMapZoom(17);
                 }}
                 className="shadow-lg"
@@ -379,7 +380,7 @@ export default function MapPage() {
             <div className="flex-1">
               <PlacesSearch
                 onPlaceSelected={(place) => {
-                  setMapCenter({ lat: place.lat, lng: place.lng });
+                  setNavigateTarget({ lat: place.lat, lng: place.lng });
                   setMapZoom(17);
                 }}
                 className="shadow-lg"
@@ -595,6 +596,7 @@ export default function MapPage() {
             pinMode={pinMode}
             prospectMode={prospectMode}
             prospectPins={prospectList.map(a => ({ lat: a.lat, lng: a.lng }))}
+            navigateTo={navigateTarget}
             zoom={mapZoom}
             onLeadClick={(_id, lead) => { handleLeadClickInProspectMode(lead); }}
             onCenterChanged={(c) => { setMapCenter(c); setHasUserPanned(true); }}

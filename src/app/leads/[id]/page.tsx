@@ -456,8 +456,8 @@ export default function LeadDetailPage() {
                         }),
                       });
                       const data = await res.json();
-                      if (data.error === 'insufficient_balance') {
-                        setLookupResult({ hit: false, error: 'Add funds to your wallet first' });
+                      if (data.error === 'limit_reached') {
+                        setLookupResult({ hit: false, error: data.message || 'No skip traces remaining. Upgrade your plan.' });
                       } else if (data.hit) {
                         setLookupResult({ hit: true, owner_name: data.owner_name, phones: data.phones });
                         refreshData();
@@ -475,7 +475,7 @@ export default function LeadDetailPage() {
                   {lookupLoading ? (
                     <><span className="w-3 h-3 border-2 border-indigo-400/30 border-t-indigo-400 rounded-full animate-spin" /> Looking up owner...</>
                   ) : (
-                    <><MaterialIcon icon="person_search" className="text-[16px]" /> Get Owner Info — $0.50</>
+                    <><MaterialIcon icon="person_search" className="text-[16px]" /> Get Owner Info — 1 credit</>
                   )}
                 </button>
               )}

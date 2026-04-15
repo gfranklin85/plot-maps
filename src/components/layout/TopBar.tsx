@@ -147,18 +147,38 @@ export default function TopBar() {
         <ThemeToggle />
 
         {/* Usage counters — desktop only */}
-        {usage && (
-          <div className="hidden md:flex items-center gap-2">
-            <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[10px] font-bold" title="Skip traces remaining this month">
-              <span className="material-symbols-outlined text-[14px]">person_search</span>
-              {usage.skip_traces_limit - usage.skip_traces_used}/{usage.skip_traces_limit}
+        {usage && (() => {
+          const stRemaining = usage.skip_traces_limit - usage.skip_traces_used;
+          const stPct = usage.skip_traces_limit > 0 ? stRemaining / usage.skip_traces_limit : 0;
+          const stLow = stPct < 0.2 || stRemaining < 10;
+          const stColor = stLow
+            ? 'bg-orange-500/10 border-orange-500/30 text-orange-400'
+            : 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400';
+
+          const gcRemaining = usage.geocodes_limit - usage.geocodes_used;
+          const gcPct = usage.geocodes_limit > 0 ? gcRemaining / usage.geocodes_limit : 0;
+          const gcLow = gcPct < 0.2 || gcRemaining < 20;
+          const gcColor = gcLow
+            ? 'bg-orange-500/10 border-orange-500/30 text-orange-400'
+            : 'bg-sky-500/10 border-sky-500/20 text-sky-400';
+
+          return (
+            <div className="hidden md:flex items-center gap-2">
+              <Link
+                href="/subscribe"
+                className={`flex items-center gap-1 px-2 py-1 rounded-full border text-[10px] font-bold transition-colors hover:brightness-110 ${stColor}`}
+                title={stLow ? 'Running low — click to upgrade' : 'Skip traces remaining'}
+              >
+                <span className="material-symbols-outlined text-[14px]">person_search</span>
+                {stRemaining}/{usage.skip_traces_limit}
+              </Link>
+              <div className={`flex items-center gap-1 px-2 py-1 rounded-full border text-[10px] font-bold ${gcColor}`} title="Geocodes remaining">
+                <span className="material-symbols-outlined text-[14px]">pin_drop</span>
+                {gcRemaining}/{usage.geocodes_limit}
+              </div>
             </div>
-            <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-sky-500/10 border border-sky-500/20 text-sky-400 text-[10px] font-bold" title="Geocodes remaining this month">
-              <span className="material-symbols-outlined text-[14px]">pin_drop</span>
-              {usage.geocodes_limit - usage.geocodes_used}/{usage.geocodes_limit}
-            </div>
-          </div>
-        )}
+          );
+        })()}
 
 
         <button className="relative p-2 text-on-surface-variant hover:text-primary transition-colors" title="Notifications coming soon">

@@ -7,7 +7,7 @@ function getCurrentMonth(): string {
   return new Date().toISOString().slice(0, 7);
 }
 
-async function getOrCreateUsage(userId: string, month: string, geocodeLimit: number, skipTraceLimit: number) {
+async function getOrCreateUsage(userId: string, month: string, geocodeLimit: number, skipTraceLimit: number, aiMinutesLimit: number) {
   let { data } = await supabaseAdmin
     .from('usage_tracking')
     .select('*')
@@ -25,19 +25,30 @@ async function getOrCreateUsage(userId: string, month: string, geocodeLimit: num
         geocodes_limit: geocodeLimit,
         skip_traces_used: 0,
         skip_traces_limit: skipTraceLimit,
+        ai_minutes_used: 0,
+        ai_minutes_limit: aiMinutesLimit,
       })
       .select()
       .single();
     data = created;
   } else {
     // Update limits if plan changed
-    if (data.geocodes_limit !== geocodeLimit || data.skip_traces_limit !== skipTraceLimit) {
+    if (
+      data.geocodes_limit !== geocodeLimit ||
+      data.skip_traces_limit !== skipTraceLimit ||
+      data.ai_minutes_limit !== aiMinutesLimit
+    ) {
       await supabaseAdmin
         .from('usage_tracking')
-        .update({ geocodes_limit: geocodeLimit, skip_traces_limit: skipTraceLimit })
+        .update({
+          geocodes_limit: geocodeLimit,
+          skip_traces_limit: skipTraceLimit,
+          ai_minutes_limit: aiMinutesLimit,
+        })
         .eq('id', data.id);
       data.geocodes_limit = geocodeLimit;
       data.skip_traces_limit = skipTraceLimit;
+      data.ai_minutes_limit = aiMinutesLimit;
     }
   }
 
@@ -56,11 +67,12 @@ export async function GET() {
     // Free user: lifetime limits across all months
     const { data: allUsage } = await supabaseAdmin
       .from('usage_tracking')
-      .select('geocodes_used, skip_traces_used')
+      .select('geocodes_used, skip_traces_used, ai_minutes_used')
       .eq('user_id', user.id);
 
     const totalGeocodes = (allUsage || []).reduce((s, r) => s + (r.geocodes_used || 0), 0);
     const totalSkipTraces = (allUsage || []).reduce((s, r) => s + (r.skip_traces_used || 0), 0);
+    const totalAiMinutes = (allUsage || []).reduce((s, r) => s + Number(r.ai_minutes_used || 0), 0);
 
     return NextResponse.json({
       month,
@@ -72,13 +84,19 @@ export async function GET() {
       skip_traces_used: totalSkipTraces,
       skip_traces_limit: tier.skipTraces,
       skip_traces_remaining: Math.max(0, tier.skipTraces - totalSkipTraces),
+      ai_minutes_used: totalAiMinutes,
+      ai_minutes_limit: tier.aiMinutes,
+      ai_minutes_remaining: Math.max(0, tier.aiMinutes - totalAiMinutes),
+      ai_overage_per_min_cents: tier.aiOverageCentsPerMin,
       is_free: true,
       can_buy_overages: false,
     });
   }
 
   // Subscribed user: monthly limits
-  const data = await getOrCreateUsage(user.id, month, tier.geocodes, tier.skipTraces);
+  const data = await getOrCreateUsage(user.id, month, tier.geocodes, tier.skipTraces, tier.aiMinutes);
+
+  const aiMinutesUsed = Number(data?.ai_minutes_used || 0);
 
   return NextResponse.json({
     month: data?.month,
@@ -90,6 +108,10 @@ export async function GET() {
     skip_traces_used: data?.skip_traces_used || 0,
     skip_traces_limit: tier.skipTraces,
     skip_traces_remaining: Math.max(0, tier.skipTraces - (data?.skip_traces_used || 0)),
+    ai_minutes_used: aiMinutesUsed,
+    ai_minutes_limit: tier.aiMinutes,
+    ai_minutes_remaining: Math.max(0, tier.aiMinutes - aiMinutesUsed),
+    ai_overage_per_min_cents: tier.aiOverageCentsPerMin,
     is_free: false,
     can_buy_overages: true,
     overage_cost_cents: tier.overageSkipTraceCents,
@@ -106,7 +128,7 @@ export async function POST(request: Request) {
   const tier = await getTierForUser(user.id);
   const isFree = tier.key === 'free';
 
-  const data = await getOrCreateUsage(user.id, month, tier.geocodes, tier.skipTraces);
+  const data = await getOrCreateUsage(user.id, month, tier.geocodes, tier.skipTraces, tier.aiMinutes);
   if (!data) return NextResponse.json({ error: 'Failed to track usage' }, { status: 500 });
 
   if (type === 'skip_trace') {

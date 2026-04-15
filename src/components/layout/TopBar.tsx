@@ -26,7 +26,7 @@ export default function TopBar() {
   const [results, setResults] = useState<SearchResult[]>([]);
   const [showResults, setShowResults] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
-  const [usage, setUsage] = useState<{ skip_traces_used: number; skip_traces_limit: number; geocodes_used: number; geocodes_limit: number; tier_label: string } | null>(null);
+  const [usage, setUsage] = useState<{ skip_traces_used: number; skip_traces_limit: number; geocodes_used: number; geocodes_limit: number; ai_minutes_used: number; ai_minutes_limit: number; tier_label: string } | null>(null);
   const searchRef = useRef<HTMLDivElement>(null);
 
   // Fetch usage
@@ -40,6 +40,8 @@ export default function TopBar() {
           skip_traces_limit: data.skip_traces_limit || 0,
           geocodes_used: data.geocodes_used || 0,
           geocodes_limit: data.geocodes_limit || 0,
+          ai_minutes_used: Number(data.ai_minutes_used || 0),
+          ai_minutes_limit: data.ai_minutes_limit || 0,
           tier_label: data.tier_label || 'Free',
         });
       }
@@ -162,6 +164,13 @@ export default function TopBar() {
             ? 'bg-orange-500/10 border-orange-500/30 text-orange-400'
             : 'bg-sky-500/10 border-sky-500/20 text-sky-400';
 
+          const aiRemaining = Math.max(0, usage.ai_minutes_limit - usage.ai_minutes_used);
+          const aiPct = usage.ai_minutes_limit > 0 ? aiRemaining / usage.ai_minutes_limit : 0;
+          const aiLow = usage.ai_minutes_limit > 0 && (aiPct < 0.2 || aiRemaining < 5);
+          const aiColor = aiLow
+            ? 'bg-orange-500/10 border-orange-500/30 text-orange-400'
+            : 'bg-violet-500/10 border-violet-500/20 text-violet-400';
+
           return (
             <div className="hidden md:flex items-center gap-2">
               <Link
@@ -172,6 +181,16 @@ export default function TopBar() {
                 <span className="material-symbols-outlined text-[14px]">person_search</span>
                 {stRemaining}/{usage.skip_traces_limit}
               </Link>
+              {usage.ai_minutes_limit > 0 && (
+                <Link
+                  href="/subscribe"
+                  className={`flex items-center gap-1 px-2 py-1 rounded-full border text-[10px] font-bold transition-colors hover:brightness-110 ${aiColor}`}
+                  title={aiLow ? 'AI minutes running low — click to upgrade' : 'AI caller minutes remaining'}
+                >
+                  <span className="material-symbols-outlined text-[14px]">smart_toy</span>
+                  {Math.round(aiRemaining)}/{usage.ai_minutes_limit} min
+                </Link>
+              )}
               <div className={`flex items-center gap-1 px-2 py-1 rounded-full border text-[10px] font-bold ${gcColor}`} title="Geocodes remaining">
                 <span className="material-symbols-outlined text-[14px]">pin_drop</span>
                 {gcRemaining}/{usage.geocodes_limit}

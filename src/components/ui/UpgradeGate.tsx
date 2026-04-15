@@ -61,6 +61,13 @@ const FEATURES: Record<string, FeatureConfig> = {
     bullets: ['One-Click Prospect Discovery', 'Addresses + Phone Numbers', 'Ready-to-Dial Lists'],
     dismiss: 'Maybe later',
   },
+  aiCaller: {
+    title: 'AI Assistant Calls',
+    icon: 'smart_toy',
+    description: 'Let AI make the first touch while you listen. Jump in the moment the owner is interested.',
+    bullets: ['AI Dials and Qualifies with Market Context', 'Live Listen + Instant Takeover', 'Uses Comps, DOM & Price/Sqft to Open'],
+    dismiss: 'Maybe later',
+  },
 };
 
 interface Props {

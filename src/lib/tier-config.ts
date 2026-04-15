@@ -6,11 +6,13 @@ export interface TierConfig {
   label: string;
   geocodes: number;       // monthly limit (lifetime for free)
   skipTraces: number;     // monthly limit (lifetime for free)
-  callingMinutes: number; // 0 = manual dialing only
+  callingMinutes: number; // 0 = manual dialing only (Twilio minutes)
   hasDialer: boolean;
   hasPhoneNumber: boolean;
   unlimitedStreetView: boolean;
-  overageSkipTraceCents: number; // cost per extra skip trace (0 = no overages)
+  overageSkipTraceCents: number;      // cost per extra skip trace (0 = no overages)
+  aiMinutes: number;                  // AI caller minutes (monthly; lifetime for free)
+  aiOverageCentsPerMin: number;       // AI caller overage rate (0 = no overages)
 }
 
 export const TIERS: Record<string, TierConfig> = {
@@ -24,6 +26,8 @@ export const TIERS: Record<string, TierConfig> = {
     hasPhoneNumber: false,
     unlimitedStreetView: false,
     overageSkipTraceCents: 0, // no overages for free
+    aiMinutes: 5,             // lifetime "try it" pool
+    aiOverageCentsPerMin: 0,  // no overages for free
   },
   basic: {
     key: 'basic',
@@ -35,6 +39,8 @@ export const TIERS: Record<string, TierConfig> = {
     hasPhoneNumber: false,
     unlimitedStreetView: false,
     overageSkipTraceCents: 25, // $0.25
+    aiMinutes: 20,             // monthly
+    aiOverageCentsPerMin: 50,  // $0.50/min
   },
   standard: {
     key: 'standard',
@@ -46,6 +52,8 @@ export const TIERS: Record<string, TierConfig> = {
     hasPhoneNumber: true,
     unlimitedStreetView: true,
     overageSkipTraceCents: 20, // $0.20
+    aiMinutes: 75,             // monthly
+    aiOverageCentsPerMin: 40,  // $0.40/min
   },
   pro: {
     key: 'pro',
@@ -57,6 +65,8 @@ export const TIERS: Record<string, TierConfig> = {
     hasPhoneNumber: true,
     unlimitedStreetView: true,
     overageSkipTraceCents: 15, // $0.15
+    aiMinutes: 250,            // monthly
+    aiOverageCentsPerMin: 30,  // $0.30/min
   },
 };
 

@@ -307,6 +307,33 @@ export default function SettingsPage() {
         />
       </section>
 
+      {/* AI Caller — custom opening line override */}
+      <section className="glass-card rounded-2xl p-6 space-y-4">
+        <div className="flex items-center gap-3 mb-2">
+          <MaterialIcon icon="smart_toy" className="text-primary" />
+          <h2 className="text-lg font-bold text-on-surface font-headline">AI Caller Opening</h2>
+        </div>
+        <p className="text-xs text-secondary">
+          Override the AI caller&apos;s first line. Leave blank to use the default template for each assistant. Placeholders:{' '}
+          <code className="bg-surface-container px-1 rounded">{'{agent_first_name}'}</code>{' '}
+          <code className="bg-surface-container px-1 rounded">{'{agent_company}'}</code>{' '}
+          <code className="bg-surface-container px-1 rounded">{'{owner_first_name}'}</code>{' '}
+          <code className="bg-surface-container px-1 rounded">{'{reference_address}'}</code>{' '}
+          <code className="bg-surface-container px-1 rounded">{'{sold_price}'}</code>{' '}
+          <code className="bg-surface-container px-1 rounded">{'{property_city}'}</code>.
+        </p>
+        <textarea
+          value={form.aiCustomOpening}
+          onChange={(e) => setForm((prev) => ({ ...prev, aiCustomOpening: e.target.value }))}
+          rows={4}
+          placeholder="Hi, is this {owner_first_name}? This is an assistant calling on behalf of {agent_first_name}..."
+          className="w-full px-4 py-3 rounded-xl bg-input-bg border border-card-border text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-mono leading-relaxed"
+        />
+        <p className="text-[11px] text-on-surface-variant/70">
+          Keep it short (under 2 sentences). The AI will continue the conversation from here.
+        </p>
+      </section>
+
       {/* Usage */}
       <UsageMeter />
 

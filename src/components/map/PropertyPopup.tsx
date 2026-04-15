@@ -10,6 +10,8 @@ import { useProfile } from "@/lib/profile-context";
 import { useAuth } from "@/lib/auth-context";
 import { usePhone } from "@/lib/phone-context";
 import UpgradeGate from "@/components/ui/UpgradeGate";
+import AICallLauncher from "@/components/call/AICallLauncher";
+import AICallListener from "@/components/call/AICallListener";
 
 interface Props {
   lead: Lead;
@@ -139,6 +141,10 @@ export default function PropertyPopup({ lead, onUpdate, walkMode = false, onWalk
   const [contextSaved, setContextSaved] = useState(false);
   const [lookupLoading, setLookupLoading] = useState(false);
   const [lookupResult, setLookupResult] = useState<{ hit: boolean; owner_name?: string; phones?: string[]; error?: string } | null>(null);
+
+  // AI call state
+  const [aiLaunchPhone, setAiLaunchPhone] = useState<string | null>(null);
+  const [aiActiveCall, setAiActiveCall] = useState<{ aiCallId: string; vapiCallId: string; monitorListenUrl: string | null; firstMessage: string } | null>(null);
 
   const isFree = profile.subscriptionStatus !== 'active';
 
@@ -326,18 +332,32 @@ export default function PropertyPopup({ lead, onUpdate, walkMode = false, onWalk
 
             {/* Phone numbers + call buttons */}
             {isCallable && (
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-col gap-1.5">
                 {phones.map((phone, idx) => (
-                  <button key={idx}
-                    onClick={() => {
-                      if (isFree) { setUpgradeFeature('dialer'); return; }
-                      if (isDesktop) makeCall(phone, lead.owner_name || lead.name || 'Unknown', lead.id);
-                      else window.location.href = `tel:${phone}`;
-                    }}
-                    className="flex items-center gap-1 text-[11px] font-bold text-emerald-500 hover:underline">
-                    <MaterialIcon icon="call" className="text-[12px]" />
-                    {formatPhone(phone)}
-                  </button>
+                  <div key={idx} className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        if (isFree) { setUpgradeFeature('dialer'); return; }
+                        if (isDesktop) makeCall(phone, lead.owner_name || lead.name || 'Unknown', lead.id);
+                        else window.location.href = `tel:${phone}`;
+                      }}
+                      className="flex items-center gap-1 text-[11px] font-bold text-emerald-500 hover:underline"
+                    >
+                      <MaterialIcon icon="call" className="text-[12px]" />
+                      {formatPhone(phone)}
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (isFree) { setUpgradeFeature('aiCaller'); return; }
+                        setAiLaunchPhone(phone);
+                      }}
+                      title="Launch AI caller"
+                      className="flex items-center gap-1 px-1.5 py-0.5 rounded border border-violet-500/30 bg-violet-500/10 text-violet-400 text-[10px] font-bold hover:bg-violet-500/20 transition-colors"
+                    >
+                      <MaterialIcon icon="smart_toy" className="text-[12px]" />
+                      AI
+                    </button>
+                  </div>
                 ))}
               </div>
             )}
@@ -477,10 +497,40 @@ export default function PropertyPopup({ lead, onUpdate, walkMode = false, onWalk
       </div>
 
       <UpgradeGate
-        feature={upgradeFeature as 'dialer' | 'marketData'}
+        feature={upgradeFeature as 'dialer' | 'marketData' | 'aiCaller'}
         show={!!upgradeFeature}
         onClose={() => setUpgradeFeature(null)}
       />
+
+      {/* AI Call launcher (pre-call confirmation) */}
+      {aiLaunchPhone && !aiActiveCall && (
+        <AICallLauncher
+          lead={lead}
+          phoneNumber={aiLaunchPhone}
+          onClose={() => setAiLaunchPhone(null)}
+          onStarted={(call) => {
+            setAiActiveCall(call);
+            setAiLaunchPhone(null);
+          }}
+          onUpgrade={() => {
+            setAiLaunchPhone(null);
+            setUpgradeFeature('aiCaller');
+          }}
+        />
+      )}
+
+      {/* AI Call live listener */}
+      {aiActiveCall && (
+        <AICallListener
+          aiCallId={aiActiveCall.aiCallId}
+          monitorListenUrl={aiActiveCall.monitorListenUrl}
+          firstMessage={aiActiveCall.firstMessage}
+          onClose={() => {
+            setAiActiveCall(null);
+            onUpdate?.();
+          }}
+        />
+      )}
     </div>
   );
 }

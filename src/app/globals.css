@@ -6,7 +6,7 @@
 .hero-bg-section {
   background-image:
     linear-gradient(to right, rgba(12,19,36,0.85) 10%, rgba(12,19,36,0.5) 50%, rgba(12,19,36,0.2) 80%, transparent 100%),
-    url('/hero-street.png');
+    url('/hero-bg-1.png');
   background-size: cover, cover;
   background-position: center, 70% center;
   background-repeat: no-repeat, no-repeat;
@@ -16,7 +16,7 @@
   .hero-bg-section {
     background-image:
       linear-gradient(to right, #0c1324 25%, rgba(12,19,36,0.7) 50%, rgba(12,19,36,0.2) 75%, transparent 100%),
-      url('/hero-street.png');
+      url('/hero-bg-1.png');
     background-position: center, 65% center;
   }
 }

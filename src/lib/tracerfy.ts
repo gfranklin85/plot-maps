@@ -37,7 +37,7 @@ interface BatchTraceResult {
 }
 
 export async function batchTrace(addresses: BatchTraceAddress[], traceType: 'normal' | 'advanced' = 'advanced'): Promise<BatchTraceResult> {
-  // Format as JSON data with column mappings
+  // Tracerfy batch endpoint requires multipart/form-data
   const jsonData = addresses.map(a => ({
     address: a.address.split(',')[0]?.trim() || a.address,
     city: a.city || '',
@@ -45,22 +45,31 @@ export async function batchTrace(addresses: BatchTraceAddress[], traceType: 'nor
     zip: a.zip || '',
   }));
 
-  return tracerfy('/trace/', {
+  const formData = new FormData();
+  formData.append('json_data', JSON.stringify(jsonData));
+  formData.append('address_column', 'address');
+  formData.append('city_column', 'city');
+  formData.append('state_column', 'state');
+  formData.append('zip_column', 'zip');
+  formData.append('first_name_column', 'first_name');
+  formData.append('last_name_column', 'last_name');
+  formData.append('mail_address_column', 'mail_address');
+  formData.append('mail_city_column', 'mail_city');
+  formData.append('mail_state_column', 'mail_state');
+  formData.append('trace_type', traceType);
+
+  const res = await fetch(`${BASE_URL}/trace/`, {
     method: 'POST',
-    body: JSON.stringify({
-      json_data: JSON.stringify(jsonData),
-      address_column: 'address',
-      city_column: 'city',
-      state_column: 'state',
-      zip_column: 'zip',
-      first_name_column: 'first_name',
-      last_name_column: 'last_name',
-      mail_address_column: 'mail_address',
-      mail_city_column: 'mail_city',
-      mail_state_column: 'mail_state',
-      trace_type: traceType,
-    }),
+    headers: { 'Authorization': `Bearer ${API_KEY}` },
+    body: formData,
   });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`Tracerfy batch ${res.status}: ${text}`);
+  }
+
+  return res.json();
 }
 
 // ── Instant Lookup (sync — returns immediately) ──

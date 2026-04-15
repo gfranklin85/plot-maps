@@ -40,15 +40,7 @@ export default function LandingPage() {
 
       <main>
         {/* Hero Section — full bleed background */}
-        <section
-          className="relative pt-24 sm:pt-40 pb-16 sm:pb-32 overflow-hidden"
-          style={{
-            backgroundImage: 'linear-gradient(to right, #0c1324 25%, rgba(12,19,36,0.7) 50%, rgba(12,19,36,0.2) 75%, transparent 100%), url(/benefit-streetview.png)',
-            backgroundSize: 'cover, cover',
-            backgroundPosition: 'center, 65% center',
-            backgroundRepeat: 'no-repeat, no-repeat',
-          }}
-        >
+        <section className="relative pt-24 sm:pt-40 pb-16 sm:pb-32 overflow-hidden hero-bg-section">
 
           <div className="max-w-7xl mx-auto px-5 sm:px-8">
             <div className="max-w-2xl relative z-10">

@@ -43,9 +43,9 @@ export default function LandingPage() {
         <section
           className="relative pt-24 sm:pt-40 pb-16 sm:pb-32 overflow-hidden"
           style={{
-            backgroundImage: 'linear-gradient(to right, #0c1324 30%, rgba(12,19,36,0.7) 55%, rgba(12,19,36,0.2) 80%, transparent 100%), url(/hero-bg.png)',
+            backgroundImage: 'linear-gradient(to right, #0c1324 25%, rgba(12,19,36,0.7) 50%, rgba(12,19,36,0.2) 75%, transparent 100%), url(/hero-bg.png)',
             backgroundSize: 'cover, cover',
-            backgroundPosition: 'center, right center',
+            backgroundPosition: 'center, 65% center',
             backgroundRepeat: 'no-repeat, no-repeat',
           }}
         >

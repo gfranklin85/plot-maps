@@ -6,19 +6,10 @@
 .hero-bg-section {
   background-image:
     linear-gradient(to right, #0c1324 25%, rgba(12,19,36,0.7) 50%, rgba(12,19,36,0.2) 75%, transparent 100%),
-    url('/mobile_hero_bg_streetview.jpg');
+    url('/hero-street.png');
   background-size: cover, cover;
   background-position: center, 65% center;
   background-repeat: no-repeat, no-repeat;
-}
-
-@media (min-width: 768px) {
-  .hero-bg-section {
-    background-image:
-      linear-gradient(to right, #0c1324 25%, rgba(12,19,36,0.7) 50%, rgba(12,19,36,0.2) 75%, transparent 100%),
-      url('/benefit-streetview.png');
-    background-position: center, 65% center;
-  }
 }
 
 /* ─── Mobile App Feel ─── */

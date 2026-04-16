@@ -12,13 +12,14 @@ const PRO_PRICE_ID = process.env.NEXT_PUBLIC_STRIPE_PRO_PRICE_ID || '';
 async function getSubscriptionInfo(userId: string) {
   const { data } = await supabaseAdmin
     .from('profiles')
-    .select('subscription_status, stripe_price_id')
+    .select('subscription_status, stripe_price_id, is_admin')
     .eq('id', userId)
     .single();
 
   const isActive = data?.subscription_status === 'active';
   const isPro = isActive && data?.stripe_price_id === PRO_PRICE_ID;
-  return { isActive, isPro };
+  const isAdmin = !!data?.is_admin;
+  return { isActive, isPro, isAdmin };
 }
 
 function getCurrentMonth(): string {
@@ -26,7 +27,21 @@ function getCurrentMonth(): string {
 }
 
 async function getCredits(userId: string) {
-  const { isActive, isPro } = await getSubscriptionInfo(userId);
+  const { isActive, isPro, isAdmin } = await getSubscriptionInfo(userId);
+
+  if (isAdmin) {
+    return {
+      allowed: true,
+      used: 0,
+      limit: Number.MAX_SAFE_INTEGER,
+      included_remaining: Number.MAX_SAFE_INTEGER,
+      is_overage: false,
+      overage_cost: 0,
+      is_free: false,
+      can_buy_more: true,
+      plan: 'admin',
+    };
+  }
 
   if (isActive) {
     // Paid user: monthly included limit + unlimited overages at $2/ea

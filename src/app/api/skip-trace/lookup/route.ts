@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getAuthUser, getTierForUser } from '@/lib/auth';
+import { getAuthUser, getBillingContext } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { instantLookup } from '@/lib/tracerfy';
 import { logCost } from '@/lib/cost-tracker';
@@ -13,64 +13,68 @@ export async function POST(request: Request) {
     const user = await getAuthUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const tier = await getTierForUser(user.id);
+    const { tier, isAdmin } = await getBillingContext(user.id);
     const { leadId, address, city, state, zip } = await request.json();
 
     if (!address || !city || !state) {
       return NextResponse.json({ error: 'address, city, and state required' }, { status: 400 });
     }
 
-    // Check monthly skip trace allocation
+    // Check monthly skip trace allocation (admins bypass entirely)
     const month = getCurrentMonth();
     const isFree = tier.key === 'free';
 
-    let usedCount = 0;
-    if (isFree) {
-      const { data: allUsage } = await supabaseAdmin
-        .from('usage_tracking')
-        .select('skip_traces_used')
-        .eq('user_id', user.id);
-      usedCount = (allUsage || []).reduce((s, r) => s + (r.skip_traces_used || 0), 0);
-    } else {
-      const { data: usage } = await supabaseAdmin
-        .from('usage_tracking')
-        .select('skip_traces_used')
-        .eq('user_id', user.id)
-        .eq('month', month)
-        .single();
-      usedCount = usage?.skip_traces_used || 0;
-    }
+    if (!isAdmin) {
+      let usedCount = 0;
+      if (isFree) {
+        const { data: allUsage } = await supabaseAdmin
+          .from('usage_tracking')
+          .select('skip_traces_used')
+          .eq('user_id', user.id);
+        usedCount = (allUsage || []).reduce((s, r) => s + (r.skip_traces_used || 0), 0);
+      } else {
+        const { data: usage } = await supabaseAdmin
+          .from('usage_tracking')
+          .select('skip_traces_used')
+          .eq('user_id', user.id)
+          .eq('month', month)
+          .single();
+        usedCount = usage?.skip_traces_used || 0;
+      }
 
-    if (usedCount >= tier.skipTraces) {
-      return NextResponse.json({
-        error: 'limit_reached',
-        message: `You've used all ${tier.skipTraces} skip traces this month.`,
-        upgrade: true,
-        tier: tier.key,
-        skip_traces_used: usedCount,
-        skip_traces_limit: tier.skipTraces,
-      }, { status: 402 });
+      if (usedCount >= tier.skipTraces) {
+        return NextResponse.json({
+          error: 'limit_reached',
+          message: `You've used all ${tier.skipTraces} skip traces this month.`,
+          upgrade: true,
+          tier: tier.key,
+          skip_traces_used: usedCount,
+          skip_traces_limit: tier.skipTraces,
+        }, { status: 402 });
+      }
     }
 
     // Call Tracerfy
     const result = await instantLookup(address, city, state, zip);
 
     if (result.hit && result.persons.length > 0) {
-      // Increment skip trace usage
-      const { data: usage } = await supabaseAdmin
-        .from('usage_tracking')
-        .select('id, skip_traces_used')
-        .eq('user_id', user.id)
-        .eq('month', month)
-        .single();
+      // Increment skip trace usage (admins don't consume credits)
+      if (!isAdmin) {
+        const { data: usage } = await supabaseAdmin
+          .from('usage_tracking')
+          .select('id, skip_traces_used')
+          .eq('user_id', user.id)
+          .eq('month', month)
+          .single();
 
-      if (usage) {
-        await supabaseAdmin.from('usage_tracking')
-          .update({ skip_traces_used: (usage.skip_traces_used || 0) + 1, updated_at: new Date().toISOString() })
-          .eq('id', usage.id);
-      } else {
-        await supabaseAdmin.from('usage_tracking')
-          .insert({ user_id: user.id, month, skip_traces_used: 1, geocodes_used: 0, geocodes_limit: tier.geocodes, skip_traces_limit: tier.skipTraces });
+        if (usage) {
+          await supabaseAdmin.from('usage_tracking')
+            .update({ skip_traces_used: (usage.skip_traces_used || 0) + 1, updated_at: new Date().toISOString() })
+            .eq('id', usage.id);
+        } else {
+          await supabaseAdmin.from('usage_tracking')
+            .insert({ user_id: user.id, month, skip_traces_used: 1, geocodes_used: 0, geocodes_limit: tier.geocodes, skip_traces_limit: tier.skipTraces });
+        }
       }
 
       // Extract best data

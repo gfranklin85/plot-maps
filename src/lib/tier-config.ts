@@ -15,6 +15,23 @@ export interface TierConfig {
   aiOverageCentsPerMin: number;       // AI caller overage rate (0 = no overages)
 }
 
+// Special tier for admin users — all limits set to effectively infinite.
+// Admin routes bypass billing entirely but this tier is returned so any code
+// that reads limits (e.g. UI counters) still works without special-casing.
+export const ADMIN_TIER: TierConfig = {
+  key: 'admin',
+  label: 'Admin',
+  geocodes: 1_000_000,
+  skipTraces: 1_000_000,
+  callingMinutes: 1_000_000,
+  hasDialer: true,
+  hasPhoneNumber: true,
+  unlimitedStreetView: true,
+  overageSkipTraceCents: 0,
+  aiMinutes: 1_000_000,
+  aiOverageCentsPerMin: 0,
+};
+
 export const TIERS: Record<string, TierConfig> = {
   free: {
     key: 'free',

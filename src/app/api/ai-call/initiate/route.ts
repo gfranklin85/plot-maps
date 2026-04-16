@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getAuthUser, getTierForUser } from '@/lib/auth';
+import { getAuthUser, getBillingContext } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { startCall } from '@/lib/vapi';
 import { ASSISTANT_TEMPLATES, buildAssistantOverrides, varsToVapiVariables, type TemplateVariables } from '@/lib/ai-assistant-templates';
@@ -37,66 +37,70 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unknown assistant' }, { status: 400 });
   }
 
-  const tier = await getTierForUser(user.id);
+  const { tier, isAdmin } = await getBillingContext(user.id);
   const month = getCurrentMonth();
   const isFree = tier.key === 'free';
 
-  // ── 1. Check included AI minutes remaining ──────────────────────────────
-  let aiUsed = 0;
-  if (isFree) {
-    const { data: allUsage } = await supabaseAdmin
-      .from('usage_tracking')
-      .select('ai_minutes_used')
-      .eq('user_id', user.id);
-    aiUsed = (allUsage || []).reduce((s, r) => s + Number(r.ai_minutes_used || 0), 0);
-  } else {
-    const { data: usage } = await supabaseAdmin
-      .from('usage_tracking')
-      .select('ai_minutes_used')
-      .eq('user_id', user.id)
-      .eq('month', month)
-      .single();
-    aiUsed = Number(usage?.ai_minutes_used || 0);
-  }
-
-  const includedRemaining = Math.max(0, tier.aiMinutes - aiUsed);
-
-  // ── 2. Check wallet balance if user may exceed included ─────────────────
-  // Enforce minimum budget: user must have at least MIN_BUDGET_MINUTES covered.
+  let includedRemaining = tier.aiMinutes;
   let walletBalanceCents = 0;
-  const minutesShortfall = Math.max(0, MIN_BUDGET_MINUTES - includedRemaining);
 
-  if (minutesShortfall > 0) {
-    if (isFree || tier.aiOverageCentsPerMin === 0) {
-      return NextResponse.json({
-        error: 'limit_reached',
-        message: `You've used your AI minutes. Upgrade your plan to continue.`,
-        upgrade: true,
-        tier: tier.key,
-        ai_minutes_remaining: includedRemaining,
-        ai_minutes_limit: tier.aiMinutes,
-      }, { status: 402 });
+  if (!isAdmin) {
+    // ── 1. Check included AI minutes remaining ────────────────────────────
+    let aiUsed = 0;
+    if (isFree) {
+      const { data: allUsage } = await supabaseAdmin
+        .from('usage_tracking')
+        .select('ai_minutes_used')
+        .eq('user_id', user.id);
+      aiUsed = (allUsage || []).reduce((s, r) => s + Number(r.ai_minutes_used || 0), 0);
+    } else {
+      const { data: usage } = await supabaseAdmin
+        .from('usage_tracking')
+        .select('ai_minutes_used')
+        .eq('user_id', user.id)
+        .eq('month', month)
+        .single();
+      aiUsed = Number(usage?.ai_minutes_used || 0);
     }
 
-    const { data: wallet } = await supabaseAdmin
-      .from('wallets')
-      .select('balance_cents')
-      .eq('user_id', user.id)
-      .single();
-    walletBalanceCents = Number(wallet?.balance_cents || 0);
+    includedRemaining = Math.max(0, tier.aiMinutes - aiUsed);
 
-    const minRequiredCents = minutesShortfall * tier.aiOverageCentsPerMin;
-    if (walletBalanceCents < minRequiredCents) {
-      return NextResponse.json({
-        error: 'insufficient_balance',
-        message: `You have ${includedRemaining} AI minutes left. A ${MIN_BUDGET_MINUTES}-minute call requires $${(minRequiredCents / 100).toFixed(2)} in your wallet. Top up to continue.`,
-        needs_topup: true,
-        tier: tier.key,
-        ai_minutes_remaining: includedRemaining,
-        overage_per_min_cents: tier.aiOverageCentsPerMin,
-        wallet_balance_cents: walletBalanceCents,
-        min_required_cents: minRequiredCents,
-      }, { status: 402 });
+    // ── 2. Check wallet balance if user may exceed included ──────────────
+    // Enforce minimum budget: user must have at least MIN_BUDGET_MINUTES covered.
+    const minutesShortfall = Math.max(0, MIN_BUDGET_MINUTES - includedRemaining);
+
+    if (minutesShortfall > 0) {
+      if (isFree || tier.aiOverageCentsPerMin === 0) {
+        return NextResponse.json({
+          error: 'limit_reached',
+          message: `You've used your AI minutes. Upgrade your plan to continue.`,
+          upgrade: true,
+          tier: tier.key,
+          ai_minutes_remaining: includedRemaining,
+          ai_minutes_limit: tier.aiMinutes,
+        }, { status: 402 });
+      }
+
+      const { data: wallet } = await supabaseAdmin
+        .from('wallets')
+        .select('balance_cents')
+        .eq('user_id', user.id)
+        .single();
+      walletBalanceCents = Number(wallet?.balance_cents || 0);
+
+      const minRequiredCents = minutesShortfall * tier.aiOverageCentsPerMin;
+      if (walletBalanceCents < minRequiredCents) {
+        return NextResponse.json({
+          error: 'insufficient_balance',
+          message: `You have ${includedRemaining} AI minutes left. A ${MIN_BUDGET_MINUTES}-minute call requires $${(minRequiredCents / 100).toFixed(2)} in your wallet. Top up to continue.`,
+          needs_topup: true,
+          tier: tier.key,
+          ai_minutes_remaining: includedRemaining,
+          overage_per_min_cents: tier.aiOverageCentsPerMin,
+          wallet_balance_cents: walletBalanceCents,
+          min_required_cents: minRequiredCents,
+        }, { status: 402 });
+      }
     }
   }
 

@@ -148,8 +148,19 @@ export default function TopBar() {
       <div className="flex items-center gap-2 md:gap-4">
         <ThemeToggle />
 
-        {/* Usage counters — desktop only */}
-        {usage && (() => {
+        {/* Admin pill — replaces usage counters for admins */}
+        {profile.isAdmin && (
+          <div
+            className="hidden md:flex items-center gap-1 px-2.5 py-1 rounded-full border border-amber-500/40 bg-gradient-to-r from-amber-500/15 to-orange-500/15 text-amber-400 text-[10px] font-black uppercase tracking-widest"
+            title="Admin — all billing bypassed"
+          >
+            <span className="material-symbols-outlined text-[14px]">shield_person</span>
+            Admin • Free
+          </div>
+        )}
+
+        {/* Usage counters — desktop only, hidden for admins */}
+        {!profile.isAdmin && usage && (() => {
           const stRemaining = usage.skip_traces_limit - usage.skip_traces_used;
           const stPct = usage.skip_traces_limit > 0 ? stRemaining / usage.skip_traces_limit : 0;
           const stLow = stPct < 0.2 || stRemaining < 10;

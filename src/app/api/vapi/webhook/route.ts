@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { verifyWebhookSignature } from '@/lib/vapi';
-import { getTier } from '@/lib/tier-config';
+import { getTier, ADMIN_TIER } from '@/lib/tier-config';
 import { logCost } from '@/lib/cost-tracker';
 
 function getCurrentMonth(): string {
@@ -92,68 +92,78 @@ export async function POST(request: Request) {
     // Determine billing split from tier + current usage
     const { data: profile } = await supabaseAdmin
       .from('profiles')
-      .select('subscription_status, stripe_price_id')
+      .select('subscription_status, stripe_price_id, is_admin')
       .eq('id', aiCall.user_id)
       .single();
 
-    const tier = getTier(profile?.subscription_status || null, profile?.stripe_price_id || null);
+    const isAdmin = !!profile?.is_admin;
+    const tier = isAdmin
+      ? ADMIN_TIER
+      : getTier(profile?.subscription_status || null, profile?.stripe_price_id || null);
     const isFree = tier.key === 'free';
     const month = getCurrentMonth();
 
-    // Current AI minutes used (lifetime for free, monthly otherwise)
-    let aiUsed = 0;
-    if (isFree) {
-      const { data: allUsage } = await supabaseAdmin
-        .from('usage_tracking')
-        .select('ai_minutes_used')
-        .eq('user_id', aiCall.user_id);
-      aiUsed = (allUsage || []).reduce((s, r) => s + Number(r.ai_minutes_used || 0), 0);
-    } else {
-      const { data: usage } = await supabaseAdmin
-        .from('usage_tracking')
-        .select('ai_minutes_used')
-        .eq('user_id', aiCall.user_id)
-        .eq('month', month)
-        .single();
-      aiUsed = Number(usage?.ai_minutes_used || 0);
-    }
+    // Admins never consume credits or wallet balance
+    let fromIncluded = 0;
+    let fromOverage = 0;
+    let overageCents = 0;
 
-    const includedRemaining = Math.max(0, tier.aiMinutes - aiUsed);
-    const fromIncluded = Math.min(minutesBilled, includedRemaining);
-    const fromOverage = minutesBilled - fromIncluded;
-    const overageCents = fromOverage * tier.aiOverageCentsPerMin;
-
-    // Increment included usage
-    if (fromIncluded > 0) {
-      const { data: existing } = await supabaseAdmin
-        .from('usage_tracking')
-        .select('id, ai_minutes_used')
-        .eq('user_id', aiCall.user_id)
-        .eq('month', month)
-        .single();
-
-      if (existing) {
-        await supabaseAdmin
+    if (!isAdmin) {
+      // Current AI minutes used (lifetime for free, monthly otherwise)
+      let aiUsed = 0;
+      if (isFree) {
+        const { data: allUsage } = await supabaseAdmin
           .from('usage_tracking')
-          .update({
-            ai_minutes_used: Number(existing.ai_minutes_used || 0) + fromIncluded,
-            ai_minutes_limit: tier.aiMinutes,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', existing.id);
+          .select('ai_minutes_used')
+          .eq('user_id', aiCall.user_id);
+        aiUsed = (allUsage || []).reduce((s, r) => s + Number(r.ai_minutes_used || 0), 0);
       } else {
-        await supabaseAdmin
+        const { data: usage } = await supabaseAdmin
           .from('usage_tracking')
-          .insert({
-            user_id: aiCall.user_id,
-            month,
-            ai_minutes_used: fromIncluded,
-            ai_minutes_limit: tier.aiMinutes,
-            geocodes_used: 0,
-            geocodes_limit: tier.geocodes,
-            skip_traces_used: 0,
-            skip_traces_limit: tier.skipTraces,
-          });
+          .select('ai_minutes_used')
+          .eq('user_id', aiCall.user_id)
+          .eq('month', month)
+          .single();
+        aiUsed = Number(usage?.ai_minutes_used || 0);
+      }
+
+      const includedRemaining = Math.max(0, tier.aiMinutes - aiUsed);
+      fromIncluded = Math.min(minutesBilled, includedRemaining);
+      fromOverage = minutesBilled - fromIncluded;
+      overageCents = fromOverage * tier.aiOverageCentsPerMin;
+
+      // Increment included usage
+      if (fromIncluded > 0) {
+        const { data: existing } = await supabaseAdmin
+          .from('usage_tracking')
+          .select('id, ai_minutes_used')
+          .eq('user_id', aiCall.user_id)
+          .eq('month', month)
+          .single();
+
+        if (existing) {
+          await supabaseAdmin
+            .from('usage_tracking')
+            .update({
+              ai_minutes_used: Number(existing.ai_minutes_used || 0) + fromIncluded,
+              ai_minutes_limit: tier.aiMinutes,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', existing.id);
+        } else {
+          await supabaseAdmin
+            .from('usage_tracking')
+            .insert({
+              user_id: aiCall.user_id,
+              month,
+              ai_minutes_used: fromIncluded,
+              ai_minutes_limit: tier.aiMinutes,
+              geocodes_used: 0,
+              geocodes_limit: tier.geocodes,
+              skip_traces_used: 0,
+              skip_traces_limit: tier.skipTraces,
+            });
+        }
       }
     }
 

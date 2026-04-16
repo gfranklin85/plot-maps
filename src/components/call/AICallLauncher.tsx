@@ -2,30 +2,39 @@
 
 import { useEffect, useState } from "react";
 import MaterialIcon from "@/components/ui/MaterialIcon";
+import { useAuth } from "@/lib/auth-context";
+import { useProfile } from "@/lib/profile-context";
+import { supabase } from "@/lib/supabase";
 import type { Lead } from "@/types";
 
 interface AssistantOption {
   key: string;
   label: string;
   description: string;
+  firstMessageTemplate: string;
 }
 
-// Mirror of ASSISTANT_TEMPLATES keys so we don't bundle server code
 const ASSISTANTS: AssistantOption[] = [
   {
     key: "neighbor_warmth",
     label: "Neighbor Warmth",
     description: "Friendly opener referencing a recent sale nearby. Best for circle prospecting.",
+    firstMessageTemplate:
+      "Hi, is this {owner_first_name}? This is an assistant calling on behalf of {agent_first_name} with {agent_company}. I'm reaching out because a home just sold right near you at {reference_address} for {sold_price}. Quick question — have you been thinking about selling anytime soon, or are you pretty settled in for now?",
   },
   {
     key: "expired_opener",
     label: "Expired Listing Opener",
     description: "Empathetic opener for expired MLS listings. Not pushy.",
+    firstMessageTemplate:
+      "Hi, is this {owner_first_name}? This is {agent_first_name}'s assistant with {agent_company}. I saw your home at {reference_address} came off the market recently and I just wanted to reach out and see — are you still hoping to sell, or have you decided to stay put for now?",
   },
   {
     key: "fsbo_outreach",
     label: "FSBO Outreach",
     description: "Respectful outreach to for-sale-by-owner leads.",
+    firstMessageTemplate:
+      "Hi, is this {owner_first_name}? This is an assistant calling on behalf of {agent_first_name} at {agent_company}. I noticed your home at {reference_address} is for sale by owner — I'm not calling to convince you to list with an agent, I just wanted to see if you might be open to talking with {agent_first_name} briefly.",
   },
 ];
 
@@ -57,12 +66,32 @@ interface Props {
   onTopup?: () => void;
 }
 
+const STATUS_COLORS: Record<string, string> = {
+  Sold: "bg-amber-500/20 text-amber-400 border-amber-500/30",
+  Pending: "bg-violet-500/20 text-violet-400 border-violet-500/30",
+  Active: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
+};
+
+function formatPrice(p: number | null | undefined): string | null {
+  if (!p) return null;
+  if (p >= 1_000_000) return `$${(p / 1_000_000).toFixed(1)}M`;
+  return `$${Math.round(p / 1000)}K`;
+}
+
 export default function AICallLauncher({ lead, phoneNumber, onClose, onStarted, onUpgrade, onTopup }: Props) {
+  const { user } = useAuth();
+  const { profile } = useProfile();
   const [selectedKey, setSelectedKey] = useState<string>("neighbor_warmth");
   const [usage, setUsage] = useState<UsageInfo | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Reference property state
+  const [refOptions, setRefOptions] = useState<Lead[]>([]);
+  const [selectedRef, setSelectedRef] = useState<Lead | null>(null);
+  const [refLoading, setRefLoading] = useState(true);
+
+  // Fetch usage + nearby reference properties on mount
   useEffect(() => {
     async function fetchUsage() {
       try {
@@ -77,14 +106,62 @@ export default function AICallLauncher({ lead, phoneNumber, onClose, onStarted, 
           wallet_balance_cents: Number(walletRes.balance_cents || 0),
           tier_label: usageRes.tier_label || "Free",
         });
-      } catch {
-        /* silent */
-      }
+      } catch { /* silent */ }
     }
     fetchUsage();
   }, []);
 
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      setRefLoading(true);
+      const { data } = await supabase
+        .from("leads")
+        .select("*")
+        .eq("user_id", user.id)
+        .not("listing_status", "is", null)
+        .order("selling_date", { ascending: false, nullsFirst: false })
+        .limit(25);
+      const refs = (data as Lead[]) || [];
+
+      // Sort by distance from target lead if coordinates available
+      if (lead?.latitude && lead?.longitude) {
+        refs.sort((a, b) => {
+          const distA = a.latitude && a.longitude
+            ? Math.hypot(a.latitude - lead.latitude!, a.longitude - lead.longitude!)
+            : Infinity;
+          const distB = b.latitude && b.longitude
+            ? Math.hypot(b.latitude - lead.latitude!, b.longitude - lead.longitude!)
+            : Infinity;
+          return distA - distB;
+        });
+      }
+
+      setRefOptions(refs);
+      if (refs.length > 0) setSelectedRef(refs[0]);
+      setRefLoading(false);
+    })();
+  }, [user, lead]);
+
   const currentAssistant = ASSISTANTS.find((a) => a.key === selectedKey) || ASSISTANTS[0];
+
+  // Build live preview of first message
+  const previewMessage = (() => {
+    const ownerFirst = (lead?.owner_name || lead?.name || "there").split(" ")[0];
+    const agentFirst = (profile.fullName || "your agent").split(" ")[0];
+    const company = profile.company || "Plot Maps";
+    const refAddr = selectedRef?.property_address?.split(",")[0] || "a nearby home";
+    const price = formatPrice(selectedRef?.selling_price || selectedRef?.listing_price) || "";
+
+    return currentAssistant.firstMessageTemplate
+      .replace("{owner_first_name}", ownerFirst)
+      .replace("{agent_first_name}", agentFirst)
+      .replace("{agent_company}", company)
+      .replace("{reference_address}", refAddr)
+      .replace("{sold_price}", price)
+      .replace(/\s+/g, " ")
+      .trim();
+  })();
 
   async function handleStart() {
     setLoading(true);
@@ -97,6 +174,7 @@ export default function AICallLauncher({ lead, phoneNumber, onClose, onStarted, 
           leadId: lead?.id,
           phoneNumber,
           assistantKey: selectedKey,
+          referenceLeadId: selectedRef?.id || null,
         }),
       });
       const data: InitiateResponse = await res.json();
@@ -137,10 +215,10 @@ export default function AICallLauncher({ lead, phoneNumber, onClose, onStarted, 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-surface/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-lg bg-card rounded-2xl border border-violet-500/30 shadow-2xl overflow-hidden">
+      <div className="relative w-full max-w-lg bg-card rounded-2xl border border-violet-500/30 shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
         <div className="absolute -top-16 -right-16 w-40 h-40 bg-violet-500/20 rounded-full blur-[60px]" />
 
-        <div className="relative z-10 p-6 space-y-5">
+        <div className="relative z-10 p-6 space-y-4 overflow-y-auto">
           {/* Header */}
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
@@ -182,16 +260,63 @@ export default function AICallLauncher({ lead, phoneNumber, onClose, onStarted, 
             </div>
           </div>
 
-          {/* Opening preview */}
+          {/* Reference property picker */}
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-2">
+              Reference Property
+            </p>
+            {refLoading ? (
+              <div className="flex items-center gap-2 p-3 text-xs text-on-surface-variant">
+                <span className="h-3 w-3 rounded-full border-2 border-violet-500/30 border-t-violet-500 animate-spin" />
+                Loading nearby properties...
+              </div>
+            ) : refOptions.length === 0 ? (
+              <div className="p-3 rounded-xl border border-card-border bg-surface-container-lowest">
+                <p className="text-xs text-on-surface-variant">
+                  No MLS listings found. Import listings to reference nearby activity on calls.
+                </p>
+              </div>
+            ) : (
+              <div className="max-h-36 overflow-y-auto rounded-xl border border-card-border divide-y divide-card-border/50">
+                {refOptions.map((ref) => (
+                  <button
+                    key={ref.id}
+                    onClick={() => setSelectedRef(ref)}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-all ${
+                      selectedRef?.id === ref.id
+                        ? "bg-violet-500/10"
+                        : "hover:bg-surface-container-high/30"
+                    }`}
+                  >
+                    <div className={`w-1.5 h-8 rounded-full shrink-0 ${
+                      selectedRef?.id === ref.id ? "bg-violet-500" : "bg-transparent"
+                    }`} />
+                    <span className={`shrink-0 px-1.5 py-0.5 rounded text-[9px] font-bold border ${
+                      STATUS_COLORS[ref.listing_status || ""] || "bg-zinc-500/20 text-zinc-400 border-zinc-500/30"
+                    }`}>
+                      {ref.listing_status}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-on-surface truncate">
+                        {ref.property_address?.split(",")[0]}
+                      </p>
+                    </div>
+                    <span className="text-[11px] font-bold text-on-surface-variant shrink-0">
+                      {formatPrice(ref.selling_price || ref.listing_price) || ""}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Live opening preview */}
           <div className="rounded-xl bg-surface-container-lowest border border-card-border p-4">
             <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-2">
               What the AI will say first
             </p>
             <p className="text-sm text-on-surface italic leading-relaxed">
-              &ldquo;{currentAssistant.description}&rdquo;
-            </p>
-            <p className="text-[10px] text-on-surface-variant/60 mt-2">
-              The AI will reference your nearest sold comp, owner name (if known), and your opening script from Settings.
+              &ldquo;{previewMessage}&rdquo;
             </p>
           </div>
 

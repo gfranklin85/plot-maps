@@ -22,10 +22,12 @@ export async function POST(request: Request) {
     leadId,
     phoneNumber,
     assistantKey = 'neighbor_warmth',
+    referenceLeadId,
   }: {
     leadId?: string;
     phoneNumber: string;
     assistantKey?: string;
+    referenceLeadId?: string;
   } = body;
 
   if (!phoneNumber) {
@@ -138,16 +140,25 @@ export async function POST(request: Request) {
     return first || null;
   })();
 
-  // Find nearest Sold comp within ~1 mile (rough bbox) to reference in the opener
+  // Find reference property: use user-selected if provided, else auto-detect nearest Sold comp
   let nearestComp: {
     property_address?: string | null;
     selling_price?: number | null;
+    listing_price?: number | null;
     dom?: number | null;
     sqft?: number | null;
   } | null = null;
 
-  if (lead?.latitude != null && lead?.longitude != null) {
-    // Rough degree box: 0.015 deg ≈ 1 mile latitude, wider at higher lat but close enough for Central CA
+  if (referenceLeadId) {
+    // User explicitly chose a reference property
+    const { data: refLead } = await supabaseAdmin
+      .from('leads')
+      .select('property_address, selling_price, listing_price, dom, sqft')
+      .eq('id', referenceLeadId)
+      .single();
+    nearestComp = refLead || null;
+  } else if (lead?.latitude != null && lead?.longitude != null) {
+    // Fallback: auto-detect nearest Sold comp within ~1 mile
     const latMin = lead.latitude - 0.015;
     const latMax = lead.latitude + 0.015;
     const lngMin = lead.longitude - 0.02;
@@ -155,7 +166,7 @@ export async function POST(request: Request) {
 
     const { data: comps } = await supabaseAdmin
       .from('leads')
-      .select('property_address, selling_price, dom, sqft, selling_date, latitude, longitude')
+      .select('property_address, selling_price, listing_price, dom, sqft, selling_date')
       .eq('listing_status', 'Sold')
       .gte('latitude', latMin)
       .lte('latitude', latMax)
@@ -175,8 +186,9 @@ export async function POST(request: Request) {
   };
 
   const ppsf = (() => {
-    if (!nearestComp?.selling_price || !nearestComp?.sqft || nearestComp.sqft <= 0) return null;
-    return `$${Math.round(nearestComp.selling_price / nearestComp.sqft)} per square foot`;
+    const price = nearestComp?.selling_price || nearestComp?.listing_price;
+    if (!price || !nearestComp?.sqft || nearestComp.sqft <= 0) return null;
+    return `$${Math.round(price / nearestComp.sqft)} per square foot`;
   })();
 
   const templateVars: TemplateVariables = {
@@ -184,7 +196,7 @@ export async function POST(request: Request) {
     agent_company: agentCompany,
     owner_first_name: ownerFirstName,
     reference_address: nearestComp?.property_address?.split(',')[0] || null,
-    sold_price: formatPrice(nearestComp?.selling_price),
+    sold_price: formatPrice(nearestComp?.selling_price || nearestComp?.listing_price),
     dom: nearestComp?.dom != null ? `${nearestComp.dom} days` : null,
     ppsf,
     property_city: lead?.city || null,

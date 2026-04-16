@@ -43,10 +43,10 @@ export async function POST(request: Request) {
   let fromOverage = 0;
   let walletBalanceCents = 0;
   let walletSpendCents = 0;
+  let usedCount = 0;
 
   if (!isAdmin) {
     // Step 1: Check how many included credits the user has used
-    let usedCount = 0;
     if (isFree) {
       const { data: allUsage } = await supabaseAdmin
         .from('usage_tracking')

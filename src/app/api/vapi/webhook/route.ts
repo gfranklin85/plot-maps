@@ -11,6 +11,28 @@ function getCurrentMonth(): string {
 // VAPI cost per minute to log internally (our actual cost, not what we charge)
 const VAPI_REAL_COST_PER_MIN = 0.18;
 
+const INTENT_KEYWORDS: [string, string][] = [
+  ['curious', 'curious'],
+  ['maybe this year', 'maybe_this_year'],
+  ['thinking about', 'maybe_this_year'],
+  ['settled', 'settled_for_now'],
+  ['not interested', 'not_interested'],
+  ['wrong number', 'wrong_number'],
+  ['call back', 'call_back_later'],
+  ['no answer', 'no_answer'],
+  ['voicemail', 'voicemail'],
+  ['left a message', 'voicemail'],
+];
+
+function parseIntentFromSummary(summary: string): string | null {
+  if (!summary) return null;
+  const lower = summary.toLowerCase();
+  for (const [keyword, intent] of INTENT_KEYWORDS) {
+    if (lower.includes(keyword)) return intent;
+  }
+  return null;
+}
+
 interface VapiWebhookMessage {
   type: string;
   call?: {
@@ -53,7 +75,7 @@ export async function POST(request: Request) {
   // Look up our AI call record
   const { data: aiCall } = await supabaseAdmin
     .from('ai_calls')
-    .select('id, user_id, lead_id, status, vapi_call_id')
+    .select('id, user_id, lead_id, status, vapi_call_id, campaign_id')
     .eq('vapi_call_id', vapiCallId)
     .single();
 
@@ -208,6 +230,10 @@ export async function POST(request: Request) {
       ai_call_id: aiCall.id,
     });
 
+    // Parse intent from summary if available
+    const intentLabel = parseIntentFromSummary(call.summary || '');
+    const answered = durationSeconds > 10;
+
     // Finalize the ai_calls row
     await supabaseAdmin
       .from('ai_calls')
@@ -221,8 +247,33 @@ export async function POST(request: Request) {
         transcript: call.transcript ? { raw: call.transcript } : null,
         summary: call.summary || null,
         ended_at: new Date(endedAt).toISOString(),
+        ...(intentLabel ? { intent_label: intentLabel } : {}),
       })
       .eq('id', aiCall.id);
+
+    // Campaign-specific: update prospect status + campaign stats
+    if (aiCall.campaign_id) {
+      await supabaseAdmin
+        .from('campaign_prospects')
+        .update({ call_status: 'completed' })
+        .eq('ai_call_id', aiCall.id);
+
+      const { data: camp } = await supabaseAdmin
+        .from('campaigns')
+        .select('calls_made, calls_answered')
+        .eq('id', aiCall.campaign_id)
+        .single();
+      if (camp) {
+        await supabaseAdmin
+          .from('campaigns')
+          .update({
+            calls_made: (camp.calls_made || 0) + 1,
+            calls_answered: answered ? (camp.calls_answered || 0) + 1 : (camp.calls_answered || 0),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', aiCall.campaign_id);
+      }
+    }
 
     return NextResponse.json({ ok: true });
   }

@@ -1,4 +1,3 @@
-import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-server';
 
 // TwiML endpoint — Twilio calls this when a broadcast call is answered.

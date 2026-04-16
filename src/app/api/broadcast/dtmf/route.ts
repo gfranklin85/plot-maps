@@ -1,4 +1,3 @@
-import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-server';
 
 const INTENT_MAP: Record<string, string> = {

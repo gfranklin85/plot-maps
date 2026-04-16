@@ -46,7 +46,6 @@ export default function NewBroadcastPage() {
   const [editedScript, setEditedScript] = useState("");
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   function handleGenerateVariants() {

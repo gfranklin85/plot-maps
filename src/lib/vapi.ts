@@ -85,7 +85,20 @@ export interface StartCallOptions {
   assistantOverrides?: {
     firstMessage?: string;
     variableValues?: Record<string, string | number | null>;
+    model?: {
+      provider: 'openai';
+      model: string;
+      temperature?: number;
+      messages?: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>;
+    };
+    voice?: {
+      provider: string;
+      voiceId: string;
+    };
+    maxDurationSeconds?: number;
+    endCallFunctionEnabled?: boolean;
   };
+  metadata?: Record<string, string>;
 }
 
 export interface VapiCall {
@@ -115,6 +128,7 @@ export async function startCall(options: StartCallOptions): Promise<VapiCall> {
   };
   if (options.phoneNumberId) body.phoneNumberId = options.phoneNumberId;
   if (options.assistantOverrides) body.assistantOverrides = options.assistantOverrides;
+  if (options.metadata) body.metadata = options.metadata;
 
   return vapiFetch<VapiCall>('/call/phone', {
     method: 'POST',

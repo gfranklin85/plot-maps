@@ -2,6 +2,7 @@ export const NAV_ITEMS = [
   { label: "Dashboard", href: "/", icon: "dashboard" },
   { label: "Map", href: "/map", icon: "map" },
   { label: "Leads", href: "/leads", icon: "group" },
+  { label: "Campaigns", href: "/campaigns", icon: "campaign" },
   { label: "Imports", href: "/imports", icon: "upload_file" },
 ] as const;
 

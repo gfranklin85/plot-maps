@@ -31,11 +31,25 @@ export default function CampaignsPage() {
 
   useEffect(() => {
     setLoading(true);
-    if (tab === "ai") {
-      fetch("/api/campaigns").then(r => r.json()).then(setCampaigns).catch(() => {}).finally(() => setLoading(false));
-    } else {
-      fetch("/api/broadcast").then(r => r.json()).then(setBroadcasts).catch(() => {}).finally(() => setLoading(false));
-    }
+    const fetchTab = async () => {
+      try {
+        if (tab === "ai") {
+          const res = await fetch("/api/campaigns");
+          if (res.ok) {
+            const data = await res.json();
+            setCampaigns(Array.isArray(data) ? data : []);
+          }
+        } else {
+          const res = await fetch("/api/broadcast");
+          if (res.ok) {
+            const data = await res.json();
+            setBroadcasts(Array.isArray(data) ? data : []);
+          }
+        }
+      } catch { /* table may not exist yet */ }
+      setLoading(false);
+    };
+    fetchTab();
   }, [tab]);
 
   return (

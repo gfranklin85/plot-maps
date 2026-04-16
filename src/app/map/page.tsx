@@ -361,6 +361,17 @@ export default function MapPage() {
               <MaterialIcon icon="ads_click" className="text-[20px]" />
             </button>
 
+            {/* Broadcast — create from selected reference */}
+            {pinnedRef && (
+              <a
+                href={`/campaigns/broadcast/new?refs=${pinnedRef.id}`}
+                title="Create Broadcast from this reference"
+                className="w-10 h-10 flex items-center justify-center rounded-xl bg-surface text-on-surface-variant shadow-lg hover:text-emerald-400 transition-all"
+              >
+                <MaterialIcon icon="campaign" className="text-[20px]" />
+              </a>
+            )}
+
             {/* Filters */}
             <button
               onClick={() => setFiltersOpen((o) => !o)}

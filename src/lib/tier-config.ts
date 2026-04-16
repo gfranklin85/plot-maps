@@ -13,6 +13,8 @@ export interface TierConfig {
   overageSkipTraceCents: number;      // cost per extra skip trace (0 = no overages)
   aiMinutes: number;                  // AI caller minutes (monthly; lifetime for free)
   aiOverageCentsPerMin: number;       // AI caller overage rate (0 = no overages)
+  broadcastCalls: number;             // broadcast calls per month (0 = no broadcasts)
+  broadcastOverageCentsPerCall: number; // overage rate per extra broadcast call
 }
 
 // Special tier for admin users — all limits set to effectively infinite.
@@ -30,6 +32,8 @@ export const ADMIN_TIER: TierConfig = {
   overageSkipTraceCents: 0,
   aiMinutes: 1_000_000,
   aiOverageCentsPerMin: 0,
+  broadcastCalls: 1_000_000,
+  broadcastOverageCentsPerCall: 0,
 };
 
 export const TIERS: Record<string, TierConfig> = {
@@ -42,9 +46,11 @@ export const TIERS: Record<string, TierConfig> = {
     hasDialer: false,
     hasPhoneNumber: false,
     unlimitedStreetView: false,
-    overageSkipTraceCents: 0, // no overages for free
-    aiMinutes: 5,             // lifetime "try it" pool
-    aiOverageCentsPerMin: 0,  // no overages for free
+    overageSkipTraceCents: 0,
+    aiMinutes: 5,
+    aiOverageCentsPerMin: 0,
+    broadcastCalls: 0,           // no broadcasts for free
+    broadcastOverageCentsPerCall: 0,
   },
   basic: {
     key: 'basic',
@@ -55,9 +61,11 @@ export const TIERS: Record<string, TierConfig> = {
     hasDialer: false,
     hasPhoneNumber: false,
     unlimitedStreetView: false,
-    overageSkipTraceCents: 25, // $0.25
-    aiMinutes: 20,             // monthly
-    aiOverageCentsPerMin: 50,  // $0.50/min
+    overageSkipTraceCents: 25,
+    aiMinutes: 20,
+    aiOverageCentsPerMin: 50,
+    broadcastCalls: 100,         // 100 calls/month
+    broadcastOverageCentsPerCall: 10, // $0.10/call overage
   },
   standard: {
     key: 'standard',
@@ -68,9 +76,11 @@ export const TIERS: Record<string, TierConfig> = {
     hasDialer: true,
     hasPhoneNumber: true,
     unlimitedStreetView: true,
-    overageSkipTraceCents: 20, // $0.20
-    aiMinutes: 75,             // monthly
-    aiOverageCentsPerMin: 40,  // $0.40/min
+    overageSkipTraceCents: 20,
+    aiMinutes: 75,
+    aiOverageCentsPerMin: 40,
+    broadcastCalls: 500,         // 500 calls/month
+    broadcastOverageCentsPerCall: 8, // $0.08/call overage
   },
   pro: {
     key: 'pro',
@@ -81,9 +91,11 @@ export const TIERS: Record<string, TierConfig> = {
     hasDialer: true,
     hasPhoneNumber: true,
     unlimitedStreetView: true,
-    overageSkipTraceCents: 15, // $0.15
-    aiMinutes: 250,            // monthly
-    aiOverageCentsPerMin: 30,  // $0.30/min
+    overageSkipTraceCents: 15,
+    aiMinutes: 250,
+    aiOverageCentsPerMin: 30,
+    broadcastCalls: 2000,        // 2000 calls/month
+    broadcastOverageCentsPerCall: 5, // $0.05/call overage
   },
 };
 

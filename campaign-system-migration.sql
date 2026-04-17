@@ -39,6 +39,10 @@ CREATE INDEX IF NOT EXISTS idx_campaigns_status ON campaigns(user_id, status);
 
 ALTER TABLE campaigns ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users see own campaigns" ON campaigns;
+DROP POLICY IF EXISTS "Users insert own campaigns" ON campaigns;
+DROP POLICY IF EXISTS "Users update own campaigns" ON campaigns;
+
 CREATE POLICY "Users see own campaigns"
   ON campaigns FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "Users insert own campaigns"
@@ -64,6 +68,10 @@ CREATE INDEX IF NOT EXISTS idx_cp_campaign ON campaign_prospects(campaign_id, ca
 CREATE INDEX IF NOT EXISTS idx_cp_lead ON campaign_prospects(lead_id);
 
 ALTER TABLE campaign_prospects ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users see own campaign prospects" ON campaign_prospects;
+DROP POLICY IF EXISTS "Users insert own campaign prospects" ON campaign_prospects;
+DROP POLICY IF EXISTS "Users update own campaign prospects" ON campaign_prospects;
 
 CREATE POLICY "Users see own campaign prospects"
   ON campaign_prospects FOR SELECT

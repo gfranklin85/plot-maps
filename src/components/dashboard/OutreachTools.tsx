@@ -32,17 +32,31 @@ interface CardProps {
   subtitle: string;
   bullets: string[];
   badge?: { label: string; lowAlert: boolean };
+  image?: string;
 }
 
-function ToolCard({ href, icon, iconTint, hoverBorder, hoverText, title, subtitle, bullets, badge }: CardProps) {
+function ToolCard({ href, icon, iconTint, hoverBorder, hoverText, title, subtitle, bullets, badge, image }: CardProps) {
   return (
     <a
       href={href}
-      className={`relative flex flex-col rounded-2xl border border-card-border bg-card shadow-lg hover:shadow-xl transition-all group p-5 ${hoverBorder}`}
+      className={`relative flex flex-col rounded-2xl border border-card-border bg-card shadow-lg hover:shadow-xl transition-all group p-5 overflow-hidden ${hoverBorder}`}
     >
+      {image && (
+        <>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={image}
+            alt=""
+            className="absolute inset-0 w-full h-full object-cover opacity-10 group-hover:opacity-20 transition-opacity"
+            loading="lazy"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-card via-card/90 to-card/60" />
+        </>
+      )}
+
       {badge && (
         <span
-          className={`absolute top-3 right-3 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider border ${
+          className={`absolute top-3 right-3 z-10 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider border ${
             badge.lowAlert
               ? 'bg-amber-500/15 border-amber-500/40 text-amber-400'
               : 'bg-surface-container-high/80 border-card-border text-on-surface-variant'
@@ -52,23 +66,25 @@ function ToolCard({ href, icon, iconTint, hoverBorder, hoverText, title, subtitl
         </span>
       )}
 
-      <div className={`w-11 h-11 rounded-xl flex items-center justify-center mb-3 ${iconTint}`}>
-        <MaterialIcon icon={icon} className="text-[24px]" />
+      <div className="relative flex flex-col">
+        <div className={`w-11 h-11 rounded-xl flex items-center justify-center mb-3 ${iconTint}`}>
+          <MaterialIcon icon={icon} className="text-[24px]" />
+        </div>
+
+        <h4 className={`font-headline text-base font-bold text-on-surface transition-colors ${hoverText}`}>
+          {title}
+        </h4>
+        <p className="text-xs text-secondary mt-1">{subtitle}</p>
+
+        <ul className="mt-3 space-y-1.5 text-[11px] text-on-surface-variant leading-snug">
+          {bullets.map((b, i) => (
+            <li key={i} className="flex items-start gap-1.5">
+              <MaterialIcon icon="check" className="text-[13px] text-on-surface-variant/70 mt-0.5 shrink-0" />
+              <span>{b}</span>
+            </li>
+          ))}
+        </ul>
       </div>
-
-      <h4 className={`font-headline text-base font-bold text-on-surface transition-colors ${hoverText}`}>
-        {title}
-      </h4>
-      <p className="text-xs text-secondary mt-1">{subtitle}</p>
-
-      <ul className="mt-3 space-y-1.5 text-[11px] text-on-surface-variant leading-snug">
-        {bullets.map((b, i) => (
-          <li key={i} className="flex items-start gap-1.5">
-            <MaterialIcon icon="check" className="text-[13px] text-on-surface-variant/70 mt-0.5 shrink-0" />
-            <span>{b}</span>
-          </li>
-        ))}
-      </ul>
     </a>
   );
 }
@@ -88,6 +104,7 @@ export default function OutreachTools({ usage }: Props) {
           hoverText="group-hover:text-emerald-400"
           title="Import Inventory"
           subtitle="Load listings, leads, and reference data"
+          image="/card-mls.png"
           bullets={[
             'Drop a CSV or paste from MLS',
             'Auto-detects addresses, owners, phones',
@@ -102,6 +119,7 @@ export default function OutreachTools({ usage }: Props) {
           hoverText="group-hover:text-primary"
           title="Open the Map"
           subtitle="Walk your market from overhead"
+          image="/card-map.png"
           bullets={[
             'See every listing, sale, and prospect',
             'Click homes to select and skiptrace',
@@ -116,6 +134,7 @@ export default function OutreachTools({ usage }: Props) {
           hoverText="group-hover:text-orange-400"
           title="Dialer"
           subtitle="Call directly from the map"
+          image="/card-dialer.png"
           bullets={[
             'Get a local phone number',
             'One-click dial from any property',
@@ -131,6 +150,7 @@ export default function OutreachTools({ usage }: Props) {
           hoverText="group-hover:text-violet-400"
           title="AI Receptionist"
           subtitle="Answers inbound calls — never cold outbound"
+          image="/card-leads.png"
           bullets={[
             'Answers calls on your number when you miss them',
             'Qualifies and captures seller intent',

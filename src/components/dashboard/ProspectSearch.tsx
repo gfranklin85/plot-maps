@@ -6,13 +6,15 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import MaterialIcon from '@/components/ui/MaterialIcon';
 
-interface ListingResult {
-  kind: 'listing';
+interface LeadResult {
+  kind: 'lead';
   id: string;
   address: string;
   lat: number | null;
   lng: number | null;
-  status: string | null;
+  listingStatus: string | null;
+  name: string | null;
+  ownerName: string | null;
 }
 
 interface PlaceResult {
@@ -21,7 +23,7 @@ interface PlaceResult {
   description: string;
 }
 
-type Result = ListingResult | PlaceResult;
+type Result = LeadResult | PlaceResult;
 
 const STATUS_TINT: Record<string, string> = {
   Active: 'text-emerald-400',
@@ -43,7 +45,7 @@ export default function ProspectSearch({ compact = false }: Props) {
   const router = useRouter();
   const { user } = useAuth();
   const [query, setQuery] = useState('');
-  const [listings, setListings] = useState<ListingResult[]>([]);
+  const [leads, setLeads] = useState<LeadResult[]>([]);
   const [places, setPlaces] = useState<PlaceResult[]>([]);
   const [open, setOpen] = useState(false);
   const [highlight, setHighlight] = useState(0);
@@ -93,26 +95,29 @@ export default function ProspectSearch({ compact = false }: Props) {
   }, []);
 
   useEffect(() => {
-    if (!user) { setListings([]); return; }
+    if (!user) { setLeads([]); return; }
     const q = query.trim();
-    if (q.length < 2) { setListings([]); return; }
+    if (q.length < 2) { setLeads([]); return; }
     const timer = setTimeout(async () => {
+      const escaped = q.replace(/[,()]/g, ' ').trim();
       const { data } = await supabase
         .from('leads')
-        .select('id, property_address, latitude, longitude, listing_status')
+        .select('id, property_address, latitude, longitude, listing_status, name, owner_name')
         .eq('user_id', user.id)
-        .not('listing_status', 'is', null)
         .not('latitude', 'is', null)
-        .ilike('property_address', `%${q}%`)
-        .limit(5);
-      setListings(
-        (data || []).map((row: { id: string; property_address: string | null; latitude: number | null; longitude: number | null; listing_status: string | null }) => ({
-          kind: 'listing' as const,
+        .or(`property_address.ilike.%${escaped}%,name.ilike.%${escaped}%,owner_name.ilike.%${escaped}%`)
+        .order('listing_status', { ascending: false, nullsFirst: false })
+        .limit(6);
+      setLeads(
+        (data || []).map((row: { id: string; property_address: string | null; latitude: number | null; longitude: number | null; listing_status: string | null; name: string | null; owner_name: string | null }) => ({
+          kind: 'lead' as const,
           id: row.id,
           address: row.property_address || '',
           lat: row.latitude,
           lng: row.longitude,
-          status: row.listing_status,
+          listingStatus: row.listing_status,
+          name: row.name,
+          ownerName: row.owner_name,
         }))
       );
     }, 200);
@@ -143,7 +148,7 @@ export default function ProspectSearch({ compact = false }: Props) {
     return () => clearTimeout(timer);
   }, [query, googleReady]);
 
-  const results: Result[] = [...listings, ...places];
+  const results: Result[] = [...leads, ...places];
 
   function navigateToCoords(args: { lat: number; lng: number; address: string; leadId?: string }) {
     bumpSearchCount();
@@ -160,7 +165,7 @@ export default function ProspectSearch({ compact = false }: Props) {
 
   function pickResult(r: Result) {
     setOpen(false);
-    if (r.kind === 'listing') {
+    if (r.kind === 'lead') {
       if (r.lat == null || r.lng == null) return;
       navigateToCoords({ lat: r.lat, lng: r.lng, address: r.address, leadId: r.id });
       return;
@@ -223,11 +228,13 @@ export default function ProspectSearch({ compact = false }: Props) {
         <div className="absolute top-full left-0 right-0 mt-2 bg-card rounded-2xl shadow-2xl border border-card-border overflow-hidden z-50">
           {results.map((r, idx) => {
             const isHot = idx === highlight;
-            if (r.kind === 'listing') {
-              const tint = STATUS_TINT[r.status || ''] || 'text-on-surface-variant';
+            if (r.kind === 'lead') {
+              const isListing = !!r.listingStatus;
+              const tint = STATUS_TINT[r.listingStatus || ''] || 'text-on-surface-variant';
+              const who = r.ownerName || r.name;
               return (
                 <button
-                  key={`listing-${r.id}`}
+                  key={`lead-${r.id}`}
                   onClick={() => pickResult(r)}
                   onMouseEnter={() => setHighlight(idx)}
                   className={`w-full px-4 py-3 text-left flex items-center gap-3 border-b border-card-border/40 last:border-0 transition-colors ${isHot ? 'bg-primary/10' : 'hover:bg-primary/5'}`}
@@ -235,10 +242,14 @@ export default function ProspectSearch({ compact = false }: Props) {
                   <MaterialIcon icon="home" className="text-[20px] text-primary shrink-0" />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-on-surface truncate">
-                      {r.address.split(',')[0]}
+                      {r.address.split(',')[0] || who || 'Lead'}
                     </p>
-                    <p className="text-[11px] text-on-surface-variant">
-                      Your Listing <span className={`font-bold ${tint}`}>• {r.status}</span>
+                    <p className="text-[11px] text-on-surface-variant truncate">
+                      {isListing ? (
+                        <>Your Listing <span className={`font-bold ${tint}`}>• {r.listingStatus}</span></>
+                      ) : (
+                        <>Your Lead{who ? <span className="opacity-70"> • {who}</span> : null}</>
+                      )}
                     </p>
                   </div>
                 </button>

@@ -485,7 +485,7 @@ export default function ImportsPage() {
             </div>
             <div className="group relative flex flex-col h-full border border-card-border rounded-2xl p-5 sm:p-6 md:p-10 hover:border-orange-500/40 transition-all overflow-hidden">
               <img src="/import-leads.png" alt="" className="absolute inset-0 w-full h-full object-cover opacity-10 group-hover:opacity-20 transition-opacity" loading="lazy" />
-              <div className="absolute inset-0 bg-gradient-to-t from-[#0c1324] via-[#0c1324]/90 to-[#0c1324]/60" />
+              <div className="absolute inset-0 bg-gradient-to-t from-surface-container-lowest via-surface-container-lowest/90 to-surface-container-lowest/60" />
               <div className="relative">
                 <div className="w-12 h-12 rounded-xl bg-orange-500/10 flex items-center justify-center mb-6">
                   <MaterialIcon icon="person_search" className="text-[24px] text-orange-400" />

@@ -22,13 +22,22 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const body = await request.json();
-  const { name, type = 'circle_prospecting', reference_pack, script_text, cta_enabled = true } = body;
+  const {
+    name,
+    type = 'circle_prospecting',
+    reference_pack,
+    script_text,
+    cta_enabled = true,
+    audio_url,
+    audio_duration_seconds,
+  } = body;
 
   if (!name?.trim()) return NextResponse.json({ error: 'name required' }, { status: 400 });
   if (!reference_pack) return NextResponse.json({ error: 'reference_pack required' }, { status: 400 });
   if (!script_text?.trim()) return NextResponse.json({ error: 'script_text required' }, { status: 400 });
 
   const scriptHash = hashScript(script_text);
+  const hasPreGeneratedAudio = typeof audio_url === 'string' && audio_url.length > 0;
 
   const { data, error } = await supabaseAdmin
     .from('broadcasts')
@@ -40,7 +49,9 @@ export async function POST(request: Request) {
       script_text: script_text.trim(),
       script_hash: scriptHash,
       cta_enabled,
-      status: 'draft',
+      status: hasPreGeneratedAudio ? 'ready' : 'draft',
+      audio_url: hasPreGeneratedAudio ? audio_url : null,
+      audio_duration_seconds: hasPreGeneratedAudio ? (audio_duration_seconds || null) : null,
     })
     .select('*')
     .single();

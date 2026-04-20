@@ -60,13 +60,24 @@ export default function CampaignsPage() {
           <h1 className="font-headline text-2xl md:text-3xl font-extrabold text-on-surface">Campaigns</h1>
           <p className="text-sm text-on-surface-variant mt-1">AI calls and broadcast outreach</p>
         </div>
-        <Link
-          href={tab === "ai" ? "/campaigns/new" : "/campaigns/broadcast/new"}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-br from-violet-500 to-violet-600 text-white font-bold text-sm shadow-[0_8px_25px_-5px_rgba(139,92,246,0.4)] hover:opacity-90 active:scale-[0.98] transition-all"
-        >
-          <MaterialIcon icon="add" className="text-[18px]" />
-          <span className="hidden sm:inline">{tab === "ai" ? "New AI Campaign" : "New Broadcast"}</span>
-        </Link>
+        <div className="flex items-center gap-2">
+          {tab === "broadcasts" && (
+            <Link
+              href="/campaigns/commercials"
+              className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-surface-container-high text-on-surface font-bold text-sm hover:bg-surface-container-highest transition-all"
+            >
+              <MaterialIcon icon="mic" className="text-[18px]" />
+              <span className="hidden sm:inline">Commercials</span>
+            </Link>
+          )}
+          <Link
+            href={tab === "ai" ? "/campaigns/new" : "/campaigns/broadcast/new"}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-br from-violet-500 to-violet-600 text-white font-bold text-sm shadow-[0_8px_25px_-5px_rgba(139,92,246,0.4)] hover:opacity-90 active:scale-[0.98] transition-all"
+          >
+            <MaterialIcon icon="add" className="text-[18px]" />
+            <span className="hidden sm:inline">{tab === "ai" ? "New AI Campaign" : "New Broadcast"}</span>
+          </Link>
+        </div>
       </div>
 
       {/* Tabs */}

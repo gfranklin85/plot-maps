@@ -64,6 +64,7 @@ interface Props {
   onStarted: (args: { aiCallId: string; vapiCallId: string; monitorListenUrl: string | null; firstMessage: string }) => void;
   onUpgrade?: () => void;
   onTopup?: () => void;
+  mode?: 'call' | 'config';
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -78,7 +79,8 @@ function formatPrice(p: number | null | undefined): string | null {
   return `$${Math.round(p / 1000)}K`;
 }
 
-export default function AICallLauncher({ lead, phoneNumber, onClose, onStarted, onUpgrade, onTopup }: Props) {
+export default function AICallLauncher({ lead, phoneNumber, onClose, onStarted, onUpgrade, onTopup, mode = 'call' }: Props) {
+  const isConfig = mode === 'config';
   const { user } = useAuth();
   const { profile } = useProfile();
   const [selectedKey, setSelectedKey] = useState<string>("neighbor_warmth");
@@ -226,9 +228,13 @@ export default function AICallLauncher({ lead, phoneNumber, onClose, onStarted, 
                 <MaterialIcon icon="smart_toy" className="text-[24px] text-violet-400" />
               </div>
               <div>
-                <h2 className="font-headline text-lg font-extrabold text-on-surface">Launch AI Call</h2>
+                <h2 className="font-headline text-lg font-extrabold text-on-surface">
+                  {isConfig ? 'AI Assistant' : 'Launch AI Call'}
+                </h2>
                 <p className="text-xs text-on-surface-variant">
-                  Call {lead?.owner_name || lead?.name || "prospect"} at {phoneNumber}
+                  {isConfig
+                    ? 'Pick a template and reference property. We use this when you launch a call from the map.'
+                    : `Call ${lead?.owner_name || lead?.name || 'prospect'} at ${phoneNumber}`}
                 </p>
               </div>
             </div>
@@ -351,27 +357,43 @@ export default function AICallLauncher({ lead, phoneNumber, onClose, onStarted, 
             <div className="rounded-lg bg-red-500/10 p-3 text-xs font-semibold text-red-400">{error}</div>
           )}
 
-          {/* CTA */}
-          <button
-            onClick={handleStart}
-            disabled={loading}
-            className="w-full py-3.5 rounded-xl bg-gradient-to-br from-violet-500 to-violet-600 text-white font-bold text-sm flex items-center justify-center gap-2 shadow-[0_8px_25px_-5px_rgba(139,92,246,0.4)] hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50"
-          >
-            {loading ? (
-              <>
-                <span className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-                Dialing...
-              </>
-            ) : (
-              <>
-                <MaterialIcon icon="smart_toy" className="text-[18px]" />
-                Start AI Call
-              </>
-            )}
-          </button>
-          <p className="text-[10px] text-on-surface-variant/60 text-center">
-            You&apos;ll listen live and can jump in at any time.
-          </p>
+          {isConfig ? (
+            <>
+              <button
+                onClick={onClose}
+                className="w-full py-3.5 rounded-xl bg-gradient-to-br from-violet-500 to-violet-600 text-white font-bold text-sm flex items-center justify-center gap-2 shadow-[0_8px_25px_-5px_rgba(139,92,246,0.4)] hover:opacity-90 active:scale-[0.98] transition-all"
+              >
+                <MaterialIcon icon="check" className="text-[18px]" />
+                Done
+              </button>
+              <p className="text-[10px] text-on-surface-variant/60 text-center">
+                To launch a call, click a property on the map and pick &ldquo;AI Call&rdquo;.
+              </p>
+            </>
+          ) : (
+            <>
+              <button
+                onClick={handleStart}
+                disabled={loading}
+                className="w-full py-3.5 rounded-xl bg-gradient-to-br from-violet-500 to-violet-600 text-white font-bold text-sm flex items-center justify-center gap-2 shadow-[0_8px_25px_-5px_rgba(139,92,246,0.4)] hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50"
+              >
+                {loading ? (
+                  <>
+                    <span className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                    Dialing...
+                  </>
+                ) : (
+                  <>
+                    <MaterialIcon icon="smart_toy" className="text-[18px]" />
+                    Start AI Call
+                  </>
+                )}
+              </button>
+              <p className="text-[10px] text-on-surface-variant/60 text-center">
+                You&apos;ll listen live and can jump in at any time.
+              </p>
+            </>
+          )}
         </div>
       </div>
     </div>

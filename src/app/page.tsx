@@ -6,6 +6,8 @@ import { Lead, Activity, DailyTarget } from '@/types';
 import ActionList from '@/components/dashboard/ActionList';
 import Scorecard from '@/components/dashboard/Scorecard';
 import MaterialIcon from '@/components/ui/MaterialIcon';
+import ProspectSearch from '@/components/dashboard/ProspectSearch';
+import OutreachTools from '@/components/dashboard/OutreachTools';
 import { useProfile } from '@/lib/profile-context';
 import { useAuth } from '@/lib/auth-context';
 import UpgradeGate from '@/components/ui/UpgradeGate';
@@ -26,18 +28,26 @@ const DEFAULT_TARGETS: DailyTarget = {
   updated_at: '',
 };
 
+interface UsageData {
+  ai_minutes_used: number;
+  ai_minutes_limit: number;
+}
+
 export default function Dashboard() {
   const { profile, updateProfile } = useProfile();
   const { user } = useAuth();
   const [targets, setTargets] = useState<DailyTarget>(DEFAULT_TARGETS);
   const [attentionLeads, setAttentionLeads] = useState<Lead[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
-  const [showGate, setShowGate] = useState(false);
-  const isSubscribed = profile.subscriptionStatus === 'active';
+  const [showGate] = useState(false);
   const [totalLeads, setTotalLeads] = useState(0);
-  const [newThisWeek, setNewThisWeek] = useState(0);
   const [callsToday, setCallsToday] = useState(0);
+  const [contactsToday, setContactsToday] = useState(0);
+  const [followupsToday, setFollowupsToday] = useState(0);
   const [leadsByStatus, setLeadsByStatus] = useState<Record<string, number>>({});
+  const [listings, setListings] = useState<Lead[]>([]);
+  const [lastImportAt, setLastImportAt] = useState<string | null>(null);
+  const [usage, setUsage] = useState<UsageData | null>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
@@ -45,34 +55,29 @@ export default function Dashboard() {
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
     const todayStr = now.toISOString().slice(0, 10);
 
-    // Week start (Monday)
-    const weekStart = new Date(now);
-    weekStart.setDate(now.getDate() - now.getDay() + (now.getDay() === 0 ? -6 : 1));
-    weekStart.setHours(0, 0, 0, 0);
-
     const [
       targetsRes,
       attentionRes,
       activitiesRes,
       totalRes,
-      newWeekRes,
       callsTodayRes,
+      contactsTodayRes,
+      followupsTodayRes,
+      listingsRes,
+      lastImportRes,
+      usageRes,
     ] = await Promise.all([
-      // Daily targets from API
       fetch('/api/daily-targets').then((r) => r.json()).catch(() => null),
 
-      // Leads needing attention
       supabase
         .from('leads')
         .select('*')
         .eq('user_id', user!.id)
-        .eq('follow_up_date', todayStr)
-        .in('status', ['Follow-Up', 'Hot Lead', 'New'])
-        .eq('priority', 'high')
-        .order('follow_up_date', { ascending: true })
+        .or(`follow_up_date.eq.${todayStr},priority.eq.high,status.eq.New`)
+        .in('status', ['Follow-Up', 'Hot Lead', 'New', 'Called', 'Interested'])
+        .order('priority', { ascending: false })
         .limit(20),
 
-      // Today's activities
       supabase
         .from('activities')
         .select('*')
@@ -80,39 +85,71 @@ export default function Dashboard() {
         .gte('created_at', todayStart)
         .order('created_at', { ascending: false }),
 
-      // Total lead count
       supabase
         .from('leads')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', user!.id),
 
-      // New leads this week
-      supabase
-        .from('leads')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user!.id)
-        .gte('created_at', weekStart.toISOString()),
-
-      // Calls today
       supabase
         .from('activities')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', user!.id)
         .eq('type', 'call')
         .gte('created_at', todayStart),
+
+      supabase
+        .from('activities')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user!.id)
+        .eq('type', 'call')
+        .eq('outcome', 'Spoke with Owner')
+        .gte('created_at', todayStart),
+
+      supabase
+        .from('activities')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user!.id)
+        .eq('type', 'call')
+        .eq('outcome', 'Follow-Up')
+        .gte('created_at', todayStart),
+
+      supabase
+        .from('leads')
+        .select('*')
+        .eq('user_id', user!.id)
+        .not('listing_status', 'is', null)
+        .not('latitude', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(6),
+
+      supabase
+        .from('activities')
+        .select('created_at')
+        .eq('user_id', user!.id)
+        .eq('type', 'import')
+        .order('created_at', { ascending: false })
+        .limit(1),
+
+      fetch('/api/usage').then((r) => r.ok ? r.json() : null).catch(() => null),
     ]);
 
-    if (targetsRes && targetsRes.id) {
-      setTargets(targetsRes);
-    }
+    if (targetsRes && targetsRes.id) setTargets(targetsRes);
 
     setAttentionLeads((attentionRes.data as Lead[]) ?? []);
     setActivities((activitiesRes.data as Activity[]) ?? []);
     setTotalLeads(totalRes.count ?? 0);
-    setNewThisWeek(newWeekRes.count ?? 0);
     setCallsToday(callsTodayRes.count ?? 0);
+    setContactsToday(contactsTodayRes.count ?? 0);
+    setFollowupsToday(followupsTodayRes.count ?? 0);
+    setListings((listingsRes.data as Lead[]) ?? []);
+    setLastImportAt(lastImportRes.data?.[0]?.created_at ?? null);
+    if (usageRes) {
+      setUsage({
+        ai_minutes_used: Number(usageRes.ai_minutes_used || 0),
+        ai_minutes_limit: Number(usageRes.ai_minutes_limit || 0),
+      });
+    }
 
-    // Pipeline summary
     const allLeads = await supabase
       .from('leads')
       .select('status')
@@ -128,137 +165,66 @@ export default function Dashboard() {
     setLoading(false);
   }, [user]);
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
-  // Auto-generate action list for subscribers on first load
-  useEffect(() => {
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, totalLeads, isSubscribed]);
-
-
-  const avgCallsDay = callsToday > 0 ? callsToday : 0;
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   // New user onboarding — no leads yet
   if (!loading && totalLeads === 0) {
     return (
-      <div className="p-4 md:p-8 flex flex-col items-center justify-center min-h-[60vh]">
-        <div className="max-w-lg text-center">
-          <MaterialIcon icon="rocket_launch" className="text-[48px] sm:text-[72px] text-blue-500 mb-4" />
-          <h2 className="font-headline text-xl sm:text-3xl font-extrabold text-on-surface mb-3">
+      <div className="p-4 md:p-8 max-w-3xl mx-auto space-y-8">
+        <div className="text-center">
+          <MaterialIcon icon="rocket_launch" className="text-[48px] sm:text-[64px] text-primary mb-3" />
+          <h2 className="font-headline text-2xl sm:text-3xl font-extrabold text-on-surface mb-2">
             Welcome{profile.fullName ? `, ${profile.fullName.split(' ')[0]}` : ''}!
           </h2>
-
-          {!profile.defaultMapCenter ? (
-            <>
-              <p className="text-secondary text-lg mb-6">
-                First, set your market area so the map centers on your territory.
-              </p>
-              <MarketAreaPicker onComplete={(lat: number, lng: number) => {
-                updateProfile({ defaultMapCenter: { lat, lng } });
-              }} />
-            </>
-          ) : (
-            <>
-              <p className="text-secondary text-lg mb-8">
-                Get started by importing your property list. Upload a CSV from PropWire, BatchLeads, MLS, or any source with addresses.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <a href="/imports" className="flex items-center justify-center gap-2 rounded-xl action-gradient px-8 py-4 text-lg font-bold text-on-primary hover:shadow-lg transition-shadow">
-                  <MaterialIcon icon="upload_file" className="text-[22px]" />
-                  Import Your First List
-                </a>
-                <a href="/map" className="flex items-center justify-center gap-2 rounded-xl border border-card-border bg-card px-8 py-4 text-lg font-bold text-on-surface hover:bg-surface-container-low transition-colors">
-                  <MaterialIcon icon="map" className="text-[22px]" />
-                  Explore the Map
-                </a>
-              </div>
-            </>
-          )}
+          <p className="text-secondary text-base">
+            Circle prospect any listing. Paste an address to start.
+          </p>
         </div>
+
+        <ProspectSearch />
+
+        {!profile.defaultMapCenter && (
+          <MarketAreaPicker onComplete={(lat: number, lng: number) => {
+            updateProfile({ defaultMapCenter: { lat, lng } });
+          }} />
+        )}
+
+        <UploadBanner />
       </div>
     );
   }
 
+  const showUploadBanner = shouldShowUploadBanner({ totalLeads, lastImportAt });
 
   return (
-    <div className="p-4 md:p-8 space-y-6">
-      {/* ── GET STARTED HEADER ── */}
-      <div className="text-center md:text-left">
-        <h2 className="font-headline text-xl md:text-2xl font-extrabold text-on-surface">Get Started in 3 Steps</h2>
-        <p className="text-sm text-secondary mt-1">Upload your listings, set up your dialer, open the map.</p>
+    <div className="p-4 md:p-8 space-y-8">
+      {/* ═══ HERO ═══ */}
+      <div className="max-w-3xl mx-auto text-center space-y-4">
+        <div>
+          <h2 className="font-headline text-2xl md:text-3xl font-extrabold text-on-surface">
+            Circle Prospect Any Listing
+          </h2>
+          <p className="text-sm md:text-base text-secondary mt-1">
+            Enter a property. We&apos;ll map the neighbors and get you calling.
+          </p>
+        </div>
+        <ProspectSearch />
+        <p className="text-xs text-on-surface-variant/70">
+          Use one of your listings or paste any address. Select nearby homes and start outreach in seconds.
+        </p>
       </div>
 
-      {/* ── 3 ACTION CARDS ── */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* 1. Upload Your Inventory */}
-        <a
-          href="/imports"
-          className="block relative rounded-2xl border border-card-border hover:border-emerald-500/40 shadow-lg hover:shadow-xl transition-all group overflow-hidden"
-        >
-          <img src="/card-mls.png" alt="" className="absolute inset-0 w-full h-full object-cover opacity-15 group-hover:opacity-25 transition-opacity" loading="lazy" />
-          <div className="absolute inset-0 bg-gradient-to-t from-surface-container-high via-surface-container-high/80 to-transparent" />
-          <div className="relative p-5">
-            <div className="flex items-center gap-2 mb-3">
-              <span className="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400 text-xs font-bold">1</span>
-              <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Step One</span>
-            </div>
-            <div className="w-11 h-11 rounded-xl bg-emerald-500/20 flex items-center justify-center mb-3 group-hover:bg-emerald-500/30 transition-colors">
-              <MaterialIcon icon="upload_file" className="text-[24px] text-emerald-400" />
-            </div>
-            <h3 className="font-headline text-base font-bold text-on-surface group-hover:text-emerald-400 transition-colors">Upload Your Inventory</h3>
-            <p className="text-xs text-secondary mt-1">Paste MLS data, lead lists, or any property data. We auto-detect and map everything.</p>
-          </div>
-        </a>
+      {/* ═══ LISTING CHIPS ═══ */}
+      {listings.length > 0 && <ListingChips listings={listings} />}
 
-        {/* 2. Set Up Your Dialer */}
-        <a
-          href="/setup-number"
-          className="block relative rounded-2xl border border-card-border hover:border-orange-500/40 shadow-lg hover:shadow-xl transition-all group overflow-hidden"
-        >
-          <img src="/card-dialer.png" alt="" className="absolute inset-0 w-full h-full object-cover opacity-20 group-hover:opacity-30 transition-opacity" loading="lazy" />
-          <div className="absolute inset-0 bg-gradient-to-t from-surface-container-high via-surface-container-high/80 to-transparent" />
-          <div className="relative p-5">
-            <div className="flex items-center gap-2 mb-3">
-              <span className="w-6 h-6 rounded-full bg-orange-500/20 flex items-center justify-center text-orange-400 text-xs font-bold">2</span>
-              <span className="text-[10px] font-bold text-orange-400 uppercase tracking-wider">Step Two</span>
-            </div>
-            <div className="w-11 h-11 rounded-xl bg-orange-500/20 flex items-center justify-center mb-3 group-hover:bg-orange-500/30 transition-colors">
-              <MaterialIcon icon="phone_in_talk" className="text-[24px] text-orange-400" />
-            </div>
-            <h3 className="font-headline text-base font-bold text-on-surface group-hover:text-orange-400 transition-colors">Set Up Your Dialer</h3>
-            <p className="text-xs text-secondary mt-1">Get a local phone number and start calling prospects directly from the map.</p>
-          </div>
-        </a>
+      {/* ═══ UPLOAD BANNER ═══ */}
+      {showUploadBanner && <UploadBanner />}
 
-        {/* 3. Open the Map */}
-        <a
-          href="/map"
-          className="block relative rounded-2xl border border-card-border hover:border-primary/40 shadow-lg hover:shadow-xl transition-all group overflow-hidden"
-        >
-          <img src="/card-map.png" alt="" className="absolute inset-0 w-full h-full object-cover opacity-15 group-hover:opacity-25 transition-opacity" loading="lazy" />
-          <div className="absolute inset-0 bg-gradient-to-t from-surface-container-high via-surface-container-high/80 to-transparent" />
-          <div className="relative p-5">
-            <div className="flex items-center gap-2 mb-3">
-              <span className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-primary text-xs font-bold">3</span>
-              <span className="text-[10px] font-bold text-primary uppercase tracking-wider">Step Three</span>
-            </div>
-            <div className="w-11 h-11 rounded-xl bg-primary/20 flex items-center justify-center mb-3 group-hover:bg-primary/30 transition-colors">
-              <MaterialIcon icon="map" className="text-[24px] text-primary" />
-            </div>
-            <h3 className="font-headline text-base font-bold text-on-surface group-hover:text-primary transition-colors">Open the Map</h3>
-            <p className="text-xs text-secondary mt-1">See your market, walk neighborhoods, find prospects, and start calling.</p>
-          </div>
-        </a>
-      </div>
+      {/* ═══ OUTREACH TOOLS ═══ */}
+      <OutreachTools usage={usage} />
 
-      {/* ── MARKET ACTIVITY: Recent listings to prospect around ── */}
-      <MarketActivity />
-
-      {/* ── STATS + ACTION FEED ── */}
+      {/* ═══ STATS + ACTION FEED ═══ */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-        {/* Left: Leads Needing Attention */}
         <div className="lg:col-span-8">
           <ActionList
             actions={[]}
@@ -267,21 +233,11 @@ export default function Dashboard() {
           />
         </div>
 
-        {/* Right: Quick Stats + Scorecard */}
         <div className="lg:col-span-4 space-y-4">
           <div className="grid grid-cols-3 gap-3">
-            <div className="bg-surface-container-lowest rounded-xl p-4 text-center">
-              <p className="text-xl sm:text-2xl font-extrabold text-on-surface">{loading ? '--' : totalLeads}</p>
-              <p className="text-[10px] text-secondary font-bold uppercase tracking-wider">Leads</p>
-            </div>
-            <div className="bg-surface-container-lowest rounded-xl p-4 text-center">
-              <p className="text-xl sm:text-2xl font-extrabold text-on-surface">{loading ? '--' : newThisWeek}</p>
-              <p className="text-[10px] text-secondary font-bold uppercase tracking-wider">New</p>
-            </div>
-            <div className="bg-surface-container-lowest rounded-xl p-4 text-center">
-              <p className="text-xl sm:text-2xl font-extrabold text-on-surface">{loading ? '--' : avgCallsDay}</p>
-              <p className="text-[10px] text-secondary font-bold uppercase tracking-wider">Calls</p>
-            </div>
+            <StatBox label="Calls" value={loading ? null : callsToday} />
+            <StatBox label="Contacts" value={loading ? null : contactsToday} />
+            <StatBox label="Follow-ups" value={loading ? null : followupsToday} />
           </div>
 
           <Scorecard
@@ -292,98 +248,82 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <UpgradeGate feature="ai" show={showGate} onClose={() => setShowGate(false)} />
+      <UpgradeGate feature="ai" show={showGate} onClose={() => { /* noop */ }} />
     </div>
   );
 }
 
-/* ── Market Activity — recent listings to prospect around ── */
-function MarketActivity() {
-  const { user } = useAuth();
-  const [listings, setListings] = useState<Lead[]>([]);
-
-  useEffect(() => {
-    if (!user) return;
-    async function fetch() {
-      // Get user's own MLS records for market activity
-      const { data } = await supabase
-        .from('leads')
-        .select('*')
-        .eq('user_id', user!.id)
-        .not('listing_status', 'is', null)
-        .not('latitude', 'is', null)
-        .order('created_at', { ascending: false })
-        .limit(6);
-      if (data) setListings(data as Lead[]);
-    }
-    fetch();
-  }, [user]);
-
-  if (listings.length === 0) return null;
-
-  const statusColors: Record<string, string> = {
-    Active: 'text-green-400 bg-green-400/10',
-    Sold: 'text-yellow-400 bg-yellow-400/10',
-    Pending: 'text-purple-400 bg-purple-400/10',
-  };
-
-  const statusVerbs: Record<string, string> = {
-    Active: 'just listed',
-    Sold: 'just sold',
-    Pending: 'went pending',
-  };
-
-  function daysSince(dateStr: string | null): string {
-    if (!dateStr) return '';
-    const days = Math.floor((Date.now() - new Date(dateStr + 'T00:00:00').getTime()) / 86400000);
-    if (days <= 0) return 'today';
-    if (days === 1) return 'yesterday';
-    return `${days}d ago`;
-  }
-
+function StatBox({ label, value }: { label: string; value: number | null }) {
   return (
-    <div>
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="font-headline text-lg font-bold text-on-surface">Market Activity</h3>
-        <a href="/map" className="text-xs font-bold text-primary hover:underline">View all on map →</a>
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        {listings.map((lead) => {
-          const address = lead.property_address?.split(',')[0] || 'Unknown';
-          const status = lead.listing_status || '';
-          const price = lead.selling_price || lead.listing_price;
-          const priceStr = price ? `$${price.toLocaleString()}` : '';
-          const date = lead.selling_date || lead.pending_date || lead.listing_date;
-          const recency = daysSince(date);
-          const verb = statusVerbs[status] || 'listed';
-          const colorClass = statusColors[status] || 'text-on-surface-variant bg-surface-container-high';
+    <div className="bg-surface-container-lowest rounded-xl p-4 text-center">
+      <p className="text-xl sm:text-2xl font-extrabold text-on-surface">{value ?? '--'}</p>
+      <p className="text-[10px] text-secondary font-bold uppercase tracking-wider">{label}</p>
+    </div>
+  );
+}
 
+function ListingChips({ listings }: { listings: Lead[] }) {
+  return (
+    <div className="max-w-5xl mx-auto w-full">
+      <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-on-surface-variant mb-2 px-1">
+        Start from your listings
+      </p>
+      <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-thin">
+        {listings.map((lead) => {
+          const address = lead.property_address?.split(',')[0] || 'Listing';
+          const params = new URLSearchParams({
+            lat: String(lead.latitude),
+            lng: String(lead.longitude),
+            zoom: '19',
+            prospect: '1',
+            address: lead.property_address || '',
+            leadId: lead.id,
+          });
           return (
             <a
               key={lead.id}
-              href={`/map?lat=${lead.latitude}&lng=${lead.longitude}&zoom=19`}
-              className="flex items-start gap-3 p-4 rounded-xl bg-card border border-card-border hover:border-primary/30 hover:bg-surface-container-high/50 transition-all group"
+              href={`/map?${params.toString()}`}
+              className="shrink-0 flex items-center gap-2 px-3 py-2 rounded-full bg-card border border-card-border hover:border-primary/40 hover:bg-primary/5 text-sm text-on-surface transition-all"
             >
-              <div className={`shrink-0 w-10 h-10 rounded-lg flex items-center justify-center ${colorClass}`}>
-                <MaterialIcon icon={status === 'Sold' ? 'sell' : status === 'Pending' ? 'pending' : 'home'} className="text-[20px]" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold text-on-surface truncate group-hover:text-primary transition-colors">{address}</p>
-                <p className="text-xs text-secondary mt-0.5">
-                  {priceStr && <span className="font-semibold">{priceStr}</span>}
-                  {priceStr && ' · '}
-                  <span className={statusColors[status]?.split(' ')[0] || ''}>{verb}</span>
-                  {recency && ` ${recency}`}
-                </p>
-                <p className="text-[10px] text-primary font-bold mt-1.5 uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-opacity">
-                  Call the neighbors →
-                </p>
-              </div>
+              <MaterialIcon icon="home" className="text-[16px] text-primary" />
+              <span className="font-medium whitespace-nowrap">{address}</span>
+              {lead.listing_status && (
+                <span className="text-[9px] font-bold uppercase tracking-wider text-on-surface-variant/70">
+                  {lead.listing_status}
+                </span>
+              )}
             </a>
           );
         })}
       </div>
     </div>
+  );
+}
+
+function shouldShowUploadBanner({ totalLeads, lastImportAt }: { totalLeads: number; lastImportAt: string | null }): boolean {
+  if (totalLeads === 0) return true;
+  if (!lastImportAt) return true;
+  const daysSince = (Date.now() - new Date(lastImportAt).getTime()) / 86400000;
+  if (daysSince > 30) return true;
+  if (typeof window !== 'undefined') {
+    const count = parseInt(window.localStorage.getItem('plotmaps.heroSearchCount') || '0', 10);
+    if (!isNaN(count) && count >= 3) return true;
+  }
+  return false;
+}
+
+function UploadBanner() {
+  return (
+    <a
+      href="/imports"
+      className="flex items-center gap-3 rounded-xl border border-card-border bg-card hover:border-emerald-500/40 hover:bg-emerald-500/5 px-4 py-3 transition-all group"
+    >
+      <MaterialIcon icon="upload_file" className="text-[20px] text-emerald-400" />
+      <p className="flex-1 text-sm text-on-surface">
+        Don&apos;t see your listings? <span className="font-bold">Upload your inventory</span>
+      </p>
+      <MaterialIcon icon="arrow_forward" className="text-[18px] text-on-surface-variant group-hover:text-emerald-400 transition-colors" />
+    </a>
   );
 }
 

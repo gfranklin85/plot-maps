@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { Lead, LeadStatus, Priority } from "@/types";
 import MapDynamic from "@/components/map/MapDynamic";
@@ -15,6 +16,8 @@ import UpgradeGate from "@/components/ui/UpgradeGate";
 import PropertyPopup from "@/components/map/PropertyPopup";
 import ProspectListPanel from "@/components/map/ProspectListPanel";
 import OnboardingTooltips from "@/components/ui/OnboardingTooltips";
+import ProspectCoachOverlay from "@/components/map/ProspectCoachOverlay";
+import AICallLauncher from "@/components/call/AICallLauncher";
 
 const FILTER_TABS: { label: string; key: string; statuses: LeadStatus[] }[] = [
   { label: "All", key: "all", statuses: [] },
@@ -57,7 +60,70 @@ export default function MapPage() {
   const [prospectToast, setProspectToast] = useState<string | null>(null);
   const [mapZoom, setMapZoom] = useState<number | null>(null);
   const [navigateTarget, setNavigateTarget] = useState<{ lat: number; lng: number } | null>(null);
+  const [showCoach, setShowCoach] = useState(false);
+  const [aiConfigOpen, setAiConfigOpen] = useState(false);
   const isSubscribed = profile.subscriptionStatus === 'active';
+
+  const searchParams = useSearchParams();
+  const urlInitDone = useRef(false);
+
+  useEffect(() => {
+    if (urlInitDone.current) return;
+    if (!searchParams) return;
+
+    const latStr = searchParams.get('lat');
+    const lngStr = searchParams.get('lng');
+    const zoomStr = searchParams.get('zoom');
+    const prospectParam = searchParams.get('prospect');
+    const leadIdParam = searchParams.get('leadId');
+    const openAiParam = searchParams.get('openAi');
+
+    const lat = latStr ? parseFloat(latStr) : NaN;
+    const lng = lngStr ? parseFloat(lngStr) : NaN;
+    const hasCoords = !Number.isNaN(lat) && !Number.isNaN(lng);
+
+    if (!hasCoords && !leadIdParam && !openAiParam) return;
+
+    urlInitDone.current = true;
+
+    if (hasCoords) {
+      setNavigateTarget({ lat, lng });
+      setMapCenter({ lat, lng });
+      setHasUserPanned(true);
+      const zoom = zoomStr ? parseInt(zoomStr, 10) : 19;
+      setMapZoom(Number.isNaN(zoom) ? 19 : zoom);
+    }
+
+    if (prospectParam === '1') {
+      setProspectMode(true);
+      const dismissed = typeof window !== 'undefined'
+        && window.localStorage.getItem('plotmaps.coachDismissed.prospect') === '1';
+      if (!dismissed) setShowCoach(true);
+    }
+
+    if (leadIdParam && user) {
+      supabase
+        .from('leads')
+        .select('*')
+        .eq('id', leadIdParam)
+        .eq('user_id', user.id)
+        .single()
+        .then(({ data }) => {
+          if (data) setPinnedRef(data as Lead);
+        });
+    }
+
+    if (openAiParam === '1') {
+      setAiConfigOpen(true);
+    }
+  }, [searchParams, user]);
+
+  function dismissCoach() {
+    setShowCoach(false);
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('plotmaps.coachDismissed.prospect', '1');
+    }
+  }
 
   function handleToggleProspectMode(lead?: Lead) {
     const entering = !prospectMode;
@@ -84,6 +150,7 @@ export default function MapPage() {
 
   async function handleMapClick(latLng: { lat: number; lng: number }) {
     if (!prospectMode) return;
+    if (showCoach) dismissCoach();
     try {
       const res = await fetch('/api/geocode', {
         method: 'POST',
@@ -755,6 +822,20 @@ export default function MapPage() {
       )}
 
       <UpgradeGate feature="walkMode" show={showGate} onClose={() => setShowGate(false)} />
+
+      {showCoach && !walkMode && (
+        <ProspectCoachOverlay onDismiss={dismissCoach} />
+      )}
+
+      {aiConfigOpen && (
+        <AICallLauncher
+          mode="config"
+          lead={null}
+          phoneNumber=""
+          onClose={() => setAiConfigOpen(false)}
+          onStarted={() => setAiConfigOpen(false)}
+        />
+      )}
 
       {/* Expand map — hides mobile browser chrome */}
       <button

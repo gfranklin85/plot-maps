@@ -98,7 +98,16 @@ function ActionCard({ item }: { item: ActionItem }) {
   );
 }
 
+function attentionLabel(lead: Lead): { text: string; color: string } | null {
+  if (lead.priority === 'high') return { text: 'Hot', color: 'bg-red-500/15 text-red-400' };
+  const todayStr = new Date().toISOString().slice(0, 10);
+  if (lead.follow_up_date === todayStr) return { text: 'Follow-up Today', color: 'bg-amber-500/15 text-amber-400' };
+  if (lead.status === 'New') return { text: 'New Lead', color: 'bg-sky-500/15 text-sky-400' };
+  return null;
+}
+
 function FallbackLeadCard({ lead }: { lead: Lead }) {
+  const label = attentionLabel(lead);
   return (
     <div className="flex items-center gap-4 bg-card border border-card-border rounded-xl px-5 py-4 hover:border-card-border-hover transition-all">
       <div
@@ -117,9 +126,16 @@ function FallbackLeadCard({ lead }: { lead: Lead }) {
       </div>
 
       <div className="min-w-0 flex-1">
-        <p className="truncate font-semibold text-on-surface">
-          {lead.name || lead.owner_name || 'Unknown'}
-        </p>
+        <div className="flex items-center gap-2">
+          {label && (
+            <span className={cn('shrink-0 px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider', label.color)}>
+              {label.text}
+            </span>
+          )}
+          <p className="truncate font-semibold text-on-surface">
+            {lead.name || lead.owner_name || 'Unknown'}
+          </p>
+        </div>
         <p className="truncate text-xs text-secondary">
           {lead.property_address ?? 'No address'}
         </p>

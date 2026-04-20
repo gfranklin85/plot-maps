@@ -17,7 +17,6 @@ import PropertyPopup from "@/components/map/PropertyPopup";
 import ProspectListPanel from "@/components/map/ProspectListPanel";
 import OnboardingTooltips from "@/components/ui/OnboardingTooltips";
 import ProspectCoachOverlay from "@/components/map/ProspectCoachOverlay";
-import AICallLauncher from "@/components/call/AICallLauncher";
 
 const FILTER_TABS: { label: string; key: string; statuses: LeadStatus[] }[] = [
   { label: "All", key: "all", statuses: [] },
@@ -61,7 +60,6 @@ export default function MapPage() {
   const [mapZoom, setMapZoom] = useState<number | null>(null);
   const [navigateTarget, setNavigateTarget] = useState<{ lat: number; lng: number } | null>(null);
   const [showCoach, setShowCoach] = useState(false);
-  const [aiConfigOpen, setAiConfigOpen] = useState(false);
   const isSubscribed = profile.subscriptionStatus === 'active';
 
   const searchParams = useSearchParams();
@@ -76,13 +74,12 @@ export default function MapPage() {
     const zoomStr = searchParams.get('zoom');
     const prospectParam = searchParams.get('prospect');
     const leadIdParam = searchParams.get('leadId');
-    const openAiParam = searchParams.get('openAi');
 
     const lat = latStr ? parseFloat(latStr) : NaN;
     const lng = lngStr ? parseFloat(lngStr) : NaN;
     const hasCoords = !Number.isNaN(lat) && !Number.isNaN(lng);
 
-    if (!hasCoords && !leadIdParam && !openAiParam) return;
+    if (!hasCoords && !leadIdParam) return;
 
     urlInitDone.current = true;
 
@@ -111,10 +108,6 @@ export default function MapPage() {
         .then(({ data }) => {
           if (data) setPinnedRef(data as Lead);
         });
-    }
-
-    if (openAiParam === '1') {
-      setAiConfigOpen(true);
     }
   }, [searchParams, user]);
 
@@ -427,17 +420,6 @@ export default function MapPage() {
             >
               <MaterialIcon icon="ads_click" className="text-[20px]" />
             </button>
-
-            {/* Broadcast — create from selected reference */}
-            {pinnedRef && (
-              <a
-                href={`/campaigns/broadcast/new?refs=${pinnedRef.id}`}
-                title="Create Broadcast from this reference"
-                className="w-10 h-10 flex items-center justify-center rounded-xl bg-surface text-on-surface-variant shadow-lg hover:text-emerald-400 transition-all"
-              >
-                <MaterialIcon icon="campaign" className="text-[20px]" />
-              </a>
-            )}
 
             {/* Filters */}
             <button
@@ -825,16 +807,6 @@ export default function MapPage() {
 
       {showCoach && !walkMode && (
         <ProspectCoachOverlay onDismiss={dismissCoach} />
-      )}
-
-      {aiConfigOpen && (
-        <AICallLauncher
-          mode="config"
-          lead={null}
-          phoneNumber=""
-          onClose={() => setAiConfigOpen(false)}
-          onStarted={() => setAiConfigOpen(false)}
-        />
       )}
 
       {/* Expand map — hides mobile browser chrome */}

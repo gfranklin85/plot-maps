@@ -79,7 +79,7 @@ export default function OutreachTools({ usage }: Props) {
   return (
     <div>
       <h3 className="font-headline text-lg font-bold text-on-surface mb-3">What do you want to do?</h3>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <ToolCard
           href="/imports"
           icon="upload_file"
@@ -124,33 +124,19 @@ export default function OutreachTools({ usage }: Props) {
           badge={badge}
         />
         <ToolCard
-          href="/map?openAi=1"
+          href="/ai-assistant"
           icon="smart_toy"
           iconTint="bg-violet-500/15 text-violet-400 group-hover:bg-violet-500/25"
           hoverBorder="hover:border-violet-500/40"
           hoverText="group-hover:text-violet-400"
-          title="AI Assistant"
-          subtitle="Let AI handle outreach calls"
+          title="AI Receptionist"
+          subtitle="Answers inbound calls — never cold outbound"
           bullets={[
-            'Picks a reference property nearby',
-            'Qualifies sellers, logs the transcript',
-            'You can listen and jump in live',
+            'Answers calls on your number when you miss them',
+            'Qualifies and captures seller intent',
+            'Follows up only with opted-in leads',
           ]}
           badge={badge}
-        />
-        <ToolCard
-          href="/campaigns"
-          icon="campaign"
-          iconTint="bg-sky-500/15 text-sky-400 group-hover:bg-sky-500/25"
-          hoverBorder="hover:border-sky-500/40"
-          hoverText="group-hover:text-sky-400"
-          title="Campaigns"
-          subtitle="Broadcast to a whole neighborhood"
-          bullets={[
-            'Send voice, text, or letters at scale',
-            'Track responses and intent signals',
-            'Follow up on the hottest replies',
-          ]}
         />
       </div>
     </div>

@@ -12,9 +12,6 @@ import MaterialIcon from '@/components/ui/MaterialIcon';
 import LeadMap from '@/components/leads/LeadMap';
 import { usePhone } from '@/lib/phone-context';
 import { useProfile } from '@/lib/profile-context';
-import UpgradeGate from '@/components/ui/UpgradeGate';
-import AICallLauncher from '@/components/call/AICallLauncher';
-import AICallListener from '@/components/call/AICallListener';
 
 const GROUPS = [
   'Appointment Set', 'BUYERS', 'Dead Lead', 'Future Follow Up',
@@ -41,7 +38,6 @@ export default function LeadDetailPage() {
   const { user } = useAuth();
   const { makeCall, isDesktop } = usePhone();
   const { profile } = useProfile();
-  const [showGate, setShowGate] = useState(false);
   const isSubscribed = profile.subscriptionStatus === 'active';
   const [lead, setLead] = useState<Lead | null>(null);
   const [, setActivities] = useState<Activity[]>([]);
@@ -73,8 +69,6 @@ export default function LeadDetailPage() {
   const [lookupResult, setLookupResult] = useState<{ hit: boolean; owner_name?: string; phones?: string[]; error?: string } | null>(null);
 
   // AI caller state
-  const [aiLaunchPhone, setAiLaunchPhone] = useState<string | null>(null);
-  const [aiActiveCall, setAiActiveCall] = useState<{ aiCallId: string; vapiCallId: string; monitorListenUrl: string | null; firstMessage: string } | null>(null);
 
   const API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
 
@@ -435,17 +429,6 @@ export default function LeadDetailPage() {
                   <div className="flex items-center gap-1.5 shrink-0">
                     <button
                       onClick={() => {
-                        if (!isSubscribed) { setShowGate(true); return; }
-                        setAiLaunchPhone(phone!);
-                      }}
-                      title="Launch AI caller"
-                      className="flex items-center gap-1 px-2 py-1 rounded border border-violet-500/30 bg-violet-500/10 text-violet-400 text-[11px] font-bold hover:bg-violet-500/20 transition-colors"
-                    >
-                      <MaterialIcon icon="smart_toy" className="text-[13px]" />
-                      AI
-                    </button>
-                    <button
-                      onClick={() => {
                         if (isDesktop) { makeCall(phone!, lead.owner_name || lead.name || 'Unknown', lead.id); }
                         else { window.location.href = `tel:${phone}`; }
                       }}
@@ -708,35 +691,6 @@ export default function LeadDetailPage() {
           </div>
         </div>
       </div>
-      <UpgradeGate feature="aiCaller" show={showGate} onClose={() => setShowGate(false)} />
-
-      {aiLaunchPhone && !aiActiveCall && (
-        <AICallLauncher
-          lead={lead}
-          phoneNumber={aiLaunchPhone}
-          onClose={() => setAiLaunchPhone(null)}
-          onStarted={(call) => {
-            setAiActiveCall(call);
-            setAiLaunchPhone(null);
-          }}
-          onUpgrade={() => {
-            setAiLaunchPhone(null);
-            setShowGate(true);
-          }}
-        />
-      )}
-
-      {aiActiveCall && (
-        <AICallListener
-          aiCallId={aiActiveCall.aiCallId}
-          monitorListenUrl={aiActiveCall.monitorListenUrl}
-          firstMessage={aiActiveCall.firstMessage}
-          onClose={() => {
-            setAiActiveCall(null);
-            refreshData();
-          }}
-        />
-      )}
     </div>
   );
 }

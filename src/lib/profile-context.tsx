@@ -14,6 +14,8 @@ export interface UserProfile {
   defaultMapCenter: { lat: number; lng: number } | null;
   openingScript: string;
   aiCustomOpening: string;
+  aiDefaultAssistant: string;
+  aiVoiceId: string;
   subscriptionStatus: string;
   isAdmin: boolean;
   notifications: {
@@ -33,6 +35,8 @@ const defaultProfile: UserProfile = {
   defaultMapCenter: null,
   openingScript: `Hi, is this {name}?\n\nHey {name} — this is Greg Franklin here in Lemoore. I'm reaching out because a home over on {street} just sold around {value}, and I've been touching base with nearby homeowners since there's been a little more movement in the market.\n\n"I'm just curious — are you guys planning to stay there long term, or do you see yourselves making a move at some point down the road?"\n\n"If you ever did move, what would the next place look like for you?"\n• "Would that be somewhere here locally or somewhere else?"\n• "What would the next house need to have that this one doesn't?"`,
   aiCustomOpening: '',
+  aiDefaultAssistant: 'neighbor_warmth',
+  aiVoiceId: 'rachel',
   subscriptionStatus: '',
   isAdmin: false,
   notifications: {
@@ -115,6 +119,8 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
           defaultMapCenter: data.settings?.defaultMapCenter || null,
           openingScript: data.opening_script || defaultProfile.openingScript,
           aiCustomOpening: data.ai_custom_opening || '',
+          aiDefaultAssistant: data.ai_default_assistant || 'neighbor_warmth',
+          aiVoiceId: data.ai_voice_id || 'rachel',
           subscriptionStatus: data.subscription_status || '',
           isAdmin: data.is_admin || false,
           notifications: {
@@ -172,6 +178,8 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       if (partial.defaultMapType !== undefined) dbUpdate.default_map_type = partial.defaultMapType;
       if (partial.openingScript !== undefined) dbUpdate.opening_script = partial.openingScript;
       if (partial.aiCustomOpening !== undefined) dbUpdate.ai_custom_opening = partial.aiCustomOpening;
+      if (partial.aiDefaultAssistant !== undefined) dbUpdate.ai_default_assistant = partial.aiDefaultAssistant;
+      if (partial.aiVoiceId !== undefined) dbUpdate.ai_voice_id = partial.aiVoiceId;
       if (partial.defaultMapCenter !== undefined) {
         // Merge into settings jsonb
         const { data: current } = await supabase.from('profiles').select('settings').eq('id', user.id).single();

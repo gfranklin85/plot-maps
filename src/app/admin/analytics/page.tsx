@@ -3,10 +3,11 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import WarRoom from '@/components/admin/WarRoom';
+import type { AnalyticsData } from '@/components/admin/admin-utils';
 
 export default function AdminAnalyticsPage() {
   const router = useRouter();
-  const [data, setData] = useState<Record<string, unknown> | null>(null);
+  const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -50,6 +51,5 @@ export default function AdminAnalyticsPage() {
     );
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return <WarRoom data={data as any} />;
+  return <WarRoom data={data} />;
 }

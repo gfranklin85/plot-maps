@@ -63,10 +63,19 @@ export interface AdminData {
 }
 
 export interface AnalyticsData {
-  pulse: { liveVisitors: number; sessionsToday: number; totalSessions: number; conversionRate: number };
+  range?: string;
+  pulse: {
+    liveVisitors: number;
+    sessionsToday: number;
+    totalSessions: number;
+    conversionRate: number;
+    sessionsThisPeriod?: number;
+    sessionsPriorPeriod?: number;
+  };
+  sessionsTimeline?: { date: string; count: number }[];
   funnel: { visitors: number; multiPage: number; signedUp: number; subscribed: number };
   hotProspects: HotProspect[];
-  topLandingPages: { page: string; count: number }[];
+  topLandingPages: { page: string; count: number; bounces?: number; rate?: number }[];
   utmBreakdown: { source: string; visits: number; conversions: number; rate: number }[];
   dropOffPages: { page: string; bounces: number; total: number; rate: number }[];
   devices: { device: string; count: number }[];

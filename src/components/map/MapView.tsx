@@ -368,8 +368,11 @@ export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClic
         streetViewControl={false}
         fullscreenControl={false}
         gestureHandling="greedy"
-        tilt={0}
-        heading={0}
+        defaultTilt={0}
+        defaultHeading={0}
+        tiltInteractionEnabled
+        headingInteractionEnabled
+        rotateControl
         styles={isSatellite ? undefined : MAP_STYLES}
         onClick={handleMapClick}
       >

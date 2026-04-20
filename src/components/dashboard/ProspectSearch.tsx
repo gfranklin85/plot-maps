@@ -35,7 +35,11 @@ function bumpSearchCount() {
   window.localStorage.setItem('plotmaps.heroSearchCount', String((isNaN(current) ? 0 : current) + 1));
 }
 
-export default function ProspectSearch() {
+interface Props {
+  compact?: boolean;
+}
+
+export default function ProspectSearch({ compact = false }: Props) {
   const router = useRouter();
   const { user } = useAuth();
   const [query, setQuery] = useState('');
@@ -198,7 +202,7 @@ export default function ProspectSearch() {
       <div className="relative">
         <MaterialIcon
           icon="search"
-          className="absolute left-5 top-1/2 -translate-y-1/2 text-[22px] text-on-surface-variant pointer-events-none"
+          className={`absolute top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none ${compact ? 'left-4 text-[18px]' : 'left-5 text-[22px]'}`}
         />
         <input
           type="text"
@@ -206,8 +210,12 @@ export default function ProspectSearch() {
           onChange={(e) => { setQuery(e.target.value); setOpen(true); setHighlight(0); }}
           onFocus={() => { if (results.length > 0) setOpen(true); }}
           onKeyDown={handleKeyDown}
-          placeholder="What listing do you want to prospect around?"
-          className="w-full pl-14 pr-5 py-4 md:py-5 rounded-2xl bg-card border border-card-border text-base md:text-lg text-on-surface placeholder:text-on-surface-variant/70 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary shadow-lg"
+          placeholder={compact ? 'Have a listing in mind? Type the address to circle prospect around it.' : 'What listing do you want to prospect around?'}
+          className={
+            compact
+              ? 'w-full pl-11 pr-4 py-2.5 rounded-full bg-card border border-card-border text-sm text-on-surface placeholder:text-on-surface-variant/70 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary shadow-sm'
+              : 'w-full pl-14 pr-5 py-4 md:py-5 rounded-2xl bg-card border border-card-border text-base md:text-lg text-on-surface placeholder:text-on-surface-variant/70 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary shadow-lg'
+          }
         />
       </div>
 

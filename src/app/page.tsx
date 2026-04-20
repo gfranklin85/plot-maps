@@ -197,31 +197,20 @@ export default function Dashboard() {
   const showUploadBanner = shouldShowUploadBanner({ totalLeads, lastImportAt });
 
   return (
-    <div className="p-4 md:p-8 space-y-8">
-      {/* ═══ HERO ═══ */}
-      <div className="max-w-3xl mx-auto text-center space-y-4">
-        <div>
-          <h2 className="font-headline text-2xl md:text-3xl font-extrabold text-on-surface">
-            Circle Prospect Any Listing
-          </h2>
-          <p className="text-sm md:text-base text-secondary mt-1">
-            Enter a property. We&apos;ll map the neighbors and get you calling.
-          </p>
-        </div>
-        <ProspectSearch />
-        <p className="text-xs text-on-surface-variant/70">
-          Use one of your listings or paste any address. Select nearby homes and start outreach in seconds.
-        </p>
+    <div className="p-4 md:p-8 space-y-6">
+      {/* ═══ COMPACT SEARCH (optional shortcut) ═══ */}
+      <div className="max-w-2xl">
+        <ProspectSearch compact />
       </div>
 
       {/* ═══ LISTING CHIPS ═══ */}
       {listings.length > 0 && <ListingChips listings={listings} />}
 
-      {/* ═══ UPLOAD BANNER ═══ */}
-      {showUploadBanner && <UploadBanner />}
-
-      {/* ═══ OUTREACH TOOLS ═══ */}
+      {/* ═══ 5-CARD ACTION ROW ═══ */}
       <OutreachTools usage={usage} />
+
+      {/* ═══ UPLOAD BANNER (conditional, small) ═══ */}
+      {showUploadBanner && <UploadBanner />}
 
       {/* ═══ STATS + ACTION FEED ═══ */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">

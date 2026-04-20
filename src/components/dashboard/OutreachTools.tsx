@@ -22,17 +22,54 @@ function minutesBadge(usage: Usage | null): { label: string; lowAlert: boolean }
   return { label: `${usage.ai_minutes_limit} min included`, lowAlert: false };
 }
 
-function Badge({ label, lowAlert }: { label: string; lowAlert: boolean }) {
+interface CardProps {
+  href: string;
+  icon: string;
+  iconTint: string;
+  hoverBorder: string;
+  hoverText: string;
+  title: string;
+  subtitle: string;
+  bullets: string[];
+  badge?: { label: string; lowAlert: boolean };
+}
+
+function ToolCard({ href, icon, iconTint, hoverBorder, hoverText, title, subtitle, bullets, badge }: CardProps) {
   return (
-    <span
-      className={`absolute top-3 right-3 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider border ${
-        lowAlert
-          ? 'bg-amber-500/15 border-amber-500/40 text-amber-400'
-          : 'bg-surface-container-high/80 border-card-border text-on-surface-variant'
-      }`}
+    <a
+      href={href}
+      className={`relative flex flex-col rounded-2xl border border-card-border bg-card shadow-lg hover:shadow-xl transition-all group p-5 ${hoverBorder}`}
     >
-      {label}
-    </span>
+      {badge && (
+        <span
+          className={`absolute top-3 right-3 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider border ${
+            badge.lowAlert
+              ? 'bg-amber-500/15 border-amber-500/40 text-amber-400'
+              : 'bg-surface-container-high/80 border-card-border text-on-surface-variant'
+          }`}
+        >
+          {badge.label}
+        </span>
+      )}
+
+      <div className={`w-11 h-11 rounded-xl flex items-center justify-center mb-3 ${iconTint}`}>
+        <MaterialIcon icon={icon} className="text-[24px]" />
+      </div>
+
+      <h4 className={`font-headline text-base font-bold text-on-surface transition-colors ${hoverText}`}>
+        {title}
+      </h4>
+      <p className="text-xs text-secondary mt-1">{subtitle}</p>
+
+      <ul className="mt-3 space-y-1.5 text-[11px] text-on-surface-variant leading-snug">
+        {bullets.map((b, i) => (
+          <li key={i} className="flex items-start gap-1.5">
+            <MaterialIcon icon="check" className="text-[13px] text-on-surface-variant/70 mt-0.5 shrink-0" />
+            <span>{b}</span>
+          </li>
+        ))}
+      </ul>
+    </a>
   );
 }
 
@@ -41,48 +78,80 @@ export default function OutreachTools({ usage }: Props) {
 
   return (
     <div>
-      <h3 className="font-headline text-lg font-bold text-on-surface mb-3">Outreach Tools</h3>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <a
+      <h3 className="font-headline text-lg font-bold text-on-surface mb-3">What do you want to do?</h3>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <ToolCard
+          href="/imports"
+          icon="upload_file"
+          iconTint="bg-emerald-500/15 text-emerald-400 group-hover:bg-emerald-500/25"
+          hoverBorder="hover:border-emerald-500/40"
+          hoverText="group-hover:text-emerald-400"
+          title="Import Inventory"
+          subtitle="Load listings, leads, and reference data"
+          bullets={[
+            'Drop a CSV or paste from MLS',
+            'Auto-detects addresses, owners, phones',
+            'Populates context for every prospect call',
+          ]}
+        />
+        <ToolCard
+          href="/map"
+          icon="map"
+          iconTint="bg-primary/15 text-primary group-hover:bg-primary/25"
+          hoverBorder="hover:border-primary/40"
+          hoverText="group-hover:text-primary"
+          title="Open the Map"
+          subtitle="Walk your market from overhead"
+          bullets={[
+            'See every listing, sale, and prospect',
+            'Click homes to select and skiptrace',
+            'Filter by status, price, or tags',
+          ]}
+        />
+        <ToolCard
           href="/setup-number"
-          className="relative block rounded-2xl border border-card-border hover:border-orange-500/40 bg-card shadow-lg hover:shadow-xl transition-all group p-5"
-        >
-          <Badge label={badge.label} lowAlert={badge.lowAlert} />
-          <div className="w-11 h-11 rounded-xl bg-orange-500/15 flex items-center justify-center mb-3 group-hover:bg-orange-500/25 transition-colors">
-            <MaterialIcon icon="phone_in_talk" className="text-[24px] text-orange-400" />
-          </div>
-          <h4 className="font-headline text-base font-bold text-on-surface group-hover:text-orange-400 transition-colors">
-            Dialer
-          </h4>
-          <p className="text-xs text-secondary mt-1">Call prospects directly from the map</p>
-        </a>
-
-        <a
+          icon="phone_in_talk"
+          iconTint="bg-orange-500/15 text-orange-400 group-hover:bg-orange-500/25"
+          hoverBorder="hover:border-orange-500/40"
+          hoverText="group-hover:text-orange-400"
+          title="Dialer"
+          subtitle="Call directly from the map"
+          bullets={[
+            'Get a local phone number',
+            'One-click dial from any property',
+            'Notes and outcomes auto-logged',
+          ]}
+          badge={badge}
+        />
+        <ToolCard
           href="/map?openAi=1"
-          className="relative block rounded-2xl border border-card-border hover:border-violet-500/40 bg-card shadow-lg hover:shadow-xl transition-all group p-5"
-        >
-          <Badge label={badge.label} lowAlert={badge.lowAlert} />
-          <div className="w-11 h-11 rounded-xl bg-violet-500/15 flex items-center justify-center mb-3 group-hover:bg-violet-500/25 transition-colors">
-            <MaterialIcon icon="smart_toy" className="text-[24px] text-violet-400" />
-          </div>
-          <h4 className="font-headline text-base font-bold text-on-surface group-hover:text-violet-400 transition-colors">
-            AI Assistant
-          </h4>
-          <p className="text-xs text-secondary mt-1">Handle inbound calls or assist with outreach</p>
-        </a>
-
-        <a
+          icon="smart_toy"
+          iconTint="bg-violet-500/15 text-violet-400 group-hover:bg-violet-500/25"
+          hoverBorder="hover:border-violet-500/40"
+          hoverText="group-hover:text-violet-400"
+          title="AI Assistant"
+          subtitle="Let AI handle outreach calls"
+          bullets={[
+            'Picks a reference property nearby',
+            'Qualifies sellers, logs the transcript',
+            'You can listen and jump in live',
+          ]}
+          badge={badge}
+        />
+        <ToolCard
           href="/campaigns"
-          className="relative block rounded-2xl border border-card-border hover:border-emerald-500/40 bg-card shadow-lg hover:shadow-xl transition-all group p-5"
-        >
-          <div className="w-11 h-11 rounded-xl bg-emerald-500/15 flex items-center justify-center mb-3 group-hover:bg-emerald-500/25 transition-colors">
-            <MaterialIcon icon="campaign" className="text-[24px] text-emerald-400" />
-          </div>
-          <h4 className="font-headline text-base font-bold text-on-surface group-hover:text-emerald-400 transition-colors">
-            Campaigns
-          </h4>
-          <p className="text-xs text-secondary mt-1">Email, text, and mail outreach at scale</p>
-        </a>
+          icon="campaign"
+          iconTint="bg-sky-500/15 text-sky-400 group-hover:bg-sky-500/25"
+          hoverBorder="hover:border-sky-500/40"
+          hoverText="group-hover:text-sky-400"
+          title="Campaigns"
+          subtitle="Broadcast to a whole neighborhood"
+          bullets={[
+            'Send voice, text, or letters at scale',
+            'Track responses and intent signals',
+            'Follow up on the hottest replies',
+          ]}
+        />
       </div>
     </div>
   );

@@ -32,7 +32,8 @@ interface Props {
   mapType?: "roadmap" | "satellite" | "hybrid" | "terrain";
   pinMode?: PinMode;
   prospectMode?: boolean;
-  prospectPins?: { lat: number; lng: number }[];
+  prospectPins?: { lat: number; lng: number; address: string }[];
+  onProspectPinClick?: (address: string) => void;
 }
 
 const API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
@@ -303,42 +304,75 @@ function LeadMarkers({
   return null;
 }
 
-function ProspectPins({ pins }: { pins: { lat: number; lng: number }[] }) {
+function ProspectPins({ pins, onPinClick }: { pins: { lat: number; lng: number; address: string }[]; onPinClick?: (address: string) => void }) {
   const map = useMap();
-  const markersRef = useRef<google.maps.Marker[]>([]);
+  const overlaysRef = useRef<Map<string, google.maps.OverlayView>>(new window.Map());
+  const handlerRef = useRef(onPinClick);
+  handlerRef.current = onPinClick;
 
   useEffect(() => {
     if (!map) return;
-    markersRef.current.forEach(m => m.setMap(null));
-    markersRef.current = [];
+    const overlays = overlaysRef.current;
+    const currentKeys = new Set(pins.map(p => p.address));
 
+    // Remove overlays for addresses that were deselected
+    Array.from(overlays.entries()).forEach(([address, overlay]) => {
+      if (!currentKeys.has(address)) {
+        overlay.setMap(null);
+        overlays.delete(address);
+      }
+    });
+
+    // Add overlays for newly selected addresses
     pins.forEach(pin => {
-      const marker = new google.maps.Marker({
-        position: pin,
-        map,
-        icon: {
-          path: google.maps.SymbolPath.CIRCLE,
-          scale: 12,
-          fillColor: '#f97316',
-          fillOpacity: 0.9,
-          strokeColor: '#ffffff',
-          strokeWeight: 3,
-        },
-        zIndex: 999,
+      if (overlays.has(pin.address)) return;
+
+      const overlay = new google.maps.OverlayView();
+      const div = document.createElement('div');
+      div.className = 'prospect-pin';
+      div.setAttribute('role', 'button');
+      div.setAttribute('aria-label', `Remove ${pin.address.split(',')[0]} from prospect list`);
+      div.style.position = 'absolute';
+      div.style.zIndex = '999';
+      div.innerHTML = `
+        <svg viewBox="0 0 24 24" class="prospect-pin__check" aria-hidden="true">
+          <polyline points="5 12 10 17 19 8" />
+        </svg>
+      `;
+      div.addEventListener('click', (e) => {
+        e.stopPropagation();
+        handlerRef.current?.(pin.address);
       });
-      markersRef.current.push(marker);
+
+      overlay.onAdd = function () {
+        const panes = this.getPanes();
+        panes?.overlayMouseTarget.appendChild(div);
+      };
+      overlay.draw = function () {
+        const projection = this.getProjection();
+        if (!projection) return;
+        const point = projection.fromLatLngToDivPixel(new google.maps.LatLng(pin.lat, pin.lng));
+        if (!point) return;
+        div.style.left = `${point.x}px`;
+        div.style.top = `${point.y}px`;
+      };
+      overlay.onRemove = function () {
+        if (div.parentNode) div.parentNode.removeChild(div);
+      };
+      overlay.setMap(map);
+      overlays.set(pin.address, overlay);
     });
 
     return () => {
-      markersRef.current.forEach(m => m.setMap(null));
-      markersRef.current = [];
+      Array.from(overlays.values()).forEach(o => o.setMap(null));
+      overlays.clear();
     };
   }, [map, pins]);
 
   return null;
 }
 
-export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClick, center, navigateTo, zoom, mapType = "roadmap", pinMode = "dots", prospectMode = false, prospectPins = [] }: Props) {
+export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClick, center, navigateTo, zoom, mapType = "roadmap", pinMode = "dots", prospectMode = false, prospectPins = [], onProspectPinClick }: Props) {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme !== 'light';
   const isSatellite = mapType === "satellite" || mapType === "hybrid";
@@ -381,7 +415,7 @@ export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClic
         <CenterController center={navigateTo} />
         <CenterTracker onCenterChanged={onCenterChanged} />
         <LeadMarkers leads={leads} onMarkerClick={handleMarkerClick} pinMode={pinMode} isDark={isDark} />
-        {prospectPins.length > 0 && <ProspectPins pins={prospectPins} />}
+        {prospectPins.length > 0 && <ProspectPins pins={prospectPins} onPinClick={onProspectPinClick} />}
       </Map>
     </APIProvider>
   );

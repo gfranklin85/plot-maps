@@ -183,3 +183,94 @@ h1, h2, h3, h4, h5, h6 {
   overflow: visible !important;
   max-height: none !important;
 }
+
+/* ─── Prospect pin (selected house in prospect mode) ─── */
+.prospect-pin {
+  width: 28px;
+  height: 28px;
+  border-radius: 9999px;
+  background-color: #f97316;
+  border: 3px solid #ffffff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+  transform: translate(-50%, -50%);
+  animation: prospectPinDrop 400ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  transition: transform 150ms ease-out, box-shadow 150ms ease-out;
+}
+
+.prospect-pin::before {
+  /* Pulse ring that fires once on mount */
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: 9999px;
+  border: 3px solid #f97316;
+  opacity: 0;
+  animation: prospectPinPulse 700ms ease-out 80ms forwards;
+  pointer-events: none;
+}
+
+.prospect-pin:hover {
+  transform: translate(-50%, -50%) scale(1.12);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.45);
+}
+
+.prospect-pin:active {
+  transform: translate(-50%, -50%) scale(0.95);
+}
+
+.prospect-pin .prospect-pin__check {
+  width: 14px;
+  height: 14px;
+  stroke: #ffffff;
+  stroke-width: 3;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  animation: prospectPinCheck 420ms ease-out 120ms both;
+}
+
+@keyframes prospectPinDrop {
+  0% {
+    transform: translate(-50%, -80%) scale(0.4);
+    opacity: 0;
+  }
+  60% {
+    transform: translate(-50%, -48%) scale(1.15);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes prospectPinPulse {
+  0% {
+    inset: -3px;
+    opacity: 0.7;
+  }
+  100% {
+    inset: -22px;
+    opacity: 0;
+  }
+}
+
+@keyframes prospectPinCheck {
+  0% {
+    stroke-dasharray: 0 24;
+    opacity: 0;
+  }
+  40% {
+    opacity: 1;
+  }
+  100% {
+    stroke-dasharray: 24 24;
+    opacity: 1;
+  }
+}

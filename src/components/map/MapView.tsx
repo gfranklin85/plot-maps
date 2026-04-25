@@ -36,9 +36,11 @@ interface Props {
   prospectPins?: { lat: number; lng: number; address: string }[];
   onProspectPinClick?: (address: string) => void;
   showZoningOverlay?: boolean;
+  view3D?: boolean;
 }
 
 const API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
+const MAP_ID = process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID || undefined;
 
 const MAP_STYLES: google.maps.MapTypeStyle[] = [
   { featureType: "poi", elementType: "labels", stylers: [{ visibility: "off" }] },
@@ -374,6 +376,21 @@ function ProspectPins({ pins, onPinClick }: { pins: { lat: number; lng: number; 
   return null;
 }
 
+// Imperatively set tilt when 3D mode toggles on/off. Photorealistic
+// 3D Tiles only render when the map has a Map ID configured + tilt > 0.
+function Tilt3DController({ enabled }: { enabled: boolean }) {
+  const map = useMap();
+  useEffect(() => {
+    if (!map) return;
+    if (enabled) {
+      map.setTilt(67);
+    } else {
+      map.setTilt(0);
+    }
+  }, [map, enabled]);
+  return null;
+}
+
 function PendingSkiptracePins({ pins }: { pins: { id: string; lat: number; lng: number }[] }) {
   const map = useMap();
   const overlaysRef = useRef<Map<string, google.maps.OverlayView>>(new window.Map());
@@ -425,7 +442,7 @@ function PendingSkiptracePins({ pins }: { pins: { id: string; lat: number; lng: 
   return null;
 }
 
-export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClick, center, navigateTo, zoom, mapType = "roadmap", pinMode = "dots", prospectMode = false, prospectPins = [], onProspectPinClick, showZoningOverlay = false }: Props) {
+export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClick, center, navigateTo, zoom, mapType = "roadmap", pinMode = "dots", prospectMode = false, prospectPins = [], onProspectPinClick, showZoningOverlay = false, view3D = false }: Props) {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme !== 'light';
   const isSatellite = mapType === "satellite" || mapType === "hybrid";
@@ -455,6 +472,7 @@ export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClic
       <Map
         defaultCenter={center || MAP_CENTER}
         defaultZoom={MAP_ZOOM}
+        mapId={MAP_ID}
         className={`h-full w-full ${prospectMode ? 'cursor-crosshair' : ''}`}
         disableDefaultUI
         zoomControl
@@ -467,13 +485,14 @@ export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClic
         tiltInteractionEnabled
         headingInteractionEnabled
         rotateControl
-        styles={isSatellite ? undefined : MAP_STYLES}
+        styles={isSatellite || MAP_ID ? undefined : MAP_STYLES}
         onClick={handleMapClick}
       >
         <MapTypeSync mapType={mapType} />
         <ZoomController zoom={zoom} />
         <CenterController center={navigateTo} />
         <CenterTracker onCenterChanged={onCenterChanged} />
+        <Tilt3DController enabled={view3D} />
         <ZoningOverlay visible={showZoningOverlay} />
         <LeadMarkers leads={leads} onMarkerClick={handleMarkerClick} pinMode={pinMode} isDark={isDark} />
         {pendingSkiptracePins.length > 0 && <PendingSkiptracePins pins={pendingSkiptracePins} />}

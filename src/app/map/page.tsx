@@ -46,6 +46,8 @@ export default function MapPage() {
   const [mapType, setMapType] = useState<'roadmap' | 'satellite' | 'hybrid'>('hybrid');
   const [listingFilters, setListingFilters] = useState<Set<string>>(new Set());
   const [showZoning, setShowZoning] = useState(false);
+  const [view3D, setView3D] = useState(false);
+  const has3DSupport = !!process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID;
   const [walkMode, setWalkMode] = useState(false);
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(profile.defaultMapCenter);
   const [hasUserPanned, setHasUserPanned] = useState(false);
@@ -475,6 +477,20 @@ export default function MapPage() {
               <MaterialIcon icon="layers" className="text-[20px]" />
             </button>
 
+            {/* 3D Photorealistic Tiles */}
+            <button
+              onClick={() => has3DSupport ? setView3D(v => !v) : alert('3D requires NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID with Photorealistic 3D Tiles enabled in Google Cloud Console.')}
+              title={has3DSupport ? (view3D ? 'Exit 3D' : 'View in 3D') : '3D not configured — set NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID'}
+              className={`relative w-10 h-10 flex items-center justify-center rounded-xl shadow-lg transition-all ${
+                view3D ? 'bg-violet-500 text-white' : 'bg-surface text-on-surface-variant hover:text-violet-400'
+              } ${!has3DSupport ? 'opacity-60' : ''}`}
+            >
+              <span className="text-[12px] font-black tracking-tighter">3D</span>
+              {!has3DSupport && (
+                <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-amber-400" />
+              )}
+            </button>
+
             {/* Filters */}
             <button
               onClick={() => setFiltersOpen((o) => !o)}
@@ -712,6 +728,7 @@ export default function MapPage() {
             prospectPins={prospectList.map(a => ({ lat: a.lat, lng: a.lng, address: a.address }))}
             onProspectPinClick={removeFromProspectList}
             showZoningOverlay={showZoning}
+            view3D={view3D}
             navigateTo={navigateTarget}
             zoom={mapZoom}
             onLeadClick={(_id, lead) => { handleLeadClickInProspectMode(lead); }}

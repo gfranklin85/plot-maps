@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Lead, CallOutcome, LeadStatus } from "@/types";
 import MaterialIcon from "@/components/ui/MaterialIcon";
@@ -141,6 +141,29 @@ export default function PropertyPopup({ lead, onUpdate, walkMode = false, onWalk
   const [lookupLoading, setLookupLoading] = useState(false);
   const [lookupResult, setLookupResult] = useState<{ hit: boolean; owner_name?: string; phones?: string[]; error?: string } | null>(null);
 
+  // Parcel info from City of Lemoore GIS (zoning, GP, APN, acres)
+  const [parcel, setParcel] = useState<{
+    hit: boolean;
+    apn: string | null;
+    zoningCode: string | null;
+    zoningDesc: string | null;
+    generalPlanCode: string | null;
+    generalPlanDesc: string | null;
+    acres: number | null;
+    use2024: string | null;
+    development2024: string | null;
+  } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (lead.latitude == null || lead.longitude == null) return;
+    fetch(`/api/parcel?lat=${lead.latitude}&lng=${lead.longitude}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (!cancelled && data) setParcel(data); })
+      .catch(() => { /* silent */ });
+    return () => { cancelled = true; };
+  }, [lead.id, lead.latitude, lead.longitude]);
+
   // AI call state
 
   const isFree = profile.subscriptionStatus !== 'active';
@@ -237,6 +260,61 @@ export default function PropertyPopup({ lead, onUpdate, walkMode = false, onWalk
           </div>
         </div>
 
+        {/* ── PARCEL INFO from City of Lemoore GIS ── */}
+        {parcel?.hit && (
+          <div className="rounded-lg border border-card-border bg-surface-container-low/60 px-3 py-2 space-y-1.5">
+            <div className="flex items-center gap-1.5">
+              <MaterialIcon icon="location_searching" className="text-[12px] text-primary" />
+              <span className="text-[9px] font-bold uppercase tracking-[0.15em] text-on-surface-variant">
+                Parcel Details
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
+              {parcel.zoningCode && (
+                <div className="col-span-2 flex items-baseline gap-2">
+                  <span className="text-on-surface-variant shrink-0">Zoning</span>
+                  <span className="font-semibold text-on-surface">{parcel.zoningCode}</span>
+                  {parcel.zoningDesc && (
+                    <span className="text-on-surface-variant truncate">· {parcel.zoningDesc}</span>
+                  )}
+                </div>
+              )}
+              {parcel.generalPlanCode && (
+                <div className="col-span-2 flex items-baseline gap-2">
+                  <span className="text-on-surface-variant shrink-0">Gen. Plan</span>
+                  <span className="font-semibold text-on-surface">{parcel.generalPlanCode}</span>
+                  {parcel.generalPlanDesc && (
+                    <span className="text-on-surface-variant truncate">· {parcel.generalPlanDesc}</span>
+                  )}
+                </div>
+              )}
+              {parcel.acres != null && (
+                <div className="flex items-baseline gap-2">
+                  <span className="text-on-surface-variant">Acres</span>
+                  <span className="font-semibold text-on-surface">{parcel.acres.toFixed(2)}</span>
+                </div>
+              )}
+              {parcel.apn && (
+                <div className="flex items-baseline gap-2">
+                  <span className="text-on-surface-variant">APN</span>
+                  <span className="font-mono text-[10px] text-on-surface">{parcel.apn}</span>
+                </div>
+              )}
+              {parcel.use2024 && (
+                <div className="col-span-2 flex items-baseline gap-2">
+                  <span className="text-on-surface-variant shrink-0">Use</span>
+                  <span className="text-on-surface">{parcel.use2024}</span>
+                </div>
+              )}
+              {parcel.development2024 && (
+                <div className="col-span-2 flex items-baseline gap-2">
+                  <span className="text-on-surface-variant shrink-0">Status</span>
+                  <span className="text-on-surface">{parcel.development2024}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* ════════════════════════════════════════════════════════ */}
         {/* REFERENCE PROPERTY CARD — market context, not call workflow */}

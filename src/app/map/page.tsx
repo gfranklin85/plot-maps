@@ -45,6 +45,7 @@ export default function MapPage() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [mapType, setMapType] = useState<'roadmap' | 'satellite' | 'hybrid'>('hybrid');
   const [listingFilters, setListingFilters] = useState<Set<string>>(new Set());
+  const [showZoning, setShowZoning] = useState(false);
   const [walkMode, setWalkMode] = useState(false);
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(profile.defaultMapCenter);
   const [hasUserPanned, setHasUserPanned] = useState(false);
@@ -463,6 +464,17 @@ export default function MapPage() {
               <MaterialIcon icon="ads_click" className="text-[20px]" />
             </button>
 
+            {/* Zoning Overlay */}
+            <button
+              onClick={() => setShowZoning(z => !z)}
+              title={showZoning ? 'Hide zoning overlay' : 'Show zoning overlay'}
+              className={`w-10 h-10 flex items-center justify-center rounded-xl shadow-lg transition-all ${
+                showZoning ? 'bg-emerald-500 text-white' : 'bg-surface text-on-surface-variant hover:text-emerald-400'
+              }`}
+            >
+              <MaterialIcon icon="layers" className="text-[20px]" />
+            </button>
+
             {/* Filters */}
             <button
               onClick={() => setFiltersOpen((o) => !o)}
@@ -699,6 +711,7 @@ export default function MapPage() {
             prospectMode={prospectMode}
             prospectPins={prospectList.map(a => ({ lat: a.lat, lng: a.lng, address: a.address }))}
             onProspectPinClick={removeFromProspectList}
+            showZoningOverlay={showZoning}
             navigateTo={navigateTarget}
             zoom={mapZoom}
             onLeadClick={(_id, lead) => { handleLeadClickInProspectMode(lead); }}

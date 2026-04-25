@@ -10,6 +10,7 @@ import { MarkerClusterer, Renderer, Cluster } from "@googlemaps/markerclusterer"
 import { Lead, STATUS_COLORS, LISTING_STATUS_COLORS } from "@/types";
 import { MAP_CENTER, MAP_ZOOM } from "@/lib/constants";
 import { useTheme } from "next-themes";
+import ZoningOverlay from "./ZoningOverlay";
 
 // Theme-aware pin colors
 const PIN_THEME = {
@@ -34,6 +35,7 @@ interface Props {
   prospectMode?: boolean;
   prospectPins?: { lat: number; lng: number; address: string }[];
   onProspectPinClick?: (address: string) => void;
+  showZoningOverlay?: boolean;
 }
 
 const API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
@@ -423,7 +425,7 @@ function PendingSkiptracePins({ pins }: { pins: { id: string; lat: number; lng: 
   return null;
 }
 
-export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClick, center, navigateTo, zoom, mapType = "roadmap", pinMode = "dots", prospectMode = false, prospectPins = [], onProspectPinClick }: Props) {
+export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClick, center, navigateTo, zoom, mapType = "roadmap", pinMode = "dots", prospectMode = false, prospectPins = [], onProspectPinClick, showZoningOverlay = false }: Props) {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme !== 'light';
   const isSatellite = mapType === "satellite" || mapType === "hybrid";
@@ -472,6 +474,7 @@ export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClic
         <ZoomController zoom={zoom} />
         <CenterController center={navigateTo} />
         <CenterTracker onCenterChanged={onCenterChanged} />
+        <ZoningOverlay visible={showZoningOverlay} />
         <LeadMarkers leads={leads} onMarkerClick={handleMarkerClick} pinMode={pinMode} isDark={isDark} />
         {pendingSkiptracePins.length > 0 && <PendingSkiptracePins pins={pendingSkiptracePins} />}
         {prospectPins.length > 0 && <ProspectPins pins={prospectPins} onPinClick={onProspectPinClick} />}

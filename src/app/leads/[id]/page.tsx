@@ -12,6 +12,7 @@ import MaterialIcon from '@/components/ui/MaterialIcon';
 import LeadMap from '@/components/leads/LeadMap';
 import { usePhone } from '@/lib/phone-context';
 import { useProfile } from '@/lib/profile-context';
+import SkiptraceReveal, { type SkiptracePhase } from '@/components/map/SkiptraceReveal';
 
 const GROUPS = [
   'Appointment Set', 'BUYERS', 'Dead Lead', 'Future Follow Up',
@@ -439,78 +440,61 @@ export default function LeadDetailPage() {
                   </div>
                 </div>
               ))}
-              {!lead.phone && !lookupResult?.hit && (
-                <button
-                  onClick={async () => {
-                    setLookupLoading(true);
-                    setLookupResult(null);
-                    try {
-                      const addr = lead.property_address || '';
-                      const res = await fetch('/api/skip-trace/lookup', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                          leadId: lead.id,
-                          address: addr,
-                          city: lead.city || addr.split(',')[1]?.trim() || '',
-                          state: lead.state || 'CA',
-                          zip: lead.zip || '',
-                        }),
-                      });
-                      const data = await res.json();
-                      if (data.error === 'limit_reached') {
-                        setLookupResult({ hit: false, error: data.message || 'No skip traces remaining. Upgrade your plan.' });
-                      } else if (data.hit) {
-                        setLookupResult({ hit: true, owner_name: data.owner_name, phones: data.phones });
-                        refreshData();
-                      } else {
-                        setLookupResult({ hit: false, error: 'No owner data found for this address' });
+              {!lead.phone && (() => {
+                const phase: SkiptracePhase =
+                  lookupLoading ? 'searching' :
+                  lookupResult?.hit ? 'revealed' :
+                  lookupResult && !lookupResult.hit ? (lookupResult.error?.toLowerCase().includes('failed') ? 'error' : 'not_found') :
+                  'idle';
+
+                return (
+                  <SkiptraceReveal
+                    phase={phase}
+                    compact
+                    data={lookupResult?.hit ? {
+                      ownerName: lookupResult.owner_name || null,
+                      phones: lookupResult.phones || [],
+                      address: lead.property_address || null,
+                    } : null}
+                    errorMessage={lookupResult?.error || null}
+                    priceLabel="1 credit"
+                    onTrigger={async () => {
+                      setLookupLoading(true);
+                      setLookupResult(null);
+                      try {
+                        const addr = lead.property_address || '';
+                        const res = await fetch('/api/skip-trace/lookup', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            leadId: lead.id,
+                            address: addr,
+                            city: lead.city || addr.split(',')[1]?.trim() || '',
+                            state: lead.state || 'CA',
+                            zip: lead.zip || '',
+                          }),
+                        });
+                        const data = await res.json();
+                        if (data.error === 'limit_reached') {
+                          setLookupResult({ hit: false, error: data.message || 'No skip traces remaining. Upgrade your plan.' });
+                        } else if (data.hit) {
+                          setLookupResult({ hit: true, owner_name: data.owner_name, phones: data.phones });
+                          refreshData();
+                        } else {
+                          setLookupResult({ hit: false, error: 'No owner data on file for this address.' });
+                        }
+                      } catch {
+                        setLookupResult({ hit: false, error: 'Lookup failed' });
                       }
-                    } catch {
-                      setLookupResult({ hit: false, error: 'Lookup failed' });
-                    }
-                    setLookupLoading(false);
-                  }}
-                  disabled={lookupLoading}
-                  className="w-full flex items-center justify-center gap-2 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-500 dark:text-indigo-400 border border-indigo-500/20 rounded-lg px-3 py-3 text-xs font-bold transition-all disabled:opacity-50"
-                >
-                  {lookupLoading ? (
-                    <><span className="w-3 h-3 border-2 border-indigo-400/30 border-t-indigo-400 rounded-full animate-spin" /> Looking up owner...</>
-                  ) : (
-                    <><MaterialIcon icon="person_search" className="text-[16px]" /> Get Owner Info — 1 credit</>
-                  )}
-                </button>
-              )}
-              {lookupResult && !lookupResult.hit && (
-                <p className="text-xs text-red-500 text-center py-1">{lookupResult.error}</p>
-              )}
-              {lookupResult?.hit && (
-                <div className="space-y-1.5">
-                  {lookupResult.owner_name && (
-                    <div className="bg-surface rounded-lg px-3 py-2 border border-card-border">
-                      <span className="text-xs font-bold text-on-surface">{lookupResult.owner_name}</span>
-                    </div>
-                  )}
-                  {lookupResult.phones?.map((phone, idx) => (
-                    <div key={idx} className="flex items-center justify-between bg-surface rounded-lg px-3 py-2 border border-emerald-500/20">
-                      <div className="flex items-center gap-2">
-                        <MaterialIcon icon="phone" className="text-[14px] text-emerald-500" />
-                        <span className="text-xs font-mono text-on-surface font-medium">{formatPhone(phone)}</span>
-                        {idx === 0 && <span className="text-[9px] bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 rounded font-bold">NEW</span>}
-                      </div>
-                      <button
-                        onClick={() => {
-                          if (isDesktop) makeCall(phone, lookupResult.owner_name || 'Unknown', lead.id);
-                          else window.location.href = `tel:${phone}`;
-                        }}
-                        className="flex items-center gap-1 px-3 py-1 bg-emerald-600 text-white rounded text-[11px] font-bold hover:bg-emerald-500 transition-colors"
-                      >
-                        <MaterialIcon icon="call" className="text-[14px]" /> Call
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
+                      setLookupLoading(false);
+                    }}
+                    onCall={(phone) => {
+                      if (isDesktop) makeCall(phone, lookupResult?.owner_name || 'Unknown', lead.id);
+                      else window.location.href = `tel:${phone}`;
+                    }}
+                  />
+                );
+              })()}
             </div>
 
             {/* Email card */}

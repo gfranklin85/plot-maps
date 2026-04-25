@@ -350,10 +350,16 @@ export default function PropertyPopup({ lead, onUpdate, walkMode = false, onWalk
 
             {/* Skiptrace reveal — V2 lines-of-light replaces the old button + spinner */}
             {!isCallable && !isReference && (() => {
+              // Treat a batch-order skiptrace that's still in flight as 'searching'
+              // even when the user hasn't clicked the button on this popup.
+              const isBatchPending = lead.skiptrace_status === 'pending' && !lookupLoading && !lookupResult;
+              const isBatchNotFound = lead.skiptrace_status === 'not_found' && !lookupResult;
+
               const phase: SkiptracePhase =
-                lookupLoading ? 'searching' :
+                lookupLoading || isBatchPending ? 'searching' :
                 lookupResult?.hit ? 'revealed' :
                 lookupResult && !lookupResult.hit ? (lookupResult.error?.toLowerCase().includes('failed') ? 'error' : 'not_found') :
+                isBatchNotFound ? 'not_found' :
                 'idle';
 
               return (
@@ -364,7 +370,10 @@ export default function PropertyPopup({ lead, onUpdate, walkMode = false, onWalk
                     phones: lookupResult.phones || [],
                     address: lead.property_address || null,
                   } : null}
-                  errorMessage={lookupResult?.error || null}
+                  errorMessage={
+                    lookupResult?.error ||
+                    (lead.skiptrace_status === 'not_found' ? 'No owner data on file for this address.' : null)
+                  }
                   priceLabel="$0.50"
                   onTrigger={async () => {
                     if (isFree) { setUpgradeFeature('dialer'); return; }

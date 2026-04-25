@@ -235,6 +235,48 @@ export default function MapPage() {
       .then(({ data }) => { if (data) setLeads(data as Lead[]); });
   }
 
+  // Realtime: when a lead row owned by this user changes (e.g. the
+  // Tracerfy webhook populates owner/phones), splice the new row into
+  // local state so pins and the open popup update without a refresh.
+  useEffect(() => {
+    if (!user) return;
+    const channel = supabase
+      .channel(`leads-user-${user.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'leads', filter: `user_id=eq.${user.id}` },
+        (payload) => {
+          const next = payload.new as Lead;
+          if (!next?.id) return;
+          setLeads(prev => prev.map(l => l.id === next.id ? next : l));
+          // Keep open popups in sync if they reference the changed lead.
+          setSelectedLead(prev => prev?.id === next.id ? next : prev);
+          setPinnedRef(prev => prev?.id === next.id ? next : prev);
+          setExpandedLead(prev => prev?.id === next.id ? next : prev);
+          // Toast on a completed skiptrace.
+          if (next.skiptrace_status === 'completed' && next.phone) {
+            const street = next.property_address?.split(',')[0] || 'Owner found';
+            setProspectToast(`📞 ${street}`);
+            setTimeout(() => setProspectToast(null), 3000);
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'leads', filter: `user_id=eq.${user.id}` },
+        (payload) => {
+          const next = payload.new as Lead;
+          if (!next?.id || next.latitude == null || next.longitude == null) return;
+          setLeads(prev => prev.some(l => l.id === next.id) ? prev : [...prev, next]);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
+
   const distinctTags = useMemo(() => {
     const tagSet = new Set<string>();
     leads.forEach((l) => l.tags?.forEach((t) => tagSet.add(t)));

@@ -184,6 +184,44 @@ h1, h2, h3, h4, h5, h6 {
   max-height: none !important;
 }
 
+/* ─── Skiptrace-pending pin overlay (ambient pulse over any pin
+       whose lead is awaiting Tracerfy results) ─── */
+.skiptrace-pending-pin {
+  width: 18px;
+  height: 18px;
+  border-radius: 9999px;
+  border: 2px solid #6366f1;
+  background: transparent;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  position: relative;
+}
+
+.skiptrace-pending-pin::before,
+.skiptrace-pending-pin::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  border: 2px solid #6366f1;
+  opacity: 0.6;
+  animation: skiptracePendingPulse 1.8s ease-out infinite;
+}
+.skiptrace-pending-pin::after {
+  animation-delay: 0.9s;
+}
+
+@keyframes skiptracePendingPulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(2.5);
+    opacity: 0;
+  }
+}
+
 /* ─── Prospect pin (selected house in prospect mode) ─── */
 .prospect-pin {
   width: 28px;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import {
   APIProvider,
   Map,
@@ -372,6 +372,57 @@ function ProspectPins({ pins, onPinClick }: { pins: { lat: number; lng: number; 
   return null;
 }
 
+function PendingSkiptracePins({ pins }: { pins: { id: string; lat: number; lng: number }[] }) {
+  const map = useMap();
+  const overlaysRef = useRef<Map<string, google.maps.OverlayView>>(new window.Map());
+
+  useEffect(() => {
+    if (!map) return;
+    const overlays = overlaysRef.current;
+    const currentKeys = new Set(pins.map(p => p.id));
+
+    Array.from(overlays.entries()).forEach(([id, overlay]) => {
+      if (!currentKeys.has(id)) {
+        overlay.setMap(null);
+        overlays.delete(id);
+      }
+    });
+
+    pins.forEach(pin => {
+      if (overlays.has(pin.id)) return;
+      const overlay = new google.maps.OverlayView();
+      const div = document.createElement('div');
+      div.className = 'skiptrace-pending-pin';
+      div.style.position = 'absolute';
+      div.style.zIndex = '500';
+      overlay.onAdd = function () {
+        const panes = this.getPanes();
+        panes?.overlayLayer.appendChild(div);
+      };
+      overlay.draw = function () {
+        const projection = this.getProjection();
+        if (!projection) return;
+        const point = projection.fromLatLngToDivPixel(new google.maps.LatLng(pin.lat, pin.lng));
+        if (!point) return;
+        div.style.left = `${point.x}px`;
+        div.style.top = `${point.y}px`;
+      };
+      overlay.onRemove = function () {
+        if (div.parentNode) div.parentNode.removeChild(div);
+      };
+      overlay.setMap(map);
+      overlays.set(pin.id, overlay);
+    });
+
+    return () => {
+      Array.from(overlays.values()).forEach(o => o.setMap(null));
+      overlays.clear();
+    };
+  }, [map, pins]);
+
+  return null;
+}
+
 export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClick, center, navigateTo, zoom, mapType = "roadmap", pinMode = "dots", prospectMode = false, prospectPins = [], onProspectPinClick }: Props) {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme !== 'light';
@@ -388,6 +439,13 @@ export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClic
       onMapClick({ lat: e.detail.latLng.lat, lng: e.detail.latLng.lng });
     },
     [prospectMode, onMapClick]
+  );
+
+  const pendingSkiptracePins = useMemo(
+    () => leads
+      .filter(l => l.skiptrace_status === 'pending' && l.latitude != null && l.longitude != null)
+      .map(l => ({ id: l.id, lat: l.latitude as number, lng: l.longitude as number })),
+    [leads]
   );
 
   return (
@@ -415,6 +473,7 @@ export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClic
         <CenterController center={navigateTo} />
         <CenterTracker onCenterChanged={onCenterChanged} />
         <LeadMarkers leads={leads} onMarkerClick={handleMarkerClick} pinMode={pinMode} isDark={isDark} />
+        {pendingSkiptracePins.length > 0 && <PendingSkiptracePins pins={pendingSkiptracePins} />}
         {prospectPins.length > 0 && <ProspectPins pins={prospectPins} onPinClick={onProspectPinClick} />}
       </Map>
     </APIProvider>

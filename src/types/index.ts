@@ -76,6 +76,8 @@ export interface Lead {
   lot_acres: number | null;
   year_built: number | null;
   record_type: string | null;
+  // Skiptrace pipeline state
+  skiptrace_status: 'pending' | 'completed' | 'not_found' | 'failed' | null;
 }
 
 export interface Activity {

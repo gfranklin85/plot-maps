@@ -148,7 +148,53 @@ export async function POST(request: Request) {
     }
   }
 
-  // Step 4: Create prospect order
+  // Step 4a: Ensure a `leads` row exists for every ordered address. New
+  // entries get skiptrace_status='pending'; existing leads we found are
+  // also marked pending so the UI shows the in-progress state.
+  // Resulting lead_ids are stashed on the order's addresses JSON so the
+  // webhook can update by ID instead of fuzzy address matching.
+  const addressesWithLeads: (AddressItem & { lead_id?: string })[] = [];
+  for (const a of addresses) {
+    const { data: existing } = await supabaseAdmin
+      .from('leads')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('property_address', a.address)
+      .limit(1)
+      .maybeSingle();
+
+    let leadId = existing?.id;
+
+    if (!leadId) {
+      const { data: created } = await supabaseAdmin
+        .from('leads')
+        .insert({
+          user_id: user.id,
+          property_address: a.address,
+          latitude: a.lat,
+          longitude: a.lng,
+          city: a.city,
+          state: a.state,
+          zip: a.zip,
+          source: 'Skiptrace',
+          status: 'New',
+          priority: 'medium',
+          skiptrace_status: 'pending',
+        })
+        .select('id')
+        .single();
+      leadId = created?.id;
+    } else {
+      await supabaseAdmin
+        .from('leads')
+        .update({ skiptrace_status: 'pending' })
+        .eq('id', leadId);
+    }
+
+    addressesWithLeads.push({ ...a, lead_id: leadId });
+  }
+
+  // Step 4b: Create prospect order with lead_ids embedded in addresses JSON
   const { data: order } = await supabaseAdmin
     .from('prospect_orders')
     .insert({
@@ -156,7 +202,7 @@ export async function POST(request: Request) {
       status: 'paid',
       address_count: needed,
       amount_cents: walletSpendCents,
-      addresses,
+      addresses: addressesWithLeads,
     })
     .select('id')
     .single();

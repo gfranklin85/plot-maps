@@ -45,6 +45,25 @@ export default function SkiptraceReveal({
 
   const dashOffset = phase === 'searching' || phase === 'idle' ? 500 : 0;
 
+  // Not-found is a low-information state — don't render the whole abstract
+  // street trace just to plant a grey terminus dot. A compact message card
+  // reads cleaner and avoids the "what's this random dot?" confusion.
+  if (phase === 'not_found') {
+    return (
+      <div
+        className="w-full rounded-xl border border-card-border bg-[#0a0d1c] px-4 py-5 text-center"
+        role="region"
+        aria-label="Skiptrace lookup"
+      >
+        <div className="mx-auto mb-2 flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/5">
+          <MaterialIcon icon="search_off" className="text-[18px] text-slate-400" />
+        </div>
+        <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-slate-400">No Records Found</p>
+        <p className="mt-1 text-xs text-slate-300">{errorMessage || 'No additional contact info on file.'}</p>
+      </div>
+    );
+  }
+
   return (
     <div
       className="relative w-full overflow-hidden rounded-xl border border-card-border bg-[#0a0d1c]"
@@ -69,7 +88,7 @@ export default function SkiptraceReveal({
           width="360"
           height="220"
           fill="url(#skipgrid)"
-          opacity={phase === 'revealed' || phase === 'not_found' ? 0.35 : 0.7}
+          opacity={phase === 'revealed' ? 0.35 : 0.7}
         />
 
         {/* Abstract street paths */}
@@ -77,7 +96,7 @@ export default function SkiptraceReveal({
           fill="none"
           stroke="#243056"
           strokeWidth="1.5"
-          opacity={phase === 'revealed' || phase === 'not_found' ? 0.4 : 0.7}
+          opacity={phase === 'revealed' ? 0.4 : 0.7}
         >
           <path d="M 0 60 L 360 60" />
           <path d="M 0 130 L 360 130" />
@@ -99,7 +118,7 @@ export default function SkiptraceReveal({
               style={{
                 transition: phase === 'searching'
                   ? 'stroke-dashoffset 1.6s cubic-bezier(.6,.05,.3,.95)'
-                  : phase === 'revealed' || phase === 'not_found'
+                  : phase === 'revealed'
                     ? 'none'
                     : 'stroke-dashoffset 0.4s ease',
               }}
@@ -121,9 +140,6 @@ export default function SkiptraceReveal({
                   <animate attributeName="opacity" values="0.6;0;0.6" dur="1.6s" repeatCount="indefinite" />
                 </circle>
               </g>
-            )}
-            {phase === 'not_found' && (
-              <circle cx="320" cy="60" r="5" fill="#64748b" />
             )}
           </g>
         )}
@@ -183,14 +199,6 @@ export default function SkiptraceReveal({
           {data.address && !compact && (
             <p className="mt-2 truncate font-mono text-[10px] text-on-surface-variant/70">{data.address}</p>
           )}
-        </div>
-      )}
-
-      {/* Not found */}
-      {phase === 'not_found' && (
-        <div className="absolute bottom-3 left-3 right-3 animate-in fade-in slide-in-from-bottom-2 rounded-lg border border-white/10 bg-[#0b0e1c]/85 p-3 text-center backdrop-blur duration-300">
-          <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-slate-400">No Records Found</p>
-          <p className="mt-1 text-xs text-slate-300">{errorMessage || 'No owner data on file for this address.'}</p>
         </div>
       )}
 

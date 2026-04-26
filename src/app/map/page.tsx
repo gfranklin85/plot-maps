@@ -171,16 +171,22 @@ export default function MapPage() {
   }
 
   function handleLeadClickInProspectMode(lead: Lead) {
-    if (prospectMode && lead.property_address && lead.latitude != null && lead.longitude != null) {
+    // In prospect mode, any pin with coordinates is selectable. Skiptrace
+    // stubs and freshly-imported leads can be missing property_address until
+    // the webhook fills it in — fall back to a coord-derived label so the
+    // user can still drop them into the prospect list.
+    if (prospectMode && lead.latitude != null && lead.longitude != null) {
+      const address = lead.property_address?.trim() ||
+        `${lead.latitude.toFixed(5)}, ${lead.longitude.toFixed(5)}`;
       addToProspectList([{
-        address: lead.property_address,
+        address,
         lat: lead.latitude,
         lng: lead.longitude,
         city: lead.city || null,
         state: lead.state || null,
         zip: lead.zip || null,
       }]);
-      setProspectToast(lead.property_address.split(',')[0]);
+      setProspectToast(address.split(',')[0]);
       setTimeout(() => setProspectToast(null), 2000);
       return;
     }

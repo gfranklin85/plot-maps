@@ -141,7 +141,8 @@ export default function PropertyPopup({ lead, onUpdate, walkMode = false, onWalk
   const [lookupLoading, setLookupLoading] = useState(false);
   const [lookupResult, setLookupResult] = useState<{ hit: boolean; owner_name?: string; phones?: string[]; error?: string } | null>(null);
 
-  // Parcel info from City of Lemoore GIS (zoning, GP, APN, acres)
+  // Parcel info from City of Lemoore GIS (zoning, GP, APN, acres,
+  // subdivision, site plan)
   const [parcel, setParcel] = useState<{
     hit: boolean;
     apn: string | null;
@@ -152,6 +153,20 @@ export default function PropertyPopup({ lead, onUpdate, walkMode = false, onWalk
     acres: number | null;
     use2024: string | null;
     development2024: string | null;
+    subdivision: {
+      name: string | null;
+      tract: string | null;
+      applicant: string | null;
+      units: string | null;
+      status: string | null;
+    } | null;
+    sitePlan: {
+      projectNumber: string | null;
+      title: string | null;
+      applicant: string | null;
+      units: string | null;
+      status: string | null;
+    } | null;
   } | null>(null);
 
   useEffect(() => {
@@ -310,6 +325,30 @@ export default function PropertyPopup({ lead, onUpdate, walkMode = false, onWalk
                 <div className="col-span-2 flex items-baseline gap-2">
                   <span className="text-on-surface-variant shrink-0">Status</span>
                   <span className="text-on-surface">{parcel.development2024}</span>
+                </div>
+              )}
+              {parcel.subdivision?.name && (
+                <div className="col-span-2 flex items-baseline gap-2">
+                  <span className="text-on-surface-variant shrink-0">Subdivision</span>
+                  <span className="font-semibold text-on-surface">{parcel.subdivision.name}</span>
+                  {parcel.subdivision.tract && (
+                    <span className="text-on-surface-variant text-[10px]">· {parcel.subdivision.tract}</span>
+                  )}
+                  {parcel.subdivision.status && (
+                    <span className="text-on-surface-variant text-[10px]">· {parcel.subdivision.status}</span>
+                  )}
+                </div>
+              )}
+              {parcel.sitePlan?.title && (
+                <div className="col-span-2 flex items-baseline gap-2">
+                  <span className="text-on-surface-variant shrink-0">Site Plan</span>
+                  <span className="font-semibold text-on-surface">{parcel.sitePlan.title}</span>
+                  {parcel.sitePlan.projectNumber && (
+                    <span className="text-on-surface-variant text-[10px]">· #{parcel.sitePlan.projectNumber}</span>
+                  )}
+                  {parcel.sitePlan.status && (
+                    <span className="text-on-surface-variant text-[10px]">· {parcel.sitePlan.status}</span>
+                  )}
                 </div>
               )}
             </div>

@@ -3,7 +3,9 @@ import { getAuthUser } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { logCost } from '@/lib/cost-tracker';
 
-const GOOGLE_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || process.env.GOOGLE_MAPS_API_KEY!;
+// Prefer the server-only key. The NEXT_PUBLIC_* key is restricted to
+// browser referrers and will be denied on server-side fetches.
+const GOOGLE_API_KEY = process.env.GOOGLE_MAPS_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!;
 
 interface GeocodedResult {
   formatted_address: string;

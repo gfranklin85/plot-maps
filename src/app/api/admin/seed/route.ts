@@ -273,7 +273,7 @@ export async function POST(request: Request) {
   const format = requestedFormat || detectFormat(csvText);
   const now = new Date().toISOString();
   let inserted = 0, updated = 0, errors = 0, total = 0, geocoded = 0;
-  const GOOGLE_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
+  const GOOGLE_API_KEY = process.env.GOOGLE_MAPS_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
 
   // Geocode with cache — check geocode_cache first, only call Google on miss
   async function geocodeAddress(address: string): Promise<{ lat: number; lng: number } | null> {

@@ -312,3 +312,268 @@ h1, h2, h3, h4, h5, h6 {
     opacity: 1;
   }
 }
+
+/* ─── Lead pin family (AdvancedMarkerElement-based) ─────────────
+   Shared base: 32px circle with white border, drop-tail underneath,
+   24px Material icon centered. Per-status modifier classes apply
+   color + animation (active pulses, sold gleams, pending sweeps,
+   hot glows, cold dims).
+   --------------------------------------------------------------- */
+
+.lp {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transform: translate(-50%, -100%);
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.35));
+}
+
+.lp__bubble {
+  width: 32px;
+  height: 32px;
+  border-radius: 9999px;
+  border: 2px solid rgba(255, 255, 255, 0.95);
+  background: #6366f1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  transition: transform 180ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.lp__icon {
+  font-family: 'Material Symbols Outlined';
+  font-variation-settings: 'FILL' 1, 'wght' 500;
+  font-size: 16px;
+  color: #ffffff;
+  line-height: 1;
+}
+
+.lp__tail {
+  position: absolute;
+  bottom: -5px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 8px solid var(--lp-color, #6366f1);
+}
+
+.lp:hover .lp__bubble {
+  transform: scale(1.18);
+}
+
+/* Status: Active listing — emerald, 2s gentle pulse */
+.lp--active { --lp-color: #22c55e; }
+.lp--active .lp__bubble {
+  background: #22c55e;
+  box-shadow: 0 0 16px rgba(34, 197, 94, 0.5);
+  animation: lp-active-pulse 2s ease-in-out infinite;
+}
+@keyframes lp-active-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+}
+
+/* Status: Sold — amber, periodic gleam sweep */
+.lp--sold { --lp-color: #eab308; }
+.lp--sold .lp__bubble {
+  background: #eab308;
+  box-shadow: 0 0 14px rgba(234, 179, 8, 0.4);
+  overflow: hidden;
+}
+.lp--sold .lp__bubble::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+  transform: skewX(-25deg);
+  animation: lp-sold-gleam 4.2s ease-in-out infinite;
+}
+@keyframes lp-sold-gleam {
+  0%, 70% { left: -100%; }
+  85% { left: 100%; }
+  100% { left: 100%; }
+}
+
+/* Status: Pending — violet, rotating dashed ring */
+.lp--pending { --lp-color: #a855f7; }
+.lp--pending .lp__bubble {
+  background: #a855f7;
+  box-shadow: 0 0 14px rgba(168, 85, 247, 0.4);
+}
+.lp--pending::before {
+  content: '';
+  position: absolute;
+  inset: -5px 0 5px 0; /* center on the bubble, ignore tail */
+  width: 42px;
+  height: 42px;
+  left: 50%;
+  top: 50%;
+  margin: -21px 0 0 -21px;
+  border-radius: 9999px;
+  border: 2px dashed rgba(168, 85, 247, 0.55);
+  animation: lp-pending-sweep 4s linear infinite;
+  pointer-events: none;
+}
+@keyframes lp-pending-sweep {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Status: Hot lead — coral red, ambient glow + heartbeat */
+.lp--hot { --lp-color: #f87171; }
+.lp--hot .lp__bubble {
+  background: #f87171;
+  box-shadow: 0 0 24px rgba(248, 113, 113, 0.65);
+  animation: lp-hot-pulse 1.4s ease-in-out infinite;
+}
+@keyframes lp-hot-pulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 18px rgba(248, 113, 113, 0.55); }
+  50% { transform: scale(1.06); box-shadow: 0 0 28px rgba(248, 113, 113, 0.8); }
+}
+
+/* Status: Cold prospect — neutral grey, dimmed */
+.lp--cold { --lp-color: #64748b; }
+.lp--cold .lp__bubble {
+  background: #64748b;
+  opacity: 0.78;
+  box-shadow: none;
+}
+.lp--cold .lp__icon { opacity: 0.85; }
+
+/* Status: Default lead (has phone, no special status) */
+.lp--lead { --lp-color: #6366f1; }
+.lp--lead .lp__bubble {
+  background: #6366f1;
+  box-shadow: 0 0 10px rgba(99, 102, 241, 0.35);
+}
+
+/* Status: Called recently */
+.lp--called { --lp-color: #f59e0b; }
+.lp--called .lp__bubble {
+  background: #f59e0b;
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.4);
+}
+
+/* Hover-reveal label pill — slides in to the right of the pin */
+.lp__label {
+  position: absolute;
+  left: calc(100% + 6px);
+  top: 4px;
+  white-space: nowrap;
+  background: rgba(11, 14, 28, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 9999px;
+  padding: 5px 10px;
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  color: #ffffff;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateX(-4px);
+  transition: opacity 180ms ease-out, transform 200ms cubic-bezier(0.2, 0.7, 0.2, 1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+}
+
+.lp__label-status {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-left: 6px;
+  padding-left: 6px;
+  border-left: 1px solid rgba(255, 255, 255, 0.18);
+  color: var(--lp-color, #c7c4d8);
+}
+
+.lp:hover .lp__label {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+/* Always-visible label (Labels mode) — render the pill statically */
+.lp--label-always .lp__label {
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: none;
+}
+
+/* Detail mode — bigger card under the pin */
+.lp__card {
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 4px);
+  transform: translateX(-50%);
+  white-space: nowrap;
+  background: rgba(11, 14, 28, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  color: #ffffff;
+  pointer-events: none;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.4);
+  text-align: center;
+  line-height: 1.35;
+}
+
+.lp__card-line {
+  display: block;
+}
+.lp__card-status {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--lp-color, #c7c4d8);
+  margin-top: 2px;
+}
+
+/* Cluster pin — layered violet/secondary circles with count */
+.lp-cluster {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transform: translate(-50%, -50%);
+}
+.lp-cluster__core {
+  width: 44px;
+  height: 44px;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, #6366f1, #4f46e5);
+  border: 2px solid rgba(255, 255, 255, 0.95);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Manrope', sans-serif;
+  font-weight: 800;
+  font-size: 14px;
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(79, 70, 229, 0.5);
+  transition: transform 180ms ease-out;
+}
+.lp-cluster__halo {
+  position: absolute;
+  inset: -4px;
+  border-radius: 9999px;
+  background: rgba(99, 102, 241, 0.25);
+  z-index: -1;
+}
+.lp-cluster:hover .lp-cluster__core {
+  transform: scale(1.08);
+}

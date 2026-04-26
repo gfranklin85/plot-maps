@@ -11,6 +11,7 @@ import { Lead, STATUS_COLORS, LISTING_STATUS_COLORS } from "@/types";
 import { MAP_CENTER, MAP_ZOOM } from "@/lib/constants";
 import { useTheme } from "next-themes";
 import ZoningOverlay from "./ZoningOverlay";
+import AdvancedLeadMarkers from "./AdvancedLeadMarkers";
 
 // Theme-aware pin colors
 const PIN_THEME = {
@@ -468,7 +469,7 @@ export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClic
   );
 
   return (
-    <APIProvider apiKey={API_KEY} libraries={['places']}>
+    <APIProvider apiKey={API_KEY} libraries={['places', 'marker']}>
       <Map
         defaultCenter={center || MAP_CENTER}
         defaultZoom={MAP_ZOOM}
@@ -494,7 +495,13 @@ export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClic
         <CenterTracker onCenterChanged={onCenterChanged} />
         <Tilt3DController enabled={view3D} />
         <ZoningOverlay visible={showZoningOverlay} />
-        <LeadMarkers leads={leads} onMarkerClick={handleMarkerClick} pinMode={pinMode} isDark={isDark} />
+        {/* AdvancedMarkerElement requires a Map ID. With one configured we
+            render the rich pin family (per-status animations, hover labels,
+            detail cards). Without one we fall back to the legacy SVG-icon
+            markers so dev environments without a Map ID still work. */}
+        {MAP_ID
+          ? <AdvancedLeadMarkers leads={leads} onMarkerClick={handleMarkerClick} pinMode={pinMode} />
+          : <LeadMarkers leads={leads} onMarkerClick={handleMarkerClick} pinMode={pinMode} isDark={isDark} />}
         {pendingSkiptracePins.length > 0 && <PendingSkiptracePins pins={pendingSkiptracePins} />}
         {prospectPins.length > 0 && <ProspectPins pins={prospectPins} onPinClick={onProspectPinClick} />}
       </Map>

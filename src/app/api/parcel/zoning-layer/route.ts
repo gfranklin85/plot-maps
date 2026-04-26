@@ -1,5 +1,11 @@
 import { NextResponse } from 'next/server';
 
+// Force dynamic — this route fetches a live ArcGIS service. Without this
+// flag Next 14 attempts to prerender it at build time and emits a noisy
+// "DYNAMIC_SERVER_USAGE" error in the build log even though the route
+// works fine at runtime.
+export const dynamic = 'force-dynamic';
+
 // Returns the entire Lemoore GPLU_Zoning polygon set as GeoJSON, suitable
 // for direct ingestion by google.maps.Data.addGeoJson(). Cached aggressively
 // in-process — this dataset rarely changes and is ~9MB raw.

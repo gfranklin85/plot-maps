@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server';
 
+// Force dynamic — this route fetches a live ArcGIS service per request and
+// caches in-process. Without this Next 14 tries to prerender at build time,
+// fails because of `cache: 'no-store'`, and pollutes the build log.
+export const dynamic = 'force-dynamic';
+
 // Public ArcGIS endpoints (City of Lemoore). All polygons in WKID 2228
 // (CA State Plane Zone 4 ft) but the API accepts inSR=4326 to spare us
 // the projection step.

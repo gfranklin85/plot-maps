@@ -27,7 +27,7 @@ interface Props {
   onDataChanged?: () => void;
   onCenterChanged?: (center: { lat: number; lng: number }) => void;
   onWalkHere?: (lead: Lead) => void;
-  onMapClick?: (latLng: { lat: number; lng: number }) => void;
+  onMapClick?: (latLng: { lat: number; lng: number }, opts?: { placeId?: string | null }) => void;
   center?: { lat: number; lng: number } | null;
   navigateTo?: { lat: number; lng: number } | null;
   zoom?: number | null;
@@ -454,9 +454,16 @@ export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClic
   );
 
   const handleMapClick = useCallback(
-    (e: { detail: { latLng: { lat: number; lng: number } | null } }) => {
+    (e: { detail: { latLng: { lat: number; lng: number } | null; placeId?: string | null }; stop?: () => void }) => {
       if (!prospectMode || !onMapClick || !e.detail.latLng) return;
-      onMapClick({ lat: e.detail.latLng.lat, lng: e.detail.latLng.lng });
+      // If the user clicked a Google POI (e.g. an address-number label on
+      // satellite/hybrid), suppress Google's default info-window popup so we
+      // can capture the click as a prospect-list addition instead.
+      if (e.detail.placeId && e.stop) e.stop();
+      onMapClick(
+        { lat: e.detail.latLng.lat, lng: e.detail.latLng.lng },
+        { placeId: e.detail.placeId || null }
+      );
     },
     [prospectMode, onMapClick]
   );
@@ -486,6 +493,7 @@ export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClic
         tiltInteractionEnabled
         headingInteractionEnabled
         rotateControl
+        clickableIcons
         styles={isSatellite || MAP_ID ? undefined : MAP_STYLES}
         onClick={handleMapClick}
       >

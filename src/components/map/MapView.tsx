@@ -392,6 +392,40 @@ function Tilt3DController({ enabled }: { enabled: boolean }) {
   return null;
 }
 
+// Listen directly on the underlying google.maps.Map for clicks on Google's
+// POI overlay (address-number labels, business markers, etc). The React
+// onClick prop doesn't always surface placeId for the address-number layer,
+// so this is a belt-and-suspenders catch.
+function PoiClickCatcher({
+  prospectMode,
+  onMapClick,
+}: {
+  prospectMode: boolean;
+  onMapClick?: (latLng: { lat: number; lng: number }, opts?: { placeId?: string | null }) => void;
+}) {
+  const map = useMap();
+  const handlerRef = useRef({ prospectMode, onMapClick });
+  handlerRef.current = { prospectMode, onMapClick };
+
+  useEffect(() => {
+    if (!map) return;
+    // IconMouseEvent has a placeId; MapMouseEvent doesn't. Both extend each
+    // other so a single 'click' listener catches both.
+    const listener = map.addListener('click', (e: google.maps.IconMouseEvent | google.maps.MapMouseEvent) => {
+      const { prospectMode: pm, onMapClick: omc } = handlerRef.current;
+      if (!pm || !omc) return;
+      const latLng = e.latLng;
+      if (!latLng) return;
+      const placeId = (e as google.maps.IconMouseEvent).placeId;
+      if (placeId && e.stop) e.stop();
+      omc({ lat: latLng.lat(), lng: latLng.lng() }, { placeId: placeId || null });
+    });
+    return () => google.maps.event.removeListener(listener);
+  }, [map]);
+
+  return null;
+}
+
 function PendingSkiptracePins({ pins }: { pins: { id: string; lat: number; lng: number }[] }) {
   const map = useMap();
   const overlaysRef = useRef<Map<string, google.maps.OverlayView>>(new window.Map());
@@ -453,21 +487,6 @@ export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClic
     [onLeadClick]
   );
 
-  const handleMapClick = useCallback(
-    (e: { detail: { latLng: { lat: number; lng: number } | null; placeId?: string | null }; stop?: () => void }) => {
-      if (!prospectMode || !onMapClick || !e.detail.latLng) return;
-      // If the user clicked a Google POI (e.g. an address-number label on
-      // satellite/hybrid), suppress Google's default info-window popup so we
-      // can capture the click as a prospect-list addition instead.
-      if (e.detail.placeId && e.stop) e.stop();
-      onMapClick(
-        { lat: e.detail.latLng.lat, lng: e.detail.latLng.lng },
-        { placeId: e.detail.placeId || null }
-      );
-    },
-    [prospectMode, onMapClick]
-  );
-
   const pendingSkiptracePins = useMemo(
     () => leads
       .filter(l => l.skiptrace_status === 'pending' && l.latitude != null && l.longitude != null)
@@ -495,13 +514,13 @@ export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClic
         rotateControl
         clickableIcons
         styles={isSatellite || MAP_ID ? undefined : MAP_STYLES}
-        onClick={handleMapClick}
       >
         <MapTypeSync mapType={mapType} />
         <ZoomController zoom={zoom} />
         <CenterController center={navigateTo} />
         <CenterTracker onCenterChanged={onCenterChanged} />
         <Tilt3DController enabled={view3D} />
+        <PoiClickCatcher prospectMode={prospectMode} onMapClick={onMapClick} />
         <ZoningOverlay visible={showZoningOverlay} />
         {/* AdvancedMarkerElement requires a Map ID. With one configured we
             render the rich pin family (per-status animations, hover labels,

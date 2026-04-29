@@ -4,9 +4,19 @@ import { supabaseAdmin } from '@/lib/supabase-server';
 import { getAuthUser, isSubscribed } from '@/lib/auth';
 import { logCost } from '@/lib/cost-tracker';
 
-const resend = new Resend(process.env.RESEND_API_KEY!);
+// Force dynamic so Next's "Collect page data" phase doesn't import this
+// module's top-level statements during build.
+export const dynamic = 'force-dynamic';
 
 const FROM_EMAIL = process.env.FROM_EMAIL || 'greg@plot.solutions';
+
+// Lazy-instantiate at request time. Module load was throwing in builds
+// where RESEND_API_KEY wasn't yet in scope.
+function getResend(): Resend {
+  const key = process.env.RESEND_API_KEY;
+  if (!key) throw new Error('RESEND_API_KEY is not configured');
+  return new Resend(key);
+}
 
 export async function POST(request: Request) {
   try {
@@ -27,6 +37,7 @@ export async function POST(request: Request) {
     }
 
     // Send email via Resend
+    const resend = getResend();
     const { data, error: sendError } = await resend.emails.send({
       from: FROM_EMAIL,
       to,

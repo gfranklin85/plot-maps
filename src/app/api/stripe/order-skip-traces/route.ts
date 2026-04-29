@@ -4,16 +4,25 @@ import { getAuthUser } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY!);
+// Force dynamic so Next's build-time "Collect page data" phase doesn't try
+// to import this module while RESEND_API_KEY is unset.
+export const dynamic = 'force-dynamic';
+
 const FROM_EMAIL = process.env.FROM_EMAIL || 'greg@plot.solutions';
 const ADMIN_NOTIFY_EMAIL = process.env.ADMIN_NOTIFICATION_EMAIL || 'gregfranklin523@gmail.com';
 const COST_PER_ADDRESS_CENTS = 18; // $0.18
 const MIN_ORDER_SIZE = 1;
 
+function getResend(): Resend {
+  const key = process.env.RESEND_API_KEY;
+  if (!key) throw new Error('RESEND_API_KEY is not configured');
+  return new Resend(key);
+}
+
 async function notifyAdmin(orderId: string, addressCount: number, addresses: { address: string }[], userEmail: string) {
   try {
     const addressList = addresses.map(a => a.address.split(',')[0]).join('\n• ');
-    await resend.emails.send({
+    await getResend().emails.send({
       from: `Plot Maps <${FROM_EMAIL}>`,
       to: ADMIN_NOTIFY_EMAIL,
       subject: `New Skip Trace Order — ${addressCount} addresses`,

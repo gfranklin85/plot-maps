@@ -4,9 +4,18 @@ import { supabaseAdmin } from '@/lib/supabase-server';
 import { batchTrace } from '@/lib/tracerfy';
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY!);
+// Force dynamic so Next's build-time "Collect page data" phase doesn't try
+// to import this module while RESEND_API_KEY is unset.
+export const dynamic = 'force-dynamic';
+
 const FROM_EMAIL = process.env.FROM_EMAIL || 'greg@plot.solutions';
 const ADMIN_NOTIFY_EMAIL = process.env.ADMIN_NOTIFICATION_EMAIL || 'gregfranklin523@gmail.com';
+
+function getResend(): Resend {
+  const key = process.env.RESEND_API_KEY;
+  if (!key) throw new Error('RESEND_API_KEY is not configured');
+  return new Resend(key);
+}
 
 function getCurrentMonth(): string {
   return new Date().toISOString().slice(0, 7);
@@ -240,7 +249,7 @@ export async function POST(request: Request) {
   try {
     const addressList = addresses.map(a => a.address.split(',')[0]).join('\n\u2022 ');
     const overageNote = fromOverage > 0 ? `\nOverage: ${fromOverage} @ $${(tier.overageSkipTraceCents / 100).toFixed(2)} = $${(walletSpendCents / 100).toFixed(2)}` : '';
-    await resend.emails.send({
+    await getResend().emails.send({
       from: `Plot Maps <${FROM_EMAIL}>`,
       to: ADMIN_NOTIFY_EMAIL,
       subject: `${tracerfyQueued ? '🟢 Auto-traced' : '🟠 Manual fulfillment'} — ${needed} addresses`,

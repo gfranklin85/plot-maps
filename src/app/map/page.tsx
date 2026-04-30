@@ -7,7 +7,7 @@ import { Lead, LeadStatus, Priority } from "@/types";
 import MapDynamic from "@/components/map/MapDynamic";
 import type { PinMode } from "@/components/map/MapView";
 import StreetViewProspecting from "@/components/map/StreetViewProspecting";
-import PlacesSearch from "@/components/map/PlacesSearch";
+import ProspectSearch from "@/components/dashboard/ProspectSearch";
 import { PRIORITIES } from "@/lib/constants";
 import { useProfile } from "@/lib/profile-context";
 import { useAuth } from "@/lib/auth-context";
@@ -375,14 +375,26 @@ export default function MapPage() {
         <>
           {/* ── DESKTOP TOOLBAR ── */}
           <div className="absolute top-4 left-4 right-4 z-10 hidden md:flex items-center gap-2">
-            {/* Search */}
+            {/* Search — same hybrid (your leads first, then Google) as the dashboard */}
             <div className="flex-1 max-w-sm">
-              <PlacesSearch
-                onPlaceSelected={(place) => {
-                  setNavigateTarget({ lat: place.lat, lng: place.lng });
-                  setMapZoom(17);
+              <ProspectSearch
+                compact
+                placeholder="Search your leads or any address..."
+                onSelect={(payload) => {
+                  setNavigateTarget({ lat: payload.lat, lng: payload.lng });
+                  setMapCenter({ lat: payload.lat, lng: payload.lng });
+                  setHasUserPanned(true);
+                  setMapZoom(19);
+                  if (payload.leadId && user) {
+                    supabase
+                      .from('leads')
+                      .select('*')
+                      .eq('id', payload.leadId)
+                      .eq('user_id', user.id)
+                      .single()
+                      .then(({ data }) => { if (data) setPinnedRef(data as Lead); });
+                  }
                 }}
-                className="shadow-lg"
               />
             </div>
 
@@ -513,13 +525,25 @@ export default function MapPage() {
 
           {/* ── MOBILE TOOLBAR ── */}
           <div className="absolute top-2 left-2 right-2 z-10 flex items-center gap-2 md:hidden">
-            <div className="flex-1">
-              <PlacesSearch
-                onPlaceSelected={(place) => {
-                  setNavigateTarget({ lat: place.lat, lng: place.lng });
-                  setMapZoom(17);
+            <div className="flex-1 min-w-0">
+              <ProspectSearch
+                compact
+                placeholder="Search leads or addresses..."
+                onSelect={(payload) => {
+                  setNavigateTarget({ lat: payload.lat, lng: payload.lng });
+                  setMapCenter({ lat: payload.lat, lng: payload.lng });
+                  setHasUserPanned(true);
+                  setMapZoom(19);
+                  if (payload.leadId && user) {
+                    supabase
+                      .from('leads')
+                      .select('*')
+                      .eq('id', payload.leadId)
+                      .eq('user_id', user.id)
+                      .single()
+                      .then(({ data }) => { if (data) setPinnedRef(data as Lead); });
+                  }
                 }}
-                className="shadow-lg"
               />
             </div>
             <button
@@ -593,6 +617,30 @@ export default function MapPage() {
                       {label}
                     </button>
                   ))}
+                </div>
+              </div>
+              {/* View toggles — 3D + Zoning overlay (parity with desktop toolbar) */}
+              <div>
+                <p className="text-[9px] font-bold text-on-surface-variant uppercase tracking-wider mb-2">View</p>
+                <div className="flex gap-1">
+                  <button
+                    onClick={() => has3DSupport ? setView3D(v => !v) : alert('3D requires NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID with Photorealistic 3D Tiles enabled in Google Cloud Console.')}
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition-all ${
+                      view3D ? 'bg-violet-500 text-white' : 'bg-surface-container-high text-on-surface-variant'
+                    } ${!has3DSupport ? 'opacity-60' : ''}`}
+                  >
+                    <span className="text-[11px] font-black tracking-tighter">3D</span>
+                    {!has3DSupport && <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />}
+                  </button>
+                  <button
+                    onClick={() => setShowZoning(z => !z)}
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition-all ${
+                      showZoning ? 'bg-emerald-500 text-white' : 'bg-surface-container-high text-on-surface-variant'
+                    }`}
+                  >
+                    <MaterialIcon icon="layers" className="text-[14px]" />
+                    Zoning
+                  </button>
                 </div>
               </div>
               <button onClick={() => setMobileControlsOpen(false)} className="w-full py-2 text-xs font-bold text-primary">Done</button>

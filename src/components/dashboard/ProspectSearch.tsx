@@ -37,11 +37,23 @@ function bumpSearchCount() {
   window.localStorage.setItem('plotmaps.heroSearchCount', String((isNaN(current) ? 0 : current) + 1));
 }
 
-interface Props {
-  compact?: boolean;
+interface SelectPayload {
+  lat: number;
+  lng: number;
+  address: string;
+  leadId?: string;
 }
 
-export default function ProspectSearch({ compact = false }: Props) {
+interface Props {
+  compact?: boolean;
+  // When provided, picking a result calls this instead of router.push.
+  // Used by the map page so we don't bounce through the URL when already
+  // on /map.
+  onSelect?: (payload: SelectPayload) => void;
+  placeholder?: string;
+}
+
+export default function ProspectSearch({ compact = false, onSelect, placeholder }: Props) {
   const router = useRouter();
   const { user } = useAuth();
   const [query, setQuery] = useState('');
@@ -152,6 +164,12 @@ export default function ProspectSearch({ compact = false }: Props) {
 
   function navigateToCoords(args: { lat: number; lng: number; address: string; leadId?: string }) {
     bumpSearchCount();
+    setQuery('');
+    setOpen(false);
+    if (onSelect) {
+      onSelect(args);
+      return;
+    }
     const params = new URLSearchParams({
       lat: String(args.lat),
       lng: String(args.lng),
@@ -215,7 +233,7 @@ export default function ProspectSearch({ compact = false }: Props) {
           onChange={(e) => { setQuery(e.target.value); setOpen(true); setHighlight(0); }}
           onFocus={() => { if (results.length > 0) setOpen(true); }}
           onKeyDown={handleKeyDown}
-          placeholder={compact ? 'Have a listing in mind? Type the address to circle prospect around it.' : 'What listing do you want to prospect around?'}
+          placeholder={placeholder ?? (compact ? 'Have a listing in mind? Type the address to circle prospect around it.' : 'What listing do you want to prospect around?')}
           className={
             compact
               ? 'w-full pl-11 pr-4 py-2.5 rounded-full bg-card border border-card-border text-sm text-on-surface placeholder:text-on-surface-variant/70 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary shadow-sm'

@@ -17,6 +17,7 @@ import PropertyPopup from "@/components/map/PropertyPopup";
 import ProspectListPanel from "@/components/map/ProspectListPanel";
 import OnboardingTooltips from "@/components/ui/OnboardingTooltips";
 import ProspectCoachOverlay from "@/components/map/ProspectCoachOverlay";
+import Mobile3DCoachOverlay from "@/components/map/Mobile3DCoachOverlay";
 
 const FILTER_TABS: { label: string; key: string; statuses: LeadStatus[] }[] = [
   { label: "All", key: "all", statuses: [] },
@@ -48,6 +49,30 @@ export default function MapPage() {
   const [showZoning, setShowZoning] = useState(false);
   const [view3D, setView3D] = useState(false);
   const has3DSupport = !!process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID;
+  const [show3DCoach, setShow3DCoach] = useState(false);
+
+  // On mobile, default to tilted 3D view — that's where the magic is and
+  // touch users can rotate freely to flatten it. Coach overlay teaches the
+  // gestures on first visit. Desktop keeps view3D=false; cursor users
+  // toggle the desktop 3D button explicitly.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const isMobile = window.matchMedia('(max-width: 767px)').matches;
+    if (!isMobile || !has3DSupport) return;
+    setView3D(true);
+    const dismissed = window.localStorage.getItem('plotmaps.coachDismissed.mobile3D') === '1';
+    if (!dismissed) {
+      const t = setTimeout(() => setShow3DCoach(true), 600);
+      return () => clearTimeout(t);
+    }
+  }, [has3DSupport]);
+
+  function dismiss3DCoach() {
+    setShow3DCoach(false);
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('plotmaps.coachDismissed.mobile3D', '1');
+    }
+  }
   const [walkMode, setWalkMode] = useState(false);
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(profile.defaultMapCenter);
   const [hasUserPanned, setHasUserPanned] = useState(false);
@@ -619,29 +644,18 @@ export default function MapPage() {
                   ))}
                 </div>
               </div>
-              {/* View toggles — 3D + Zoning overlay (parity with desktop toolbar) */}
+              {/* Zoning overlay toggle (mobile entry; 3D is auto-on so no button needed) */}
               <div>
-                <p className="text-[9px] font-bold text-on-surface-variant uppercase tracking-wider mb-2">View</p>
-                <div className="flex gap-1">
-                  <button
-                    onClick={() => has3DSupport ? setView3D(v => !v) : alert('3D requires NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID with Photorealistic 3D Tiles enabled in Google Cloud Console.')}
-                    className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition-all ${
-                      view3D ? 'bg-violet-500 text-white' : 'bg-surface-container-high text-on-surface-variant'
-                    } ${!has3DSupport ? 'opacity-60' : ''}`}
-                  >
-                    <span className="text-[11px] font-black tracking-tighter">3D</span>
-                    {!has3DSupport && <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />}
-                  </button>
-                  <button
-                    onClick={() => setShowZoning(z => !z)}
-                    className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition-all ${
-                      showZoning ? 'bg-emerald-500 text-white' : 'bg-surface-container-high text-on-surface-variant'
-                    }`}
-                  >
-                    <MaterialIcon icon="layers" className="text-[14px]" />
-                    Zoning
-                  </button>
-                </div>
+                <p className="text-[9px] font-bold text-on-surface-variant uppercase tracking-wider mb-2">Layers</p>
+                <button
+                  onClick={() => setShowZoning(z => !z)}
+                  className={`w-full flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition-all ${
+                    showZoning ? 'bg-emerald-500 text-white' : 'bg-surface-container-high text-on-surface-variant'
+                  }`}
+                >
+                  <MaterialIcon icon="layers" className="text-[14px]" />
+                  Zoning
+                </button>
               </div>
               <button onClick={() => setMobileControlsOpen(false)} className="w-full py-2 text-xs font-bold text-primary">Done</button>
             </div>
@@ -934,6 +948,10 @@ export default function MapPage() {
 
       {showCoach && !walkMode && (
         <ProspectCoachOverlay onDismiss={dismissCoach} />
+      )}
+
+      {show3DCoach && !walkMode && !showCoach && (
+        <Mobile3DCoachOverlay onDismiss={dismiss3DCoach} />
       )}
 
       {/* Expand map — hides mobile browser chrome */}

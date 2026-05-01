@@ -44,9 +44,13 @@ export default function MapPage() {
   const [selectedPriority, setSelectedPriority] = useState<Priority | "">("");
   const [selectedSource, setSelectedSource] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [mapType, setMapType] = useState<'roadmap' | 'satellite' | 'hybrid'>('hybrid');
+  // Map type is locked to Hybrid — satellite imagery + label overlay is the
+  // only mode that makes sense for circle prospecting. The toggle was UI clutter.
+  const [mapType] = useState<'roadmap' | 'satellite' | 'hybrid'>('hybrid');
   const [listingFilters, setListingFilters] = useState<Set<string>>(new Set());
-  const [showZoning, setShowZoning] = useState(false);
+  // Zoning overlay is wired but not surfaced — the toggle didn't pull its
+  // weight visually. Code stays for when we revive it with a better design.
+  const [showZoning] = useState(false);
   const [view3D, setView3D] = useState(false);
   const has3DSupport = !!process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID;
   const [show3DCoach, setShow3DCoach] = useState(false);
@@ -80,7 +84,9 @@ export default function MapPage() {
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [pinnedRef, setPinnedRef] = useState<Lead | null>(null);
   const [expandedLead, setExpandedLead] = useState<Lead | null>(null);
-  const [pinMode, setPinMode] = useState<PinMode>('dots');
+  // Pin style is dots until we ship per-status pin styling. The Pin Style
+  // toggle row was UI clutter that almost nobody used.
+  const [pinMode] = useState<PinMode>('dots');
   const [prospectList, setProspectList] = useState<{ address: string; lat: number; lng: number; city: string | null; state: string | null; zip: string | null }[]>([]);
   const [showProspectPanel, setShowProspectPanel] = useState(false);
   const [prospectMode, setProspectMode] = useState(false);
@@ -424,6 +430,7 @@ export default function MapPage() {
   }, [leads, activeTab, search, selectedTags, selectedCity, selectedPriority, selectedSource, listingFilters]);
 
   const [mobileControlsOpen, setMobileControlsOpen] = useState(false);
+  const [desktopSearchOpen, setDesktopSearchOpen] = useState(false);
 
   return (
     <div className="relative h-[calc(100vh-3.5rem)] md:h-[calc(100vh-5rem)] w-full">
@@ -440,55 +447,50 @@ export default function MapPage() {
         <>
           {/* ── DESKTOP TOOLBAR ── */}
           <div className="absolute top-4 left-4 right-4 z-10 hidden md:flex items-center gap-2">
-            {/* Search — same hybrid (your leads first, then Google) as the dashboard */}
-            <div className="flex-1 max-w-sm">
-              <ProspectSearch
-                compact
-                placeholder="Search your leads or any address..."
-                onSelect={(payload) => {
-                  setMapCenter({ lat: payload.lat, lng: payload.lng });
-                  setHasUserPanned(true);
-                  // Smooth fly-in to the picked address.
-                  dispatchFlight({
-                    center: { lat: payload.lat, lng: payload.lng },
-                    zoom: 19,
-                    duration: 900,
-                    easing: 'easeInOutCubic',
-                  });
-                  if (payload.leadId && user) {
-                    supabase
-                      .from('leads')
-                      .select('*')
-                      .eq('id', payload.leadId)
-                      .eq('user_id', user.id)
-                      .single()
-                      .then(({ data }) => { if (data) setPinnedRef(data as Lead); });
-                  }
-                }}
-              />
-            </div>
+            {/* Search — collapsed to an icon by default; expands on click. */}
+            {desktopSearchOpen ? (
+              <div className="w-[24rem]">
+                <ProspectSearch
+                  compact
+                  placeholder="Search your leads or any address..."
+                  onSelect={(payload) => {
+                    setMapCenter({ lat: payload.lat, lng: payload.lng });
+                    setHasUserPanned(true);
+                    dispatchFlight({
+                      center: { lat: payload.lat, lng: payload.lng },
+                      zoom: 19,
+                      duration: 900,
+                      easing: 'easeInOutCubic',
+                    });
+                    if (payload.leadId && user) {
+                      supabase
+                        .from('leads')
+                        .select('*')
+                        .eq('id', payload.leadId)
+                        .eq('user_id', user.id)
+                        .single()
+                        .then(({ data }) => { if (data) setPinnedRef(data as Lead); });
+                    }
+                    setDesktopSearchOpen(false);
+                  }}
+                />
+              </div>
+            ) : (
+              <button
+                onClick={() => setDesktopSearchOpen(true)}
+                title="Search address or lead"
+                className="w-10 h-10 flex items-center justify-center rounded-xl bg-surface text-on-surface-variant shadow-lg hover:text-primary transition-all"
+              >
+                <MaterialIcon icon="search" className="text-[20px]" />
+              </button>
+            )}
 
-            {/* Map type toggle */}
-            <div className="flex gap-0.5 bg-surface p-1 rounded-xl shadow-lg">
-              {(["roadmap", "satellite", "hybrid"] as const).map((type) => (
-                <button
-                  key={type}
-                  onClick={() => setMapType(type)}
-                  className={`px-3 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all ${
-                    mapType === type
-                      ? "bg-primary text-white"
-                      : "text-on-surface-variant hover:text-white"
-                  }`}
-                >
-                  {type === "roadmap" ? "Map" : type === "satellite" ? "Sat" : "Hybrid"}
-                </button>
-              ))}
-            </div>
+            <span className="flex-1" />
 
-            {/* Listing filter — multi-select toggles */}
+            {/* Listing filter — multi-select toggles. Prospect dot now matches the actual indigo prospect pin. */}
             <div className="flex gap-0.5 bg-surface p-1 rounded-xl shadow-lg">
               {[
-                { key: 'prospects', label: 'Prospects', dot: 'bg-orange-400' },
+                { key: 'prospects', label: 'Prospects', dot: 'bg-indigo-500' },
                 { key: 'Active', label: 'Active', dot: 'bg-green-500' },
                 { key: 'Sold', label: 'Sold', dot: 'bg-yellow-400' },
                 { key: 'Pending', label: 'Pending', dot: 'bg-purple-500' },
@@ -506,30 +508,6 @@ export default function MapPage() {
                 >
                   <span className={`w-1.5 h-1.5 rounded-full ${listingFilters.size === 0 || listingFilters.has(f.key) ? f.dot : 'bg-on-surface-variant/20'}`} />
                   {f.label}
-                </button>
-              ))}
-            </div>
-
-            {/* Pins View Mode */}
-            <div className="flex items-center gap-0.5 bg-surface p-1 rounded-xl shadow-lg">
-              <span className="text-[9px] font-bold text-on-surface-variant uppercase tracking-wider px-2">Pins</span>
-              {([
-                { mode: 'dots' as PinMode, icon: 'fiber_manual_record', label: 'Dots' },
-                { mode: 'labels' as PinMode, icon: 'sell', label: 'Labels' },
-                { mode: 'detail' as PinMode, icon: 'view_agenda', label: 'Cards' },
-              ]).map(({ mode, icon, label }) => (
-                <button
-                  key={mode}
-                  onClick={() => setPinMode(mode)}
-                  title={label}
-                  className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1 ${
-                    pinMode === mode
-                      ? 'bg-primary text-white'
-                      : 'text-on-surface-variant hover:text-primary'
-                  }`}
-                >
-                  <MaterialIcon icon={icon} className="text-[14px]" />
-                  {label}
                 </button>
               ))}
             </div>
@@ -554,20 +532,31 @@ export default function MapPage() {
               <MaterialIcon icon="ads_click" className="text-[20px]" />
             </button>
 
-            {/* Zoning Overlay */}
+            {/* 3D toggle. Entering: Tilt3DController animates tilt to 67°.
+                Exiting: dispatch a single flight that resets tilt to 0,
+                heading to north, and zoom to 17 (street names visible)
+                in one smooth motion — much nicer than the previous behavior
+                of just snapping tilt to 0 with whatever rotation was left. */}
             <button
-              onClick={() => setShowZoning(z => !z)}
-              title={showZoning ? 'Hide zoning overlay' : 'Show zoning overlay'}
-              className={`w-10 h-10 flex items-center justify-center rounded-xl shadow-lg transition-all ${
-                showZoning ? 'bg-emerald-500 text-white' : 'bg-surface text-on-surface-variant hover:text-emerald-400'
-              }`}
-            >
-              <MaterialIcon icon="layers" className="text-[20px]" />
-            </button>
-
-            {/* 3D Photorealistic Tiles */}
-            <button
-              onClick={() => has3DSupport ? setView3D(v => !v) : alert('3D requires NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID with Photorealistic 3D Tiles enabled in Google Cloud Console.')}
+              onClick={() => {
+                if (!has3DSupport) {
+                  alert('3D requires NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID with Photorealistic 3D Tiles enabled in Google Cloud Console.');
+                  return;
+                }
+                if (view3D) {
+                  // Exiting — fly back to a clean overhead view
+                  setView3D(false);
+                  dispatchFlight({
+                    tilt: 0,
+                    heading: 0,
+                    zoom: 17,
+                    duration: 700,
+                    easing: 'easeInOutCubic',
+                  });
+                } else {
+                  setView3D(true);
+                }
+              }}
               title={has3DSupport ? (view3D ? 'Exit 3D' : 'View in 3D') : '3D not configured — set NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID'}
               className={`relative w-10 h-10 flex items-center justify-center rounded-xl shadow-lg transition-all ${
                 view3D ? 'bg-violet-500 text-white' : 'bg-surface text-on-surface-variant hover:text-violet-400'
@@ -579,18 +568,6 @@ export default function MapPage() {
               )}
             </button>
 
-            {/* Filters */}
-            <button
-              onClick={() => setFiltersOpen((o) => !o)}
-              title="Filters"
-              className={`w-10 h-10 flex items-center justify-center rounded-xl shadow-lg transition-all ${
-                filtersOpen || hasActiveFilters
-                  ? "bg-primary text-white"
-                  : "bg-surface text-on-surface-variant hover:text-primary"
-              }`}
-            >
-              <MaterialIcon icon="tune" className="text-[20px]" />
-            </button>
           </div>
 
           {/* ── MOBILE TOOLBAR ── */}
@@ -647,24 +624,13 @@ export default function MapPage() {
           {/* ── MOBILE CONTROLS SHEET ── */}
           {mobileControlsOpen && (
             <div className="absolute top-16 left-2 right-2 z-10 bg-surface rounded-2xl p-4 shadow-2xl border border-card-border space-y-4 md:hidden">
-              {/* Map type */}
-              <div>
-                <p className="text-[9px] font-bold text-on-surface-variant uppercase tracking-wider mb-2">Map Type</p>
-                <div className="flex gap-1">
-                  {(["roadmap", "satellite", "hybrid"] as const).map((type) => (
-                    <button key={type} onClick={() => setMapType(type)}
-                      className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${mapType === type ? 'bg-primary text-white' : 'bg-surface-container-high text-on-surface-variant'}`}>
-                      {type === "roadmap" ? "Map" : type === "satellite" ? "Sat" : "Hybrid"}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              {/* Listing filter — multi-select toggles */}
+              {/* Listing filter — only control that earns its place on mobile.
+                  Prospect dot is indigo to match the actual pin color. */}
               <div>
                 <p className="text-[9px] font-bold text-on-surface-variant uppercase tracking-wider mb-2">Show</p>
                 <div className="flex flex-wrap gap-1">
                   {[
-                    { key: 'prospects', label: 'Prospects', dot: 'bg-orange-400' },
+                    { key: 'prospects', label: 'Prospects', dot: 'bg-indigo-500' },
                     { key: 'Active', label: 'Active', dot: 'bg-green-500' },
                     { key: 'Sold', label: 'Sold', dot: 'bg-yellow-400' },
                     { key: 'Pending', label: 'Pending', dot: 'bg-purple-500' },
@@ -676,35 +642,6 @@ export default function MapPage() {
                     </button>
                   ))}
                 </div>
-              </div>
-              {/* Pin mode */}
-              <div>
-                <p className="text-[9px] font-bold text-on-surface-variant uppercase tracking-wider mb-2">Pin Style</p>
-                <div className="flex gap-1">
-                  {([
-                    { mode: 'dots' as PinMode, label: 'Dots' },
-                    { mode: 'labels' as PinMode, label: 'Labels' },
-                    { mode: 'detail' as PinMode, label: 'Cards' },
-                  ]).map(({ mode, label }) => (
-                    <button key={mode} onClick={() => setPinMode(mode)}
-                      className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${pinMode === mode ? 'bg-primary text-white' : 'bg-surface-container-high text-on-surface-variant'}`}>
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              {/* Zoning overlay toggle (mobile entry; 3D is auto-on so no button needed) */}
-              <div>
-                <p className="text-[9px] font-bold text-on-surface-variant uppercase tracking-wider mb-2">Layers</p>
-                <button
-                  onClick={() => setShowZoning(z => !z)}
-                  className={`w-full flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition-all ${
-                    showZoning ? 'bg-emerald-500 text-white' : 'bg-surface-container-high text-on-surface-variant'
-                  }`}
-                >
-                  <MaterialIcon icon="layers" className="text-[14px]" />
-                  Zoning
-                </button>
               </div>
               <button onClick={() => setMobileControlsOpen(false)} className="w-full py-2 text-xs font-bold text-primary">Done</button>
             </div>

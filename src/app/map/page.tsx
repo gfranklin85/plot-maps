@@ -84,9 +84,7 @@ export default function MapPage() {
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [pinnedRef, setPinnedRef] = useState<Lead | null>(null);
   const [expandedLead, setExpandedLead] = useState<Lead | null>(null);
-  // Pin style is dots until we ship per-status pin styling. The Pin Style
-  // toggle row was UI clutter that almost nobody used.
-  const [pinMode] = useState<PinMode>('dots');
+  const [pinMode, setPinMode] = useState<PinMode>('dots');
   const [prospectList, setProspectList] = useState<{ address: string; lat: number; lng: number; city: string | null; state: string | null; zip: string | null }[]>([]);
   const [showProspectPanel, setShowProspectPanel] = useState(false);
   const [prospectMode, setProspectMode] = useState(false);
@@ -512,6 +510,30 @@ export default function MapPage() {
               ))}
             </div>
 
+            {/* Pin Style */}
+            <div className="flex items-center gap-0.5 bg-surface p-1 rounded-xl shadow-lg">
+              <span className="text-[9px] font-bold text-on-surface-variant uppercase tracking-wider px-2">Pins</span>
+              {([
+                { mode: 'dots' as PinMode, icon: 'fiber_manual_record', label: 'Dots' },
+                { mode: 'labels' as PinMode, icon: 'sell', label: 'Labels' },
+                { mode: 'detail' as PinMode, icon: 'view_agenda', label: 'Cards' },
+              ]).map(({ mode, icon, label }) => (
+                <button
+                  key={mode}
+                  onClick={() => setPinMode(mode)}
+                  title={label}
+                  className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1 ${
+                    pinMode === mode
+                      ? 'bg-primary text-white'
+                      : 'text-on-surface-variant hover:text-primary'
+                  }`}
+                >
+                  <MaterialIcon icon={icon} className="text-[14px]" />
+                  {label}
+                </button>
+              ))}
+            </div>
+
             {/* Walk Mode */}
             <button
               onClick={() => isSubscribed ? setWalkMode(true) : setShowGate(true)}
@@ -639,6 +661,22 @@ export default function MapPage() {
                       className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-all ${listingFilters.has(f.key) ? 'bg-surface-container text-white' : 'text-on-surface-variant/50'}`}>
                       <span className={`w-2 h-2 rounded-full ${listingFilters.size === 0 || listingFilters.has(f.key) ? f.dot : 'bg-on-surface-variant/20'}`} />
                       {f.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {/* Pin Style */}
+              <div>
+                <p className="text-[9px] font-bold text-on-surface-variant uppercase tracking-wider mb-2">Pin Style</p>
+                <div className="flex gap-1">
+                  {([
+                    { mode: 'dots' as PinMode, label: 'Dots' },
+                    { mode: 'labels' as PinMode, label: 'Labels' },
+                    { mode: 'detail' as PinMode, label: 'Cards' },
+                  ]).map(({ mode, label }) => (
+                    <button key={mode} onClick={() => setPinMode(mode)}
+                      className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${pinMode === mode ? 'bg-primary text-white' : 'bg-surface-container-high text-on-surface-variant'}`}>
+                      {label}
                     </button>
                   ))}
                 </div>

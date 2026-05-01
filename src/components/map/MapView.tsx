@@ -12,6 +12,7 @@ import { MAP_CENTER, MAP_ZOOM } from "@/lib/constants";
 import { useTheme } from "next-themes";
 import ZoningOverlay from "./ZoningOverlay";
 import AdvancedLeadMarkers from "./AdvancedLeadMarkers";
+import { useCameraChoreographer, type FlyToOptions } from "@/lib/useCameraChoreographer";
 
 // Theme-aware pin colors
 const PIN_THEME = {
@@ -38,6 +39,10 @@ interface Props {
   onProspectPinClick?: (address: string) => void;
   showZoningOverlay?: boolean;
   view3D?: boolean;
+  // Choreographed camera move. Pass a new object to trigger a flight;
+  // the choreographer animates from the current camera state to the
+  // target. null = no flight queued.
+  flight?: (FlyToOptions & { _id?: number }) | null;
 }
 
 const API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
@@ -379,16 +384,35 @@ function ProspectPins({ pins, onPinClick }: { pins: { lat: number; lng: number; 
 
 // Imperatively set tilt when 3D mode toggles on/off. Photorealistic
 // 3D Tiles only render when the map has a Map ID configured + tilt > 0.
+// Animates the tilt change via the camera choreographer for a smooth
+// transition instead of a hard snap.
 function Tilt3DController({ enabled }: { enabled: boolean }) {
-  const map = useMap();
+  const { flyTo } = useCameraChoreographer();
   useEffect(() => {
-    if (!map) return;
-    if (enabled) {
-      map.setTilt(67);
-    } else {
-      map.setTilt(0);
-    }
-  }, [map, enabled]);
+    flyTo({
+      tilt: enabled ? 67 : 0,
+      duration: 500,
+      easing: 'easeInOutCubic',
+    });
+  }, [enabled, flyTo]);
+  return null;
+}
+
+// Watches a `flight` prop. When the prop reference changes (parent
+// dispatched a new flight), animate the camera to its target.
+function FlightController({ flight }: { flight: (FlyToOptions & { _id?: number }) | null }) {
+  const { flyTo } = useCameraChoreographer();
+  const lastIdRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!flight) return;
+    // Track by _id (or object identity fallback) so identical-shape
+    // flights don't get skipped.
+    const id = flight._id ?? -1;
+    if (id === lastIdRef.current) return;
+    lastIdRef.current = id;
+    flyTo(flight);
+  }, [flight, flyTo]);
   return null;
 }
 
@@ -477,7 +501,7 @@ function PendingSkiptracePins({ pins }: { pins: { id: string; lat: number; lng: 
   return null;
 }
 
-export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClick, center, navigateTo, zoom, mapType = "roadmap", pinMode = "dots", prospectMode = false, prospectPins = [], onProspectPinClick, showZoningOverlay = false, view3D = false }: Props) {
+export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClick, center, navigateTo, zoom, mapType = "roadmap", pinMode = "dots", prospectMode = false, prospectPins = [], onProspectPinClick, showZoningOverlay = false, view3D = false, flight = null }: Props) {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme !== 'light';
   const isSatellite = mapType === "satellite" || mapType === "hybrid";
@@ -520,6 +544,7 @@ export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClic
         <CenterController center={navigateTo} />
         <CenterTracker onCenterChanged={onCenterChanged} />
         <Tilt3DController enabled={view3D} />
+        <FlightController flight={flight} />
         <PoiClickCatcher prospectMode={prospectMode} onMapClick={onMapClick} />
         <ZoningOverlay visible={showZoningOverlay} />
         {/* AdvancedMarkerElement requires a Map ID. With one configured we

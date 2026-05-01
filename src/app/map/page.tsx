@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo, useRef } from "react";
+import { useCallback, useEffect, useState, useMemo, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { Lead, LeadStatus, Priority } from "@/types";
@@ -86,8 +86,22 @@ export default function MapPage() {
   const [prospectMode, setProspectMode] = useState(false);
   const [prospectToast, setProspectToast] = useState<string | null>(null);
   const [mapZoom, setMapZoom] = useState<number | null>(null);
-  const [navigateTarget, setNavigateTarget] = useState<{ lat: number; lng: number } | null>(null);
+  // navigateTarget kept for compat with MapView's CenterController prop;
+  // every flow now uses the camera choreographer's dispatchFlight() instead,
+  // so this stays null in practice.
+  const [navigateTarget] = useState<{ lat: number; lng: number } | null>(null);
+  const [flight, setFlight] = useState<(import('@/lib/useCameraChoreographer').FlyToOptions & { _id?: number }) | null>(null);
+  const flightCounterRef = useRef(0);
+
+  // Dispatch a choreographed camera flight. Each call gets a unique _id so
+  // the controller treats it as a fresh animation even if the target shape
+  // matches the previous one.
+  const dispatchFlight = useCallback((opts: import('@/lib/useCameraChoreographer').FlyToOptions) => {
+    flightCounterRef.current += 1;
+    setFlight({ ...opts, _id: flightCounterRef.current });
+  }, []);
   const [showCoach, setShowCoach] = useState(false);
+  const firstProspectClickRef = useRef(false);
   const isSubscribed = profile.subscriptionStatus === 'active';
 
   const searchParams = useSearchParams();
@@ -112,11 +126,18 @@ export default function MapPage() {
     urlInitDone.current = true;
 
     if (hasCoords) {
-      setNavigateTarget({ lat, lng });
       setMapCenter({ lat, lng });
       setHasUserPanned(true);
       const zoom = zoomStr ? parseInt(zoomStr, 10) : 19;
-      setMapZoom(Number.isNaN(zoom) ? 19 : zoom);
+      // Smooth fly-in instead of an instant snap. Slightly slower than
+      // search picks (1100ms) since this is the user's "I just landed
+      // here from somewhere else" moment and deserves a beat of context.
+      dispatchFlight({
+        center: { lat, lng },
+        zoom: Number.isNaN(zoom) ? 19 : zoom,
+        duration: 1100,
+        easing: 'easeInOutCubic',
+      });
     }
 
     if (prospectParam === '1') {
@@ -137,10 +158,13 @@ export default function MapPage() {
           if (data) setPinnedRef(data as Lead);
         });
     }
-  }, [searchParams, user]);
+  }, [searchParams, user, dispatchFlight]);
 
   function dismissCoach() {
     setShowCoach(false);
+    // Arm a one-time zoom-nudge for the user's next prospect click — small
+    // affirmation that "yes, that one" right after they dismiss the coach.
+    firstProspectClickRef.current = true;
     if (typeof window !== 'undefined') {
       window.localStorage.setItem('plotmaps.coachDismissed.prospect', '1');
     }
@@ -150,8 +174,13 @@ export default function MapPage() {
     const entering = !prospectMode;
     setProspectMode(entering);
     if (entering && lead?.latitude && lead?.longitude) {
-      setNavigateTarget({ lat: lead.latitude, lng: lead.longitude });
-      setMapZoom(19); // zoom to house level
+      // Smooth fly to the target property (zoom to house level for prospecting)
+      dispatchFlight({
+        center: { lat: lead.latitude, lng: lead.longitude },
+        zoom: 19,
+        duration: 700,
+        easing: 'easeInOutCubic',
+      });
     } else if (!entering) {
       setMapZoom(null); // reset to user-controlled zoom
     }
@@ -172,6 +201,17 @@ export default function MapPage() {
   async function handleMapClick(latLng: { lat: number; lng: number }) {
     if (!prospectMode) return;
     if (showCoach) dismissCoach();
+    // First click after dismissing the coach gets a tiny affirming zoom nudge
+    // toward the click point. Fires once, then disarms.
+    if (firstProspectClickRef.current) {
+      firstProspectClickRef.current = false;
+      dispatchFlight({
+        center: latLng,
+        zoom: Math.min(20, (mapZoom ?? 19) + 0.5),
+        duration: 350,
+        easing: 'easeOutCubic',
+      });
+    }
     try {
       const res = await fetch('/api/geocode', {
         method: 'POST',
@@ -406,10 +446,15 @@ export default function MapPage() {
                 compact
                 placeholder="Search your leads or any address..."
                 onSelect={(payload) => {
-                  setNavigateTarget({ lat: payload.lat, lng: payload.lng });
                   setMapCenter({ lat: payload.lat, lng: payload.lng });
                   setHasUserPanned(true);
-                  setMapZoom(19);
+                  // Smooth fly-in to the picked address.
+                  dispatchFlight({
+                    center: { lat: payload.lat, lng: payload.lng },
+                    zoom: 19,
+                    duration: 900,
+                    easing: 'easeInOutCubic',
+                  });
                   if (payload.leadId && user) {
                     supabase
                       .from('leads')
@@ -555,10 +600,14 @@ export default function MapPage() {
                 compact
                 placeholder="Search leads or addresses..."
                 onSelect={(payload) => {
-                  setNavigateTarget({ lat: payload.lat, lng: payload.lng });
                   setMapCenter({ lat: payload.lat, lng: payload.lng });
                   setHasUserPanned(true);
-                  setMapZoom(19);
+                  dispatchFlight({
+                    center: { lat: payload.lat, lng: payload.lng },
+                    zoom: 19,
+                    duration: 900,
+                    easing: 'easeInOutCubic',
+                  });
                   if (payload.leadId && user) {
                     supabase
                       .from('leads')
@@ -797,6 +846,7 @@ export default function MapPage() {
             onProspectPinClick={removeFromProspectList}
             showZoningOverlay={showZoning}
             view3D={view3D}
+            flight={flight}
             navigateTo={navigateTarget}
             zoom={mapZoom}
             onLeadClick={(_id, lead) => { handleLeadClickInProspectMode(lead); }}

@@ -12,6 +12,7 @@ import { MAP_CENTER, MAP_ZOOM } from "@/lib/constants";
 import { useTheme } from "next-themes";
 import ZoningOverlay from "./ZoningOverlay";
 import AdvancedLeadMarkers from "./AdvancedLeadMarkers";
+import GamepadFlightController, { type GamepadActions } from "./GamepadFlightController";
 import { useCameraChoreographer, type FlyToOptions } from "@/lib/useCameraChoreographer";
 
 // Theme-aware pin colors
@@ -43,6 +44,13 @@ interface Props {
   // the choreographer animates from the current camera state to the
   // target. null = no flight queued.
   flight?: (FlyToOptions & { _id?: number }) | null;
+  // Xbox / generic gamepad. When `gamepadEnabled` is true and a controller
+  // is connected, sticks pilot the camera and buttons fire the supplied
+  // action callbacks. Status changes bubble up via onGamepadStatusChange so
+  // the page can render a status chip.
+  gamepadEnabled?: boolean;
+  gamepadActions?: GamepadActions;
+  onGamepadStatusChange?: (connected: boolean, label: string | null) => void;
 }
 
 const API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
@@ -501,7 +509,7 @@ function PendingSkiptracePins({ pins }: { pins: { id: string; lat: number; lng: 
   return null;
 }
 
-export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClick, center, navigateTo, zoom, mapType = "roadmap", pinMode = "dots", prospectMode = false, prospectPins = [], onProspectPinClick, showZoningOverlay = false, view3D = false, flight = null }: Props) {
+export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClick, center, navigateTo, zoom, mapType = "roadmap", pinMode = "dots", prospectMode = false, prospectPins = [], onProspectPinClick, showZoningOverlay = false, view3D = false, flight = null, gamepadEnabled = false, gamepadActions, onGamepadStatusChange }: Props) {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme !== 'light';
   const isSatellite = mapType === "satellite" || mapType === "hybrid";
@@ -545,6 +553,14 @@ export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClic
         <CenterTracker onCenterChanged={onCenterChanged} />
         <Tilt3DController enabled={view3D} />
         <FlightController flight={flight} />
+        {gamepadEnabled && (
+          <GamepadFlightController
+            enabled={gamepadEnabled}
+            view3D={view3D}
+            actions={gamepadActions || {}}
+            onStatusChange={onGamepadStatusChange}
+          />
+        )}
         <PoiClickCatcher prospectMode={prospectMode} onMapClick={onMapClick} />
         <ZoningOverlay visible={showZoningOverlay} />
         {/* AdvancedMarkerElement requires a Map ID. With one configured we

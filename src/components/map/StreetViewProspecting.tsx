@@ -5,6 +5,8 @@ import { APIProvider, useApiIsLoaded } from "@vis.gl/react-google-maps";
 import { Lead, STATUS_COLORS, LISTING_STATUS_COLORS } from "@/types";
 import { useTheme } from "next-themes";
 import PropertyPopup from "./PropertyPopup";
+import { useGamepad } from "@/lib/useGamepad";
+import { clamp } from "@/lib/gamepadActions";
 
 const SV_PIN_THEME = {
   dark: { bg: 'rgba(15,23,42,0.9)', bgStrong: 'rgba(15,23,42,0.92)', text: 'white', subText: '#94a3b8' },
@@ -19,6 +21,7 @@ interface Props {
   onDataChanged?: () => void;
   onPositionChanged?: (pos: { lat: number; lng: number }) => void;
   pinMode?: PinMode;
+  onExitWalk?: () => void;
 }
 
 const API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
@@ -205,7 +208,7 @@ function getLabel(lead: Lead): string {
   return firstName.length > 12 ? firstName.slice(0, 10) + '..' : firstName || '•';
 }
 
-function StreetViewInner({ leads, startPosition, onDataChanged, onPositionChanged }: Props) {
+function StreetViewInner({ leads, startPosition, onDataChanged, onPositionChanged, onExitWalk }: Props) {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme !== 'light';
   const apiLoaded = useApiIsLoaded();
@@ -280,6 +283,59 @@ function StreetViewInner({ leads, startPosition, onDataChanged, onPositionChange
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [leads]);
+
+  // ── Gamepad walk-mode controls ──────────────────────────────────────
+  // Right stick looks around (POV). Left stick Y walks forward/back by
+  // jumping to the closest panorama link in the current heading.
+  // Movement is throttled to 1 step every 350ms so a held stick doesn't
+  // teleport blocks at a time. B exits walk mode (matches the map mapping).
+  const lastStepRef = useRef(0);
+  useGamepad({
+    enabled: true,
+    onFrame: ({ dt, leftStick, rightStick, justPressed }) => {
+      const panorama = panoramaRef.current;
+      if (!panorama) return;
+
+      if (justPressed.has('b')) onExitWalk?.();
+
+      // Look (POV) — runs every frame for smooth heading/pitch.
+      if (rightStick.x !== 0 || rightStick.y !== 0) {
+        const pov = panorama.getPov();
+        const heading = (pov.heading + rightStick.x * 90 * dt + 360) % 360;
+        const pitch = clamp((pov.pitch ?? 0) - rightStick.y * 60 * dt, -90, 90);
+        panorama.setPov({ heading, pitch });
+      }
+
+      // Walk — throttled to one step per 350ms while stick held forward/back.
+      const forward = -leftStick.y; // up = forward
+      if (Math.abs(forward) > 0.4) {
+        const now = performance.now();
+        if (now - lastStepRef.current > 350) {
+          const links = panorama.getLinks() as google.maps.StreetViewLink[] | null;
+          if (links && links.length > 0) {
+            const heading = panorama.getPov().heading;
+            // Pick the link closest to our current heading (forward) or
+            // 180° from it (backward).
+            const targetHeading = forward > 0 ? heading : (heading + 180) % 360;
+            let best: google.maps.StreetViewLink | null = null;
+            let bestDelta = Infinity;
+            for (const link of links) {
+              if (link.heading == null || !link.pano) continue;
+              const delta = Math.abs(((link.heading - targetHeading + 540) % 360) - 180);
+              if (delta < bestDelta) {
+                bestDelta = delta;
+                best = link;
+              }
+            }
+            if (best && best.pano && bestDelta < 75) {
+              panorama.setPano(best.pano);
+              lastStepRef.current = now;
+            }
+          }
+        }
+      }
+    },
+  });
 
   // Re-render markers when walk pin mode changes
   useEffect(() => {
@@ -454,10 +510,10 @@ function StreetViewInner({ leads, startPosition, onDataChanged, onPositionChange
   );
 }
 
-export default function StreetViewProspecting({ leads, startPosition, onDataChanged, onPositionChanged }: Props) {
+export default function StreetViewProspecting({ leads, startPosition, onDataChanged, onPositionChanged, onExitWalk }: Props) {
   return (
     <APIProvider apiKey={API_KEY}>
-      <StreetViewInner leads={leads} startPosition={startPosition} onDataChanged={onDataChanged} onPositionChanged={onPositionChanged} />
+      <StreetViewInner leads={leads} startPosition={startPosition} onDataChanged={onDataChanged} onPositionChanged={onPositionChanged} onExitWalk={onExitWalk} />
     </APIProvider>
   );
 }

@@ -18,6 +18,9 @@ import ProspectListPanel from "@/components/map/ProspectListPanel";
 import OnboardingTooltips from "@/components/ui/OnboardingTooltips";
 import ProspectCoachOverlay from "@/components/map/ProspectCoachOverlay";
 import Mobile3DCoachOverlay from "@/components/map/Mobile3DCoachOverlay";
+import GamepadStatusChip from "@/components/map/GamepadStatusChip";
+import type { GamepadActions } from "@/components/map/GamepadFlightController";
+import { usePhone } from "@/lib/phone-context";
 
 const FILTER_TABS: { label: string; key: string; statuses: LeadStatus[] }[] = [
   { label: "All", key: "all", statuses: [] },
@@ -107,6 +110,16 @@ export default function MapPage() {
   const [showCoach, setShowCoach] = useState(false);
   const firstProspectClickRef = useRef(false);
   const isSubscribed = profile.subscriptionStatus === 'active';
+
+  // Gamepad — auto-detected. Status drives the bottom-right chip; the map's
+  // GamepadFlightController owns the input loop and reports up via
+  // onGamepadStatusChange. Once a controller has ever connected this session,
+  // we keep the chip mounted so disconnect events can announce themselves.
+  const { makeCall } = usePhone();
+  const [gamepad, setGamepad] = useState<{ connected: boolean; everConnected: boolean }>({ connected: false, everConnected: false });
+  const handleGamepadStatus = useCallback((connected: boolean) => {
+    setGamepad(prev => ({ connected, everConnected: prev.everConnected || connected }));
+  }, []);
 
   const searchParams = useSearchParams();
   const urlInitDone = useRef(false);
@@ -429,6 +442,111 @@ export default function MapPage() {
 
   const [mobileControlsOpen, setMobileControlsOpen] = useState(false);
   const [desktopSearchOpen, setDesktopSearchOpen] = useState(false);
+
+  // ── Gamepad actions ─────────────────────────────────────────────────
+  // Each action calls existing handlers — the controller is just a new
+  // input device, not a new code path. Cycling logic sorts visible leads
+  // by Haversine distance from the current map center so D-pad always
+  // moves to the next-closest pin in the current view.
+  const gamepadActions = useMemo<GamepadActions>(() => {
+    function cycleLead(dir: 1 | -1) {
+      if (!mapCenter || filteredLeads.length === 0) return;
+      const leadsWithCoords = filteredLeads.filter(l => l.latitude != null && l.longitude != null);
+      if (leadsWithCoords.length === 0) return;
+      const dist = (l: Lead) => {
+        const dLat = (l.latitude as number) - mapCenter.lat;
+        const dLng = (l.longitude as number) - mapCenter.lng;
+        return dLat * dLat + dLng * dLng; // squared distance is fine for ordering
+      };
+      const sorted = [...leadsWithCoords].sort((a, b) => dist(a) - dist(b));
+      const currentIdx = selectedLead ? sorted.findIndex(l => l.id === selectedLead.id) : -1;
+      const nextIdx = currentIdx === -1
+        ? 0
+        : (currentIdx + dir + sorted.length) % sorted.length;
+      const next = sorted[nextIdx];
+      setSelectedLead(next);
+      if (next.latitude != null && next.longitude != null) {
+        dispatchFlight({
+          center: { lat: next.latitude, lng: next.longitude },
+          duration: 350,
+          easing: 'easeOutCubic',
+        });
+      }
+    }
+
+    return {
+      onPrimary: () => {
+        // A — open popup. If no selection yet, pick nearest visible lead.
+        if (selectedLead) return; // popup already shows when selectedLead is set
+        if (!mapCenter) return;
+        const withCoords = filteredLeads.filter(l => l.latitude != null && l.longitude != null);
+        if (withCoords.length === 0) return;
+        let nearest = withCoords[0];
+        let nearestD = Infinity;
+        for (const l of withCoords) {
+          const dLat = (l.latitude as number) - mapCenter.lat;
+          const dLng = (l.longitude as number) - mapCenter.lng;
+          const d = dLat * dLat + dLng * dLng;
+          if (d < nearestD) { nearestD = d; nearest = l; }
+        }
+        setSelectedLead(nearest);
+      },
+      onCancel: () => {
+        if (walkMode) { setWalkMode(false); return; }
+        if (selectedLead) setSelectedLead(null);
+      },
+      onSkiptrace: () => {
+        // PropertyPopup owns the skiptrace UI; ensure the popup is open
+        // first (the user can then press X again or click the button).
+        // For now, surface the selection so the lines-of-light animation
+        // is visible to the user. A future refactor can fire the lookup
+        // directly via a ref into PropertyPopup.
+        if (!selectedLead) return;
+        // No-op for now — PropertyPopup auto-shows the trigger button
+        // when the lead has no owner data. The user presses A first to
+        // open the popup, then X is reserved for the skiptrace trigger.
+        // We document this in the chip help so users know.
+      },
+      onDial: () => {
+        if (!selectedLead) return;
+        const phone = selectedLead.phone || selectedLead.phone_2 || selectedLead.phone_3;
+        if (!phone) return;
+        const isDesktop = typeof window !== 'undefined' && window.matchMedia('(min-width: 768px)').matches;
+        if (isDesktop) {
+          makeCall(phone, selectedLead.owner_name || selectedLead.name || 'Unknown', selectedLead.id);
+        } else {
+          window.location.href = `tel:${phone}`;
+        }
+      },
+      onCyclePrev: () => cycleLead(-1),
+      onCycleNext: () => cycleLead(1),
+      onDropProspect: () => {
+        if (!mapCenter) return;
+        // Reuse the bare-ground click path so the orange pin behaves
+        // identically to a mouse-click drop. handleMapClick already
+        // gates on prospectMode, so RB is a no-op outside it.
+        if (!prospectMode) return;
+        handleMapClick(mapCenter);
+      },
+      onRecenter: () => {
+        if (!profile.defaultMapCenter) return;
+        dispatchFlight({
+          center: profile.defaultMapCenter,
+          zoom: 14,
+          duration: 1100,
+          easing: 'easeInOutCubic',
+        });
+      },
+      onToggleWalk: () => {
+        if (!isSubscribed) return;
+        setWalkMode(prev => !prev);
+      },
+    };
+    // handleMapClick is stable enough; including all deps would re-create
+    // the actions every render. The ones that matter for behavior change
+    // (selectedLead, walkMode, prospectMode, etc.) are listed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedLead, mapCenter, filteredLeads, walkMode, prospectMode, isSubscribed, makeCall, dispatchFlight, profile.defaultMapCenter]);
 
   return (
     <div className="relative h-[calc(100vh-3.5rem)] md:h-[calc(100vh-5rem)] w-full">
@@ -810,6 +928,7 @@ export default function MapPage() {
             startPosition={mapCenter || undefined}
             onPositionChanged={setMapCenter}
             pinMode={pinMode}
+            onExitWalk={() => setWalkMode(false)}
           />
         ) : (
           <MapDynamic
@@ -835,6 +954,9 @@ export default function MapPage() {
                 setWalkMode(true);
               }
             }}
+            gamepadEnabled
+            gamepadActions={gamepadActions}
+            onGamepadStatusChange={handleGamepadStatus}
           />
         )}
 
@@ -1032,6 +1154,7 @@ export default function MapPage() {
       )}
 
       <OnboardingTooltips />
+      {gamepad.everConnected && <GamepadStatusChip connected={gamepad.connected} />}
     </div>
   );
 }

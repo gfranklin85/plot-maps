@@ -115,6 +115,11 @@ const COCKPIT_THROTTLE_MAX = 360;        // px/s
 const COCKPIT_YAW_ACCEL = 90;            // deg/s²
 const COCKPIT_YAW_DRAG = 0.93;
 const COCKPIT_YAW_MAX = 35;              // deg/s
+// Strafe — sideways pan when right stick is idle. Same velocity scale
+// as throttle so strafe + throttle compose into a comfortable diagonal.
+const COCKPIT_STRAFE_ACCEL = 600;        // px/s²
+const COCKPIT_STRAFE_DRAG = 0.93;
+const COCKPIT_STRAFE_MAX = 280;          // px/s
 // Bank (right stick X) — applies a *secondary* heading drift like a wide
 // banking turn. Even slower than yaw so it feels like a different control.
 const COCKPIT_BANK_ACCEL = 50;
@@ -139,7 +144,7 @@ export default function GamepadFlightController({ enabled, view3D, actions, mode
   // Overhead model uses panX/panY/heading/tilt/zoom velocities. Cockpit
   // model uses throttle (forward speed in screen px/s), yaw, bank, pitch.
   const velRef = useRef({ panX: 0, panY: 0, heading: 0, tilt: 0, zoom: 0 });
-  const cockpitRef = useRef({ throttle: 0, yaw: 0, bank: 0, pitch: 0 });
+  const cockpitRef = useRef({ throttle: 0, strafe: 0, yaw: 0, bank: 0, pitch: 0 });
   // Camera state we own (so we don't read back rounded values from Google
   // every frame, which causes drift). We seed from the map on first frame.
   const camRef = useRef<{ lat: number; lng: number; heading: number; tilt: number; zoom: number } | null>(null);
@@ -158,14 +163,14 @@ export default function GamepadFlightController({ enabled, view3D, actions, mode
   useEffect(() => {
     camRef.current = null;
     velRef.current = { panX: 0, panY: 0, heading: 0, tilt: 0, zoom: 0 };
-    cockpitRef.current = { throttle: 0, yaw: 0, bank: 0, pitch: 0 };
+    cockpitRef.current = { throttle: 0, strafe: 0, yaw: 0, bank: 0, pitch: 0 };
   }, [map]);
 
   // When the user toggles flight mode, zero out velocities so we don't carry
   // momentum from a different model into the new one.
   useEffect(() => {
     velRef.current = { panX: 0, panY: 0, heading: 0, tilt: 0, zoom: 0 };
-    cockpitRef.current = { throttle: 0, yaw: 0, bank: 0, pitch: 0 };
+    cockpitRef.current = { throttle: 0, strafe: 0, yaw: 0, bank: 0, pitch: 0 };
   }, [mode]);
 
   const status = useGamepad({
@@ -265,19 +270,16 @@ export default function GamepadFlightController({ enabled, view3D, actions, mode
         //
         // Inputs (cockpit semantics):
         //   Left stick Y   → throttle (forward/back along heading)
-        //   Left stick X   → yaw (turn the nose)
+        //   Left stick X   → MODAL: strafe sideways alone, OR yaw in place
+        //                    if the right stick is also active (any axis).
+        //                    The modifier means "I'm using both hands; I
+        //                    want to rotate, not slide."
         //   Right stick Y  → ascend/descend (pure vertical, zoom-only)
         //   Right stick X  → bank (slow secondary heading drift)
         //
         // Combined-stick gestures override defaults:
         //   Left up + Right down  → ASCEND (negative pitch)
         //   Left down + Right up  → DIVE   (positive pitch + nose-dip nudge)
-        //
-        // Ascend/descend is applied as zoom-only (lat/lng frozen during the
-        // gesture), so the user's eye reads it as pure vertical movement.
-        // Yaw is paired with a small forward-pan compensation that keeps
-        // the visual focal point roughly fixed — fakes "pivot around a
-        // point behind my head" given Maps has no such native mode.
         const ck = cockpitRef.current;
 
         // Detect combined-stick gestures (use raw stick magnitudes, not
@@ -290,65 +292,75 @@ export default function GamepadFlightController({ enabled, view3D, actions, mode
         const ascendGesture = leftUp && rightDown;     // climb hard
         const diveGesture = leftDown && rightUp;       // dive hard
 
+        // "Right stick active" → any movement on either right axis past a
+        // small threshold. This is the modifier that flips left X from
+        // strafe → yaw in place.
+        const rightStickActive = rightStick.magnitude > 0.12;
+
         // Throttle accumulates from left stick Y, but combined gestures
         // suppress it — when ascending/diving you don't want forward drift.
         if (!ascendGesture && !diveGesture) {
           ck.throttle += -ly * COCKPIT_THROTTLE_ACCEL * boost * dt;
         } else {
-          // Bleed throttle aggressively during vertical gestures so the
-          // craft visibly stops drifting as it lifts/dives.
           ck.throttle *= Math.pow(0.85, dragExp);
         }
 
-        // Yaw — left stick X always.
-        ck.yaw += lx * COCKPIT_YAW_ACCEL * boost * dt;
+        // Left X — modal. Strafe sideways when the right stick is idle;
+        // yaw in place when the right stick is active. Each branch bleeds
+        // the other so a quick mode swap doesn't carry stale velocity.
+        if (rightStickActive) {
+          ck.yaw += lx * COCKPIT_YAW_ACCEL * boost * dt;
+          ck.strafe *= Math.pow(0.82, dragExp);
+        } else {
+          ck.strafe += lx * COCKPIT_STRAFE_ACCEL * boost * dt;
+          ck.yaw *= Math.pow(0.82, dragExp);
+        }
 
-        // Bank — right stick X. Doesn't run when a combined-vertical
-        // gesture is active (the right stick is committed to ascend/dive).
+        // Bank — right stick X. Suspended during combined-vertical gestures.
         if (!ascendGesture && !diveGesture) {
           ck.bank += rx * COCKPIT_BANK_ACCEL * boost * dt;
         } else {
           ck.bank *= Math.pow(0.85, dragExp);
         }
 
-        // Pitch — only ascend/descend. Right stick Y by itself is pure
-        // vertical; combined gestures multiply for stronger climb/dive.
+        // Pitch — ascend/descend.
         if (ascendGesture) {
-          // Pitch positive = climb. Combined gesture goes nearly to max.
           ck.pitch += COCKPIT_PITCH_ACCEL * 1.4 * boost * dt;
         } else if (diveGesture) {
           ck.pitch -= COCKPIT_PITCH_ACCEL * 1.4 * boost * dt;
         } else {
-          // Right stick alone — gentle ascend/descend.
           ck.pitch += -ry * COCKPIT_PITCH_ACCEL * boost * dt;
         }
 
-        // Drag — throttle drag is conditional (handled above when gestures
-        // active). Yaw, bank, pitch always drag normally.
+        // Drag — applied each frame to all five state vectors.
         ck.throttle *= Math.pow(COCKPIT_THROTTLE_DRAG, dragExp);
+        ck.strafe *= Math.pow(COCKPIT_STRAFE_DRAG, dragExp);
         ck.yaw *= Math.pow(COCKPIT_YAW_DRAG, dragExp);
         ck.bank *= Math.pow(COCKPIT_BANK_DRAG, dragExp);
         ck.pitch *= Math.pow(COCKPIT_PITCH_DRAG, dragExp);
 
         ck.throttle = clamp(ck.throttle, -COCKPIT_THROTTLE_MAX * 0.4, COCKPIT_THROTTLE_MAX);
+        ck.strafe = clamp(ck.strafe, -COCKPIT_STRAFE_MAX, COCKPIT_STRAFE_MAX);
         ck.yaw = clamp(ck.yaw, -COCKPIT_YAW_MAX, COCKPIT_YAW_MAX);
         ck.bank = clamp(ck.bank, -COCKPIT_BANK_MAX, COCKPIT_BANK_MAX);
         ck.pitch = clamp(ck.pitch, -COCKPIT_PITCH_MAX, COCKPIT_PITCH_MAX);
 
         if (Math.abs(ck.throttle) < 0.5) ck.throttle = 0;
+        if (Math.abs(ck.strafe) < 0.5) ck.strafe = 0;
         if (Math.abs(ck.yaw) < 0.05) ck.yaw = 0;
         if (Math.abs(ck.bank) < 0.05) ck.bank = 0;
         if (Math.abs(ck.pitch) < 0.005) ck.pitch = 0;
 
         // Translate cockpit state → application-phase vel struct.
-        // - Forward motion: throttle drives panY only (no strafe). When
-        //   pitch is non-zero (ascending/descending), suppress forward
+        // - panX: strafe (sideways)
+        // - panY: throttle (forward/back along heading)
+        //   When pitch is non-zero (ascending/descending), suppress all
         //   pan so the gesture reads as pure vertical.
         // - Heading: yaw + bank.
         // - Tilt: target-driven later (not velocity-driven).
         // - Zoom: pitch * negative (climb = zoom out, dive = zoom in).
         const verticalActive = Math.abs(ck.pitch) > 0.02;
-        vel.panX = 0;
+        vel.panX = verticalActive ? 0 : ck.strafe;
         vel.panY = verticalActive ? 0 : -ck.throttle;
         vel.heading = ck.yaw + ck.bank;
         vel.tilt = 0;

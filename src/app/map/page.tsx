@@ -57,13 +57,6 @@ export default function MapPage() {
   const [view3D, setView3D] = useState(false);
   const has3DSupport = !!process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID;
   const [show3DCoach, setShow3DCoach] = useState(false);
-  // Two flight models for the gamepad. 'overhead' = heavy helicopter
-  // (free pan/heading/tilt/zoom). 'cockpit' = sit-in-the-craft view —
-  // throttle + yaw on left stick, climb/dive + bank on right stick, no
-  // discrete zoom (altitude controls it). Mode is independent of view3D
-  // because some users may want a flat overhead with cockpit input feel.
-  const [flightMode, setFlightMode] = useState<'overhead' | 'cockpit'>('overhead');
-
   // On mobile, default to tilted 3D view — that's where the magic is and
   // touch users can rotate freely to flatten it. Coach overlay teaches the
   // gestures on first visit. Desktop keeps view3D=false; cursor users
@@ -480,6 +473,48 @@ export default function MapPage() {
       }
     }
 
+    // Three altitude presets for the trigger-tap cinematic descent / climb.
+    // RT tap = descend one band, LT tap = ascend one band. Holds keep
+    // the original continuous-zoom behavior. After a hold finishes the
+    // user is flying free; the next tap snaps back to the nearest band
+    // in the requested direction. Tilt is left where it was during a
+    // hold-induced free-fly so we don't yank the camera unexpectedly;
+    // tap-snap explicitly sets tilt to the band's preset.
+    const ALTITUDE_BANDS: { zoom: number; tilt: number; label: string }[] = [
+      { zoom: 16, tilt: 30, label: 'survey' },
+      { zoom: 18, tilt: 50, label: 'approach' },
+      { zoom: 20, tilt: 67, label: 'eye-level' },
+    ];
+
+    function flyToBand(idx: number) {
+      const band = ALTITUDE_BANDS[idx];
+      if (!band) return;
+      dispatchFlight({
+        zoom: band.zoom,
+        tilt: band.tilt,
+        duration: 700,
+        easing: 'easeInOutCubic',
+      });
+    }
+
+    function pickNextBand(currentZoom: number, dir: 'up' | 'down'): number {
+      // 'down' = descend = increase zoom (numerically higher = closer).
+      // 'up'   = ascend  = decrease zoom.
+      // Find the next band strictly past the current zoom in the
+      // requested direction; if none, return the boundary band.
+      if (dir === 'down') {
+        for (let i = 0; i < ALTITUDE_BANDS.length; i++) {
+          if (ALTITUDE_BANDS[i].zoom > currentZoom + 0.05) return i;
+        }
+        return ALTITUDE_BANDS.length - 1;
+      } else {
+        for (let i = ALTITUDE_BANDS.length - 1; i >= 0; i--) {
+          if (ALTITUDE_BANDS[i].zoom < currentZoom - 0.05) return i;
+        }
+        return 0;
+      }
+    }
+
     return {
       onPrimary: () => {
         // A — open popup. If no selection yet, pick nearest visible lead.
@@ -547,12 +582,23 @@ export default function MapPage() {
         if (!isSubscribed) return;
         setWalkMode(prev => !prev);
       },
+      onAltitudeUp: () => {
+        // LT tap — ascend one band. Read current zoom from state if we
+        // have it, otherwise let dispatchFlight read from the map.
+        const currentZoom = mapZoom ?? 18;
+        flyToBand(pickNextBand(currentZoom, 'up'));
+      },
+      onAltitudeDown: () => {
+        // RT tap — descend one band.
+        const currentZoom = mapZoom ?? 18;
+        flyToBand(pickNextBand(currentZoom, 'down'));
+      },
     };
     // handleMapClick is stable enough; including all deps would re-create
     // the actions every render. The ones that matter for behavior change
     // (selectedLead, walkMode, prospectMode, etc.) are listed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedLead, mapCenter, filteredLeads, walkMode, prospectMode, isSubscribed, makeCall, dispatchFlight, profile.defaultMapCenter]);
+  }, [selectedLead, mapCenter, filteredLeads, walkMode, prospectMode, isSubscribed, makeCall, dispatchFlight, profile.defaultMapCenter, mapZoom]);
 
   return (
     <div className="relative h-[calc(100vh-3.5rem)] md:h-[calc(100vh-5rem)] w-full">
@@ -709,35 +755,6 @@ export default function MapPage() {
               } ${!has3DSupport ? 'opacity-60' : ''}`}
             >
               <span className="text-[12px] font-black tracking-tighter">3D</span>
-              {!has3DSupport && (
-                <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-amber-400" />
-              )}
-            </button>
-
-            {/* Flight model toggle. Overhead = heavy-helicopter (free axes,
-                triggers zoom). Cockpit = sit-in-the-craft (left throttle,
-                right pitch/bank, no discrete zoom). Only meaningful with a
-                controller plugged in; the chip mentions which mode is active.
-                Cockpit auto-enables 3D since steep tilt is the whole point. */}
-            <button
-              onClick={() => {
-                if (flightMode === 'overhead') {
-                  if (!has3DSupport) {
-                    alert('Cockpit view requires NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID with Photorealistic 3D Tiles enabled.');
-                    return;
-                  }
-                  setFlightMode('cockpit');
-                  if (!view3D) setView3D(true);
-                } else {
-                  setFlightMode('overhead');
-                }
-              }}
-              title={flightMode === 'cockpit' ? 'Exit cockpit view' : 'Cockpit view (gamepad flight model)'}
-              className={`relative w-10 h-10 flex items-center justify-center rounded-xl shadow-lg transition-all ${
-                flightMode === 'cockpit' ? 'bg-emerald-500 text-white' : 'bg-surface text-on-surface-variant hover:text-emerald-400'
-              } ${!has3DSupport ? 'opacity-60' : ''}`}
-            >
-              <MaterialIcon icon="flight" className="text-[20px]" />
               {!has3DSupport && (
                 <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-amber-400" />
               )}
@@ -991,7 +1008,6 @@ export default function MapPage() {
             }}
             gamepadEnabled
             gamepadActions={gamepadActions}
-            gamepadMode={flightMode}
             onGamepadStatusChange={handleGamepadStatus}
           />
         )}

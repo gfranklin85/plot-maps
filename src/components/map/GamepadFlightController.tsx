@@ -130,7 +130,6 @@ const COCKPIT_TILT_TARGET_LEVEL = 67;    // tilt when neutral (looking forward+d
 const COCKPIT_TILT_TARGET_CLIMB = 50;    // tilt when climbing (more forward)
 const COCKPIT_TILT_TARGET_DIVE = 75;     // tilt when diving (more down)
 const COCKPIT_TILT_FOLLOW_RATE = 1.4;    // how fast tilt eases toward target
-const COCKPIT_CLIMB_THROTTLE_BLEED = 0.4; // climbing reduces throttle accel
 
 export default function GamepadFlightController({ enabled, view3D, actions, mode = 'overhead', onStatusChange }: Props) {
   const map = useMap();
@@ -262,51 +261,98 @@ export default function GamepadFlightController({ enabled, view3D, actions, mode
         if (Math.abs(vel.tilt) < 0.05) vel.tilt = 0;
         if (Math.abs(vel.zoom) < 0.001) vel.zoom = 0;
       } else {
-        // ── Cockpit model — sit-in-the-craft, throttle + yaw + pitch ──
+        // ── Cockpit model — sit-in-the-craft ──────────────────────────
+        //
+        // Inputs (cockpit semantics):
+        //   Left stick Y   → throttle (forward/back along heading)
+        //   Left stick X   → yaw (turn the nose)
+        //   Right stick Y  → ascend/descend (pure vertical, zoom-only)
+        //   Right stick X  → bank (slow secondary heading drift)
+        //
+        // Combined-stick gestures override defaults:
+        //   Left up + Right down  → ASCEND (negative pitch)
+        //   Left down + Right up  → DIVE   (positive pitch + nose-dip nudge)
+        //
+        // Ascend/descend is applied as zoom-only (lat/lng frozen during the
+        // gesture), so the user's eye reads it as pure vertical movement.
+        // Yaw is paired with a small forward-pan compensation that keeps
+        // the visual focal point roughly fixed — fakes "pivot around a
+        // point behind my head" given Maps has no such native mode.
         const ck = cockpitRef.current;
 
-        // Left stick Y → throttle (forward speed). Stick "up" (negative Y)
-        // accelerates forward. Climbing bleeds throttle.
-        const climbing = ry < -0.1;
-        const throttleBleed = climbing ? COCKPIT_CLIMB_THROTTLE_BLEED : 1;
-        ck.throttle += -ly * COCKPIT_THROTTLE_ACCEL * boost * throttleBleed * dt;
+        // Detect combined-stick gestures (use raw stick magnitudes, not
+        // shaped, so the threshold is predictable).
+        const leftUp = leftStick.y < -0.5;
+        const leftDown = leftStick.y > 0.5;
+        const rightUp = rightStick.y < -0.5;
+        const rightDown = rightStick.y > 0.5;
 
-        // Left stick X → yaw rate.
+        const ascendGesture = leftUp && rightDown;     // climb hard
+        const diveGesture = leftDown && rightUp;       // dive hard
+
+        // Throttle accumulates from left stick Y, but combined gestures
+        // suppress it — when ascending/diving you don't want forward drift.
+        if (!ascendGesture && !diveGesture) {
+          ck.throttle += -ly * COCKPIT_THROTTLE_ACCEL * boost * dt;
+        } else {
+          // Bleed throttle aggressively during vertical gestures so the
+          // craft visibly stops drifting as it lifts/dives.
+          ck.throttle *= Math.pow(0.85, dragExp);
+        }
+
+        // Yaw — left stick X always.
         ck.yaw += lx * COCKPIT_YAW_ACCEL * boost * dt;
 
-        // Right stick X → bank (slow secondary heading drift).
-        ck.bank += rx * COCKPIT_BANK_ACCEL * boost * dt;
+        // Bank — right stick X. Doesn't run when a combined-vertical
+        // gesture is active (the right stick is committed to ascend/dive).
+        if (!ascendGesture && !diveGesture) {
+          ck.bank += rx * COCKPIT_BANK_ACCEL * boost * dt;
+        } else {
+          ck.bank *= Math.pow(0.85, dragExp);
+        }
 
-        // Right stick Y → pitch (climb when up = negative Y, dive when down).
-        ck.pitch += -ry * COCKPIT_PITCH_ACCEL * boost * dt;
+        // Pitch — only ascend/descend. Right stick Y by itself is pure
+        // vertical; combined gestures multiply for stronger climb/dive.
+        if (ascendGesture) {
+          // Pitch positive = climb. Combined gesture goes nearly to max.
+          ck.pitch += COCKPIT_PITCH_ACCEL * 1.4 * boost * dt;
+        } else if (diveGesture) {
+          ck.pitch -= COCKPIT_PITCH_ACCEL * 1.4 * boost * dt;
+        } else {
+          // Right stick alone — gentle ascend/descend.
+          ck.pitch += -ry * COCKPIT_PITCH_ACCEL * boost * dt;
+        }
 
-        // Drag.
+        // Drag — throttle drag is conditional (handled above when gestures
+        // active). Yaw, bank, pitch always drag normally.
         ck.throttle *= Math.pow(COCKPIT_THROTTLE_DRAG, dragExp);
         ck.yaw *= Math.pow(COCKPIT_YAW_DRAG, dragExp);
         ck.bank *= Math.pow(COCKPIT_BANK_DRAG, dragExp);
         ck.pitch *= Math.pow(COCKPIT_PITCH_DRAG, dragExp);
 
-        // Clamp.
         ck.throttle = clamp(ck.throttle, -COCKPIT_THROTTLE_MAX * 0.4, COCKPIT_THROTTLE_MAX);
         ck.yaw = clamp(ck.yaw, -COCKPIT_YAW_MAX, COCKPIT_YAW_MAX);
         ck.bank = clamp(ck.bank, -COCKPIT_BANK_MAX, COCKPIT_BANK_MAX);
         ck.pitch = clamp(ck.pitch, -COCKPIT_PITCH_MAX, COCKPIT_PITCH_MAX);
 
-        // Numerical zero.
         if (Math.abs(ck.throttle) < 0.5) ck.throttle = 0;
         if (Math.abs(ck.yaw) < 0.05) ck.yaw = 0;
         if (Math.abs(ck.bank) < 0.05) ck.bank = 0;
         if (Math.abs(ck.pitch) < 0.005) ck.pitch = 0;
 
-        // Translate cockpit velocities into the shared overhead vel struct
-        // for the application phase below. Cockpit forward velocity =
-        // panY = -throttle (negative panY moves the screen up = camera
-        // moves forward). Yaw + bank both contribute to heading.
-        vel.panX = 0; // strafe doesn't exist in cockpit model
-        vel.panY = -ck.throttle;
+        // Translate cockpit state → application-phase vel struct.
+        // - Forward motion: throttle drives panY only (no strafe). When
+        //   pitch is non-zero (ascending/descending), suppress forward
+        //   pan so the gesture reads as pure vertical.
+        // - Heading: yaw + bank.
+        // - Tilt: target-driven later (not velocity-driven).
+        // - Zoom: pitch * negative (climb = zoom out, dive = zoom in).
+        const verticalActive = Math.abs(ck.pitch) > 0.02;
+        vel.panX = 0;
+        vel.panY = verticalActive ? 0 : -ck.throttle;
         vel.heading = ck.yaw + ck.bank;
-        vel.tilt = 0;       // tilt is target-driven, not velocity-driven, in cockpit mode
-        vel.zoom = -ck.pitch; // pitch up (positive) climbs = zoom out (negative zoom delta)
+        vel.tilt = 0;
+        vel.zoom = -ck.pitch;
       }
 
       // ── Apply velocity → camera state ───────────────────────────────
@@ -342,7 +388,46 @@ export default function GamepadFlightController({ enabled, view3D, actions, mode
       }
       cam.lat += panLat;
       cam.lng += panLng;
-      cam.heading = (cam.heading + vel.heading * dt + 360) % 360;
+      const headingDeltaThisFrame = vel.heading * dt;
+      cam.heading = (cam.heading + headingDeltaThisFrame + 360) % 360;
+
+      // ── Yaw "pivot behind head" fake (cockpit only) ─────────────────
+      // Maps' camera always pivots around lat/lng. When you yaw, the
+      // visual focal point in front of you sweeps sideways — reads as
+      // "world swings around me" instead of "I rotate in place."
+      // To fake the rotational center being behind the user's head, we
+      // pan forward by a small amount calibrated to the heading delta.
+      // The magnitude is tuned by feel: too much and yawing feels like
+      // boost-cruising; too little and the swing is still obvious.
+      if (modeRef.current === 'cockpit' && projection && Math.abs(headingDeltaThisFrame) > 0.001) {
+        const scale = Math.pow(2, cam.zoom);
+        // Pivot offset: how far behind the screen we pretend the rotation
+        // axis sits, in world pixels. Larger = more "fixed focal point"
+        // illusion but also more forward translation per degree of yaw.
+        const PIVOT_OFFSET_PX = 280;
+        // arc length ≈ radius * angle (rad). Sign: positive heading
+        // (yaw right) should drift forward to compensate.
+        const compPx = PIVOT_OFFSET_PX * (headingDeltaThisFrame * Math.PI / 180);
+        const radH = (cam.heading * Math.PI) / 180;
+        const cosH = Math.cos(radH), sinH = Math.sin(radH);
+        const w = projection.fromLatLngToPoint(new google.maps.LatLng(cam.lat, cam.lng));
+        if (w) {
+          // Forward direction in world coords (heading-aligned).
+          // Stick "up" / forward = negative panY in our screen frame.
+          const dxScreen = 0;
+          const dyScreen = -Math.abs(compPx);
+          // Inverse-rotate to world.
+          const dxW = (dxScreen * cosH - dyScreen * sinH) / scale;
+          const dyW = (dxScreen * sinH + dyScreen * cosH) / scale;
+          w.x += dxW;
+          w.y += dyW;
+          const out = projection.fromPointToLatLng(w);
+          if (out) {
+            cam.lat = out.lat();
+            cam.lng = out.lng();
+          }
+        }
+      }
 
       const tiltMax = view3DRef.current ? TILT_MAX_3D : 0;
 

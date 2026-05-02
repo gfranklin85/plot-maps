@@ -57,6 +57,12 @@ export default function MapPage() {
   const [view3D, setView3D] = useState(false);
   const has3DSupport = !!process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID;
   const [show3DCoach, setShow3DCoach] = useState(false);
+  // Two flight models for the gamepad. 'overhead' = heavy helicopter
+  // (free pan/heading/tilt/zoom). 'cockpit' = sit-in-the-craft view —
+  // throttle + yaw on left stick, climb/dive + bank on right stick, no
+  // discrete zoom (altitude controls it). Mode is independent of view3D
+  // because some users may want a flat overhead with cockpit input feel.
+  const [flightMode, setFlightMode] = useState<'overhead' | 'cockpit'>('overhead');
 
   // On mobile, default to tilted 3D view — that's where the magic is and
   // touch users can rotate freely to flatten it. Coach overlay teaches the
@@ -708,6 +714,35 @@ export default function MapPage() {
               )}
             </button>
 
+            {/* Flight model toggle. Overhead = heavy-helicopter (free axes,
+                triggers zoom). Cockpit = sit-in-the-craft (left throttle,
+                right pitch/bank, no discrete zoom). Only meaningful with a
+                controller plugged in; the chip mentions which mode is active.
+                Cockpit auto-enables 3D since steep tilt is the whole point. */}
+            <button
+              onClick={() => {
+                if (flightMode === 'overhead') {
+                  if (!has3DSupport) {
+                    alert('Cockpit view requires NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID with Photorealistic 3D Tiles enabled.');
+                    return;
+                  }
+                  setFlightMode('cockpit');
+                  if (!view3D) setView3D(true);
+                } else {
+                  setFlightMode('overhead');
+                }
+              }}
+              title={flightMode === 'cockpit' ? 'Exit cockpit view' : 'Cockpit view (gamepad flight model)'}
+              className={`relative w-10 h-10 flex items-center justify-center rounded-xl shadow-lg transition-all ${
+                flightMode === 'cockpit' ? 'bg-emerald-500 text-white' : 'bg-surface text-on-surface-variant hover:text-emerald-400'
+              } ${!has3DSupport ? 'opacity-60' : ''}`}
+            >
+              <MaterialIcon icon="flight" className="text-[20px]" />
+              {!has3DSupport && (
+                <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-amber-400" />
+              )}
+            </button>
+
           </div>
 
           {/* ── MOBILE TOOLBAR ── */}
@@ -956,6 +991,7 @@ export default function MapPage() {
             }}
             gamepadEnabled
             gamepadActions={gamepadActions}
+            gamepadMode={flightMode}
             onGamepadStatusChange={handleGamepadStatus}
           />
         )}

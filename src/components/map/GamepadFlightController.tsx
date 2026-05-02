@@ -17,10 +17,19 @@ export interface GamepadActions {
   onToggleWalk?: () => void;       // Back
 }
 
+export type FlightMode = 'overhead' | 'cockpit';
+
 interface Props {
   enabled: boolean;
   view3D: boolean;
   actions: GamepadActions;
+  /**
+   * Which flight model to use. 'overhead' is the heavy-helicopter free-axis
+   * model (free pan/heading/tilt/zoom). 'cockpit' is sit-in-the-craft —
+   * left stick = throttle + yaw, right stick = climb/dive + bank, zoom is
+   * altitude-derived only.
+   */
+  mode?: FlightMode;
   /** Reports controller status up to the page so it can render a toast. */
   onStatusChange?: (connected: boolean, label: string | null) => void;
 }
@@ -86,12 +95,52 @@ function shapeStick(v: number): number {
   return Math.sign(v) * Math.pow(Math.abs(v), 1.6);
 }
 
-export default function GamepadFlightController({ enabled, view3D, actions, onStatusChange }: Props) {
+// ── Cockpit flight model ──────────────────────────────────────────────
+//
+// Sit-in-the-craft perspective. Left stick is throttle + yaw; right stick
+// is climb/dive + bank. There is no discrete zoom — altitude (zoom)
+// changes only via climb/dive. Tilt stays steep so you're looking forward
+// out the window, not down on a webpage.
+//
+// Tuned for "slow + cinematic" — at full throttle you cross a typical
+// neighborhood (~500m at zoom 18) in ~12-15 seconds. Cessna feel.
+
+// Throttle accelerates forward velocity (in screen pixels/sec along the
+// current heading). Lower than overhead pan accel so it doesn't feel
+// like a sports car.
+const COCKPIT_THROTTLE_ACCEL = 700;     // px/s²
+const COCKPIT_THROTTLE_DRAG = 0.965;     // very slow decay — cruise-y
+const COCKPIT_THROTTLE_MAX = 360;        // px/s
+// Yaw — slow continuous turn rate. Heavy aircraft, not a fighter jet.
+const COCKPIT_YAW_ACCEL = 90;            // deg/s²
+const COCKPIT_YAW_DRAG = 0.93;
+const COCKPIT_YAW_MAX = 35;              // deg/s
+// Bank (right stick X) — applies a *secondary* heading drift like a wide
+// banking turn. Even slower than yaw so it feels like a different control.
+const COCKPIT_BANK_ACCEL = 50;
+const COCKPIT_BANK_DRAG = 0.95;
+const COCKPIT_BANK_MAX = 18;
+// Climb/dive — alters altitude (zoom) and tilt simultaneously. Climbing
+// flattens the camera (look more forward, less down); diving steepens it.
+// Climbing also bleeds throttle — lifting up costs energy.
+const COCKPIT_PITCH_ACCEL = 4;           // zoom units/s²
+const COCKPIT_PITCH_DRAG = 0.92;
+const COCKPIT_PITCH_MAX = 0.7;           // zoom units/s
+const COCKPIT_TILT_TARGET_LEVEL = 67;    // tilt when neutral (looking forward+down)
+const COCKPIT_TILT_TARGET_CLIMB = 50;    // tilt when climbing (more forward)
+const COCKPIT_TILT_TARGET_DIVE = 75;     // tilt when diving (more down)
+const COCKPIT_TILT_FOLLOW_RATE = 1.4;    // how fast tilt eases toward target
+const COCKPIT_CLIMB_THROTTLE_BLEED = 0.4; // climbing reduces throttle accel
+
+export default function GamepadFlightController({ enabled, view3D, actions, mode = 'overhead', onStatusChange }: Props) {
   const map = useMap();
 
   // Persistent physics state. None of this lives in React state — the input
   // loop owns it and we only call into Google Maps once per frame.
+  // Overhead model uses panX/panY/heading/tilt/zoom velocities. Cockpit
+  // model uses throttle (forward speed in screen px/s), yaw, bank, pitch.
   const velRef = useRef({ panX: 0, panY: 0, heading: 0, tilt: 0, zoom: 0 });
+  const cockpitRef = useRef({ throttle: 0, yaw: 0, bank: 0, pitch: 0 });
   // Camera state we own (so we don't read back rounded values from Google
   // every frame, which causes drift). We seed from the map on first frame.
   const camRef = useRef<{ lat: number; lng: number; heading: number; tilt: number; zoom: number } | null>(null);
@@ -102,13 +151,23 @@ export default function GamepadFlightController({ enabled, view3D, actions, onSt
   actionsRef.current = actions;
   const view3DRef = useRef(view3D);
   view3DRef.current = view3D;
+  const modeRef = useRef<FlightMode>(mode);
+  modeRef.current = mode;
 
   // Reset our owned camera state whenever the map instance changes (e.g.
   // walk mode toggle). Otherwise we carry stale center/heading from before.
   useEffect(() => {
     camRef.current = null;
     velRef.current = { panX: 0, panY: 0, heading: 0, tilt: 0, zoom: 0 };
+    cockpitRef.current = { throttle: 0, yaw: 0, bank: 0, pitch: 0 };
   }, [map]);
+
+  // When the user toggles flight mode, zero out velocities so we don't carry
+  // momentum from a different model into the new one.
+  useEffect(() => {
+    velRef.current = { panX: 0, panY: 0, heading: 0, tilt: 0, zoom: 0 };
+    cockpitRef.current = { throttle: 0, yaw: 0, bank: 0, pitch: 0 };
+  }, [mode]);
 
   const status = useGamepad({
     enabled: enabled && !!map,
@@ -169,42 +228,86 @@ export default function GamepadFlightController({ enabled, view3D, actions, onSt
       // ── Physics integration ─────────────────────────────────────────
       const boost = pressed.has('lb') ? PAN_BOOST_MULT : 1;
       const vel = velRef.current;
+      const dragExp = 60 * dt;
 
-      // Apply stick → acceleration → velocity. Stick directions:
-      // positive X = right, positive Y = down (standard Gamepad).
       const lx = shapeStick(leftStick.x);
       const ly = shapeStick(leftStick.y);
       const rx = shapeStick(rightStick.x);
       const ry = shapeStick(rightStick.y);
 
-      vel.panX += lx * PAN_ACCEL_PX_S2 * boost * dt;
-      vel.panY += ly * PAN_ACCEL_PX_S2 * boost * dt;
-      vel.heading += rx * HEAD_ACCEL_DEG_S2 * boost * dt;
-      vel.tilt -= ry * TILT_ACCEL_DEG_S2 * boost * dt; // up = look up
-      vel.zoom += (triggers.right - triggers.left) * ZOOM_ACCEL_S2 * boost * dt;
+      if (modeRef.current === 'overhead') {
+        // ── Overhead model — heavy helicopter, free axes ──────────────
+        // Stick directions: positive X = right, positive Y = down.
+        vel.panX += lx * PAN_ACCEL_PX_S2 * boost * dt;
+        vel.panY += ly * PAN_ACCEL_PX_S2 * boost * dt;
+        vel.heading += rx * HEAD_ACCEL_DEG_S2 * boost * dt;
+        vel.tilt -= ry * TILT_ACCEL_DEG_S2 * boost * dt; // up = look up
+        vel.zoom += (triggers.right - triggers.left) * ZOOM_ACCEL_S2 * boost * dt;
 
-      // Drag — apply each frame, framerate-independent. The base constants
-      // are the per-frame coefficient at 60fps, so we exponent by (60*dt).
-      const dragExp = 60 * dt;
-      vel.panX *= Math.pow(PAN_DRAG, dragExp);
-      vel.panY *= Math.pow(PAN_DRAG, dragExp);
-      vel.heading *= Math.pow(HEAD_DRAG, dragExp);
-      vel.tilt *= Math.pow(TILT_DRAG, dragExp);
-      vel.zoom *= Math.pow(ZOOM_DRAG, dragExp);
+        vel.panX *= Math.pow(PAN_DRAG, dragExp);
+        vel.panY *= Math.pow(PAN_DRAG, dragExp);
+        vel.heading *= Math.pow(HEAD_DRAG, dragExp);
+        vel.tilt *= Math.pow(TILT_DRAG, dragExp);
+        vel.zoom *= Math.pow(ZOOM_DRAG, dragExp);
 
-      // Clamp velocities so the stick can't accumulate to runaway speed.
-      vel.panX = clamp(vel.panX, -PAN_MAX_PX_S, PAN_MAX_PX_S);
-      vel.panY = clamp(vel.panY, -PAN_MAX_PX_S, PAN_MAX_PX_S);
-      vel.heading = clamp(vel.heading, -HEAD_MAX_DEG_S, HEAD_MAX_DEG_S);
-      vel.tilt = clamp(vel.tilt, -TILT_MAX_DEG_S, TILT_MAX_DEG_S);
-      vel.zoom = clamp(vel.zoom, -ZOOM_MAX_S, ZOOM_MAX_S);
+        vel.panX = clamp(vel.panX, -PAN_MAX_PX_S, PAN_MAX_PX_S);
+        vel.panY = clamp(vel.panY, -PAN_MAX_PX_S, PAN_MAX_PX_S);
+        vel.heading = clamp(vel.heading, -HEAD_MAX_DEG_S, HEAD_MAX_DEG_S);
+        vel.tilt = clamp(vel.tilt, -TILT_MAX_DEG_S, TILT_MAX_DEG_S);
+        vel.zoom = clamp(vel.zoom, -ZOOM_MAX_S, ZOOM_MAX_S);
 
-      // Numerical zero — avoid sub-pixel drift forever.
-      if (Math.abs(vel.panX) < 0.5) vel.panX = 0;
-      if (Math.abs(vel.panY) < 0.5) vel.panY = 0;
-      if (Math.abs(vel.heading) < 0.05) vel.heading = 0;
-      if (Math.abs(vel.tilt) < 0.05) vel.tilt = 0;
-      if (Math.abs(vel.zoom) < 0.001) vel.zoom = 0;
+        if (Math.abs(vel.panX) < 0.5) vel.panX = 0;
+        if (Math.abs(vel.panY) < 0.5) vel.panY = 0;
+        if (Math.abs(vel.heading) < 0.05) vel.heading = 0;
+        if (Math.abs(vel.tilt) < 0.05) vel.tilt = 0;
+        if (Math.abs(vel.zoom) < 0.001) vel.zoom = 0;
+      } else {
+        // ── Cockpit model — sit-in-the-craft, throttle + yaw + pitch ──
+        const ck = cockpitRef.current;
+
+        // Left stick Y → throttle (forward speed). Stick "up" (negative Y)
+        // accelerates forward. Climbing bleeds throttle.
+        const climbing = ry < -0.1;
+        const throttleBleed = climbing ? COCKPIT_CLIMB_THROTTLE_BLEED : 1;
+        ck.throttle += -ly * COCKPIT_THROTTLE_ACCEL * boost * throttleBleed * dt;
+
+        // Left stick X → yaw rate.
+        ck.yaw += lx * COCKPIT_YAW_ACCEL * boost * dt;
+
+        // Right stick X → bank (slow secondary heading drift).
+        ck.bank += rx * COCKPIT_BANK_ACCEL * boost * dt;
+
+        // Right stick Y → pitch (climb when up = negative Y, dive when down).
+        ck.pitch += -ry * COCKPIT_PITCH_ACCEL * boost * dt;
+
+        // Drag.
+        ck.throttle *= Math.pow(COCKPIT_THROTTLE_DRAG, dragExp);
+        ck.yaw *= Math.pow(COCKPIT_YAW_DRAG, dragExp);
+        ck.bank *= Math.pow(COCKPIT_BANK_DRAG, dragExp);
+        ck.pitch *= Math.pow(COCKPIT_PITCH_DRAG, dragExp);
+
+        // Clamp.
+        ck.throttle = clamp(ck.throttle, -COCKPIT_THROTTLE_MAX * 0.4, COCKPIT_THROTTLE_MAX);
+        ck.yaw = clamp(ck.yaw, -COCKPIT_YAW_MAX, COCKPIT_YAW_MAX);
+        ck.bank = clamp(ck.bank, -COCKPIT_BANK_MAX, COCKPIT_BANK_MAX);
+        ck.pitch = clamp(ck.pitch, -COCKPIT_PITCH_MAX, COCKPIT_PITCH_MAX);
+
+        // Numerical zero.
+        if (Math.abs(ck.throttle) < 0.5) ck.throttle = 0;
+        if (Math.abs(ck.yaw) < 0.05) ck.yaw = 0;
+        if (Math.abs(ck.bank) < 0.05) ck.bank = 0;
+        if (Math.abs(ck.pitch) < 0.005) ck.pitch = 0;
+
+        // Translate cockpit velocities into the shared overhead vel struct
+        // for the application phase below. Cockpit forward velocity =
+        // panY = -throttle (negative panY moves the screen up = camera
+        // moves forward). Yaw + bank both contribute to heading.
+        vel.panX = 0; // strafe doesn't exist in cockpit model
+        vel.panY = -ck.throttle;
+        vel.heading = ck.yaw + ck.bank;
+        vel.tilt = 0;       // tilt is target-driven, not velocity-driven, in cockpit mode
+        vel.zoom = -ck.pitch; // pitch up (positive) climbs = zoom out (negative zoom delta)
+      }
 
       // ── Apply velocity → camera state ───────────────────────────────
       // Pan: convert pixel velocity to lat/lng using the current zoom's
@@ -240,16 +343,42 @@ export default function GamepadFlightController({ enabled, view3D, actions, onSt
       cam.lat += panLat;
       cam.lng += panLng;
       cam.heading = (cam.heading + vel.heading * dt + 360) % 360;
+
       const tiltMax = view3DRef.current ? TILT_MAX_3D : 0;
-      cam.tilt = clamp(cam.tilt + vel.tilt * dt, TILT_MIN, tiltMax);
-      // Zero tilt velocity if we hit a clamp wall, otherwise the user
-      // can pre-charge a velocity that snaps free the moment they re-tilt.
-      if ((cam.tilt === TILT_MIN && vel.tilt < 0) || (cam.tilt === tiltMax && vel.tilt > 0)) {
-        vel.tilt = 0;
+
+      if (modeRef.current === 'cockpit') {
+        // Cockpit: tilt eases toward a target driven by pitch state, not
+        // by direct stick velocity. Climb → flatten (look more forward),
+        // dive → steepen (look more down), neutral → COCKPIT_TILT_TARGET_LEVEL.
+        const ck = cockpitRef.current;
+        let targetTilt = COCKPIT_TILT_TARGET_LEVEL;
+        if (ck.pitch > 0.05) {
+          // climbing — interpolate toward COCKPIT_TILT_TARGET_CLIMB
+          const t = clamp(ck.pitch / COCKPIT_PITCH_MAX, 0, 1);
+          targetTilt = COCKPIT_TILT_TARGET_LEVEL + (COCKPIT_TILT_TARGET_CLIMB - COCKPIT_TILT_TARGET_LEVEL) * t;
+        } else if (ck.pitch < -0.05) {
+          const t = clamp(-ck.pitch / COCKPIT_PITCH_MAX, 0, 1);
+          targetTilt = COCKPIT_TILT_TARGET_LEVEL + (COCKPIT_TILT_TARGET_DIVE - COCKPIT_TILT_TARGET_LEVEL) * t;
+        }
+        // Cockpit only makes sense in 3D — clamp target to the available range.
+        const cockpitTiltMax = view3DRef.current ? TILT_MAX_3D : 0;
+        targetTilt = clamp(targetTilt, TILT_MIN, cockpitTiltMax);
+        // Ease tilt toward target. Critically-damped enough that it doesn't
+        // overshoot but visible enough that you feel the nose lift/drop.
+        const tiltDelta = (targetTilt - cam.tilt) * COCKPIT_TILT_FOLLOW_RATE * dt;
+        cam.tilt = clamp(cam.tilt + tiltDelta, TILT_MIN, cockpitTiltMax);
+      } else {
+        // Overhead: tilt is direct velocity-driven.
+        cam.tilt = clamp(cam.tilt + vel.tilt * dt, TILT_MIN, tiltMax);
+        if ((cam.tilt === TILT_MIN && vel.tilt < 0) || (cam.tilt === tiltMax && vel.tilt > 0)) {
+          vel.tilt = 0;
+        }
       }
+
       cam.zoom = clamp(cam.zoom + vel.zoom * dt, ZOOM_MIN, ZOOM_MAX);
       if ((cam.zoom === ZOOM_MIN && vel.zoom < 0) || (cam.zoom === ZOOM_MAX && vel.zoom > 0)) {
         vel.zoom = 0;
+        if (modeRef.current === 'cockpit') cockpitRef.current.pitch = 0;
       }
 
       // ── Hover wave (always on, very subtle) ─────────────────────────

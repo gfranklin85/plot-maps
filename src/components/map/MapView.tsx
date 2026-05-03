@@ -12,7 +12,7 @@ import { MAP_CENTER, MAP_ZOOM } from "@/lib/constants";
 import { useTheme } from "next-themes";
 import ZoningOverlay from "./ZoningOverlay";
 import AdvancedLeadMarkers from "./AdvancedLeadMarkers";
-import GamepadFlightController, { type GamepadActions } from "./GamepadFlightController";
+import GamepadFlightController, { type GamepadActions, type FlightMode } from "./GamepadFlightController";
 import { useCameraChoreographer, type FlyToOptions } from "@/lib/useCameraChoreographer";
 
 // Theme-aware pin colors
@@ -50,6 +50,7 @@ interface Props {
   // the page can render a status chip.
   gamepadEnabled?: boolean;
   gamepadActions?: GamepadActions;
+  gamepadMode?: FlightMode;
   onGamepadStatusChange?: (connected: boolean, label: string | null) => void;
 }
 
@@ -509,7 +510,7 @@ function PendingSkiptracePins({ pins }: { pins: { id: string; lat: number; lng: 
   return null;
 }
 
-export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClick, center, navigateTo, zoom, mapType = "roadmap", pinMode = "dots", prospectMode = false, prospectPins = [], onProspectPinClick, showZoningOverlay = false, view3D = false, flight = null, gamepadEnabled = false, gamepadActions, onGamepadStatusChange }: Props) {
+export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClick, center, navigateTo, zoom, mapType = "roadmap", pinMode = "dots", prospectMode = false, prospectPins = [], onProspectPinClick, showZoningOverlay = false, view3D = false, flight = null, gamepadEnabled = false, gamepadActions, gamepadMode = 'overhead', onGamepadStatusChange }: Props) {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme !== 'light';
   const isSatellite = mapType === "satellite" || mapType === "hybrid";
@@ -557,6 +558,7 @@ export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClic
           <GamepadFlightController
             enabled={gamepadEnabled}
             view3D={view3D}
+            mode={gamepadMode}
             actions={gamepadActions || {}}
             onStatusChange={onGamepadStatusChange}
           />

@@ -57,6 +57,13 @@ export default function MapPage() {
   const [view3D, setView3D] = useState(false);
   const has3DSupport = !!process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID;
   const [show3DCoach, setShow3DCoach] = useState(false);
+  // Two flight models for the gamepad. 'overhead' = free pan + rotate
+  // (everyday work). 'airplane' = game-feel cockpit (throttle on left Y,
+  // yaw on left X, climb/dive on right Y, bank on right X). Toggle with
+  // the airplane button in the toolbar — only meaningful with a controller
+  // plugged in. Airplane mode auto-engages 3D since steep tilt is the feel.
+  const [flightMode, setFlightMode] = useState<'overhead' | 'airplane'>('overhead');
+
   // On mobile, default to tilted 3D view — that's where the magic is and
   // touch users can rotate freely to flatten it. Coach overlay teaches the
   // gestures on first visit. Desktop keeps view3D=false; cursor users
@@ -760,6 +767,34 @@ export default function MapPage() {
               )}
             </button>
 
+            {/* Airplane / cockpit flight mode. Game-feel input model:
+                left stick = throttle + yaw, right stick = climb/dive +
+                bank. Auto-engages 3D since the steep tilt is the feel.
+                Only meaningful with a controller plugged in. */}
+            <button
+              onClick={() => {
+                if (flightMode === 'overhead') {
+                  if (!has3DSupport) {
+                    alert('Airplane mode requires NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID with Photorealistic 3D Tiles enabled.');
+                    return;
+                  }
+                  setFlightMode('airplane');
+                  if (!view3D) setView3D(true);
+                } else {
+                  setFlightMode('overhead');
+                }
+              }}
+              title={flightMode === 'airplane' ? 'Exit airplane mode' : 'Airplane mode (gamepad flight feel)'}
+              className={`relative w-10 h-10 flex items-center justify-center rounded-xl shadow-lg transition-all ${
+                flightMode === 'airplane' ? 'bg-emerald-500 text-white' : 'bg-surface text-on-surface-variant hover:text-emerald-400'
+              } ${!has3DSupport ? 'opacity-60' : ''}`}
+            >
+              <MaterialIcon icon="flight" className="text-[20px]" />
+              {!has3DSupport && (
+                <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-amber-400" />
+              )}
+            </button>
+
           </div>
 
           {/* ── MOBILE TOOLBAR ── */}
@@ -1008,6 +1043,7 @@ export default function MapPage() {
             }}
             gamepadEnabled
             gamepadActions={gamepadActions}
+            gamepadMode={flightMode}
             onGamepadStatusChange={handleGamepadStatus}
           />
         )}

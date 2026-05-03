@@ -19,9 +19,13 @@ export interface GamepadActions {
   onAltitudeDown?: () => void;     // RT tapped — descend to next altitude band
 }
 
+export type FlightMode = 'overhead' | 'airplane';
+
 interface Props {
   enabled: boolean;
   view3D: boolean;
+  /** 'overhead' = free pan + rotate (everyday). 'airplane' = game-feel (throttle + yaw + climb/dive + bank). */
+  mode?: FlightMode;
   actions: GamepadActions;
   /** Reports controller status up to the page so it can render a toast. */
   onStatusChange?: (connected: boolean, label: string | null) => void;
@@ -76,13 +80,53 @@ const TRIGGER_PRESS_THRESHOLD = 0.4;
 // threshold during release.
 const TRIGGER_TAP_COOLDOWN_MS = 250;
 
+// ── Airplane-mode rates ───────────────────────────────────────────────
+//
+// Same direct-input philosophy as overhead — no velocity layer, no drag.
+// Stick deflection translates to per-frame deltas. When you let go,
+// motion stops the next frame. Maps' built-in smoothing handles any
+// micro-easing.
+//
+// Semantically airplane mode says:
+//   Left Y   → throttle (forward/back along heading, no strafe)
+//   Left X   → yaw (turn the nose, with sideways pivot fake)
+//   Right Y  → climb/dive (zoom delta, lat/lng frozen → reads as vertical)
+//   Right X  → bank (slow secondary heading drift, layered on yaw)
+//
+// Tilt does NOT change with sticks in airplane mode — it tracks a
+// target driven by climb/dive state (look forward when climbing, look
+// down when diving). That's the visual cue for vertical motion.
+
+// Throttle: forward speed at full deflection, in screen px/sec along
+// current heading. Slower than overhead pan since flight is meant to
+// feel deliberate.
+const AIR_THROTTLE_PX_PER_SEC = 380;
+
+// Yaw rate.
+const AIR_YAW_DEG_PER_SEC = 65;
+
+// Bank rate (secondary heading drift).
+const AIR_BANK_DEG_PER_SEC = 25;
+
+// Climb/dive rate at full deflection (zoom units per second). Negative
+// stick Y = climb (zoom decreases). Positive = dive.
+const AIR_PITCH_ZOOM_PER_SEC = 1.2;
+
+// Tilt targets driven by climb/dive state. Level cruise is steep so
+// you're looking forward + down (cockpit window feel). Climbing eases
+// flatter (look more forward); diving steepens (look more down).
+const AIR_TILT_LEVEL = 60;
+const AIR_TILT_CLIMB = 45;
+const AIR_TILT_DIVE = 67;
+const AIR_TILT_FOLLOW_RATE = 1.6; // fraction of remaining error eased per second
+
 interface TriggerState {
   pressing: boolean;
   pressStartMs: number;
   cooldownUntilMs: number;
 }
 
-export default function GamepadFlightController({ enabled, view3D, actions, onStatusChange }: Props) {
+export default function GamepadFlightController({ enabled, view3D, mode = 'overhead', actions, onStatusChange }: Props) {
   const map = useMap();
 
   // Latest action callbacks pinned to a ref so the input loop doesn't tear
@@ -91,6 +135,8 @@ export default function GamepadFlightController({ enabled, view3D, actions, onSt
   actionsRef.current = actions;
   const view3DRef = useRef(view3D);
   view3DRef.current = view3D;
+  const modeRef = useRef<FlightMode>(mode);
+  modeRef.current = mode;
 
   // Per-trigger press tracking so we can distinguish tap vs hold.
   const ltStateRef = useRef<TriggerState>({ pressing: false, pressStartMs: 0, cooldownUntilMs: 0 });
@@ -119,49 +165,91 @@ export default function GamepadFlightController({ enabled, view3D, actions, onSt
 
       const boost = pressed.has('lb') ? BOOST_MULT : 1;
 
-      // ── Pan (left stick) ────────────────────────────────────────────
-      // panBy moves the map by screen-pixel offsets, pre-rotated by the
-      // map's current heading. Stick X positive = pan right; stick Y
-      // positive = pan down (standard Gamepad convention; Y is inverted
-      // from world coordinates by design).
-      if (leftStick.x !== 0 || leftStick.y !== 0) {
-        const dxPx = leftStick.x * PAN_PX_PER_SEC * boost * dt;
-        const dyPx = leftStick.y * PAN_PX_PER_SEC * boost * dt;
-        (map as unknown as google.maps.Map).panBy(dxPx, dyPx);
-      }
-
-      // ── Heading (right stick X) + sideways yaw fake ─────────────────
-      // The fake: when heading rotates by Δθ, we also pan laterally by
-      // R × sin(Δθ) so the visual focal point in front of the user stays
-      // put. Lateral direction = +90° from current heading. For small
-      // Δθ this is almost linear, so we just use Δθ in radians directly.
-      if (rightStick.x !== 0) {
+      // ── Helper: apply heading delta + sideways pivot fake ───────────
+      // Compensating with a sideways pan keeps the visual focal point in
+      // front of the user fixed, so the world reads as rotating around
+      // the user's POV rather than swinging the rear end.
+      const applyHeadingDelta = (headingDelta: number) => {
+        if (Math.abs(headingDelta) < 0.001) return;
         const currentHeading = map.getHeading() ?? 0;
-        const headingDelta = rightStick.x * HEAD_DEG_PER_SEC * boost * dt;
         const newHeading = (currentHeading + headingDelta + 360) % 360;
         map.setHeading(newHeading);
+        const compPx = YAW_PIVOT_RADIUS_PX * (headingDelta * Math.PI) / 180;
+        (map as unknown as google.maps.Map).panBy(compPx, 0);
+      };
 
-        // Lateral pan compensation. headingDelta is in degrees; convert
-        // to radians for the arc-length approximation.
-        if (Math.abs(headingDelta) > 0.001) {
-          const compPx = YAW_PIVOT_RADIUS_PX * (headingDelta * Math.PI) / 180;
-          // panBy arguments are in screen-pixel coordinates of the map's
-          // current orientation, so a positive X moves the camera to the
-          // right relative to the user's view. Sign-match: rotating right
-          // (positive headingDelta) drifts laterally to the right.
-          (map as unknown as google.maps.Map).panBy(compPx, 0);
+      if (modeRef.current === 'airplane') {
+        // ── Airplane mode — game-feel cockpit ─────────────────────────
+        // Direct-input. No velocity, no drag. Sticks → per-frame deltas.
+
+        // Throttle: left Y only. Stick up (negative Y) = forward.
+        // panBy uses screen Y, so forward = negative dyPx.
+        if (leftStick.y !== 0) {
+          const dyPx = leftStick.y * AIR_THROTTLE_PX_PER_SEC * boost * dt;
+          (map as unknown as google.maps.Map).panBy(0, dyPx);
         }
-      }
 
-      // ── Tilt (right stick Y) ────────────────────────────────────────
-      // Up on the stick (negative Y) increases tilt — feels like
-      // "pulling the nose up" (looking more forward, less down). 2D
-      // mode pins tilt at 0.
-      if (rightStick.y !== 0 && view3DRef.current) {
-        const currentTilt = map.getTilt() ?? 0;
-        const tiltDelta = -rightStick.y * TILT_DEG_PER_SEC * boost * dt;
-        const newTilt = clamp(currentTilt + tiltDelta, TILT_MIN, TILT_MAX_3D);
-        map.setTilt(newTilt);
+        // Yaw: left X. With sideways pivot fake.
+        if (leftStick.x !== 0) {
+          const yawDelta = leftStick.x * AIR_YAW_DEG_PER_SEC * boost * dt;
+          applyHeadingDelta(yawDelta);
+        }
+
+        // Bank: right X. Slow secondary heading drift, layered on yaw.
+        if (rightStick.x !== 0) {
+          const bankDelta = rightStick.x * AIR_BANK_DEG_PER_SEC * boost * dt;
+          applyHeadingDelta(bankDelta);
+        }
+
+        // Climb / dive: right Y. Pure zoom delta — lat/lng frozen.
+        // Up on stick (negative Y) = climb = zoom out (zoom decreases).
+        let climbState: 0 | 1 | -1 = 0; // 0 = level, 1 = climbing, -1 = diving
+        if (rightStick.y !== 0) {
+          const zoomDelta = rightStick.y * AIR_PITCH_ZOOM_PER_SEC * boost * dt;
+          // rightStick.y > 0 = stick down = dive = zoom in (zoom increases).
+          // rightStick.y < 0 = stick up = climb = zoom out (zoom decreases).
+          const currentZoom = map.getZoom() ?? 16;
+          map.setZoom(clamp(currentZoom + zoomDelta, 3, 21));
+          climbState = rightStick.y < -0.05 ? 1 : rightStick.y > 0.05 ? -1 : 0;
+        }
+
+        // Tilt: target-driven by climb/dive state. Eases toward target
+        // each frame — never snaps, never fights stick input.
+        if (view3DRef.current) {
+          const currentTilt = map.getTilt() ?? 0;
+          const targetTilt =
+            climbState === 1 ? AIR_TILT_CLIMB :
+            climbState === -1 ? AIR_TILT_DIVE :
+            AIR_TILT_LEVEL;
+          // Exponential ease: each frame closes a fraction of the remaining gap.
+          // 1 - exp(-rate * dt) is framerate-independent.
+          const easeAmount = 1 - Math.exp(-AIR_TILT_FOLLOW_RATE * dt);
+          const newTilt = clamp(currentTilt + (targetTilt - currentTilt) * easeAmount, TILT_MIN, TILT_MAX_3D);
+          map.setTilt(newTilt);
+        }
+      } else {
+        // ── Overhead mode — free pan + rotate ─────────────────────────
+        // panBy moves the map by screen-pixel offsets, pre-rotated by
+        // the map's current heading.
+        if (leftStick.x !== 0 || leftStick.y !== 0) {
+          const dxPx = leftStick.x * PAN_PX_PER_SEC * boost * dt;
+          const dyPx = leftStick.y * PAN_PX_PER_SEC * boost * dt;
+          (map as unknown as google.maps.Map).panBy(dxPx, dyPx);
+        }
+
+        // Right X → heading + pivot fake.
+        if (rightStick.x !== 0) {
+          const headingDelta = rightStick.x * HEAD_DEG_PER_SEC * boost * dt;
+          applyHeadingDelta(headingDelta);
+        }
+
+        // Right Y → tilt (3D only).
+        if (rightStick.y !== 0 && view3DRef.current) {
+          const currentTilt = map.getTilt() ?? 0;
+          const tiltDelta = -rightStick.y * TILT_DEG_PER_SEC * boost * dt;
+          const newTilt = clamp(currentTilt + tiltDelta, TILT_MIN, TILT_MAX_3D);
+          map.setTilt(newTilt);
+        }
       }
 
       // ── Triggers — tap vs hold ──────────────────────────────────────

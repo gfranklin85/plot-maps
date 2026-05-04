@@ -123,12 +123,18 @@ function shapeStick(v: number): number {
 const AIR_THROTTLE_ACCEL = 700;     // px/s²
 const AIR_THROTTLE_DRAG = 0.965;     // very slow decay — cruise-y
 const AIR_THROTTLE_MAX = 360;        // px/s
-const AIR_YAW_ACCEL = 90;            // deg/s²
-const AIR_YAW_DRAG = 0.93;
-const AIR_YAW_MAX = 35;
-const AIR_BANK_ACCEL = 50;
-const AIR_BANK_DRAG = 0.95;
-const AIR_BANK_MAX = 18;
+// Strafe — sideways pan (left-X). Same shape as throttle so they
+// compose naturally when the user hand-compensates against right-X yaw.
+const AIR_STRAFE_ACCEL = 600;        // px/s²
+const AIR_STRAFE_DRAG = 0.96;
+const AIR_STRAFE_MAX = 320;          // px/s
+// Yaw — slow heavy rotation (right-X). Tuned at ~30°/s top speed so
+// the user can hand-compensate against it with left-X strafe. The pivot
+// fake is intentionally OFF in airplane mode (see below) — the user
+// applies their own compensation in real time.
+const AIR_YAW_ACCEL = 75;            // deg/s²
+const AIR_YAW_DRAG = 0.94;
+const AIR_YAW_MAX = 30;              // deg/s top speed
 
 // ── Trigger tap-vs-hold ───────────────────────────────────────────────
 const TRIGGER_TAP_MS = 200;
@@ -147,9 +153,9 @@ export default function GamepadFlightController({ enabled, view3D, actions, mode
   // Persistent physics state. None of this lives in React state — the input
   // loop owns it and we only call into Google Maps once per frame.
   // Overhead model uses panX/panY/heading/tilt/zoom velocities. Airplane
-  // model uses throttle (forward speed in screen px/s), yaw, bank.
+  // model uses throttle (forward speed in screen px/s), strafe, yaw.
   const velRef = useRef({ panX: 0, panY: 0, heading: 0, tilt: 0, zoom: 0 });
-  const airRef = useRef({ throttle: 0, yaw: 0, bank: 0 });
+  const airRef = useRef({ throttle: 0, strafe: 0, yaw: 0 });
   // Camera state we own (so we don't read back rounded values from Google
   // every frame, which causes drift). We seed from the map on first frame.
   const camRef = useRef<{ lat: number; lng: number; heading: number; tilt: number; zoom: number } | null>(null);
@@ -172,14 +178,14 @@ export default function GamepadFlightController({ enabled, view3D, actions, mode
   useEffect(() => {
     camRef.current = null;
     velRef.current = { panX: 0, panY: 0, heading: 0, tilt: 0, zoom: 0 };
-    airRef.current = { throttle: 0, yaw: 0, bank: 0 };
+    airRef.current = { throttle: 0, strafe: 0, yaw: 0 };
   }, [map]);
 
   // When the user toggles flight mode, zero out velocities so we don't carry
   // momentum from a different model into the new one.
   useEffect(() => {
     velRef.current = { panX: 0, panY: 0, heading: 0, tilt: 0, zoom: 0 };
-    airRef.current = { throttle: 0, yaw: 0, bank: 0 };
+    airRef.current = { throttle: 0, strafe: 0, yaw: 0 };
   }, [mode]);
 
   const status = useGamepad({
@@ -305,42 +311,42 @@ export default function GamepadFlightController({ enabled, view3D, actions, mode
         if (Math.abs(vel.tilt) < 0.05) vel.tilt = 0;
         if (Math.abs(vel.zoom) < 0.001) vel.zoom = 0;
       } else {
-        // ── Airplane model — sit-in-the-craft, throttle + yaw + bank ──
-        // Right Y drives ONLY tilt. Altitude is changed via trigger taps
-        // (altitude bands) or trigger holds (continuous zoom). Pitch
-        // state is gone in airplane mode — climb/dive doesn't exist.
+        // ── Airplane (drone-style) ────────────────────────────────────
+        //   Left X  → strafe sideways (slide, heading unchanged)
+        //   Left Y  → throttle (forward/back along heading)
+        //   Right X → yaw (turn the nose). NO pivot fake — the user
+        //             hand-compensates with left-X strafe in the
+        //             opposite direction to hold position.
+        //   Right Y → tilt only (altitude is trigger-driven).
         const air = airRef.current;
 
         air.throttle += -ly * AIR_THROTTLE_ACCEL * boost * dt;
-        air.yaw += lx * AIR_YAW_ACCEL * boost * dt;
-        air.bank += rx * AIR_BANK_ACCEL * boost * dt;
+        air.strafe += lx * AIR_STRAFE_ACCEL * boost * dt;
+        air.yaw += rx * AIR_YAW_ACCEL * boost * dt;
 
         air.throttle *= Math.pow(AIR_THROTTLE_DRAG, dragExp);
+        air.strafe *= Math.pow(AIR_STRAFE_DRAG, dragExp);
         air.yaw *= Math.pow(AIR_YAW_DRAG, dragExp);
-        air.bank *= Math.pow(AIR_BANK_DRAG, dragExp);
 
         air.throttle = clamp(air.throttle, -AIR_THROTTLE_MAX * 0.4, AIR_THROTTLE_MAX);
+        air.strafe = clamp(air.strafe, -AIR_STRAFE_MAX, AIR_STRAFE_MAX);
         air.yaw = clamp(air.yaw, -AIR_YAW_MAX, AIR_YAW_MAX);
-        air.bank = clamp(air.bank, -AIR_BANK_MAX, AIR_BANK_MAX);
 
         if (Math.abs(air.throttle) < 0.5) air.throttle = 0;
+        if (Math.abs(air.strafe) < 0.5) air.strafe = 0;
         if (Math.abs(air.yaw) < 0.05) air.yaw = 0;
-        if (Math.abs(air.bank) < 0.05) air.bank = 0;
 
-        // Tilt: direct velocity-driven, same as overhead. Use the same
-        // TILT_ACCEL/DRAG constants so tilt responsiveness is consistent.
+        // Tilt: direct velocity-driven, same as overhead.
         vel.tilt -= ry * TILT_ACCEL_DEG_S2 * boost * dt;
         vel.tilt *= Math.pow(TILT_DRAG, dragExp);
         vel.tilt = clamp(vel.tilt, -TILT_MAX_DEG_S, TILT_MAX_DEG_S);
         if (Math.abs(vel.tilt) < 0.05) vel.tilt = 0;
 
-        // Translate airplane velocities into the shared overhead vel struct
-        // for the application phase below. Forward velocity = panY =
-        // -throttle. Yaw + bank both contribute to heading. Zoom only
-        // moves on trigger hold (altitude is the trigger's job).
-        vel.panX = 0; // strafe doesn't exist in airplane model
+        // Translate airplane state into shared vel struct.
+        // panX = strafe (left-X), panY = forward (-throttle), heading = yaw.
+        vel.panX = air.strafe;
         vel.panY = -air.throttle;
-        vel.heading = air.yaw + air.bank;
+        vel.heading = air.yaw;
         vel.zoom = triggerZoomDelta * ZOOM_ACCEL_S2 * boost * dt;
       }
 
@@ -376,13 +382,13 @@ export default function GamepadFlightController({ enabled, view3D, actions, mode
       const headingDeltaThisFrame = vel.heading * dt;
       cam.heading = (cam.heading + headingDeltaThisFrame + 360) % 360;
 
-      // ── Sideways pivot fake (both modes) ────────────────────────────
+      // ── Sideways pivot fake (overhead only) ─────────────────────────
       // When heading rotates by Δθ this frame, also pan the camera laterally
-      // (perpendicular to current heading) by R × sin(Δθ). For small Δθ
-      // this is approximately R × Δθ in radians. The lateral direction is
-      // +90° from current heading; sign matches rotation direction so
-      // rotating right drifts the camera right relative to user view.
-      if (projection && Math.abs(headingDeltaThisFrame) > 0.001) {
+      // by R × sin(Δθ) so the visual focal point stays put. Skipped in
+      // airplane mode — there the user hand-compensates with left-X strafe
+      // against right-X yaw (drone-pilot style), and our compensation
+      // would fight theirs.
+      if (modeRef.current === 'overhead' && projection && Math.abs(headingDeltaThisFrame) > 0.001) {
         const compPx = YAW_PIVOT_RADIUS_PX * (headingDeltaThisFrame * Math.PI) / 180;
         const scale = Math.pow(2, cam.zoom);
         const radH = (cam.heading * Math.PI) / 180;

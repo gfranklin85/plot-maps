@@ -129,9 +129,6 @@ const AIR_YAW_MAX = 35;
 const AIR_BANK_ACCEL = 50;
 const AIR_BANK_DRAG = 0.95;
 const AIR_BANK_MAX = 18;
-const AIR_PITCH_ACCEL = 4;           // zoom units/s²
-const AIR_PITCH_DRAG = 0.92;
-const AIR_PITCH_MAX = 0.7;           // zoom units/s
 
 // ── Trigger tap-vs-hold ───────────────────────────────────────────────
 const TRIGGER_TAP_MS = 200;
@@ -150,9 +147,9 @@ export default function GamepadFlightController({ enabled, view3D, actions, mode
   // Persistent physics state. None of this lives in React state — the input
   // loop owns it and we only call into Google Maps once per frame.
   // Overhead model uses panX/panY/heading/tilt/zoom velocities. Airplane
-  // model uses throttle (forward speed in screen px/s), yaw, bank, pitch.
+  // model uses throttle (forward speed in screen px/s), yaw, bank.
   const velRef = useRef({ panX: 0, panY: 0, heading: 0, tilt: 0, zoom: 0 });
-  const airRef = useRef({ throttle: 0, yaw: 0, bank: 0, pitch: 0 });
+  const airRef = useRef({ throttle: 0, yaw: 0, bank: 0 });
   // Camera state we own (so we don't read back rounded values from Google
   // every frame, which causes drift). We seed from the map on first frame.
   const camRef = useRef<{ lat: number; lng: number; heading: number; tilt: number; zoom: number } | null>(null);
@@ -175,14 +172,14 @@ export default function GamepadFlightController({ enabled, view3D, actions, mode
   useEffect(() => {
     camRef.current = null;
     velRef.current = { panX: 0, panY: 0, heading: 0, tilt: 0, zoom: 0 };
-    airRef.current = { throttle: 0, yaw: 0, bank: 0, pitch: 0 };
+    airRef.current = { throttle: 0, yaw: 0, bank: 0 };
   }, [map]);
 
   // When the user toggles flight mode, zero out velocities so we don't carry
   // momentum from a different model into the new one.
   useEffect(() => {
     velRef.current = { panX: 0, panY: 0, heading: 0, tilt: 0, zoom: 0 };
-    airRef.current = { throttle: 0, yaw: 0, bank: 0, pitch: 0 };
+    airRef.current = { throttle: 0, yaw: 0, bank: 0 };
   }, [mode]);
 
   const status = useGamepad({
@@ -309,34 +306,29 @@ export default function GamepadFlightController({ enabled, view3D, actions, mode
         if (Math.abs(vel.zoom) < 0.001) vel.zoom = 0;
       } else {
         // ── Airplane model — sit-in-the-craft, throttle + yaw + bank ──
-        // Right Y drives BOTH tilt (direct, like overhead) AND climb/dive
-        // (zoom). They're independent — tilt is no longer target-driven
-        // by climb-state. That's the user-requested decoupling.
+        // Right Y drives ONLY tilt. Altitude is changed via trigger taps
+        // (altitude bands) or trigger holds (continuous zoom). Pitch
+        // state is gone in airplane mode — climb/dive doesn't exist.
         const air = airRef.current;
 
         air.throttle += -ly * AIR_THROTTLE_ACCEL * boost * dt;
         air.yaw += lx * AIR_YAW_ACCEL * boost * dt;
         air.bank += rx * AIR_BANK_ACCEL * boost * dt;
-        air.pitch += -ry * AIR_PITCH_ACCEL * boost * dt;
 
         air.throttle *= Math.pow(AIR_THROTTLE_DRAG, dragExp);
         air.yaw *= Math.pow(AIR_YAW_DRAG, dragExp);
         air.bank *= Math.pow(AIR_BANK_DRAG, dragExp);
-        air.pitch *= Math.pow(AIR_PITCH_DRAG, dragExp);
 
         air.throttle = clamp(air.throttle, -AIR_THROTTLE_MAX * 0.4, AIR_THROTTLE_MAX);
         air.yaw = clamp(air.yaw, -AIR_YAW_MAX, AIR_YAW_MAX);
         air.bank = clamp(air.bank, -AIR_BANK_MAX, AIR_BANK_MAX);
-        air.pitch = clamp(air.pitch, -AIR_PITCH_MAX, AIR_PITCH_MAX);
 
         if (Math.abs(air.throttle) < 0.5) air.throttle = 0;
         if (Math.abs(air.yaw) < 0.05) air.yaw = 0;
         if (Math.abs(air.bank) < 0.05) air.bank = 0;
-        if (Math.abs(air.pitch) < 0.005) air.pitch = 0;
 
-        // Tilt: direct velocity-driven, same as overhead. Decoupled from
-        // climb-state. Use the same TILT_ACCEL/DRAG constants so tilt
-        // responsiveness is consistent across modes.
+        // Tilt: direct velocity-driven, same as overhead. Use the same
+        // TILT_ACCEL/DRAG constants so tilt responsiveness is consistent.
         vel.tilt -= ry * TILT_ACCEL_DEG_S2 * boost * dt;
         vel.tilt *= Math.pow(TILT_DRAG, dragExp);
         vel.tilt = clamp(vel.tilt, -TILT_MAX_DEG_S, TILT_MAX_DEG_S);
@@ -344,13 +336,12 @@ export default function GamepadFlightController({ enabled, view3D, actions, mode
 
         // Translate airplane velocities into the shared overhead vel struct
         // for the application phase below. Forward velocity = panY =
-        // -throttle (negative panY moves the screen up = camera moves
-        // forward). Yaw + bank both contribute to heading. Trigger holds
-        // can also nudge zoom on top of climb/dive.
+        // -throttle. Yaw + bank both contribute to heading. Zoom only
+        // moves on trigger hold (altitude is the trigger's job).
         vel.panX = 0; // strafe doesn't exist in airplane model
         vel.panY = -air.throttle;
         vel.heading = air.yaw + air.bank;
-        vel.zoom = -air.pitch + triggerZoomDelta * ZOOM_ACCEL_S2 * boost * dt;
+        vel.zoom = triggerZoomDelta * ZOOM_ACCEL_S2 * boost * dt;
       }
 
       // ── Apply velocity → camera state ───────────────────────────────
@@ -425,7 +416,6 @@ export default function GamepadFlightController({ enabled, view3D, actions, mode
       cam.zoom = clamp(cam.zoom + vel.zoom * dt, ZOOM_MIN, ZOOM_MAX);
       if ((cam.zoom === ZOOM_MIN && vel.zoom < 0) || (cam.zoom === ZOOM_MAX && vel.zoom > 0)) {
         vel.zoom = 0;
-        if (modeRef.current === 'airplane') airRef.current.pitch = 0;
       }
 
       // ── Hover wave (always on, very subtle) ─────────────────────────

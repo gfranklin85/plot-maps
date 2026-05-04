@@ -780,12 +780,14 @@ export default function MapPage() {
                   }
                   setFlightMode('airplane');
                   if (!view3D) setView3D(true);
-                  // Cinematic engage — fly to the Approach band so the
-                  // user starts at a predictable cruising altitude with
-                  // a steep tilt. Strong moment, predictable feel.
+                  // Cinematic engage — fly to the Approach band at the
+                  // most-horizontal-allowable tilt. 65° is just shy of
+                  // Maps' 67° vector-mode max; the last 2° sometimes
+                  // gets edge-clamped. This lands the user right where
+                  // flight feel kicks in.
                   dispatchFlight({
                     zoom: 18,
-                    tilt: 50,
+                    tilt: 65,
                     duration: 700,
                     easing: 'easeInOutCubic',
                   });

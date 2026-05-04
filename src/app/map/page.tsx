@@ -780,6 +780,15 @@ export default function MapPage() {
                   }
                   setFlightMode('airplane');
                   if (!view3D) setView3D(true);
+                  // Cinematic engage — fly to the Approach band so the
+                  // user starts at a predictable cruising altitude with
+                  // a steep tilt. Strong moment, predictable feel.
+                  dispatchFlight({
+                    zoom: 18,
+                    tilt: 50,
+                    duration: 700,
+                    easing: 'easeInOutCubic',
+                  });
                 } else {
                   setFlightMode('overhead');
                 }

@@ -15,8 +15,13 @@ export interface GamepadActions {
   onDropProspect?: () => void;     // RB
   onRecenter?: () => void;         // Start
   onToggleWalk?: () => void;       // Back
-  onAltitudeUp?: () => void;       // LT tapped — climb to next altitude band
-  onAltitudeDown?: () => void;     // RT tapped — descend to next altitude band
+  /** Fired when LT crosses to pressed AND the reticle is hovering a target. */
+  onGrabStart?: () => void;
+  /** Fired when LT releases after a grab was active. */
+  onGrabEnd?: () => void;
+  /** Fired when right-X has been held in one direction for >=2s while grabbed.
+   *  direction = 'cw' (right) or 'ccw' (left). Camera should begin orbit. */
+  onOrbitInit?: (direction: 'cw' | 'ccw') => void;
 }
 
 export type FlightMode = 'overhead' | 'airplane';
@@ -32,6 +37,12 @@ interface Props {
    * tilt + climb/dive (independent: tilt is direct, climb/dive drives zoom).
    */
   mode?: FlightMode;
+  /**
+   * Whether the reticle is currently hovering a grabbable target. Drives the
+   * LT semantics: LT-press while hovering = grab; LT-press otherwise = zoom.
+   * Page computes this each frame from filtered leads + map center.
+   */
+  reticleHovering?: boolean;
   /** Reports controller status up to the page so it can render a toast. */
   onStatusChange?: (connected: boolean, label: string | null) => void;
 }
@@ -136,18 +147,33 @@ const AIR_YAW_ACCEL = 75;            // deg/s²
 const AIR_YAW_DRAG = 0.94;
 const AIR_YAW_MAX = 30;              // deg/s top speed
 
-// ── Trigger tap-vs-hold ───────────────────────────────────────────────
-const TRIGGER_TAP_MS = 200;
+// ── Trigger press detection ───────────────────────────────────────────
+// Triggers do continuous zoom while held. LT also gates "grab" mode when
+// pressed while the reticle is hovering a target (decision made at press
+// onset, not continuously — flying over a target after pressing LT
+// shouldn't switch you from zooming to grabbing mid-press).
 const TRIGGER_PRESS_THRESHOLD = 0.4;
-const TRIGGER_TAP_COOLDOWN_MS = 250;
 
-interface TriggerState {
+interface TriggerPressState {
   pressing: boolean;
-  pressStartMs: number;
-  cooldownUntilMs: number;
+  /** Set on press onset if reticle was hovering at that moment. */
+  startedAsGrab: boolean;
 }
 
-export default function GamepadFlightController({ enabled, view3D, actions, mode = 'overhead', onStatusChange }: Props) {
+// ── Right-X orbit-init dwell ──────────────────────────────────────────
+// While grabbed, holding right-X in one direction for this long fires
+// onOrbitInit with the chosen direction. The 2-second dwell is the gate
+// that distinguishes "I want to orbit" from "I bumped the stick."
+const ORBIT_INIT_DWELL_MS = 2000;
+const ORBIT_INIT_DEFLECTION = 0.5; // stick must be at least this magnitude to count
+
+interface OrbitInitState {
+  direction: 'cw' | 'ccw' | null;
+  heldSinceMs: number;
+  fired: boolean; // one-shot per grab session
+}
+
+export default function GamepadFlightController({ enabled, view3D, actions, mode = 'overhead', reticleHovering = false, onStatusChange }: Props) {
   const map = useMap();
 
   // Persistent physics state. None of this lives in React state — the input
@@ -168,10 +194,17 @@ export default function GamepadFlightController({ enabled, view3D, actions, mode
   view3DRef.current = view3D;
   const modeRef = useRef<FlightMode>(mode);
   modeRef.current = mode;
+  const reticleHoveringRef = useRef(reticleHovering);
+  reticleHoveringRef.current = reticleHovering;
 
-  // Per-trigger press tracking so we can distinguish tap vs hold.
-  const ltStateRef = useRef<TriggerState>({ pressing: false, pressStartMs: 0, cooldownUntilMs: 0 });
-  const rtStateRef = useRef<TriggerState>({ pressing: false, pressStartMs: 0, cooldownUntilMs: 0 });
+  // Trigger press state. LT also tracks whether the press began over a
+  // hovering reticle target — that locks LT into "grab gate" mode for
+  // the duration of the hold.
+  const ltStateRef = useRef<TriggerPressState>({ pressing: false, startedAsGrab: false });
+  const rtStateRef = useRef<TriggerPressState>({ pressing: false, startedAsGrab: false });
+
+  // Right-X orbit-init dwell tracker. Resets on grab end.
+  const orbitInitRef = useRef<OrbitInitState>({ direction: null, heldSinceMs: 0, fired: false });
 
   // Reset our owned camera state whenever the map instance changes (e.g.
   // walk mode toggle). Otherwise we carry stale center/heading from before.
@@ -244,35 +277,84 @@ export default function GamepadFlightController({ enabled, view3D, actions, mode
         if (justPressed.has('down') || justPressed.has('right')) actionsRef.current.onCycleNext?.();
       }
 
-      // ── Trigger tap vs hold ─────────────────────────────────────────
-      // Tap (<200ms) fires altitude-band action on release. Hold (>=200ms)
-      // applies continuous zoom every frame past the threshold.
+      // ── Trigger handling ────────────────────────────────────────────
+      // RT held = continuous zoom in (always).
+      // LT held = continuous zoom in/out OR grab gate.
+      //   - At LT press onset: if the reticle is hovering a target, this
+      //     entire press is a grab (no zoom). Otherwise, this press is a
+      //     zoom hold (no grab). Decision is sticky for the duration of
+      //     the press — flying over a target while LT is already held
+      //     does not switch modes.
+      //   - During a grab press: LT contributes no zoom. Left-Y reels
+      //     zoom on the grabbed lat/lng (handled in the airplane branch
+      //     below). Right-X dwell may fire onOrbitInit.
+      //   - On grab release: fire onGrabEnd, reset orbit-init dwell.
       let triggerZoomDelta = 0;
-      const handleTrigger = (
-        value: number,
-        state: TriggerState,
-        onTap: (() => void) | undefined,
-        zoomSign: 1 | -1,
-      ) => {
-        const isPressed = value >= TRIGGER_PRESS_THRESHOLD;
-        if (isPressed && !state.pressing) {
-          state.pressing = true;
-          state.pressStartMs = elapsedMs;
-        } else if (!isPressed && state.pressing) {
-          state.pressing = false;
-          const heldFor = elapsedMs - state.pressStartMs;
-          if (heldFor < TRIGGER_TAP_MS && elapsedMs > state.cooldownUntilMs) {
-            onTap?.();
-            state.cooldownUntilMs = elapsedMs + TRIGGER_TAP_COOLDOWN_MS;
-          }
-        } else if (isPressed && elapsedMs - state.pressStartMs >= TRIGGER_TAP_MS) {
-          // Hold — accumulate zoom delta to apply through the physics
-          // velocity below, so it composes with everything else.
-          triggerZoomDelta += zoomSign * value;
+      let leftYIsReel = false;
+
+      // RT
+      {
+        const rt = rtStateRef.current;
+        const isPressed = triggers.right >= TRIGGER_PRESS_THRESHOLD;
+        if (isPressed && !rt.pressing) {
+          rt.pressing = true;
+          rt.startedAsGrab = false; // RT never grabs
+        } else if (!isPressed && rt.pressing) {
+          rt.pressing = false;
         }
-      };
-      handleTrigger(triggers.right, rtStateRef.current, actionsRef.current.onAltitudeDown, 1);
-      handleTrigger(triggers.left, ltStateRef.current, actionsRef.current.onAltitudeUp, -1);
+        if (isPressed) triggerZoomDelta += triggers.right; // zoom in
+      }
+
+      // LT — grab gate or zoom out.
+      {
+        const lt = ltStateRef.current;
+        const isPressed = triggers.left >= TRIGGER_PRESS_THRESHOLD;
+        if (isPressed && !lt.pressing) {
+          lt.pressing = true;
+          lt.startedAsGrab = reticleHoveringRef.current && modeRef.current === 'airplane';
+          if (lt.startedAsGrab) {
+            actionsRef.current.onGrabStart?.();
+            // Reset orbit-init state at the start of every grab.
+            orbitInitRef.current = { direction: null, heldSinceMs: 0, fired: false };
+          }
+        } else if (!isPressed && lt.pressing) {
+          lt.pressing = false;
+          if (lt.startedAsGrab) {
+            actionsRef.current.onGrabEnd?.();
+            orbitInitRef.current = { direction: null, heldSinceMs: 0, fired: false };
+          }
+          lt.startedAsGrab = false;
+        }
+        if (isPressed && !lt.startedAsGrab) {
+          triggerZoomDelta -= triggers.left; // zoom out
+        }
+        if (isPressed && lt.startedAsGrab) {
+          leftYIsReel = true; // hand left-Y over to reel-zoom this frame
+        }
+      }
+
+      // ── Right-X orbit-init dwell (grab-only) ────────────────────────
+      // While grabbed, holding right-X past ORBIT_INIT_DEFLECTION in one
+      // direction for ORBIT_INIT_DWELL_MS fires onOrbitInit once. Direction
+      // is captured at the start of the dwell — flipping the stick mid-
+      // dwell resets the timer.
+      if (ltStateRef.current.startedAsGrab) {
+        const oi = orbitInitRef.current;
+        const dir: 'cw' | 'ccw' | null =
+          rightStick.x > ORBIT_INIT_DEFLECTION ? 'cw' :
+          rightStick.x < -ORBIT_INIT_DEFLECTION ? 'ccw' :
+          null;
+        if (dir === null) {
+          oi.direction = null;
+          oi.heldSinceMs = 0;
+        } else if (oi.direction !== dir) {
+          oi.direction = dir;
+          oi.heldSinceMs = elapsedMs;
+        } else if (!oi.fired && elapsedMs - oi.heldSinceMs >= ORBIT_INIT_DWELL_MS) {
+          oi.fired = true;
+          actionsRef.current.onOrbitInit?.(dir);
+        }
+      }
 
       // ── Physics integration ─────────────────────────────────────────
       const boost = pressed.has('lb') ? PAN_BOOST_MULT : 1;
@@ -318,15 +400,32 @@ export default function GamepadFlightController({ enabled, view3D, actions, mode
         //             hand-compensates with left-X strafe in the
         //             opposite direction to hold position.
         //   Right Y → tilt only (altitude is trigger-driven).
+        //
+        // While LT-grabbed (leftYIsReel === true):
+        //   Left Y  → reel-zoom (positive Y = stick down = zoom out =
+        //             pull tether longer; negative Y = zoom in = reel in).
+        //   Left X  → suppressed (no strafe — you're tethered)
+        //   Right X → suppressed for yaw (the right-X dwell is being
+        //             watched for orbit-init; we don't want it also to
+        //             rotate the heading mid-grab)
+        //   Right Y → tilt still works
         const air = airRef.current;
 
-        air.throttle += -ly * AIR_THROTTLE_ACCEL * boost * dt;
-        air.strafe += lx * AIR_STRAFE_ACCEL * boost * dt;
-        air.yaw += rx * AIR_YAW_ACCEL * boost * dt;
+        if (leftYIsReel) {
+          // Bleed throttle / strafe / yaw quickly so existing momentum
+          // doesn't carry through into the grabbed state.
+          air.throttle *= Math.pow(0.85, dragExp);
+          air.strafe *= Math.pow(0.85, dragExp);
+          air.yaw *= Math.pow(0.85, dragExp);
+        } else {
+          air.throttle += -ly * AIR_THROTTLE_ACCEL * boost * dt;
+          air.strafe += lx * AIR_STRAFE_ACCEL * boost * dt;
+          air.yaw += rx * AIR_YAW_ACCEL * boost * dt;
 
-        air.throttle *= Math.pow(AIR_THROTTLE_DRAG, dragExp);
-        air.strafe *= Math.pow(AIR_STRAFE_DRAG, dragExp);
-        air.yaw *= Math.pow(AIR_YAW_DRAG, dragExp);
+          air.throttle *= Math.pow(AIR_THROTTLE_DRAG, dragExp);
+          air.strafe *= Math.pow(AIR_STRAFE_DRAG, dragExp);
+          air.yaw *= Math.pow(AIR_YAW_DRAG, dragExp);
+        }
 
         air.throttle = clamp(air.throttle, -AIR_THROTTLE_MAX * 0.4, AIR_THROTTLE_MAX);
         air.strafe = clamp(air.strafe, -AIR_STRAFE_MAX, AIR_STRAFE_MAX);
@@ -336,18 +435,25 @@ export default function GamepadFlightController({ enabled, view3D, actions, mode
         if (Math.abs(air.strafe) < 0.5) air.strafe = 0;
         if (Math.abs(air.yaw) < 0.05) air.yaw = 0;
 
-        // Tilt: direct velocity-driven, same as overhead.
+        // Tilt: direct velocity-driven, always available.
         vel.tilt -= ry * TILT_ACCEL_DEG_S2 * boost * dt;
         vel.tilt *= Math.pow(TILT_DRAG, dragExp);
         vel.tilt = clamp(vel.tilt, -TILT_MAX_DEG_S, TILT_MAX_DEG_S);
         if (Math.abs(vel.tilt) < 0.05) vel.tilt = 0;
 
         // Translate airplane state into shared vel struct.
-        // panX = strafe (left-X), panY = forward (-throttle), heading = yaw.
         vel.panX = air.strafe;
         vel.panY = -air.throttle;
         vel.heading = air.yaw;
-        vel.zoom = triggerZoomDelta * ZOOM_ACCEL_S2 * boost * dt;
+
+        // Zoom: trigger holds OR left-Y reel during grab. Reel uses the
+        // same slow rate as a trigger hold so the feel is consistent.
+        // ly is positive when stick is down → that means zoom out (longer
+        // tether). Convert: reelZoomDelta = +ly  (positive ly = tether
+        // longer = zoom out = negative zoom delta in Maps semantics →
+        // we want stick-down to zoom out, so apply -ly to match).
+        const reelDelta = leftYIsReel ? -ly : 0;
+        vel.zoom = (triggerZoomDelta + reelDelta) * ZOOM_ACCEL_S2 * boost * dt;
       }
 
       // ── Apply velocity → camera state ───────────────────────────────

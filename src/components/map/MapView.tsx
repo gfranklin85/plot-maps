@@ -51,6 +51,8 @@ interface Props {
   gamepadEnabled?: boolean;
   gamepadActions?: GamepadActions;
   gamepadMode?: FlightMode;
+  /** Whether the reticle is currently hovering a target (drives LT semantics). */
+  gamepadReticleHovering?: boolean;
   onGamepadStatusChange?: (connected: boolean, label: string | null) => void;
 }
 
@@ -510,7 +512,7 @@ function PendingSkiptracePins({ pins }: { pins: { id: string; lat: number; lng: 
   return null;
 }
 
-export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClick, center, navigateTo, zoom, mapType = "roadmap", pinMode = "dots", prospectMode = false, prospectPins = [], onProspectPinClick, showZoningOverlay = false, view3D = false, flight = null, gamepadEnabled = false, gamepadActions, gamepadMode = 'overhead', onGamepadStatusChange }: Props) {
+export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClick, center, navigateTo, zoom, mapType = "roadmap", pinMode = "dots", prospectMode = false, prospectPins = [], onProspectPinClick, showZoningOverlay = false, view3D = false, flight = null, gamepadEnabled = false, gamepadActions, gamepadMode = 'overhead', gamepadReticleHovering = false, onGamepadStatusChange }: Props) {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme !== 'light';
   const isSatellite = mapType === "satellite" || mapType === "hybrid";
@@ -559,6 +561,7 @@ export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClic
             enabled={gamepadEnabled}
             view3D={view3D}
             mode={gamepadMode}
+            reticleHovering={gamepadReticleHovering}
             actions={gamepadActions || {}}
             onStatusChange={onGamepadStatusChange}
           />

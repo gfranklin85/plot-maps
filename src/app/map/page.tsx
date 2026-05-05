@@ -19,6 +19,7 @@ import OnboardingTooltips from "@/components/ui/OnboardingTooltips";
 import ProspectCoachOverlay from "@/components/map/ProspectCoachOverlay";
 import Mobile3DCoachOverlay from "@/components/map/Mobile3DCoachOverlay";
 import GamepadStatusChip from "@/components/map/GamepadStatusChip";
+import MapReticle from "@/components/map/MapReticle";
 import type { GamepadActions } from "@/components/map/GamepadFlightController";
 import { usePhone } from "@/lib/phone-context";
 
@@ -99,6 +100,21 @@ export default function MapPage() {
   const [prospectMode, setProspectMode] = useState(false);
   const [prospectToast, setProspectToast] = useState<string | null>(null);
   const [mapZoom, setMapZoom] = useState<number | null>(null);
+
+  // ── Airplane-mode reticle + grab state ──────────────────────────────
+  // The reticle sits at screen center in airplane mode. Each frame, we
+  // recompute which lead (if any) the reticle is hovering. When the user
+  // presses LT while hovering, the lead is "grabbed" — Phase B1 just
+  // stores the grab; Phase B2 will open menus off this state. Right-X
+  // 2s hold while grabbed records an orbit direction (Phase B3 will
+  // animate the orbit; B1 just stores the direction).
+  const [reticleHovering, setReticleHovering] = useState(false);
+  const [grabbedLead, setGrabbedLead] = useState<Lead | null>(null);
+  const [orbitDirection, setOrbitDirection] = useState<'cw' | 'ccw' | null>(null);
+  // Latest hover target as a ref so onGrabStart (which fires inside the
+  // gamepad RAF loop) can read the current value without re-deriving.
+  const reticleTargetRef = useRef<Lead | null>(null);
+
   // navigateTarget kept for compat with MapView's CenterController prop;
   // every flow now uses the camera choreographer's dispatchFlight() instead,
   // so this stays null in practice.
@@ -446,6 +462,48 @@ export default function MapPage() {
     return result;
   }, [leads, activeTab, search, selectedTags, selectedCity, selectedPriority, selectedSource, listingFilters]);
 
+  // ── Reticle hover detection ─────────────────────────────────────────
+  // Each time the camera or filtered lead set changes, find the closest
+  // lead to map center. If within ~24 screen-pixels (zoom-aware), mark
+  // it as hovered. Updates reticleHovering + reticleTargetRef so the
+  // gamepad controller can decide LT semantics on press.
+  useEffect(() => {
+    if (flightMode !== 'airplane' || !mapCenter || !mapZoom) {
+      if (reticleTargetRef.current !== null) reticleTargetRef.current = null;
+      if (reticleHovering) setReticleHovering(false);
+      return;
+    }
+    // Convert ~24px to a lat/lng squared-distance threshold at current
+    // zoom. Web Mercator: 1 px ≈ 156543.03392 / 2^zoom meters at the
+    // equator. We compare in degrees-squared (cheap, ordering-correct).
+    const px = 24;
+    const metersPerPx = 156543.03392 / Math.pow(2, mapZoom);
+    const radiusMeters = px * metersPerPx;
+    // Rough degrees: 1° ≈ 111_320m. Adjust lng by cos(lat) for slight
+    // accuracy at non-equatorial latitudes — barely matters at 24px but
+    // keeps the threshold honest.
+    const cosLat = Math.cos((mapCenter.lat * Math.PI) / 180) || 1;
+    const radiusDegLat = radiusMeters / 111320;
+    const radiusDegLng = radiusMeters / (111320 * cosLat);
+    const thresholdSq = Math.max(radiusDegLat, radiusDegLng) ** 2;
+
+    let nearest: Lead | null = null;
+    let nearestSq = Infinity;
+    for (const l of filteredLeads) {
+      if (l.latitude == null || l.longitude == null) continue;
+      const dLat = l.latitude - mapCenter.lat;
+      const dLng = (l.longitude - mapCenter.lng) * cosLat;
+      const sq = dLat * dLat + dLng * dLng;
+      if (sq < nearestSq) {
+        nearestSq = sq;
+        nearest = l;
+      }
+    }
+    const hit = nearest && nearestSq <= thresholdSq ? nearest : null;
+    reticleTargetRef.current = hit;
+    if (!!hit !== reticleHovering) setReticleHovering(!!hit);
+  }, [flightMode, mapCenter, mapZoom, filteredLeads, reticleHovering]);
+
   const [mobileControlsOpen, setMobileControlsOpen] = useState(false);
   const [desktopSearchOpen, setDesktopSearchOpen] = useState(false);
 
@@ -477,48 +535,6 @@ export default function MapPage() {
           duration: 350,
           easing: 'easeOutCubic',
         });
-      }
-    }
-
-    // Three altitude presets for the trigger-tap cinematic descent / climb.
-    // RT tap = descend one band, LT tap = ascend one band. Holds keep
-    // the original continuous-zoom behavior. After a hold finishes the
-    // user is flying free; the next tap snaps back to the nearest band
-    // in the requested direction. Tilt is left where it was during a
-    // hold-induced free-fly so we don't yank the camera unexpectedly;
-    // tap-snap explicitly sets tilt to the band's preset.
-    const ALTITUDE_BANDS: { zoom: number; tilt: number; label: string }[] = [
-      { zoom: 16, tilt: 30, label: 'survey' },
-      { zoom: 18, tilt: 50, label: 'approach' },
-      { zoom: 20, tilt: 67, label: 'eye-level' },
-    ];
-
-    function flyToBand(idx: number) {
-      const band = ALTITUDE_BANDS[idx];
-      if (!band) return;
-      dispatchFlight({
-        zoom: band.zoom,
-        tilt: band.tilt,
-        duration: 700,
-        easing: 'easeInOutCubic',
-      });
-    }
-
-    function pickNextBand(currentZoom: number, dir: 'up' | 'down'): number {
-      // 'down' = descend = increase zoom (numerically higher = closer).
-      // 'up'   = ascend  = decrease zoom.
-      // Find the next band strictly past the current zoom in the
-      // requested direction; if none, return the boundary band.
-      if (dir === 'down') {
-        for (let i = 0; i < ALTITUDE_BANDS.length; i++) {
-          if (ALTITUDE_BANDS[i].zoom > currentZoom + 0.05) return i;
-        }
-        return ALTITUDE_BANDS.length - 1;
-      } else {
-        for (let i = ALTITUDE_BANDS.length - 1; i >= 0; i--) {
-          if (ALTITUDE_BANDS[i].zoom < currentZoom - 0.05) return i;
-        }
-        return 0;
       }
     }
 
@@ -589,23 +605,31 @@ export default function MapPage() {
         if (!isSubscribed) return;
         setWalkMode(prev => !prev);
       },
-      onAltitudeUp: () => {
-        // LT tap — ascend one band. Read current zoom from state if we
-        // have it, otherwise let dispatchFlight read from the map.
-        const currentZoom = mapZoom ?? 18;
-        flyToBand(pickNextBand(currentZoom, 'up'));
+      onGrabStart: () => {
+        // LT pressed while reticle was hovering. Snapshot the lead the
+        // reticle was over and store it; the rest of the app can consume
+        // grabbedLead from state. Phase B1: just stores. Phase B2 will
+        // open menus / cards off this state.
+        const target = reticleTargetRef.current;
+        if (target) setGrabbedLead(target);
       },
-      onAltitudeDown: () => {
-        // RT tap — descend one band.
-        const currentZoom = mapZoom ?? 18;
-        flyToBand(pickNextBand(currentZoom, 'down'));
+      onGrabEnd: () => {
+        // LT released. Drop the grab. Orbit state (if any) ends here too.
+        setGrabbedLead(null);
+        setOrbitDirection(null);
+      },
+      onOrbitInit: (direction) => {
+        // Right-X held 2s in a direction while grabbed. B1 just records
+        // the direction in state — actual orbit camera animation is
+        // Phase B3. For now this is the hook the next phase plugs into.
+        setOrbitDirection(direction);
       },
     };
     // handleMapClick is stable enough; including all deps would re-create
     // the actions every render. The ones that matter for behavior change
     // (selectedLead, walkMode, prospectMode, etc.) are listed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedLead, mapCenter, filteredLeads, walkMode, prospectMode, isSubscribed, makeCall, dispatchFlight, profile.defaultMapCenter, mapZoom]);
+  }, [selectedLead, mapCenter, filteredLeads, walkMode, prospectMode, isSubscribed, makeCall, dispatchFlight, profile.defaultMapCenter]);
 
   return (
     <div className="relative h-[calc(100vh-3.5rem)] md:h-[calc(100vh-5rem)] w-full">
@@ -1055,8 +1079,29 @@ export default function MapPage() {
             gamepadEnabled
             gamepadActions={gamepadActions}
             gamepadMode={flightMode}
+            gamepadReticleHovering={reticleHovering}
             onGamepadStatusChange={handleGamepadStatus}
           />
+        )}
+
+        {/* Center reticle — visible only in airplane mode. Driven by
+            page-level reticleHovering / grabbedLead state; the gamepad
+            controller decides LT semantics from reticleHovering. */}
+        <MapReticle
+          visible={!walkMode && flightMode === 'airplane'}
+          hovering={reticleHovering}
+          grabbed={!!grabbedLead}
+        />
+
+        {/* Tiny orbit-direction indicator while grabbed + orbit set.
+            B1 just shows we captured the dwell — B3 will animate orbit. */}
+        {grabbedLead && orbitDirection && (
+          <div
+            aria-hidden
+            className="pointer-events-none absolute left-1/2 top-1/2 z-30 -translate-x-1/2 translate-y-8 rounded-full bg-emerald-500/85 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-white shadow-lg"
+          >
+            Orbit {orbitDirection === 'cw' ? 'CW' : 'CCW'}
+          </div>
         )}
 
         {/* Empty state — bottom center */}

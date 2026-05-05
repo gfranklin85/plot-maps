@@ -302,63 +302,55 @@ export default function GamepadFlightController({
       if (Math.abs(mapZoom - cam.zoom) > 0.05) cam.zoom = mapZoom;
 
       // ── Reticle hover detection (airplane mode only) ────────────────
-      // The map's camera lat/lng is the camera's *position*, not what
-      // appears at the visual center of the screen when tilted. With
-      // tilt > 0 the visible focal point is forward of camera position
-      // by approximately altitude * tan(tilt) meters along heading.
-      // We compute that focal point each frame, then find the closest
-      // lead in screen-px and report it if within ~24px.
+      // Use the browser's native hit-testing — same machinery the mouse
+      // cursor uses. Each lead pin has data-lead-id stamped on its
+      // wrapper div by AdvancedLeadMarkers. We sample the pixel under
+      // the reticle (screen center, with a small tilt-aware vertical
+      // shift) and walk up the DOM until we find an element with that
+      // attribute. Zero projection math; works regardless of how the
+      // map renders tilt, vector vs raster, etc.
       if (modeRef.current === 'airplane' && airplaneTargetsRef.current && airplaneTargetsRef.current.length > 0) {
-        // Web-Mercator altitude estimate from zoom: 1 zoom-level ≈ halving
-        // of metersPerPx. Camera altitude that produces the visible scale
-        // at the equator: altitudeMeters ≈ 35200000 / 2^zoom (rough but
-        // good enough for forward-throw at typical prospecting zooms).
-        const altitudeMeters = 35200000 / Math.pow(2, cam.zoom);
-        const tiltRad = (cam.tilt * Math.PI) / 180;
-        const headingRad = (cam.heading * Math.PI) / 180;
-        const forwardThrowMeters = altitudeMeters * Math.tan(tiltRad);
-        // Convert forward-throw to lat/lng deltas. North = -dy in screen
-        // space, but camera heading 0 = facing north, so heading 0 +
-        // forward = +lat. A positive forward-throw at heading θ goes
-        // (cos θ * d) north and (sin θ * d) east.
-        const cosLat = Math.cos((cam.lat * Math.PI) / 180) || 1;
-        const dLatDeg = (forwardThrowMeters * Math.cos(headingRad)) / 111320;
-        const dLngDeg = (forwardThrowMeters * Math.sin(headingRad)) / (111320 * cosLat);
-        const focalLat = cam.lat + dLatDeg;
-        const focalLng = cam.lng + dLngDeg;
-
-        // Reticle visual position: when tilt = 0 → 0.5 (CSS center).
-        // When tilt = 65° → roughly 0.42 (above center). Linear fit.
+        // Reticle visual position: 0.5 at flat, ~0.42 at 65° tilt.
+        // (Linear fit to keep the reticle close to where the user
+        // perceives the focal point with high tilt.)
         const focalY = 0.5 - (cam.tilt / 67) * 0.08;
         if (Math.abs(focalY - lastReportedFocalYRef.current) > 0.005) {
           lastReportedFocalYRef.current = focalY;
           onFocalScreenYChangeRef.current?.(focalY);
         }
 
-        // Hover detection: closest target within ~24px-equivalent in
-        // lat/lng at current zoom.
-        const px = 24;
-        const metersPerPx = 156543.03392 / Math.pow(2, cam.zoom);
-        const radiusMeters = px * metersPerPx;
-        const radiusDeg = radiusMeters / 111320; // approx; lng correction below
-        const thresholdSq = radiusDeg * radiusDeg;
-
-        let nearest: ReticleTarget | null = null;
-        let nearestSq = Infinity;
-        for (const t of airplaneTargetsRef.current) {
-          const dLat = t.lat - focalLat;
-          const dLng = (t.lng - focalLng) * cosLat;
-          const sq = dLat * dLat + dLng * dLng;
-          if (sq < nearestSq) {
-            nearestSq = sq;
-            nearest = t;
+        // Map div = the element that wraps the gmp-map-3d / gm-style
+        // root. We use the root document.elementFromPoint and walk up
+        // looking for [data-lead-id]. The reticle is centered horizontally
+        // and offset vertically per focalY in the map container.
+        const mapDiv = (map as unknown as { getDiv?: () => HTMLElement }).getDiv?.();
+        let hitId: string | null = null;
+        if (mapDiv) {
+          const rect = mapDiv.getBoundingClientRect();
+          const cx = rect.left + rect.width / 2;
+          const cy = rect.top + rect.height * focalY;
+          // elementsFromPoint gives us the full stack at that pixel —
+          // necessary because pin DOM may have inner elements blocking
+          // the data-lead-id wrapper from being the topmost node.
+          const stack = typeof document.elementsFromPoint === 'function'
+            ? document.elementsFromPoint(cx, cy)
+            : (() => {
+                const el = document.elementFromPoint(cx, cy);
+                return el ? [el] : [];
+              })();
+          for (const node of stack) {
+            const found = (node as HTMLElement).closest?.('[data-lead-id]') as HTMLElement | null;
+            if (found && found.dataset.leadId) {
+              hitId = found.dataset.leadId;
+              break;
+            }
           }
         }
-        const hit = nearest && nearestSq <= thresholdSq ? nearest : null;
-        const newId = hit ? hit.id : null;
+
+        const hit = hitId ? (airplaneTargetsRef.current.find(t => t.id === hitId) || null) : null;
         reticleHoveringRef.current = !!hit;
-        if (newId !== lastReportedTargetIdRef.current) {
-          lastReportedTargetIdRef.current = newId;
+        if ((hit?.id ?? null) !== lastReportedTargetIdRef.current) {
+          lastReportedTargetIdRef.current = hit?.id ?? null;
           onReticleTargetChangeRef.current?.(hit);
         }
       } else {

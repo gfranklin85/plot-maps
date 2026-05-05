@@ -67,6 +67,10 @@ function buildPinElement(lead: Lead, pinMode: PinMode): HTMLElement {
 
   const wrapper = document.createElement('div');
   wrapper.className = `lp lp--${status}`;
+  // Tag with the lead id so the airplane-mode reticle can hit-test pins
+  // via document.elementFromPoint(centerX, centerY) — same machinery the
+  // mouse uses, no projection math needed.
+  wrapper.dataset.leadId = lead.id;
   if (pinMode === 'labels') wrapper.classList.add('lp--label-always');
 
   const tail = document.createElement('div');

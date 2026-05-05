@@ -462,47 +462,40 @@ export default function MapPage() {
     return result;
   }, [leads, activeTab, search, selectedTags, selectedCity, selectedPriority, selectedSource, listingFilters]);
 
-  // ── Reticle hover detection ─────────────────────────────────────────
-  // Each time the camera or filtered lead set changes, find the closest
-  // lead to map center. If within ~24 screen-pixels (zoom-aware), mark
-  // it as hovered. Updates reticleHovering + reticleTargetRef so the
-  // gamepad controller can decide LT semantics on press.
-  useEffect(() => {
-    if (flightMode !== 'airplane' || !mapCenter || !mapZoom) {
-      if (reticleTargetRef.current !== null) reticleTargetRef.current = null;
-      if (reticleHovering) setReticleHovering(false);
-      return;
-    }
-    // Convert ~24px to a lat/lng squared-distance threshold at current
-    // zoom. Web Mercator: 1 px ≈ 156543.03392 / 2^zoom meters at the
-    // equator. We compare in degrees-squared (cheap, ordering-correct).
-    const px = 24;
-    const metersPerPx = 156543.03392 / Math.pow(2, mapZoom);
-    const radiusMeters = px * metersPerPx;
-    // Rough degrees: 1° ≈ 111_320m. Adjust lng by cos(lat) for slight
-    // accuracy at non-equatorial latitudes — barely matters at 24px but
-    // keeps the threshold honest.
-    const cosLat = Math.cos((mapCenter.lat * Math.PI) / 180) || 1;
-    const radiusDegLat = radiusMeters / 111320;
-    const radiusDegLng = radiusMeters / (111320 * cosLat);
-    const thresholdSq = Math.max(radiusDegLat, radiusDegLng) ** 2;
+  // Targetable leads for airplane-mode reticle hover. Strip down to id +
+  // lat/lng so the controller doesn't see the full Lead shape.
+  const airplaneTargets = useMemo(() => {
+    if (flightMode !== 'airplane') return [];
+    return filteredLeads
+      .filter(l => l.latitude != null && l.longitude != null)
+      .map(l => ({ id: l.id, lat: l.latitude as number, lng: l.longitude as number }));
+  }, [flightMode, filteredLeads]);
 
-    let nearest: Lead | null = null;
-    let nearestSq = Infinity;
-    for (const l of filteredLeads) {
-      if (l.latitude == null || l.longitude == null) continue;
-      const dLat = l.latitude - mapCenter.lat;
-      const dLng = (l.longitude - mapCenter.lng) * cosLat;
-      const sq = dLat * dLat + dLng * dLng;
-      if (sq < nearestSq) {
-        nearestSq = sq;
-        nearest = l;
+  // Reticle screen-Y fraction for visual placement (controller updates
+  // each frame as a function of camera tilt).
+  const [reticleTopFraction, setReticleTopFraction] = useState(0.5);
+
+  // Lookup helper for resolving a target id back to a full Lead so the
+  // grab handler can store the original Lead, not just the id.
+  const leadsById = useMemo(() => {
+    const m = new Map<string, Lead>();
+    for (const l of filteredLeads) m.set(l.id, l);
+    return m;
+  }, [filteredLeads]);
+
+  const handleReticleTargetChange = useCallback(
+    (target: { id: string; lat: number; lng: number } | null) => {
+      if (target === null) {
+        reticleTargetRef.current = null;
+        setReticleHovering(false);
+      } else {
+        const lead = leadsById.get(target.id) || null;
+        reticleTargetRef.current = lead;
+        setReticleHovering(!!lead);
       }
-    }
-    const hit = nearest && nearestSq <= thresholdSq ? nearest : null;
-    reticleTargetRef.current = hit;
-    if (!!hit !== reticleHovering) setReticleHovering(!!hit);
-  }, [flightMode, mapCenter, mapZoom, filteredLeads, reticleHovering]);
+    },
+    [leadsById],
+  );
 
   const [mobileControlsOpen, setMobileControlsOpen] = useState(false);
   const [desktopSearchOpen, setDesktopSearchOpen] = useState(false);
@@ -1079,7 +1072,9 @@ export default function MapPage() {
             gamepadEnabled
             gamepadActions={gamepadActions}
             gamepadMode={flightMode}
-            gamepadReticleHovering={reticleHovering}
+            gamepadAirplaneTargets={airplaneTargets}
+            onGamepadReticleTargetChange={handleReticleTargetChange}
+            onGamepadFocalScreenYChange={setReticleTopFraction}
             onGamepadStatusChange={handleGamepadStatus}
           />
         )}
@@ -1091,6 +1086,7 @@ export default function MapPage() {
           visible={!walkMode && flightMode === 'airplane'}
           hovering={reticleHovering}
           grabbed={!!grabbedLead}
+          topFraction={reticleTopFraction}
         />
 
         {/* Tiny orbit-direction indicator while grabbed + orbit set.

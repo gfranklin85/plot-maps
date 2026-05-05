@@ -9,6 +9,15 @@ interface Props {
   hovering: boolean;
   /** Set when the user has actively grabbed the hovered target (LT held). */
   grabbed: boolean;
+  /**
+   * How far up the viewport (as a 0..1 fraction) to render the reticle.
+   * 0.5 = CSS center. Lower numbers = higher up the screen. With camera
+   * tilt > 0 the visual focal point of the map sits above CSS-center, so
+   * the page passes a smaller value (e.g. 0.42) when in tilted airplane
+   * mode to land the reticle on what the user perceives as "what I'm
+   * pointed at" instead of dead-center pixels.
+   */
+  topFraction?: number;
 }
 
 /**
@@ -19,13 +28,14 @@ interface Props {
  *
  * Pure presentation. All hover detection / grab state lives on the page.
  */
-export default function MapReticle({ visible, hovering, grabbed }: Props) {
+export default function MapReticle({ visible, hovering, grabbed, topFraction = 0.5 }: Props) {
   if (!visible) return null;
 
   return (
     <div
       aria-hidden
-      className="pointer-events-none absolute left-1/2 top-1/2 z-30 -translate-x-1/2 -translate-y-1/2"
+      className="pointer-events-none absolute left-1/2 z-30 -translate-x-1/2 -translate-y-1/2"
+      style={{ top: `${topFraction * 100}%` }}
     >
       {grabbed ? (
         <div className="relative flex h-12 w-12 items-center justify-center">

@@ -12,7 +12,7 @@ import { MAP_CENTER, MAP_ZOOM } from "@/lib/constants";
 import { useTheme } from "next-themes";
 import ZoningOverlay from "./ZoningOverlay";
 import AdvancedLeadMarkers from "./AdvancedLeadMarkers";
-import GamepadFlightController, { type GamepadActions, type FlightMode } from "./GamepadFlightController";
+import GamepadFlightController, { type GamepadActions, type FlightMode, type ReticleTarget } from "./GamepadFlightController";
 import { useCameraChoreographer, type FlyToOptions } from "@/lib/useCameraChoreographer";
 
 // Theme-aware pin colors
@@ -51,8 +51,12 @@ interface Props {
   gamepadEnabled?: boolean;
   gamepadActions?: GamepadActions;
   gamepadMode?: FlightMode;
-  /** Whether the reticle is currently hovering a target (drives LT semantics). */
-  gamepadReticleHovering?: boolean;
+  /** Targetable leads in airplane mode for reticle hover detection. */
+  gamepadAirplaneTargets?: ReticleTarget[];
+  /** Fires when the reticle's hovered target changes (incl. null). */
+  onGamepadReticleTargetChange?: (target: ReticleTarget | null) => void;
+  /** Fires with the focal-point screen-Y as a 0..1 viewport fraction. */
+  onGamepadFocalScreenYChange?: (fraction: number) => void;
   onGamepadStatusChange?: (connected: boolean, label: string | null) => void;
 }
 
@@ -512,7 +516,7 @@ function PendingSkiptracePins({ pins }: { pins: { id: string; lat: number; lng: 
   return null;
 }
 
-export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClick, center, navigateTo, zoom, mapType = "roadmap", pinMode = "dots", prospectMode = false, prospectPins = [], onProspectPinClick, showZoningOverlay = false, view3D = false, flight = null, gamepadEnabled = false, gamepadActions, gamepadMode = 'overhead', gamepadReticleHovering = false, onGamepadStatusChange }: Props) {
+export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClick, center, navigateTo, zoom, mapType = "roadmap", pinMode = "dots", prospectMode = false, prospectPins = [], onProspectPinClick, showZoningOverlay = false, view3D = false, flight = null, gamepadEnabled = false, gamepadActions, gamepadMode = 'overhead', gamepadAirplaneTargets, onGamepadReticleTargetChange, onGamepadFocalScreenYChange, onGamepadStatusChange }: Props) {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme !== 'light';
   const isSatellite = mapType === "satellite" || mapType === "hybrid";
@@ -561,7 +565,9 @@ export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClic
             enabled={gamepadEnabled}
             view3D={view3D}
             mode={gamepadMode}
-            reticleHovering={gamepadReticleHovering}
+            airplaneTargets={gamepadAirplaneTargets}
+            onReticleTargetChange={onGamepadReticleTargetChange}
+            onFocalScreenYChange={onGamepadFocalScreenYChange}
             actions={gamepadActions || {}}
             onStatusChange={onGamepadStatusChange}
           />

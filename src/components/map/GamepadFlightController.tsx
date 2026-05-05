@@ -26,6 +26,14 @@ export interface GamepadActions {
 
 export type FlightMode = 'overhead' | 'airplane';
 
+/** Lightweight lead shape used only for hover detection — keeps the controller
+ *  decoupled from the full Lead type so we don't pull in unrelated deps. */
+export interface ReticleTarget {
+  id: string;
+  lat: number;
+  lng: number;
+}
+
 interface Props {
   enabled: boolean;
   view3D: boolean;
@@ -38,11 +46,24 @@ interface Props {
    */
   mode?: FlightMode;
   /**
-   * Whether the reticle is currently hovering a grabbable target. Drives the
-   * LT semantics: LT-press while hovering = grab; LT-press otherwise = zoom.
-   * Page computes this each frame from filtered leads + map center.
+   * Lead pins eligible to be hovered/grabbed by the reticle in airplane
+   * mode. Each frame we compute the focal-point lat/lng (forward-thrown
+   * from camera by current tilt + altitude) and find the nearest lead.
+   * If within ~24 screen-pixels we report it via onReticleTargetChange.
    */
-  reticleHovering?: boolean;
+  airplaneTargets?: ReticleTarget[];
+  /**
+   * Fires when the hovered target changes (including null → some target,
+   * target → different target, target → null). Page uses this to drive
+   * the reticle visual + LT-press grab decision.
+   */
+  onReticleTargetChange?: (target: ReticleTarget | null) => void;
+  /**
+   * Reports the focal-point screen-Y as a 0..1 viewport fraction so the
+   * page can position the reticle visual on the actual visual center,
+   * not CSS-center (which sits below the focal point under tilt).
+   */
+  onFocalScreenYChange?: (fraction: number) => void;
   /** Reports controller status up to the page so it can render a toast. */
   onStatusChange?: (connected: boolean, label: string | null) => void;
 }
@@ -173,7 +194,16 @@ interface OrbitInitState {
   fired: boolean; // one-shot per grab session
 }
 
-export default function GamepadFlightController({ enabled, view3D, actions, mode = 'overhead', reticleHovering = false, onStatusChange }: Props) {
+export default function GamepadFlightController({
+  enabled,
+  view3D,
+  actions,
+  mode = 'overhead',
+  airplaneTargets,
+  onReticleTargetChange,
+  onFocalScreenYChange,
+  onStatusChange,
+}: Props) {
   const map = useMap();
 
   // Persistent physics state. None of this lives in React state — the input
@@ -194,8 +224,18 @@ export default function GamepadFlightController({ enabled, view3D, actions, mode
   view3DRef.current = view3D;
   const modeRef = useRef<FlightMode>(mode);
   modeRef.current = mode;
-  const reticleHoveringRef = useRef(reticleHovering);
-  reticleHoveringRef.current = reticleHovering;
+  // Live refs for hover detection that runs each frame.
+  const airplaneTargetsRef = useRef<ReticleTarget[] | undefined>(airplaneTargets);
+  airplaneTargetsRef.current = airplaneTargets;
+  const onReticleTargetChangeRef = useRef(onReticleTargetChange);
+  onReticleTargetChangeRef.current = onReticleTargetChange;
+  const onFocalScreenYChangeRef = useRef(onFocalScreenYChange);
+  onFocalScreenYChangeRef.current = onFocalScreenYChange;
+  // Track last reported target id to avoid firing the callback every frame.
+  const lastReportedTargetIdRef = useRef<string | null>(null);
+  const lastReportedFocalYRef = useRef<number>(0.5);
+  // Live reticle-hovering flag the LT-press handler reads each frame.
+  const reticleHoveringRef = useRef(false);
 
   // Trigger press state. LT also tracks whether the press began over a
   // hovering reticle target — that locks LT into "grab gate" mode for
@@ -260,6 +300,75 @@ export default function GamepadFlightController({ enabled, view3D, actions, mode
       if (Math.abs(mapHeading - cam.heading) > 1) cam.heading = mapHeading;
       if (Math.abs(mapTilt - cam.tilt) > 1) cam.tilt = mapTilt;
       if (Math.abs(mapZoom - cam.zoom) > 0.05) cam.zoom = mapZoom;
+
+      // ── Reticle hover detection (airplane mode only) ────────────────
+      // The map's camera lat/lng is the camera's *position*, not what
+      // appears at the visual center of the screen when tilted. With
+      // tilt > 0 the visible focal point is forward of camera position
+      // by approximately altitude * tan(tilt) meters along heading.
+      // We compute that focal point each frame, then find the closest
+      // lead in screen-px and report it if within ~24px.
+      if (modeRef.current === 'airplane' && airplaneTargetsRef.current && airplaneTargetsRef.current.length > 0) {
+        // Web-Mercator altitude estimate from zoom: 1 zoom-level ≈ halving
+        // of metersPerPx. Camera altitude that produces the visible scale
+        // at the equator: altitudeMeters ≈ 35200000 / 2^zoom (rough but
+        // good enough for forward-throw at typical prospecting zooms).
+        const altitudeMeters = 35200000 / Math.pow(2, cam.zoom);
+        const tiltRad = (cam.tilt * Math.PI) / 180;
+        const headingRad = (cam.heading * Math.PI) / 180;
+        const forwardThrowMeters = altitudeMeters * Math.tan(tiltRad);
+        // Convert forward-throw to lat/lng deltas. North = -dy in screen
+        // space, but camera heading 0 = facing north, so heading 0 +
+        // forward = +lat. A positive forward-throw at heading θ goes
+        // (cos θ * d) north and (sin θ * d) east.
+        const cosLat = Math.cos((cam.lat * Math.PI) / 180) || 1;
+        const dLatDeg = (forwardThrowMeters * Math.cos(headingRad)) / 111320;
+        const dLngDeg = (forwardThrowMeters * Math.sin(headingRad)) / (111320 * cosLat);
+        const focalLat = cam.lat + dLatDeg;
+        const focalLng = cam.lng + dLngDeg;
+
+        // Reticle visual position: when tilt = 0 → 0.5 (CSS center).
+        // When tilt = 65° → roughly 0.42 (above center). Linear fit.
+        const focalY = 0.5 - (cam.tilt / 67) * 0.08;
+        if (Math.abs(focalY - lastReportedFocalYRef.current) > 0.005) {
+          lastReportedFocalYRef.current = focalY;
+          onFocalScreenYChangeRef.current?.(focalY);
+        }
+
+        // Hover detection: closest target within ~24px-equivalent in
+        // lat/lng at current zoom.
+        const px = 24;
+        const metersPerPx = 156543.03392 / Math.pow(2, cam.zoom);
+        const radiusMeters = px * metersPerPx;
+        const radiusDeg = radiusMeters / 111320; // approx; lng correction below
+        const thresholdSq = radiusDeg * radiusDeg;
+
+        let nearest: ReticleTarget | null = null;
+        let nearestSq = Infinity;
+        for (const t of airplaneTargetsRef.current) {
+          const dLat = t.lat - focalLat;
+          const dLng = (t.lng - focalLng) * cosLat;
+          const sq = dLat * dLat + dLng * dLng;
+          if (sq < nearestSq) {
+            nearestSq = sq;
+            nearest = t;
+          }
+        }
+        const hit = nearest && nearestSq <= thresholdSq ? nearest : null;
+        const newId = hit ? hit.id : null;
+        reticleHoveringRef.current = !!hit;
+        if (newId !== lastReportedTargetIdRef.current) {
+          lastReportedTargetIdRef.current = newId;
+          onReticleTargetChangeRef.current?.(hit);
+        }
+      } else {
+        // Outside airplane mode, ensure no stale hover sticks around.
+        if (reticleHoveringRef.current) reticleHoveringRef.current = false;
+        if (lastReportedTargetIdRef.current !== null) {
+          lastReportedTargetIdRef.current = null;
+          onReticleTargetChangeRef.current?.(null);
+        }
+      }
 
       // ── Edge-triggered button actions ───────────────────────────────
       if (justPressed.size > 0) {

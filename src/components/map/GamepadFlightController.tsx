@@ -246,6 +246,11 @@ export default function GamepadFlightController({
   // Right-X orbit-init dwell tracker. Resets on grab end.
   const orbitInitRef = useRef<OrbitInitState>({ direction: null, heldSinceMs: 0, fired: false });
 
+  // Lat/lng of the lead grabbed by the current LT-hold. Set on grab onset
+  // (snapshot from airplaneTargets), used to keep the camera locked on
+  // the lead while right-X rotates the heading around it.
+  const grabbedLatLngRef = useRef<{ lat: number; lng: number } | null>(null);
+
   // Reset our owned camera state whenever the map instance changes (e.g.
   // walk mode toggle). Otherwise we carry stale center/heading from before.
   useEffect(() => {
@@ -417,12 +422,20 @@ export default function GamepadFlightController({
             actionsRef.current.onGrabStart?.();
             // Reset orbit-init state at the start of every grab.
             orbitInitRef.current = { direction: null, heldSinceMs: 0, fired: false };
+            // Snapshot the lat/lng of the lead the reticle is on so we
+            // can lock the camera onto it for the rest of the grab.
+            const targetId = lastReportedTargetIdRef.current;
+            const target = targetId
+              ? (airplaneTargetsRef.current ?? []).find(t => t.id === targetId)
+              : null;
+            grabbedLatLngRef.current = target ? { lat: target.lat, lng: target.lng } : null;
           }
         } else if (!isPressed && lt.pressing) {
           lt.pressing = false;
           if (lt.startedAsGrab) {
             actionsRef.current.onGrabEnd?.();
             orbitInitRef.current = { direction: null, heldSinceMs: 0, fired: false };
+            grabbedLatLngRef.current = null;
           }
           lt.startedAsGrab = false;
         }
@@ -588,6 +601,27 @@ export default function GamepadFlightController({
 
       const headingDeltaThisFrame = vel.heading * dt;
       cam.heading = (cam.heading + headingDeltaThisFrame + 360) % 360;
+
+      // ── Grab lock — keep the held point under the reticle ──────────
+      // While LT-grabbing, the camera should orbit the held lat/lng:
+      // right-X changes heading, but the camera lat/lng is recomputed
+      // each frame so held + camera_offset = focal_point. Same forward-
+      // throw model used by the focal point calculation: along heading
+      // by altitude * tan(tilt). This makes right-X feel like rotating
+      // around the held lead instead of yawing freely past it.
+      if (ltStateRef.current.startedAsGrab && grabbedLatLngRef.current) {
+        const held = grabbedLatLngRef.current;
+        const altitudeMeters = 35200000 / Math.pow(2, cam.zoom);
+        const tiltRad = (cam.tilt * Math.PI) / 180;
+        const headingRad = (cam.heading * Math.PI) / 180;
+        const forwardThrowMeters = altitudeMeters * Math.tan(tiltRad);
+        const cosLat = Math.cos((held.lat * Math.PI) / 180) || 1;
+        // camera = held - forward(heading) * d
+        const dLatDeg = (forwardThrowMeters * Math.cos(headingRad)) / 111320;
+        const dLngDeg = (forwardThrowMeters * Math.sin(headingRad)) / (111320 * cosLat);
+        cam.lat = held.lat - dLatDeg;
+        cam.lng = held.lng - dLngDeg;
+      }
 
       // ── Sideways pivot fake (overhead only) ─────────────────────────
       // When heading rotates by Δθ this frame, also pan the camera laterally

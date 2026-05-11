@@ -22,6 +22,11 @@ export interface GamepadActions {
   /** Fired when right-X has been held in one direction for >=2s while grabbed.
    *  direction = 'cw' (right) or 'ccw' (left). Camera should begin orbit. */
   onOrbitInit?: (direction: 'cw' | 'ccw') => void;
+  /** Fired on RT press onset while LT-grabbed. The page reads the user's
+   *  armed channel from profile and dispatches to /api/inquiry/send for the
+   *  currently grabbed lead. RT zoom is suppressed for the duration of this
+   *  press so the trigger pull feels like a discrete fire, not a zoom slide. */
+  onFireArmed?: () => void;
 }
 
 export type FlightMode = 'overhead' | 'airplane';
@@ -179,6 +184,9 @@ interface TriggerPressState {
   pressing: boolean;
   /** Set on press onset if reticle was hovering at that moment. */
   startedAsGrab: boolean;
+  /** RT only — set on press onset when LT is already grabbing. While true,
+   *  RT contributes no zoom; it's a fire-the-armed-channel trigger pull. */
+  firedArmed?: boolean;
 }
 
 // ── Right-X orbit-init dwell ──────────────────────────────────────────
@@ -411,13 +419,22 @@ export default function GamepadFlightController({
       {
         const rt = rtStateRef.current;
         const isPressed = triggers.right >= TRIGGER_PRESS_THRESHOLD;
+        // RT-while-LT-grabbed = fire the armed channel. We tag the press as
+        // "fire" on onset (when LT is already grabbing) and suppress RT zoom
+        // for the remainder of that press, so the user gets a discrete trigger
+        // pull rather than a zoom slide.
         if (isPressed && !rt.pressing) {
           rt.pressing = true;
           rt.startedAsGrab = false; // RT never grabs
+          rt.firedArmed = ltStateRef.current.startedAsGrab;
+          if (rt.firedArmed) {
+            actionsRef.current.onFireArmed?.();
+          }
         } else if (!isPressed && rt.pressing) {
           rt.pressing = false;
+          rt.firedArmed = false;
         }
-        if (isPressed) triggerZoomDelta += triggers.right; // zoom in
+        if (isPressed && !rt.firedArmed) triggerZoomDelta += triggers.right; // zoom in
       }
 
       // LT — grab gate or zoom out.

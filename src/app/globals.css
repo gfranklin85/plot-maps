@@ -223,13 +223,16 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* ─── Prospect pin (selected house in prospect mode) ─── */
+/* Quiet "locked in" pin — indigo, fades in, steady glow, no celebration. */
 .prospect-pin {
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   border-radius: 9999px;
-  background-color: #f97316;
-  border: 3px solid #ffffff;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  background-color: #6366f1;
+  border: 2px solid rgba(255, 255, 255, 0.95);
+  box-shadow:
+    0 0 0 3px rgba(99, 102, 241, 0.18),
+    0 2px 8px rgba(0, 0, 0, 0.35);
   color: #ffffff;
   display: flex;
   align-items: center;
@@ -237,65 +240,40 @@ h1, h2, h3, h4, h5, h6 {
   cursor: pointer;
   position: relative;
   transform: translate(-50%, -50%);
-  animation: prospectPinDrop 400ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
-  transition: transform 150ms ease-out, box-shadow 150ms ease-out;
-}
-
-.prospect-pin::before {
-  /* Pulse ring that fires once on mount */
-  content: "";
-  position: absolute;
-  inset: -3px;
-  border-radius: 9999px;
-  border: 3px solid #f97316;
-  opacity: 0;
-  animation: prospectPinPulse 700ms ease-out 80ms forwards;
-  pointer-events: none;
+  animation: prospectPinFadeIn 250ms ease-out both;
+  transition: transform 180ms ease-out, box-shadow 180ms ease-out;
 }
 
 .prospect-pin:hover {
-  transform: translate(-50%, -50%) scale(1.12);
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.45);
+  transform: translate(-50%, -50%) scale(1.08);
+  box-shadow:
+    0 0 0 4px rgba(99, 102, 241, 0.28),
+    0 3px 10px rgba(0, 0, 0, 0.4);
 }
 
 .prospect-pin:active {
-  transform: translate(-50%, -50%) scale(0.95);
+  transform: translate(-50%, -50%) scale(0.96);
 }
 
 .prospect-pin .prospect-pin__check {
-  width: 14px;
-  height: 14px;
+  width: 13px;
+  height: 13px;
   stroke: #ffffff;
   stroke-width: 3;
   fill: none;
   stroke-linecap: round;
   stroke-linejoin: round;
-  animation: prospectPinCheck 420ms ease-out 120ms both;
+  animation: prospectPinCheck 240ms ease-out 100ms both;
 }
 
-@keyframes prospectPinDrop {
+@keyframes prospectPinFadeIn {
   0% {
-    transform: translate(-50%, -80%) scale(0.4);
+    transform: translate(-50%, -50%) scale(0.85);
     opacity: 0;
-  }
-  60% {
-    transform: translate(-50%, -48%) scale(1.15);
-    opacity: 1;
   }
   100% {
     transform: translate(-50%, -50%) scale(1);
     opacity: 1;
-  }
-}
-
-@keyframes prospectPinPulse {
-  0% {
-    inset: -3px;
-    opacity: 0.7;
-  }
-  100% {
-    inset: -22px;
-    opacity: 0;
   }
 }
 
@@ -464,6 +442,73 @@ h1, h2, h3, h4, h5, h6 {
   background: #f59e0b;
   box-shadow: 0 0 12px rgba(245, 158, 11, 0.4);
 }
+
+/* ── Plot platform — owner self-score states ──────────────────────────
+ * Score states override the generic listing/lead status colors because an
+ * owner-set score is the most authoritative signal we have on a property. */
+.lp--score-here_to_stay { --lp-color: #6b7280; }
+.lp--score-here_to_stay .lp__bubble {
+  background: #6b7280;
+  box-shadow: 0 0 10px rgba(107, 114, 128, 0.35);
+}
+.lp--score-curious_to_hear_offers { --lp-color: #f59e0b; }
+.lp--score-curious_to_hear_offers .lp__bubble {
+  background: #f59e0b;
+  box-shadow: 0 0 14px rgba(245, 158, 11, 0.55);
+}
+.lp--score-would_sell_if { --lp-color: #10b981; }
+.lp--score-would_sell_if .lp__bubble {
+  background: #10b981;
+  box-shadow: 0 0 16px rgba(16, 185, 129, 0.65);
+}
+
+/* Private-to-initiator visual: dashed ring around the bubble */
+.lp--private .lp__bubble {
+  outline: 2px dashed rgba(255, 255, 255, 0.55);
+  outline-offset: 1px;
+}
+
+/* Inquiry overlay — small badge in top-right of the bubble showing channel */
+.lp__overlay-inquiry {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: rgba(11, 14, 28, 0.95);
+  color: #fff;
+  font-family: 'Material Symbols Outlined', sans-serif;
+  font-size: 10px;
+  line-height: 14px;
+  text-align: center;
+  pointer-events: none;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+/* ── Plot platform — owner verification badges ────────────────────────
+ * Bottom-right of the bubble. Tier-specific colors so a buyer can read
+ * the trust level at a glance. */
+.lp__overlay-verif {
+  position: absolute;
+  bottom: -4px;
+  right: -4px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  color: #fff;
+  font-family: 'Material Symbols Outlined', sans-serif;
+  font-size: 10px;
+  line-height: 14px;
+  text-align: center;
+  pointer-events: none;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+.lp__overlay-verif--owner          { background: #10b981; }
+.lp__overlay-verif--manager        { background: #6b7280; }
+.lp__overlay-verif--agent_attested { background: #f59e0b; }
 
 /* Hover-reveal label pill — slides in to the right of the pin */
 .lp__label {

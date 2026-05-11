@@ -114,6 +114,10 @@ export default function MapPage() {
   // Latest hover target as a ref so onGrabStart (which fires inside the
   // gamepad RAF loop) can read the current value without re-deriving.
   const reticleTargetRef = useRef<Lead | null>(null);
+  // Grabbed lead as a ref so onFireArmed (also fires inside the RAF loop)
+  // can read the current grabbed lead without the gamepadActions useMemo
+  // having to re-create on every grab/release.
+  const grabbedLeadRef = useRef<Lead | null>(null);
 
   // navigateTarget kept for compat with MapView's CenterController prop;
   // every flow now uses the camera choreographer's dispatchFlight() instead,
@@ -604,11 +608,15 @@ export default function MapPage() {
         // grabbedLead from state. Phase B1: just stores. Phase B2 will
         // open menus / cards off this state.
         const target = reticleTargetRef.current;
-        if (target) setGrabbedLead(target);
+        if (target) {
+          setGrabbedLead(target);
+          grabbedLeadRef.current = target;
+        }
       },
       onGrabEnd: () => {
         // LT released. Drop the grab. Orbit state (if any) ends here too.
         setGrabbedLead(null);
+        grabbedLeadRef.current = null;
         setOrbitDirection(null);
       },
       onOrbitInit: (direction) => {
@@ -616,6 +624,33 @@ export default function MapPage() {
         // the direction in state — actual orbit camera animation is
         // Phase B3. For now this is the hook the next phase plugs into.
         setOrbitDirection(direction);
+      },
+      onFireArmed: () => {
+        // RT pressed while LT-grabbed. Read the user's armed channel and
+        // dispatch /api/inquiry/send for the grabbed lead. The popup never
+        // opens; this is a fire-and-update flow, the marker overlay paints
+        // on the next leads refresh.
+        const lead = grabbedLeadRef.current;
+        if (!lead) return;
+        void (async () => {
+          try {
+            const armedRes = await fetch('/api/profile/arm-channel', { method: 'GET' });
+            const armed = await armedRes.json().catch(() => ({}));
+            const channel = armed?.armed_channel;
+            if (!channel) return;
+            await fetch('/api/inquiry/send', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                leadId: lead.id,
+                channel,
+                ...(channel === 'phone_call' ? { phase: 'primer' } : {}),
+              }),
+            });
+          } catch (err) {
+            console.error('onFireArmed inquiry/send failed', err);
+          }
+        })();
       },
     };
     // handleMapClick is stable enough; including all deps would re-create

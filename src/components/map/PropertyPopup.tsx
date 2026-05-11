@@ -10,7 +10,6 @@ import { useProfile } from "@/lib/profile-context";
 import { useAuth } from "@/lib/auth-context";
 import { usePhone } from "@/lib/phone-context";
 import UpgradeGate from "@/components/ui/UpgradeGate";
-import SkiptraceReveal, { type SkiptracePhase } from "@/components/map/SkiptraceReveal";
 
 interface Props {
   lead: Lead;
@@ -127,7 +126,6 @@ function formatDate(dateStr: string | null): string {
 export default function PropertyPopup({ lead, onUpdate, walkMode = false, onWalkHere, onToggleProspectMode, prospectMode }: Props) {
   const { profile } = useProfile();
   const { user } = useAuth();
-  const { makeCall, isDesktop } = usePhone();
   const [note, setNote] = useState('');
   const [, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -138,8 +136,56 @@ export default function PropertyPopup({ lead, onUpdate, walkMode = false, onWalk
   const [upgradeFeature, setUpgradeFeature] = useState<string | null>(null);
   const [contextPaste, setContextPaste] = useState('');
   const [contextSaved, setContextSaved] = useState(false);
-  const [lookupLoading, setLookupLoading] = useState(false);
-  const [lookupResult, setLookupResult] = useState<{ hit: boolean; owner_name?: string; phones?: string[]; error?: string } | null>(null);
+  // Plot platform — channel-aware inquiry firing.
+  // For Lite users: this popup displays NO owner name or phone (masked layer).
+  // For Pro users: an Owner Contact block above the channel actions renders
+  // raw owner identity from the lead row. Same data path, different render
+  // policy by edition.
+  const [armedChannel, setArmedChannel] = useState<'text_invite' | 'direct_mail' | 'phone_call' | null>(null);
+  const [plotEdition, setPlotEdition] = useState<'lite' | 'pro' | null>(null);
+  const [inquiryStatus, setInquiryStatus] = useState<'idle' | 'sending' | 'sent' | 'failed'>('idle');
+  const [inquiryError, setInquiryError] = useState<string | null>(null);
+  const { makeCall, isDesktop } = usePhone();
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/profile/arm-channel')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (!cancelled && data) {
+          setArmedChannel(data.armed_channel || null);
+          setPlotEdition((data.plot_edition as 'lite' | 'pro') || 'lite');
+        }
+      })
+      .catch(() => { /* silent */ });
+    return () => { cancelled = true; };
+  }, []);
+  const fireArmedInquiry = async (override?: 'text_invite' | 'direct_mail' | 'phone_call', phase?: 'primer' | 'fire') => {
+    const channel = override || armedChannel;
+    if (!channel) {
+      setInquiryError('Arm a channel at /dashboard/arming first');
+      return;
+    }
+    setInquiryStatus('sending');
+    setInquiryError(null);
+    try {
+      const res = await fetch('/api/inquiry/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ leadId: lead.id, channel, ...(phase ? { phase } : {}) }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setInquiryStatus('failed');
+        setInquiryError(data?.error || 'Failed');
+        return;
+      }
+      setInquiryStatus('sent');
+      onUpdate?.();
+    } catch {
+      setInquiryStatus('failed');
+      setInquiryError('Network error');
+    }
+  };
 
   // Parcel info from City of Lemoore GIS (zoning, GP, APN, acres,
   // subdivision, site plan)
@@ -439,97 +485,154 @@ export default function PropertyPopup({ lead, onUpdate, walkMode = false, onWalk
         {/* ════════════════════════════════════════════════════════ */}
         {!isReference && (
           <>
-            {/* Owner name if present */}
-            {(lead.owner_name || lead.name) && (
-              <p className="text-sm font-semibold text-on-surface">{lead.owner_name || lead.name}</p>
-            )}
-
-            {/* Phone numbers + call buttons */}
-            {isCallable && (
-              <div className="flex flex-col gap-1.5">
-                {phones.map((phone, idx) => (
-                  <div key={idx} className="flex items-center gap-2">
+            {/* ──────── Pro: raw Owner Contact block ──────── */}
+            {/* Only renders for Pro edition. Lite never sees raw owner data
+             *  here — they continue to interact only via the Plot system
+             *  channels below. Same data on the lead row regardless of
+             *  edition; this is purely a render-policy gate.
+             */}
+            {plotEdition === 'pro' && (lead.owner_name || lead.phone || lead.email) && (
+              <div className="rounded-lg border border-card-border bg-card p-2 text-xs space-y-1">
+                <div className="text-[10px] uppercase tracking-widest text-on-surface-variant">
+                  Owner contact
+                </div>
+                {lead.owner_name && (
+                  <div className="font-semibold text-on-surface">{lead.owner_name}</div>
+                )}
+                {[lead.phone, lead.phone_2, lead.phone_3]
+                  .filter((p): p is string => !!p)
+                  .map((phone, idx) => (
                     <button
+                      key={idx}
                       onClick={() => {
-                        if (isFree) { setUpgradeFeature('dialer'); return; }
-                        if (isDesktop) makeCall(phone, lead.owner_name || lead.name || 'Unknown', lead.id);
-                        else window.location.href = `tel:${phone}`;
+                        if (isDesktop) {
+                          makeCall(phone, lead.owner_name || lead.name || 'Unknown', lead.id);
+                        } else {
+                          window.location.href = `tel:${phone}`;
+                        }
                       }}
-                      className="flex items-center gap-1 text-[11px] font-bold text-emerald-500 hover:underline"
+                      className="flex items-center gap-1 text-emerald-500 hover:underline font-bold"
                     >
                       <MaterialIcon icon="call" className="text-[12px]" />
                       {formatPhone(phone)}
                     </button>
+                  ))}
+                {lead.email && (
+                  <div className="text-on-surface-variant break-all">{lead.email}</div>
+                )}
+                {lead.mailing_address && lead.mailing_address !== lead.property_address && (
+                  <div className="text-on-surface-variant text-[11px]">
+                    Mail: {lead.mailing_address}
                   </div>
-                ))}
+                )}
               </div>
             )}
 
-            {/* Skiptrace reveal — V2 lines-of-light replaces the old button + spinner */}
-            {!isCallable && !isReference && (() => {
-              // Treat a batch-order skiptrace that's still in flight as 'searching'
-              // even when the user hasn't clicked the button on this popup.
-              const isBatchPending = lead.skiptrace_status === 'pending' && !lookupLoading && !lookupResult;
-              const isBatchNotFound = lead.skiptrace_status === 'not_found' && !lookupResult;
-
-              const phase: SkiptracePhase =
-                lookupLoading || isBatchPending ? 'searching' :
-                lookupResult?.hit ? 'revealed' :
-                lookupResult && !lookupResult.hit ? (lookupResult.error?.toLowerCase().includes('failed') ? 'error' : 'not_found') :
-                isBatchNotFound ? 'not_found' :
-                'idle';
-
-              return (
-                <SkiptraceReveal
-                  phase={phase}
-                  data={lookupResult?.hit ? {
-                    ownerName: lookupResult.owner_name || null,
-                    phones: lookupResult.phones || [],
-                    address: lead.property_address || null,
-                  } : null}
-                  errorMessage={
-                    lookupResult?.error ||
-                    (lead.skiptrace_status === 'not_found' ? 'No owner data on file for this address.' : null)
-                  }
-                  priceLabel="$0.50"
-                  onTrigger={async () => {
-                    if (isFree) { setUpgradeFeature('dialer'); return; }
-                    setLookupLoading(true);
-                    setLookupResult(null);
-                    try {
-                      const addr = lead.property_address || '';
-                      const res = await fetch('/api/skip-trace/lookup', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                          leadId: lead.id,
-                          address: addr,
-                          city: lead.city || addr.split(',')[1]?.trim() || '',
-                          state: lead.state || 'CA',
-                          zip: lead.zip || '',
-                        }),
-                      });
-                      const data = await res.json();
-                      if (data.error === 'insufficient_balance') {
-                        setLookupResult({ hit: false, error: 'Add funds to your wallet first' });
-                      } else if (data.hit) {
-                        setLookupResult({ hit: true, owner_name: data.owner_name, phones: data.phones });
-                        onUpdate?.();
-                      } else {
-                        setLookupResult({ hit: false, error: 'No owner data on file for this address.' });
-                      }
-                    } catch {
-                      setLookupResult({ hit: false, error: 'Lookup failed' });
-                    }
-                    setLookupLoading(false);
-                  }}
-                  onCall={(phone) => {
-                    if (isDesktop) makeCall(phone, lookupResult?.owner_name || 'Unknown', lead.id);
-                    else window.location.href = `tel:${phone}`;
-                  }}
-                />
-              );
-            })()}
+            {/* ──────── Plot platform — channel-aware inquiry actions ──────── */}
+            {/* Self-score state, if any (no buyer info ever shown). */}
+            {lead.self_score_state && (
+              <div className="rounded-lg border border-card-border bg-surface-container-low p-2 text-xs">
+                <div className="font-semibold text-on-surface">
+                  Owner self-score:{' '}
+                  <span className="text-emerald-400">
+                    {lead.self_score_state.state === 'here_to_stay' && 'Staying put'}
+                    {lead.self_score_state.state === 'curious_to_hear_offers' && 'Curious to hear offers'}
+                    {lead.self_score_state.state === 'would_sell_if' && (
+                      <>
+                        Would sell if {lead.self_score_state.condition || '—'}
+                      </>
+                    )}
+                  </span>
+                </div>
+                {lead.self_score_state.visibility === 'private_to_initiator' && (
+                  <div className="text-[10px] text-on-surface-variant mt-0.5">Private to your inquiry</div>
+                )}
+                {/* Verification badge text */}
+                {lead.verification_state && lead.verification_state.tier !== 'unverified' && (
+                  <div className="text-[10px] mt-0.5">
+                    {lead.verification_state.tier === 'agent_attested' && (
+                      <span className="text-amber-400">Verified by agent</span>
+                    )}
+                    {lead.verification_state.tier === 'owner' && (
+                      <span className="text-emerald-400">Verified owner</span>
+                    )}
+                    {lead.verification_state.tier === 'manager' && (
+                      <span className="text-on-surface-variant">Manager-claimed</span>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+            {/* Agent verification — discrete inline link only, no beacon.
+             *  The verification path exists for agents who want to use it
+             *  but is NOT a workflow we push from the map. The dedicated
+             *  /dashboard/agent/verifications page is where agents go
+             *  when they're in verification-mode. */}
+            {lead.verification_state?.needs_verification && (
+              <a
+                href={`/dashboard/agent/verifications?lead=${lead.id}`}
+                className="text-[10px] text-on-surface-variant hover:text-on-surface underline self-start"
+              >
+                Owner requested agent verification →
+              </a>
+            )}
+            {/* Inquiry-state row */}
+            {lead.inquiry_state && (
+              <div className="text-[10px] text-on-surface-variant uppercase tracking-widest">
+                Inquiry: {lead.inquiry_state.channel.replace('_', ' ')} — {lead.inquiry_state.status}
+              </div>
+            )}
+            {/* Channel actions: text invitation, mail letter, dial. No name or phone is shown. */}
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => fireArmedInquiry('text_invite')}
+                disabled={
+                  inquiryStatus === 'sending' ||
+                  lead.inquiry_state?.channel === 'text_invite' ||
+                  !!lead.text_declined
+                }
+                title={lead.text_declined ? 'This property declined text inquiries — try direct mail instead' : undefined}
+                className="flex items-center gap-1 rounded-md bg-primary/20 hover:bg-primary/30 px-2 py-1 text-[11px] font-bold text-primary disabled:opacity-50"
+              >
+                <MaterialIcon icon="mail" className="text-[14px]" />
+                Send invitation
+              </button>
+              <button
+                onClick={() => fireArmedInquiry('direct_mail')}
+                disabled={inquiryStatus === 'sending'}
+                className="flex items-center gap-1 rounded-md bg-amber-500/20 hover:bg-amber-500/30 px-2 py-1 text-[11px] font-bold text-amber-400 disabled:opacity-50"
+              >
+                <MaterialIcon icon="inventory_2" className="text-[14px]" />
+                Send letter
+              </button>
+              <button
+                onClick={() => fireArmedInquiry('phone_call', 'fire')}
+                disabled={inquiryStatus === 'sending'}
+                className="flex items-center gap-1 rounded-md bg-emerald-500/20 hover:bg-emerald-500/30 px-2 py-1 text-[11px] font-bold text-emerald-400 disabled:opacity-50"
+              >
+                <MaterialIcon icon="call" className="text-[14px]" />
+                Dial
+              </button>
+            </div>
+            {lead.text_declined && (
+              <div className="text-[10px] text-on-surface-variant italic">
+                This property declined text inquiries. Try direct mail instead.
+              </div>
+            )}
+            {inquiryStatus === 'sent' && (
+              <div className="text-[10px] text-emerald-400">Inquiry queued.</div>
+            )}
+            {inquiryStatus === 'failed' && inquiryError && (
+              <div className="text-[10px] text-rose-400">{inquiryError}</div>
+            )}
+          </>
+        )}
+        {!isReference && (
+          <>
+            {/* Owner name and phone numbers intentionally not shown.
+             *  Plot's universal product trait: raw owner identity stays
+             *  server-side and is reached only via the channel-aware
+             *  inquiry actions above. */}
 
             {/* Script (collapsed by default) */}
             {profile.openingScript && isCallable && (

@@ -66,7 +66,19 @@ function buildPinElement(lead: Lead, pinMode: PinMode): HTMLElement {
   const label = statusLabel(status);
 
   const wrapper = document.createElement('div');
-  wrapper.className = `lp lp--${status}`;
+  // Self-score state takes precedence over generic listing/lead status because
+  // an owner-set score is the most authoritative signal we have.
+  const scoreClass = lead.self_score_state ? `lp--score-${lead.self_score_state.state}` : null;
+  wrapper.className = `lp lp--${status}${scoreClass ? ` ${scoreClass}` : ''}`;
+  if (lead.self_score_state?.visibility === 'private_to_initiator') {
+    wrapper.classList.add('lp--private');
+  }
+  // Verification tier — small inline modulator on the score. NOT a separate
+  // alert. The score is the headline; verification is the footnote that
+  // gauges how much the score can be trusted.
+  if (lead.verification_state?.tier && lead.verification_state.tier !== 'unverified') {
+    wrapper.classList.add(`lp--verif-${lead.verification_state.tier}`);
+  }
   // Tag with the lead id so the airplane-mode reticle can hit-test pins
   // via document.elementFromPoint(centerX, centerY) — same machinery the
   // mouse uses, no projection math needed.
@@ -86,6 +98,35 @@ function buildPinElement(lead: Lead, pinMode: PinMode): HTMLElement {
 
   wrapper.appendChild(bubble);
   wrapper.appendChild(tail);
+
+  // Inquiry overlay — small icon in the top-right of the bubble showing that
+  // the user has fired an outreach on this property via this channel.
+  if (lead.inquiry_state) {
+    const overlay = document.createElement('span');
+    overlay.className = 'lp__overlay-inquiry';
+    overlay.textContent =
+      lead.inquiry_state.channel === 'text_invite' ? 'mail' :
+      lead.inquiry_state.channel === 'direct_mail' ? 'inventory_2' :
+      'call';
+    bubble.appendChild(overlay);
+  }
+
+  // Verification badge — small icon in the bottom-right of the bubble.
+  // Agent-attested gets a star; owner-name-matched gets a check; manager-
+  // claimed gets a person icon. "Needs verification" is intentionally
+  // NOT rendered on the map — it's not a state worth competing for the
+  // viewer's attention. The score is the headline; verification tier is
+  // the footnote, surfaced inline on the marker only when actually present.
+  if (lead.verification_state && lead.verification_state.tier !== 'unverified') {
+    const tier = lead.verification_state.tier;
+    const badge = document.createElement('span');
+    badge.className = `lp__overlay-verif lp__overlay-verif--${tier}`;
+    badge.textContent =
+      tier === 'agent_attested' ? 'verified' :
+      tier === 'owner' ? 'check' :
+      'person';
+    bubble.appendChild(badge);
+  }
 
   // Hover pill (Dots mode) and always-visible pill (Labels mode) share markup
   if (pinMode === 'dots' || pinMode === 'labels') {

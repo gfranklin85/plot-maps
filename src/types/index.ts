@@ -78,7 +78,50 @@ export interface Lead {
   record_type: string | null;
   // Skiptrace pipeline state
   skiptrace_status: 'pending' | 'completed' | 'not_found' | 'failed' | null;
+  // Plot platform — populated server-side via joins
+  inquiry_state?: InquiryState | null;
+  self_score_state?: SelfScoreState | null;
+  verification_state?: VerificationState | null;
+  // Channel-routing signal: this number doesn't accept Plot SMS.
+  // Set by the inbound STOP webhook. NOT an owner-will signal — purely
+  // tells the UI to gray out the text-invite button and suggest mail.
+  text_declined?: boolean | null;
 }
+
+export type InquiryChannel = 'text_invite' | 'direct_mail' | 'phone_call';
+
+export interface InquiryState {
+  channel: InquiryChannel;
+  status: 'queued' | 'sent' | 'delivered' | 'failed' | 'replied' | 'opted_out';
+  sent_at: string | null;
+}
+
+export type SelfScoreNamedState = 'here_to_stay' | 'curious_to_hear_offers' | 'would_sell_if';
+
+export interface SelfScoreState {
+  state: SelfScoreNamedState;
+  condition?: string | null;
+  visibility: 'private_to_initiator' | 'public';
+}
+
+export type VerificationTier = 'unverified' | 'owner' | 'manager' | 'agent_attested';
+
+export interface VerificationState {
+  tier: VerificationTier;
+  /** Owner has explicitly asked for an agent to attest. Drives the "Needs
+   *  Verification" pin color on the public map. */
+  needs_verification: boolean;
+}
+
+export type ClaimantRelationship =
+  | 'owner'
+  | 'spouse'
+  | 'managing_for_owner'
+  | 'executor'
+  | 'trustee'
+  | 'property_manager';
+
+export type PlotEdition = 'lite' | 'pro';
 
 export interface Activity {
   id: string;

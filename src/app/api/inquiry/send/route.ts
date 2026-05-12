@@ -4,6 +4,7 @@ import crypto from 'crypto';
 import { getAuthUser } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { silentLookup } from '@/lib/skiptrace-silent';
+import { reverseGeocodeServer } from '@/lib/geocode-server';
 import { logCost } from '@/lib/cost-tracker';
 
 type Channel = 'text_invite' | 'direct_mail' | 'phone_call';
@@ -43,14 +44,75 @@ export async function POST(request: Request) {
   const user = await getAuthUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { leadId, channel, phase } = (await request.json()) as {
-    leadId: string;
+  const body = (await request.json()) as {
+    leadId?: string;
+    lat?: number;
+    lng?: number;
+    placeId?: string | null;
     channel: Channel;
     phase?: Phase;
   };
+  const { channel, phase } = body;
+  let { leadId } = body;
 
-  if (!leadId || !channel) {
-    return NextResponse.json({ error: 'leadId and channel required' }, { status: 400 });
+  if (!channel) {
+    return NextResponse.json({ error: 'channel required' }, { status: 400 });
+  }
+  if (!leadId && (typeof body.lat !== 'number' || typeof body.lng !== 'number')) {
+    return NextResponse.json({ error: 'leadId or lat/lng required' }, { status: 400 });
+  }
+  if (leadId && (typeof body.lat === 'number' || typeof body.lng === 'number')) {
+    return NextResponse.json({ error: 'provide leadId OR lat/lng, not both' }, { status: 400 });
+  }
+
+  // Open-grab path: caller passed lat/lng instead of leadId. Resolve to
+  // an existing Lead at that point (de-dupe by user + address), or auto-
+  // create one. The placeId, if provided, is logged for analytics but
+  // doesn't affect outreach — Plot's outreach target is always the deed
+  // owner at the address, never the tenant business at the POI.
+  if (!leadId) {
+    const lat = body.lat as number;
+    const lng = body.lng as number;
+    const geocoded = await reverseGeocodeServer(lat, lng, user.id);
+    if (!geocoded) {
+      return NextResponse.json(
+        { error: 'No address at this location', code: 'no_address' },
+        { status: 422 },
+      );
+    }
+    // De-dupe: if the same user already has a lead at this address, reuse it.
+    const { data: existing } = await supabaseAdmin
+      .from('leads')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('property_address', geocoded.formatted_address)
+      .limit(1)
+      .maybeSingle();
+    if (existing) {
+      leadId = existing.id;
+    } else {
+      const { data: inserted, error: insertErr } = await supabaseAdmin
+        .from('leads')
+        .insert({
+          user_id: user.id,
+          name: geocoded.formatted_address,
+          property_address: geocoded.formatted_address,
+          city: geocoded.city,
+          state: geocoded.state,
+          zip: geocoded.zip,
+          latitude: geocoded.lat,
+          longitude: geocoded.lng,
+          status: 'New',
+          source: 'airplane_grab',
+        })
+        .select('id')
+        .single();
+      if (insertErr || !inserted) {
+        console.error('Lead auto-create failed', insertErr);
+        return NextResponse.json({ error: 'Failed to create Lead' }, { status: 500 });
+      }
+      leadId = inserted.id;
+    }
   }
 
   // Load profile (edition + arming) and the property

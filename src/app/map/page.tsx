@@ -118,6 +118,16 @@ export default function MapPage() {
   // can read the current grabbed lead without the gamepadActions useMemo
   // having to re-create on every grab/release.
   const grabbedLeadRef = useRef<Lead | null>(null);
+  // Open-grab mode state (page-level, not persisted in v1).
+  const [grabMode, setGrabMode] = useState<'pin_only' | 'open_grab'>('pin_only');
+  // When LT-press in open-grab mode finds no DOM hit, the controller asks us
+  // to synthesize a click at the focal pixel. We set this flag so the
+  // resulting Google click event (delivered via onMapClick) is captured as
+  // the active synthetic grab instead of falling through to prospect mode.
+  const pendingSyntheticGrabRef = useRef(false);
+  // Synthetic grab data captured from a Google click event. Read by
+  // onFireArmed when there's no grabbedLeadRef.
+  const grabbedSyntheticRef = useRef<{ lat: number; lng: number; placeId: string | null } | null>(null);
 
   // navigateTarget kept for compat with MapView's CenterController prop;
   // every flow now uses the camera choreographer's dispatchFlight() instead,
@@ -241,7 +251,24 @@ export default function MapPage() {
     setProspectList(prev => prev.filter(a => a.address !== address));
   }
 
-  async function handleMapClick(latLng: { lat: number; lng: number }) {
+  async function handleMapClick(
+    latLng: { lat: number; lng: number },
+    opts?: { placeId?: string | null },
+  ) {
+    // Open-grab synthetic-click path: if the reticle synthesized a click and
+    // we're waiting on a placeId+latLng, capture it as the active grab and
+    // return early. The fire path (RT) reads grabbedSyntheticRef and sends
+    // lat/lng to /api/inquiry/send. The Google info window is suppressed by
+    // PoiClickCatcher when a placeId is present, so this doesn't pop anything.
+    if (pendingSyntheticGrabRef.current) {
+      pendingSyntheticGrabRef.current = false;
+      grabbedSyntheticRef.current = {
+        lat: latLng.lat,
+        lng: latLng.lng,
+        placeId: opts?.placeId || null,
+      };
+      return;
+    }
     if (!prospectMode) return;
     if (showCoach) dismissCoach();
     // First click after dismissing the coach gets a tiny affirming zoom nudge
@@ -617,7 +644,43 @@ export default function MapPage() {
         // LT released. Drop the grab. Orbit state (if any) ends here too.
         setGrabbedLead(null);
         grabbedLeadRef.current = null;
+        grabbedSyntheticRef.current = null;
+        pendingSyntheticGrabRef.current = false;
         setOrbitDirection(null);
+      },
+      onSyntheticGrab: (focalClientX: number, focalClientY: number) => {
+        // Open-grab LT-press onset with no DOM hit. Synthesize a real
+        // mouse click on the map's container at the focal pixel so
+        // Google's own click listener resolves the property under the
+        // reticle (placeId + lat/lng). The listener calls back into
+        // handleMapClick, which sees pendingSyntheticGrabRef and
+        // captures the result as grabbedSyntheticRef.
+        pendingSyntheticGrabRef.current = true;
+        grabbedSyntheticRef.current = null;
+        // Hit-test the topmost element at the focal pixel and dispatch
+        // a click event on it. Google's gmp-map-3d / classic Map listens
+        // on its own container.
+        const el = document.elementFromPoint(focalClientX, focalClientY);
+        if (!el) {
+          pendingSyntheticGrabRef.current = false;
+          return;
+        }
+        const evt = new MouseEvent('click', {
+          bubbles: true,
+          cancelable: true,
+          clientX: focalClientX,
+          clientY: focalClientY,
+          view: window,
+        });
+        el.dispatchEvent(evt);
+        // Clear the pending flag after a short window if Google didn't
+        // pick up the synthesized click. Prevents a stuck pending flag
+        // from capturing the next unrelated map click.
+        setTimeout(() => {
+          if (pendingSyntheticGrabRef.current) {
+            pendingSyntheticGrabRef.current = false;
+          }
+        }, 500);
       },
       onOrbitInit: (direction) => {
         // Right-X held 2s in a direction while grabbed. B1 just records
@@ -627,26 +690,39 @@ export default function MapPage() {
       },
       onFireArmed: () => {
         // RT pressed while LT-grabbed. Read the user's armed channel and
-        // dispatch /api/inquiry/send for the grabbed lead. The popup never
-        // opens; this is a fire-and-update flow, the marker overlay paints
-        // on the next leads refresh.
+        // dispatch /api/inquiry/send for whatever's grabbed. Two paths:
+        //   1) grabbedLeadRef set → existing Lead, send by leadId.
+        //   2) grabbedSyntheticRef set → open-grab on empty map; send by
+        //      lat/lng. Server reverse-geocodes + auto-creates the Lead.
         const lead = grabbedLeadRef.current;
-        if (!lead) return;
+        const synthetic = grabbedSyntheticRef.current;
+        if (!lead && !synthetic) return;
         void (async () => {
           try {
             const armedRes = await fetch('/api/profile/arm-channel', { method: 'GET' });
             const armed = await armedRes.json().catch(() => ({}));
             const channel = armed?.armed_channel;
             if (!channel) return;
-            await fetch('/api/inquiry/send', {
+            const phasePart = channel === 'phone_call' ? { phase: 'primer' } : {};
+            const body = lead
+              ? { leadId: lead.id, channel, ...phasePart }
+              : {
+                  lat: synthetic!.lat,
+                  lng: synthetic!.lng,
+                  placeId: synthetic!.placeId,
+                  channel,
+                  ...phasePart,
+                };
+            const res = await fetch('/api/inquiry/send', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                leadId: lead.id,
-                channel,
-                ...(channel === 'phone_call' ? { phase: 'primer' } : {}),
-              }),
+              body: JSON.stringify(body),
             });
+            // If we just auto-created a Lead, refetch so the new marker
+            // paints on the map.
+            if (!lead && res.ok) {
+              refetchLeads();
+            }
           } catch (err) {
             console.error('onFireArmed inquiry/send failed', err);
           }
@@ -857,6 +933,31 @@ export default function MapPage() {
                 <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-amber-400" />
               )}
             </button>
+
+            {/* Grab-mode toggle (airplane mode only). pin_only = reticle
+                grabs only existing pins (free). open_grab = reticle can
+                grab any property — synthesizes a click at the focal pixel
+                so Google's picker resolves it. */}
+            {flightMode === 'airplane' && (
+              <button
+                onClick={() => setGrabMode(m => (m === 'pin_only' ? 'open_grab' : 'pin_only'))}
+                title={
+                  grabMode === 'open_grab'
+                    ? 'Open grab: reticle grabs any property (auto-creates a Lead on fire). Click to switch to pin-only.'
+                    : 'Pin-only grab: reticle only grabs existing leads (free). Click to enable open grab.'
+                }
+                className={`w-10 h-10 flex items-center justify-center rounded-xl shadow-lg transition-all ${
+                  grabMode === 'open_grab'
+                    ? 'bg-emerald-500/80 text-white'
+                    : 'bg-surface text-on-surface-variant hover:text-emerald-400'
+                }`}
+              >
+                <MaterialIcon
+                  icon={grabMode === 'open_grab' ? 'add_location' : 'place'}
+                  className="text-[20px]"
+                />
+              </button>
+            )}
 
           </div>
 
@@ -1107,6 +1208,7 @@ export default function MapPage() {
             gamepadEnabled
             gamepadActions={gamepadActions}
             gamepadMode={flightMode}
+            gamepadGrabMode={grabMode}
             gamepadAirplaneTargets={airplaneTargets}
             onGamepadReticleTargetChange={handleReticleTargetChange}
             onGamepadFocalScreenYChange={setReticleTopFraction}

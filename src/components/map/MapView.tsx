@@ -51,6 +51,10 @@ interface Props {
   gamepadEnabled?: boolean;
   gamepadActions?: GamepadActions;
   gamepadMode?: FlightMode;
+  /** Reticle grab mode. 'pin_only' only grabs DOM-hittable pins (free,
+   *  default). 'open_grab' lets the reticle synthesize a click on empty
+   *  map so Google's picker can resolve any property under it. */
+  gamepadGrabMode?: 'pin_only' | 'open_grab';
   /** Targetable leads in airplane mode for reticle hover detection. */
   gamepadAirplaneTargets?: ReticleTarget[];
   /** Fires when the reticle's hovered target changes (incl. null). */
@@ -451,11 +455,15 @@ function PoiClickCatcher({
     // IconMouseEvent has a placeId; MapMouseEvent doesn't. Both extend each
     // other so a single 'click' listener catches both.
     const listener = map.addListener('click', (e: google.maps.IconMouseEvent | google.maps.MapMouseEvent) => {
-      const { prospectMode: pm, onMapClick: omc } = handlerRef.current;
-      if (!pm || !omc) return;
+      const { onMapClick: omc } = handlerRef.current;
+      if (!omc) return;
       const latLng = e.latLng;
       if (!latLng) return;
       const placeId = (e as google.maps.IconMouseEvent).placeId;
+      // Suppress Google's default info window when a placeId is present.
+      // The page handler decides what to do with the click — it gates on
+      // prospectMode internally for the prospect-list flow, and on a
+      // pendingSyntheticGrab flag for the reticle open-grab flow.
       if (placeId && e.stop) e.stop();
       omc({ lat: latLng.lat(), lng: latLng.lng() }, { placeId: placeId || null });
     });
@@ -516,7 +524,7 @@ function PendingSkiptracePins({ pins }: { pins: { id: string; lat: number; lng: 
   return null;
 }
 
-export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClick, center, navigateTo, zoom, mapType = "roadmap", pinMode = "dots", prospectMode = false, prospectPins = [], onProspectPinClick, showZoningOverlay = false, view3D = false, flight = null, gamepadEnabled = false, gamepadActions, gamepadMode = 'overhead', gamepadAirplaneTargets, onGamepadReticleTargetChange, onGamepadFocalScreenYChange, onGamepadStatusChange }: Props) {
+export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClick, center, navigateTo, zoom, mapType = "roadmap", pinMode = "dots", prospectMode = false, prospectPins = [], onProspectPinClick, showZoningOverlay = false, view3D = false, flight = null, gamepadEnabled = false, gamepadActions, gamepadMode = 'overhead', gamepadGrabMode = 'pin_only', gamepadAirplaneTargets, onGamepadReticleTargetChange, onGamepadFocalScreenYChange, onGamepadStatusChange }: Props) {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme !== 'light';
   const isSatellite = mapType === "satellite" || mapType === "hybrid";
@@ -565,6 +573,7 @@ export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClic
             enabled={gamepadEnabled}
             view3D={view3D}
             mode={gamepadMode}
+            grabMode={gamepadGrabMode}
             airplaneTargets={gamepadAirplaneTargets}
             onReticleTargetChange={onGamepadReticleTargetChange}
             onFocalScreenYChange={onGamepadFocalScreenYChange}

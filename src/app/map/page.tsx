@@ -118,12 +118,6 @@ export default function MapPage() {
   // can read the current grabbed lead without the gamepadActions useMemo
   // having to re-create on every grab/release.
   const grabbedLeadRef = useRef<Lead | null>(null);
-  // Open-grab mode state (page-level, not persisted in v1).
-  const [grabMode, setGrabMode] = useState<'pin_only' | 'open_grab'>('pin_only');
-  // Synthetic grab data captured from the controller when LT-press in
-  // open-grab mode lands on an unpinned property. Read by onFireArmed
-  // when grabbedLeadRef is empty.
-  const grabbedSyntheticRef = useRef<{ lat: number; lng: number; placeId: string | null } | null>(null);
 
   // navigateTarget kept for compat with MapView's CenterController prop;
   // every flow now uses the camera choreographer's dispatchFlight() instead,
@@ -623,16 +617,7 @@ export default function MapPage() {
         // LT released. Drop the grab. Orbit state (if any) ends here too.
         setGrabbedLead(null);
         grabbedLeadRef.current = null;
-        grabbedSyntheticRef.current = null;
         setOrbitDirection(null);
-      },
-      onSyntheticGrab: (lat: number, lng: number) => {
-        // Open-grab LT-press onset with no DOM hit. The controller reports
-        // the camera's lat/lng under the reticle directly — no click
-        // synthesis. Store it; RT-fire reads grabbedSyntheticRef and
-        // sends lat/lng to /api/inquiry/send, which reverse-geocodes and
-        // auto-creates the Lead.
-        grabbedSyntheticRef.current = { lat, lng, placeId: null };
       },
       onOrbitInit: (direction) => {
         // Right-X held 2s in a direction while grabbed. B1 just records
@@ -642,39 +627,26 @@ export default function MapPage() {
       },
       onFireArmed: () => {
         // RT pressed while LT-grabbed. Read the user's armed channel and
-        // dispatch /api/inquiry/send for whatever's grabbed. Two paths:
-        //   1) grabbedLeadRef set → existing Lead, send by leadId.
-        //   2) grabbedSyntheticRef set → open-grab on empty map; send by
-        //      lat/lng. Server reverse-geocodes + auto-creates the Lead.
+        // dispatch /api/inquiry/send for the grabbed lead. The popup never
+        // opens; this is a fire-and-update flow, the marker overlay paints
+        // on the next leads refresh.
         const lead = grabbedLeadRef.current;
-        const synthetic = grabbedSyntheticRef.current;
-        if (!lead && !synthetic) return;
+        if (!lead) return;
         void (async () => {
           try {
             const armedRes = await fetch('/api/profile/arm-channel', { method: 'GET' });
             const armed = await armedRes.json().catch(() => ({}));
             const channel = armed?.armed_channel;
             if (!channel) return;
-            const phasePart = channel === 'phone_call' ? { phase: 'primer' } : {};
-            const body = lead
-              ? { leadId: lead.id, channel, ...phasePart }
-              : {
-                  lat: synthetic!.lat,
-                  lng: synthetic!.lng,
-                  placeId: synthetic!.placeId,
-                  channel,
-                  ...phasePart,
-                };
-            const res = await fetch('/api/inquiry/send', {
+            await fetch('/api/inquiry/send', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(body),
+              body: JSON.stringify({
+                leadId: lead.id,
+                channel,
+                ...(channel === 'phone_call' ? { phase: 'primer' } : {}),
+              }),
             });
-            // If we just auto-created a Lead, refetch so the new marker
-            // paints on the map.
-            if (!lead && res.ok) {
-              refetchLeads();
-            }
           } catch (err) {
             console.error('onFireArmed inquiry/send failed', err);
           }
@@ -885,31 +857,6 @@ export default function MapPage() {
                 <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-amber-400" />
               )}
             </button>
-
-            {/* Grab-mode toggle (airplane mode only). pin_only = reticle
-                grabs only existing pins (free). open_grab = reticle can
-                grab any property — synthesizes a click at the focal pixel
-                so Google's picker resolves it. */}
-            {flightMode === 'airplane' && (
-              <button
-                onClick={() => setGrabMode(m => (m === 'pin_only' ? 'open_grab' : 'pin_only'))}
-                title={
-                  grabMode === 'open_grab'
-                    ? 'Open grab: reticle grabs any property (auto-creates a Lead on fire). Click to switch to pin-only.'
-                    : 'Pin-only grab: reticle only grabs existing leads (free). Click to enable open grab.'
-                }
-                className={`w-10 h-10 flex items-center justify-center rounded-xl shadow-lg transition-all ${
-                  grabMode === 'open_grab'
-                    ? 'bg-emerald-500/80 text-white'
-                    : 'bg-surface text-on-surface-variant hover:text-emerald-400'
-                }`}
-              >
-                <MaterialIcon
-                  icon={grabMode === 'open_grab' ? 'add_location' : 'place'}
-                  className="text-[20px]"
-                />
-              </button>
-            )}
 
           </div>
 
@@ -1160,7 +1107,6 @@ export default function MapPage() {
             gamepadEnabled
             gamepadActions={gamepadActions}
             gamepadMode={flightMode}
-            gamepadGrabMode={grabMode}
             gamepadAirplaneTargets={airplaneTargets}
             onGamepadReticleTargetChange={handleReticleTargetChange}
             onGamepadFocalScreenYChange={setReticleTopFraction}

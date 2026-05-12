@@ -65,6 +65,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'provide leadId OR lat/lng, not both' }, { status: 400 });
   }
 
+  // RESERVED FOR FUTURE: no client path currently calls this with lat/lng.
+  // Kept as the server-side foundation for the next click-to-grab feature.
+  // The corresponding client-side open-grab UI was reverted; this branch
+  // waits for the next attempt.
+  //
   // Open-grab path: caller passed lat/lng instead of leadId. Resolve to
   // an existing Lead at that point (de-dupe by user + address), or auto-
   // create one. The placeId, if provided, is logged for analytics but

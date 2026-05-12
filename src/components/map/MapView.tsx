@@ -51,10 +51,6 @@ interface Props {
   gamepadEnabled?: boolean;
   gamepadActions?: GamepadActions;
   gamepadMode?: FlightMode;
-  /** Reticle grab mode. 'pin_only' only grabs DOM-hittable pins (free,
-   *  default). 'open_grab' lets the reticle synthesize a click on empty
-   *  map so Google's picker can resolve any property under it. */
-  gamepadGrabMode?: 'pin_only' | 'open_grab';
   /** Targetable leads in airplane mode for reticle hover detection. */
   gamepadAirplaneTargets?: ReticleTarget[];
   /** Fires when the reticle's hovered target changes (incl. null). */
@@ -520,7 +516,7 @@ function PendingSkiptracePins({ pins }: { pins: { id: string; lat: number; lng: 
   return null;
 }
 
-export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClick, center, navigateTo, zoom, mapType = "roadmap", pinMode = "dots", prospectMode = false, prospectPins = [], onProspectPinClick, showZoningOverlay = false, view3D = false, flight = null, gamepadEnabled = false, gamepadActions, gamepadMode = 'overhead', gamepadGrabMode = 'pin_only', gamepadAirplaneTargets, onGamepadReticleTargetChange, onGamepadFocalScreenYChange, onGamepadStatusChange }: Props) {
+export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClick, center, navigateTo, zoom, mapType = "roadmap", pinMode = "dots", prospectMode = false, prospectPins = [], onProspectPinClick, showZoningOverlay = false, view3D = false, flight = null, gamepadEnabled = false, gamepadActions, gamepadMode = 'overhead', gamepadAirplaneTargets, onGamepadReticleTargetChange, onGamepadFocalScreenYChange, onGamepadStatusChange }: Props) {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme !== 'light';
   const isSatellite = mapType === "satellite" || mapType === "hybrid";
@@ -569,7 +565,6 @@ export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClic
             enabled={gamepadEnabled}
             view3D={view3D}
             mode={gamepadMode}
-            grabMode={gamepadGrabMode}
             airplaneTargets={gamepadAirplaneTargets}
             onReticleTargetChange={onGamepadReticleTargetChange}
             onFocalScreenYChange={onGamepadFocalScreenYChange}

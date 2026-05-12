@@ -27,11 +27,6 @@ export interface GamepadActions {
    *  currently grabbed lead. RT zoom is suppressed for the duration of this
    *  press so the trigger pull feels like a discrete fire, not a zoom slide. */
   onFireArmed?: () => void;
-  /** Open-grab mode only. Fired on LT-press onset when the reticle is NOT
-   *  hovering an existing pin. Reports the focal lat/lng under the reticle.
-   *  The page captures this as the active synthetic grab; RT-fire sends it
-   *  to /api/inquiry/send which reverse-geocodes + auto-creates a Lead. */
-  onSyntheticGrab?: (lat: number, lng: number) => void;
 }
 
 export type FlightMode = 'overhead' | 'airplane';
@@ -76,15 +71,6 @@ interface Props {
   onFocalScreenYChange?: (fraction: number) => void;
   /** Reports controller status up to the page so it can render a toast. */
   onStatusChange?: (connected: boolean, label: string | null) => void;
-  /**
-   * Grab mode for airplane reticle:
-   *   'pin_only'  — only DOM-hittable pins grab (default, free).
-   *   'open_grab' — LT-press on empty map synthesizes a mouse click at the
-   *                 reticle position so Google's picker can resolve the
-   *                 property under it. Page then captures the placeId + latLng
-   *                 from Google's own click event and treats it as a grab.
-   */
-  grabMode?: 'pin_only' | 'open_grab';
 }
 
 // ── Heavy helicopter physics constants ────────────────────────────────
@@ -225,7 +211,6 @@ export default function GamepadFlightController({
   onReticleTargetChange,
   onFocalScreenYChange,
   onStatusChange,
-  grabMode = 'pin_only',
 }: Props) {
   const map = useMap();
 
@@ -247,8 +232,6 @@ export default function GamepadFlightController({
   view3DRef.current = view3D;
   const modeRef = useRef<FlightMode>(mode);
   modeRef.current = mode;
-  const grabModeRef = useRef<'pin_only' | 'open_grab'>(grabMode);
-  grabModeRef.current = grabMode;
   // Live refs for hover detection that runs each frame.
   const airplaneTargetsRef = useRef<ReticleTarget[] | undefined>(airplaneTargets);
   airplaneTargetsRef.current = airplaneTargets;
@@ -348,7 +331,7 @@ export default function GamepadFlightController({
       // shift) and walk up the DOM until we find an element with that
       // attribute. Zero projection math; works regardless of how the
       // map renders tilt, vector vs raster, etc.
-      if (modeRef.current === 'airplane') {
+      if (modeRef.current === 'airplane' && airplaneTargetsRef.current && airplaneTargetsRef.current.length > 0) {
         // Reticle visual position: 0.5 at flat, ~0.42 at 65° tilt.
         // (Linear fit to keep the reticle close to where the user
         // perceives the focal point with high tilt.)
@@ -358,12 +341,13 @@ export default function GamepadFlightController({
           onFocalScreenYChangeRef.current?.(focalY);
         }
 
-        // DOM hit-test for existing pins. Only meaningful if we have
-        // airplane targets loaded.
+        // Map div = the element that wraps the gmp-map-3d / gm-style
+        // root. We use the root document.elementFromPoint and walk up
+        // looking for [data-lead-id]. The reticle is centered horizontally
+        // and offset vertically per focalY in the map container.
         const mapDiv = (map as unknown as { getDiv?: () => HTMLElement }).getDiv?.();
-        const hasTargets = !!airplaneTargetsRef.current && airplaneTargetsRef.current.length > 0;
         let hitId: string | null = null;
-        if (mapDiv && hasTargets) {
+        if (mapDiv) {
           const rect = mapDiv.getBoundingClientRect();
           const cx = rect.left + rect.width / 2;
           const cy = rect.top + rect.height * focalY;
@@ -385,15 +369,8 @@ export default function GamepadFlightController({
           }
         }
 
-        const hit = hitId && airplaneTargetsRef.current
-          ? (airplaneTargetsRef.current.find(t => t.id === hitId) || null)
-          : null;
-        // In open-grab mode, the reticle is always grab-ready in airplane
-        // mode regardless of whether there's a DOM pin under it. This gives
-        // the user visual feedback (cursor=hand) that they can LT-press to
-        // grab any property under the reticle.
-        const openGrab = grabModeRef.current === 'open_grab';
-        reticleHoveringRef.current = !!hit || openGrab;
+        const hit = hitId ? (airplaneTargetsRef.current.find(t => t.id === hitId) || null) : null;
+        reticleHoveringRef.current = !!hit;
         if ((hit?.id ?? null) !== lastReportedTargetIdRef.current) {
           lastReportedTargetIdRef.current = hit?.id ?? null;
           onReticleTargetChangeRef.current?.(hit);
@@ -466,20 +443,7 @@ export default function GamepadFlightController({
         const isPressed = triggers.left >= TRIGGER_PRESS_THRESHOLD;
         if (isPressed && !lt.pressing) {
           lt.pressing = true;
-          // In pin_only mode, grab requires a DOM hit on a known pin.
-          // In open_grab mode, any LT-press in airplane mode grabs whatever
-          // the reticle is over. If there's no DOM hit, we report the
-          // camera's lat/lng as the synthetic grab target. (This is
-          // approximate at high tilt — the reticle's visual focal point
-          // is forward of the camera — but it's deterministic and good
-          // enough for v1. Future polish: project focal pixel to lat/lng.)
-          const isAirplane = modeRef.current === 'airplane';
-          const openGrab = grabModeRef.current === 'open_grab';
-          const hitTarget = lastReportedTargetIdRef.current !== null;
-          lt.startedAsGrab = isAirplane && (hitTarget || openGrab);
-          if (lt.startedAsGrab && !hitTarget && openGrab) {
-            actionsRef.current.onSyntheticGrab?.(cam.lat, cam.lng);
-          }
+          lt.startedAsGrab = reticleHoveringRef.current && modeRef.current === 'airplane';
           if (lt.startedAsGrab) {
             actionsRef.current.onGrabStart?.();
             orbitInitRef.current = { direction: null, heldSinceMs: 0, fired: false };

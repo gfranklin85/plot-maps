@@ -1,6 +1,9 @@
 import { supabaseAdmin } from './supabase-server';
 import { logCost } from './cost-tracker';
 
+// RESERVED FOR FUTURE: currently no client path exercises this. Kept in place
+// as the right server-side foundation for the next click-to-grab feature.
+//
 // Server-only reverse-geocode helper. Same logic as /api/geocode's
 // reverseGeocode() but importable from other server routes (e.g.
 // /api/inquiry/send when auto-creating a Lead from a reticle grab).

@@ -401,8 +401,8 @@ export default function GamepadFlightController({
       }
 
       // ── Trigger handling ────────────────────────────────────────────
-      // RT held = continuous zoom in (always).
-      // LT held = continuous zoom in/out OR grab gate.
+      // LT held = continuous zoom in (always when not grabbing).
+      // RT held = continuous zoom out (always except when firing-armed).
       //   - At LT press onset: if the reticle is hovering a target, this
       //     entire press is a grab (no zoom). Otherwise, this press is a
       //     zoom hold (no grab). Decision is sticky for the duration of
@@ -434,10 +434,10 @@ export default function GamepadFlightController({
           rt.pressing = false;
           rt.firedArmed = false;
         }
-        if (isPressed && !rt.firedArmed) triggerZoomDelta += triggers.right; // zoom in
+        if (isPressed && !rt.firedArmed) triggerZoomDelta -= triggers.right; // zoom out
       }
 
-      // LT — grab gate or zoom out.
+      // LT — grab gate or zoom in.
       {
         const lt = ltStateRef.current;
         const isPressed = triggers.left >= TRIGGER_PRESS_THRESHOLD;
@@ -473,7 +473,7 @@ export default function GamepadFlightController({
           lt.startedAsGrab = false;
         }
         if (isPressed && !lt.startedAsGrab) {
-          triggerZoomDelta -= triggers.left; // zoom out
+          triggerZoomDelta += triggers.left; // zoom in
         }
         if (isPressed && lt.startedAsGrab) {
           leftYIsReel = true; // hand left-Y over to reel-zoom this frame

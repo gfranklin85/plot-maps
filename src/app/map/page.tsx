@@ -120,13 +120,9 @@ export default function MapPage() {
   const grabbedLeadRef = useRef<Lead | null>(null);
   // Open-grab mode state (page-level, not persisted in v1).
   const [grabMode, setGrabMode] = useState<'pin_only' | 'open_grab'>('pin_only');
-  // When LT-press in open-grab mode finds no DOM hit, the controller asks us
-  // to synthesize a click at the focal pixel. We set this flag so the
-  // resulting Google click event (delivered via onMapClick) is captured as
-  // the active synthetic grab instead of falling through to prospect mode.
-  const pendingSyntheticGrabRef = useRef(false);
-  // Synthetic grab data captured from a Google click event. Read by
-  // onFireArmed when there's no grabbedLeadRef.
+  // Synthetic grab data captured from the controller when LT-press in
+  // open-grab mode lands on an unpinned property. Read by onFireArmed
+  // when grabbedLeadRef is empty.
   const grabbedSyntheticRef = useRef<{ lat: number; lng: number; placeId: string | null } | null>(null);
 
   // navigateTarget kept for compat with MapView's CenterController prop;
@@ -251,24 +247,7 @@ export default function MapPage() {
     setProspectList(prev => prev.filter(a => a.address !== address));
   }
 
-  async function handleMapClick(
-    latLng: { lat: number; lng: number },
-    opts?: { placeId?: string | null },
-  ) {
-    // Open-grab synthetic-click path: if the reticle synthesized a click and
-    // we're waiting on a placeId+latLng, capture it as the active grab and
-    // return early. The fire path (RT) reads grabbedSyntheticRef and sends
-    // lat/lng to /api/inquiry/send. The Google info window is suppressed by
-    // PoiClickCatcher when a placeId is present, so this doesn't pop anything.
-    if (pendingSyntheticGrabRef.current) {
-      pendingSyntheticGrabRef.current = false;
-      grabbedSyntheticRef.current = {
-        lat: latLng.lat,
-        lng: latLng.lng,
-        placeId: opts?.placeId || null,
-      };
-      return;
-    }
+  async function handleMapClick(latLng: { lat: number; lng: number }) {
     if (!prospectMode) return;
     if (showCoach) dismissCoach();
     // First click after dismissing the coach gets a tiny affirming zoom nudge
@@ -645,42 +624,15 @@ export default function MapPage() {
         setGrabbedLead(null);
         grabbedLeadRef.current = null;
         grabbedSyntheticRef.current = null;
-        pendingSyntheticGrabRef.current = false;
         setOrbitDirection(null);
       },
-      onSyntheticGrab: (focalClientX: number, focalClientY: number) => {
-        // Open-grab LT-press onset with no DOM hit. Synthesize a real
-        // mouse click on the map's container at the focal pixel so
-        // Google's own click listener resolves the property under the
-        // reticle (placeId + lat/lng). The listener calls back into
-        // handleMapClick, which sees pendingSyntheticGrabRef and
-        // captures the result as grabbedSyntheticRef.
-        pendingSyntheticGrabRef.current = true;
-        grabbedSyntheticRef.current = null;
-        // Hit-test the topmost element at the focal pixel and dispatch
-        // a click event on it. Google's gmp-map-3d / classic Map listens
-        // on its own container.
-        const el = document.elementFromPoint(focalClientX, focalClientY);
-        if (!el) {
-          pendingSyntheticGrabRef.current = false;
-          return;
-        }
-        const evt = new MouseEvent('click', {
-          bubbles: true,
-          cancelable: true,
-          clientX: focalClientX,
-          clientY: focalClientY,
-          view: window,
-        });
-        el.dispatchEvent(evt);
-        // Clear the pending flag after a short window if Google didn't
-        // pick up the synthesized click. Prevents a stuck pending flag
-        // from capturing the next unrelated map click.
-        setTimeout(() => {
-          if (pendingSyntheticGrabRef.current) {
-            pendingSyntheticGrabRef.current = false;
-          }
-        }, 500);
+      onSyntheticGrab: (lat: number, lng: number) => {
+        // Open-grab LT-press onset with no DOM hit. The controller reports
+        // the camera's lat/lng under the reticle directly — no click
+        // synthesis. Store it; RT-fire reads grabbedSyntheticRef and
+        // sends lat/lng to /api/inquiry/send, which reverse-geocodes and
+        // auto-creates the Lead.
+        grabbedSyntheticRef.current = { lat, lng, placeId: null };
       },
       onOrbitInit: (direction) => {
         // Right-X held 2s in a direction while grabbed. B1 just records

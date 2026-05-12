@@ -455,15 +455,11 @@ function PoiClickCatcher({
     // IconMouseEvent has a placeId; MapMouseEvent doesn't. Both extend each
     // other so a single 'click' listener catches both.
     const listener = map.addListener('click', (e: google.maps.IconMouseEvent | google.maps.MapMouseEvent) => {
-      const { onMapClick: omc } = handlerRef.current;
-      if (!omc) return;
+      const { prospectMode: pm, onMapClick: omc } = handlerRef.current;
+      if (!pm || !omc) return;
       const latLng = e.latLng;
       if (!latLng) return;
       const placeId = (e as google.maps.IconMouseEvent).placeId;
-      // Suppress Google's default info window when a placeId is present.
-      // The page handler decides what to do with the click — it gates on
-      // prospectMode internally for the prospect-list flow, and on a
-      // pendingSyntheticGrab flag for the reticle open-grab flow.
       if (placeId && e.stop) e.stop();
       omc({ lat: latLng.lat(), lng: latLng.lng() }, { placeId: placeId || null });
     });

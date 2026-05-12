@@ -244,13 +244,6 @@ export default function GamepadFlightController({
   const lastReportedFocalYRef = useRef<number>(0.5);
   // Live reticle-hovering flag the LT-press handler reads each frame.
   const reticleHoveringRef = useRef(false);
-  // Last known mouse cursor position in viewport coords. Used to synthesize
-  // mousemove events while the gamepad pilots the camera, so Google's POI
-  // hover hit-test (which only fires on actual mouse events) re-runs as the
-  // world slides under the stationary cursor. Without this, the hand-cursor
-  // stays stuck on whatever was under the cursor when airplane mode started.
-  const lastMousePosRef = useRef<{ x: number; y: number } | null>(null);
-  const lastSyntheticMoveRef = useRef<number>(0);
 
   // Trigger press state. LT also tracks whether the press began over a
   // hovering reticle target — that locks LT into "grab gate" mode for
@@ -764,50 +757,12 @@ export default function GamepadFlightController({
         if (Math.abs(mapTilt - cam.tilt) > 0.05) map.setTilt(cam.tilt);
         if (Math.abs(mapZoom - cam.zoom) > 0.001) map.setZoom(cam.zoom);
       }
-
-      // ── Keep Google's POI hover hit-test alive while flying ─────────
-      // The cursor sits stationary while the world moves under it. Google's
-      // POI hand-cursor only updates on actual mouse events, so without
-      // help it gets stuck on whatever was under the cursor when airplane
-      // mode started — and stays stuck even after exiting airplane mode
-      // (until the user moves the real mouse). Dispatch a synthetic
-      // mousemove at the cursor's last known position, throttled to ~30Hz.
-      // Google's listener re-runs hit-test → hand cursor updates correctly.
-      if (modeRef.current === 'airplane' && lastMousePosRef.current) {
-        const nowMs = elapsedMs;
-        if (nowMs - lastSyntheticMoveRef.current > 33) {
-          lastSyntheticMoveRef.current = nowMs;
-          const { x, y } = lastMousePosRef.current;
-          const el = document.elementFromPoint(x, y);
-          if (el) {
-            const evt = new MouseEvent('mousemove', {
-              bubbles: true,
-              cancelable: true,
-              clientX: x,
-              clientY: y,
-              view: window,
-            });
-            el.dispatchEvent(evt);
-          }
-        }
-      }
     },
   });
 
   useEffect(() => {
     onStatusChange?.(status.connected, status.label);
   }, [status.connected, status.label, onStatusChange]);
-
-  // Track the mouse cursor's screen position. Used by the per-frame
-  // synthetic-mousemove logic so Google's POI hover hit-test re-runs while
-  // the gamepad pilots the world under a stationary cursor.
-  useEffect(() => {
-    function onMove(e: MouseEvent) {
-      lastMousePosRef.current = { x: e.clientX, y: e.clientY };
-    }
-    window.addEventListener('mousemove', onMove, { passive: true });
-    return () => window.removeEventListener('mousemove', onMove);
-  }, []);
 
   return null;
 }

@@ -269,6 +269,13 @@ export default function GamepadFlightController({
   const lastReportedFocalYRef = useRef<number>(0.5);
   // Live reticle-hovering flag the LT-press handler reads each frame.
   const reticleHoveringRef = useRef(false);
+  // Last known mouse cursor position in viewport coords. Used to synthesize
+  // pointermove events on the map container during active flight, so Google's
+  // canvas-rendered POI hover hit-test (which only fires on real pointer
+  // events) re-runs as the world slides under the stationary cursor.
+  const lastMousePosRef = useRef<{ x: number; y: number } | null>(null);
+  // Throttle for the synthetic pointermove dispatch — ~30Hz max.
+  const lastSyntheticPointerMsRef = useRef<number>(0);
 
   // Trigger press state. LT also tracks whether the press began over a
   // hovering reticle target — that locks LT into "grab gate" mode for
@@ -803,12 +810,79 @@ export default function GamepadFlightController({
         if (Math.abs(mapTilt - tiltApplied) > 0.05) map.setTilt(tiltApplied);
         if (Math.abs(mapZoom - cam.zoom) > 0.001) map.setZoom(cam.zoom);
       }
+
+      // ── Keep Google's POI hover hit-test alive while flying ─────────
+      // The world slides under a stationary cursor; Google's canvas POI
+      // hover only fires on real pointer events. Dispatch a synthetic
+      // PointerEvent on the map container at ~30Hz so the POI hand-cursor
+      // tracks what's under the cursor as we fly.
+      //
+      // Fire only when the user is actively driving (input or velocity).
+      // When fully idle, real mouse motion handles hover normally.
+      const v = velRef.current;
+      const a = airRef.current;
+      const isDriving =
+        leftStick.magnitude > 0.02 ||
+        rightStick.magnitude > 0.02 ||
+        triggers.left > 0.05 ||
+        triggers.right > 0.05 ||
+        Math.abs(v.panX) > 0.5 ||
+        Math.abs(v.panY) > 0.5 ||
+        Math.abs(v.heading) > 0.05 ||
+        Math.abs(v.tilt) > 0.05 ||
+        Math.abs(v.zoom) > 0.001 ||
+        Math.abs(a.throttle) > 0.5 ||
+        Math.abs(a.strafe) > 0.5 ||
+        Math.abs(a.yaw) > 0.05;
+
+      if (isDriving && lastMousePosRef.current) {
+        const nowMs = elapsedMs;
+        if (nowMs - lastSyntheticPointerMsRef.current > 33) {
+          lastSyntheticPointerMsRef.current = nowMs;
+          const { x, y } = lastMousePosRef.current;
+          const mapDiv = (map as unknown as { getDiv?: () => HTMLElement }).getDiv?.();
+          if (mapDiv) {
+            try {
+              const evt = new PointerEvent('pointermove', {
+                bubbles: true,
+                cancelable: true,
+                clientX: x,
+                clientY: y,
+                pointerType: 'mouse',
+                isPrimary: true,
+              });
+              mapDiv.dispatchEvent(evt);
+            } catch {
+              // Some browsers may not support PointerEvent constructor;
+              // fall back to MouseEvent in that case.
+              const evt = new MouseEvent('mousemove', {
+                bubbles: true,
+                cancelable: true,
+                clientX: x,
+                clientY: y,
+                view: window,
+              });
+              mapDiv.dispatchEvent(evt);
+            }
+          }
+        }
+      }
     },
   });
 
   useEffect(() => {
     onStatusChange?.(status.connected, status.label);
   }, [status.connected, status.label, onStatusChange]);
+
+  // Track the real mouse cursor so the per-frame synthetic pointermove
+  // dispatch has an accurate target position.
+  useEffect(() => {
+    function onMove(e: MouseEvent) {
+      lastMousePosRef.current = { x: e.clientX, y: e.clientY };
+    }
+    window.addEventListener('mousemove', onMove, { passive: true });
+    return () => window.removeEventListener('mousemove', onMove);
+  }, []);
 
   return null;
 }

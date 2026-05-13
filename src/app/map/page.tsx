@@ -1113,7 +1113,7 @@ export default function MapPage() {
                 setWalkMode(true);
               }
             }}
-            gamepadEnabled={!debugUnmountController}
+            gamepadEnabled={flightMode === 'airplane' && !debugUnmountController}
             gamepadActions={gamepadActions}
             gamepadMode={flightMode}
             gamepadDebugSuspendMoveCamera={debugSuspendMoveCamera}

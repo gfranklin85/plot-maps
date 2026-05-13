@@ -77,6 +77,16 @@ interface Props {
    *  doesn't actually move. Used to isolate whether per-frame map mutation
    *  is what breaks Google's POI hover hit-test in airplane mode. */
   debugSuspendMoveCamera?: boolean;
+  /** Debug-only: when true, ALWAYS use the absolute-setter fallback path
+   *  (setCenter + setHeading + setTilt + setZoom) instead of moveCamera().
+   *  Tests whether the fallback path keeps POI hover alive while still
+   *  delivering smooth flight feel. */
+  debugForceFallbackPath?: boolean;
+  /** Debug-only: when true, after each moveCamera() call also fire a no-op
+   *  map.setOptions({ clickableIcons: true }) to "tickle" Google's POI
+   *  pipeline. Tests whether a follow-up call can rescue hover without
+   *  giving up moveCamera's smoothness. */
+  debugTickleAfterMoveCamera?: boolean;
 }
 
 // ── Heavy helicopter physics constants ────────────────────────────────
@@ -218,6 +228,8 @@ export default function GamepadFlightController({
   onFocalScreenYChange,
   onStatusChange,
   debugSuspendMoveCamera = false,
+  debugForceFallbackPath = false,
+  debugTickleAfterMoveCamera = false,
 }: Props) {
   const map = useMap();
 
@@ -241,6 +253,10 @@ export default function GamepadFlightController({
   modeRef.current = mode;
   const debugSuspendMoveCameraRef = useRef<boolean>(debugSuspendMoveCamera);
   debugSuspendMoveCameraRef.current = debugSuspendMoveCamera;
+  const debugForceFallbackPathRef = useRef<boolean>(debugForceFallbackPath);
+  debugForceFallbackPathRef.current = debugForceFallbackPath;
+  const debugTickleAfterMoveCameraRef = useRef<boolean>(debugTickleAfterMoveCamera);
+  debugTickleAfterMoveCameraRef.current = debugTickleAfterMoveCamera;
   // Live refs for hover detection that runs each frame.
   const airplaneTargetsRef = useRef<ReticleTarget[] | undefined>(airplaneTargets);
   airplaneTargetsRef.current = airplaneTargets;
@@ -758,19 +774,33 @@ export default function GamepadFlightController({
         zoom: number;
       }) => void;
       const mc = (map as unknown as { moveCamera?: MoveCamera }).moveCamera;
-      if (typeof mc === 'function') {
+      const headingApplied = (cam.heading + hoverHeading + 360) % 360;
+      const tiltApplied = clamp(cam.tilt + hoverTilt, TILT_MIN, tiltMax || TILT_MIN);
+
+      const useFallback = debugForceFallbackPathRef.current || typeof mc !== 'function';
+
+      if (!useFallback && mc) {
         mc.call(map, {
           center: { lat: appliedLat, lng: appliedLng },
-          heading: (cam.heading + hoverHeading + 360) % 360,
-          tilt: clamp(cam.tilt + hoverTilt, TILT_MIN, tiltMax || TILT_MIN),
+          heading: headingApplied,
+          tilt: tiltApplied,
           zoom: cam.zoom,
         });
+        // Debug-only: tickle Google's POI hit-test pipeline by writing a
+        // no-op options change after moveCamera. Tests whether the tickle
+        // rescues hover without giving up moveCamera's smoothness.
+        if (debugTickleAfterMoveCameraRef.current) {
+          (map as unknown as { setOptions?: (o: object) => void }).setOptions?.({
+            clickableIcons: true,
+          });
+        }
       } else {
-        // Fallback for raster maps (no Map ID) — still better than panBy
-        // because we're applying once-per-frame absolute state.
+        // Fallback path: absolute setters. Used always for raster maps
+        // (no moveCamera available), and in debug-only mode for testing
+        // whether this path preserves POI hover.
         map.setCenter({ lat: appliedLat, lng: appliedLng });
-        if (Math.abs(mapHeading - cam.heading) > 0.05) map.setHeading(cam.heading);
-        if (Math.abs(mapTilt - cam.tilt) > 0.05) map.setTilt(cam.tilt);
+        if (Math.abs(mapHeading - headingApplied) > 0.05) map.setHeading(headingApplied);
+        if (Math.abs(mapTilt - tiltApplied) > 0.05) map.setTilt(tiltApplied);
         if (Math.abs(mapZoom - cam.zoom) > 0.001) map.setZoom(cam.zoom);
       }
     },

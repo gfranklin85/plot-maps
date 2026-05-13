@@ -55,6 +55,14 @@ interface Props {
    *  per-frame moveCamera/setCenter applies are skipped. Used to isolate
    *  whether camera mutation is what breaks Google's POI hover hit-test. */
   gamepadDebugSuspendMoveCamera?: boolean;
+  /** Debug-only: force the controller to use the absolute-setter fallback
+   *  path instead of moveCamera(). Tests whether that path preserves POI
+   *  hover while still delivering smooth flight feel. */
+  gamepadDebugForceFallbackPath?: boolean;
+  /** Debug-only: after each moveCamera() call, additionally call a no-op
+   *  setOptions to tickle Google's POI hit-test back to life. Tests
+   *  whether a follow-up call rescues hover. */
+  gamepadDebugTickleAfterMoveCamera?: boolean;
   /** Targetable leads in airplane mode for reticle hover detection. */
   gamepadAirplaneTargets?: ReticleTarget[];
   /** Fires when the reticle's hovered target changes (incl. null). */
@@ -520,7 +528,7 @@ function PendingSkiptracePins({ pins }: { pins: { id: string; lat: number; lng: 
   return null;
 }
 
-export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClick, center, navigateTo, zoom, mapType = "roadmap", pinMode = "dots", prospectMode = false, prospectPins = [], onProspectPinClick, showZoningOverlay = false, view3D = false, flight = null, gamepadEnabled = false, gamepadActions, gamepadMode = 'overhead', gamepadDebugSuspendMoveCamera = false, gamepadAirplaneTargets, onGamepadReticleTargetChange, onGamepadFocalScreenYChange, onGamepadStatusChange }: Props) {
+export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClick, center, navigateTo, zoom, mapType = "roadmap", pinMode = "dots", prospectMode = false, prospectPins = [], onProspectPinClick, showZoningOverlay = false, view3D = false, flight = null, gamepadEnabled = false, gamepadActions, gamepadMode = 'overhead', gamepadDebugSuspendMoveCamera = false, gamepadDebugForceFallbackPath = false, gamepadDebugTickleAfterMoveCamera = false, gamepadAirplaneTargets, onGamepadReticleTargetChange, onGamepadFocalScreenYChange, onGamepadStatusChange }: Props) {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme !== 'light';
   const isSatellite = mapType === "satellite" || mapType === "hybrid";
@@ -575,6 +583,8 @@ export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClic
             actions={gamepadActions || {}}
             onStatusChange={onGamepadStatusChange}
             debugSuspendMoveCamera={gamepadDebugSuspendMoveCamera}
+            debugForceFallbackPath={gamepadDebugForceFallbackPath}
+            debugTickleAfterMoveCamera={gamepadDebugTickleAfterMoveCamera}
           />
         )}
         <PoiClickCatcher prospectMode={prospectMode} onMapClick={onMapClick} />

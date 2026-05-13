@@ -131,6 +131,8 @@ export default function MapPage() {
   // Toggles let us isolate the cause of the POI hover bug in airplane mode.
   const [debugSuspendMoveCamera, setDebugSuspendMoveCamera] = useState(false);
   const [debugUnmountController, setDebugUnmountController] = useState(false);
+  const [debugForceFallbackPath, setDebugForceFallbackPath] = useState(false);
+  const [debugTickleAfterMoveCamera, setDebugTickleAfterMoveCamera] = useState(false);
 
   // Dispatch a choreographed camera flight. Each call gets a unique _id so
   // the controller treats it as a fresh animation even if the target shape
@@ -1115,6 +1117,8 @@ export default function MapPage() {
             gamepadActions={gamepadActions}
             gamepadMode={flightMode}
             gamepadDebugSuspendMoveCamera={debugSuspendMoveCamera}
+            gamepadDebugForceFallbackPath={debugForceFallbackPath}
+            gamepadDebugTickleAfterMoveCamera={debugTickleAfterMoveCamera}
             gamepadAirplaneTargets={airplaneTargets}
             onGamepadReticleTargetChange={handleReticleTargetChange}
             onGamepadFocalScreenYChange={setReticleTopFraction}
@@ -1343,17 +1347,18 @@ export default function MapPage() {
        *  this is a one-time diagnostic tool, not a real feature. Revert
        *  the commit that added it once the POI hover bug is diagnosed. */}
       {debugHoverMode && (
-        <div className="fixed bottom-4 right-4 z-50 rounded-lg border-2 border-yellow-400 bg-black/90 p-3 text-xs text-white shadow-2xl">
+        <div className="fixed bottom-4 right-4 z-50 rounded-lg border-2 border-yellow-400 bg-black/90 p-3 text-xs text-white shadow-2xl max-w-xs">
           <div className="mb-2 font-bold text-yellow-300">HOVER DEBUG</div>
+          <div className="mb-2 text-[10px] text-white/70 italic">Round 1 (diagnostic):</div>
           <label className="mb-1 flex items-center gap-2">
             <input
               type="checkbox"
               checked={debugSuspendMoveCamera}
               onChange={e => setDebugSuspendMoveCamera(e.target.checked)}
             />
-            <span>Suspend moveCamera() in controller</span>
+            <span>Suspend moveCamera()</span>
           </label>
-          <label className="flex items-center gap-2">
+          <label className="mb-2 flex items-center gap-2">
             <input
               type="checkbox"
               checked={debugUnmountController}
@@ -1361,8 +1366,28 @@ export default function MapPage() {
             />
             <span>Unmount gamepad controller</span>
           </label>
+          <div className="mt-2 mb-2 border-t border-white/20 pt-2 text-[10px] text-white/70 italic">
+            Round 2 (fix exploration):
+          </div>
+          <label className="mb-1 flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={debugForceFallbackPath}
+              onChange={e => setDebugForceFallbackPath(e.target.checked)}
+            />
+            <span>Force fallback path (setCenter etc.)</span>
+          </label>
+          <label className="mb-1 flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={debugTickleAfterMoveCamera}
+              onChange={e => setDebugTickleAfterMoveCamera(e.target.checked)}
+            />
+            <span>Tickle setOptions after moveCamera</span>
+          </label>
           <div className="mt-2 text-[10px] text-white/60">
-            Test matrix: both off → both broken; toggle each, observe POI hover.
+            Test 1: all off (broken). Test 2: Force fallback ON. Test 3: Tickle ON.
+            For each: hover work? flight smooth?
           </div>
         </div>
       )}

@@ -51,6 +51,10 @@ interface Props {
   gamepadEnabled?: boolean;
   gamepadActions?: GamepadActions;
   gamepadMode?: FlightMode;
+  /** Debug-only: passed through to GamepadFlightController. When true the
+   *  per-frame moveCamera/setCenter applies are skipped. Used to isolate
+   *  whether camera mutation is what breaks Google's POI hover hit-test. */
+  gamepadDebugSuspendMoveCamera?: boolean;
   /** Targetable leads in airplane mode for reticle hover detection. */
   gamepadAirplaneTargets?: ReticleTarget[];
   /** Fires when the reticle's hovered target changes (incl. null). */
@@ -516,7 +520,7 @@ function PendingSkiptracePins({ pins }: { pins: { id: string; lat: number; lng: 
   return null;
 }
 
-export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClick, center, navigateTo, zoom, mapType = "roadmap", pinMode = "dots", prospectMode = false, prospectPins = [], onProspectPinClick, showZoningOverlay = false, view3D = false, flight = null, gamepadEnabled = false, gamepadActions, gamepadMode = 'overhead', gamepadAirplaneTargets, onGamepadReticleTargetChange, onGamepadFocalScreenYChange, onGamepadStatusChange }: Props) {
+export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClick, center, navigateTo, zoom, mapType = "roadmap", pinMode = "dots", prospectMode = false, prospectPins = [], onProspectPinClick, showZoningOverlay = false, view3D = false, flight = null, gamepadEnabled = false, gamepadActions, gamepadMode = 'overhead', gamepadDebugSuspendMoveCamera = false, gamepadAirplaneTargets, onGamepadReticleTargetChange, onGamepadFocalScreenYChange, onGamepadStatusChange }: Props) {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme !== 'light';
   const isSatellite = mapType === "satellite" || mapType === "hybrid";
@@ -570,6 +574,7 @@ export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClic
             onFocalScreenYChange={onGamepadFocalScreenYChange}
             actions={gamepadActions || {}}
             onStatusChange={onGamepadStatusChange}
+            debugSuspendMoveCamera={gamepadDebugSuspendMoveCamera}
           />
         )}
         <PoiClickCatcher prospectMode={prospectMode} onMapClick={onMapClick} />

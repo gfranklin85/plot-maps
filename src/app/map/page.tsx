@@ -126,6 +126,12 @@ export default function MapPage() {
   const [flight, setFlight] = useState<(import('@/lib/useCameraChoreographer').FlyToOptions & { _id?: number }) | null>(null);
   const flightCounterRef = useRef(0);
 
+  // Debug-only state for POI hover diagnosis. Gated to ?debug=hover URL
+  // param so we can ship this without exposing it to regular users.
+  // Toggles let us isolate the cause of the POI hover bug in airplane mode.
+  const [debugSuspendMoveCamera, setDebugSuspendMoveCamera] = useState(false);
+  const [debugUnmountController, setDebugUnmountController] = useState(false);
+
   // Dispatch a choreographed camera flight. Each call gets a unique _id so
   // the controller treats it as a fresh animation even if the target shape
   // matches the previous one.
@@ -149,6 +155,7 @@ export default function MapPage() {
 
   const searchParams = useSearchParams();
   const urlInitDone = useRef(false);
+  const debugHoverMode = searchParams?.get('debug') === 'hover';
 
   useEffect(() => {
     if (urlInitDone.current) return;
@@ -1104,9 +1111,10 @@ export default function MapPage() {
                 setWalkMode(true);
               }
             }}
-            gamepadEnabled
+            gamepadEnabled={!debugUnmountController}
             gamepadActions={gamepadActions}
             gamepadMode={flightMode}
+            gamepadDebugSuspendMoveCamera={debugSuspendMoveCamera}
             gamepadAirplaneTargets={airplaneTargets}
             onGamepadReticleTargetChange={handleReticleTargetChange}
             onGamepadFocalScreenYChange={setReticleTopFraction}
@@ -1330,6 +1338,34 @@ export default function MapPage() {
 
       <OnboardingTooltips />
       {gamepad.everConnected && <GamepadStatusChip connected={gamepad.connected} />}
+
+      {/* Debug panel — gated on ?debug=hover URL param. Intentionally ugly;
+       *  this is a one-time diagnostic tool, not a real feature. Revert
+       *  the commit that added it once the POI hover bug is diagnosed. */}
+      {debugHoverMode && (
+        <div className="fixed bottom-4 right-4 z-50 rounded-lg border-2 border-yellow-400 bg-black/90 p-3 text-xs text-white shadow-2xl">
+          <div className="mb-2 font-bold text-yellow-300">HOVER DEBUG</div>
+          <label className="mb-1 flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={debugSuspendMoveCamera}
+              onChange={e => setDebugSuspendMoveCamera(e.target.checked)}
+            />
+            <span>Suspend moveCamera() in controller</span>
+          </label>
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={debugUnmountController}
+              onChange={e => setDebugUnmountController(e.target.checked)}
+            />
+            <span>Unmount gamepad controller</span>
+          </label>
+          <div className="mt-2 text-[10px] text-white/60">
+            Test matrix: both off → both broken; toggle each, observe POI hover.
+          </div>
+        </div>
+      )}
     </div>
   );
 }

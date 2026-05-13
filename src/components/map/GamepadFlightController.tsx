@@ -71,6 +71,12 @@ interface Props {
   onFocalScreenYChange?: (fraction: number) => void;
   /** Reports controller status up to the page so it can render a toast. */
   onStatusChange?: (connected: boolean, label: string | null) => void;
+  /** Debug-only: when true, the controller runs its full loop (sticks read,
+   *  buttons fire, grab/orbit logic, hover-wave math computed) but the
+   *  per-frame moveCamera()/setCenter() applies are SKIPPED. The camera
+   *  doesn't actually move. Used to isolate whether per-frame map mutation
+   *  is what breaks Google's POI hover hit-test in airplane mode. */
+  debugSuspendMoveCamera?: boolean;
 }
 
 // ── Heavy helicopter physics constants ────────────────────────────────
@@ -211,6 +217,7 @@ export default function GamepadFlightController({
   onReticleTargetChange,
   onFocalScreenYChange,
   onStatusChange,
+  debugSuspendMoveCamera = false,
 }: Props) {
   const map = useMap();
 
@@ -232,6 +239,8 @@ export default function GamepadFlightController({
   view3DRef.current = view3D;
   const modeRef = useRef<FlightMode>(mode);
   modeRef.current = mode;
+  const debugSuspendMoveCameraRef = useRef<boolean>(debugSuspendMoveCamera);
+  debugSuspendMoveCameraRef.current = debugSuspendMoveCamera;
   // Live refs for hover detection that runs each frame.
   const airplaneTargetsRef = useRef<ReticleTarget[] | undefined>(airplaneTargets);
   airplaneTargetsRef.current = airplaneTargets;
@@ -735,6 +744,13 @@ export default function GamepadFlightController({
 
       // ── Apply to map (single moveCamera call per frame) ─────────────
       // moveCamera bypasses Google's per-call ease-out. Vector mode only.
+      // Debug-only: if debugSuspendMoveCamera is on, skip the entire apply.
+      // The rest of the loop has already run (physics, button edges, etc.)
+      // — we're only isolating whether the map-side mutation is what
+      // breaks Google's POI hover hit-test.
+      if (debugSuspendMoveCameraRef.current) {
+        return;
+      }
       type MoveCamera = (opts: {
         center: { lat: number; lng: number };
         heading: number;

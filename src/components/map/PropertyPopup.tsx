@@ -187,11 +187,15 @@ export default function PropertyPopup({ lead, onUpdate, walkMode = false, onWalk
     }
   };
 
-  // Parcel info from City of Lemoore GIS (zoning, GP, APN, acres,
-  // subdivision, site plan)
+  // Parcel info: zoning/general-plan/subdivision/site-plan from municipal
+  // sources (Lemoore GIS), plus the rich assessor extensions surfaced by
+  // county sources (Kings County for now, more counties to follow). The
+  // resolver flattens contributions into a single shape; we render what's
+  // present and hide what isn't.
   const [parcel, setParcel] = useState<{
     hit: boolean;
     apn: string | null;
+    address: string | null;
     zoningCode: string | null;
     zoningDesc: string | null;
     generalPlanCode: string | null;
@@ -213,12 +217,32 @@ export default function PropertyPopup({ lead, onUpdate, walkMode = false, onWalk
       units: string | null;
       status: string | null;
     } | null;
+    // Assessor extensions (Kings County and similar rich sources)
+    assesseeName: string | null;
+    yearBuilt: string | number | null;
+    buildingSize: number | null;
+    bedrooms: string | number | null;
+    bathrooms: string | number | null;
+    buildingType: string | null;
+    netValue: number | null;
   } | null>(null);
+  const [parcelTab, setParcelTab] = useState<'overview' | 'owner' | 'structure' | 'land' | 'value'>('overview');
 
   useEffect(() => {
     let cancelled = false;
-    if (lead.latitude == null || lead.longitude == null) return;
-    fetch(`/api/parcel?lat=${lead.latitude}&lng=${lead.longitude}`)
+    // Polygon-click stubs encode the parcel identity in the id as
+    // 'parcel:<APN>'. When present, look up by APN directly — exact,
+    // deterministic, and avoids the proximity guess the lat/lng path
+    // uses (which misses when the click is far from the parcel
+    // centroid). Falls back to lat/lng for normal pin clicks.
+    const apnFromStub = lead.id?.startsWith('parcel:') ? lead.id.slice('parcel:'.length) : null;
+    const url = apnFromStub
+      ? `/api/parcel?apn=${encodeURIComponent(apnFromStub)}`
+      : (lead.latitude != null && lead.longitude != null
+          ? `/api/parcel?lat=${lead.latitude}&lng=${lead.longitude}`
+          : null);
+    if (!url) return;
+    fetch(url)
       .then(r => r.ok ? r.json() : null)
       .then(data => { if (!cancelled && data) setParcel(data); })
       .catch(() => { /* silent */ });
@@ -289,12 +313,24 @@ export default function PropertyPopup({ lead, onUpdate, walkMode = false, onWalk
         {/* ── ADDRESS + ACTION PILLS ── */}
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h2 className="font-headline text-lg font-extrabold tracking-tight text-on-surface leading-tight">
-              {lead.property_address?.split(',')[0] || 'No address'}
-            </h2>
-            <p className="text-xs text-on-surface-variant font-medium">
-              {lead.property_address?.split(',').slice(1).join(',').trim() || ''}
-            </p>
+            {(() => {
+              // Prefer the lead's address (real prospect), fall back to
+              // the resolved parcel address (polygon-click case where the
+              // stub has no address yet — assessor data fills it in).
+              const addr = lead.property_address || parcel?.address || null;
+              const head = addr?.split(',')[0]?.trim() || 'No address';
+              const tail = addr?.split(',').slice(1).join(',').trim() || '';
+              return (
+                <>
+                  <h2 className="font-headline text-lg font-extrabold tracking-tight text-on-surface leading-tight">
+                    {head}
+                  </h2>
+                  {tail && (
+                    <p className="text-xs text-on-surface-variant font-medium">{tail}</p>
+                  )}
+                </>
+              );
+            })()}
             {!isReference && (lead.owner_name || lead.name) && (
               <p className="text-xs text-on-surface-variant mt-0.5">{lead.owner_name || lead.name}</p>
             )}
@@ -321,85 +357,197 @@ export default function PropertyPopup({ lead, onUpdate, walkMode = false, onWalk
           </div>
         </div>
 
-        {/* ── PARCEL INFO from City of Lemoore GIS ── */}
-        {parcel?.hit && (
-          <div className="rounded-lg border border-card-border bg-surface-container-low/60 px-3 py-2 space-y-1.5">
-            <div className="flex items-center gap-1.5">
-              <MaterialIcon icon="location_searching" className="text-[12px] text-primary" />
-              <span className="text-[9px] font-bold uppercase tracking-[0.15em] text-on-surface-variant">
-                Parcel Details
-              </span>
+        {/* ── PARCEL DETAILS — tabbed view ── */}
+        {parcel?.hit && (() => {
+          // Decide which tabs have anything to show. Empty tabs are hidden
+          // so a Lemoore-only popup stays compact, while a Kings popup with
+          // assessor + structure + valuation gets the full set.
+          const hasOverview = !!(parcel.apn || parcel.acres != null || parcel.zoningCode || parcel.generalPlanCode || parcel.use2024 || parcel.development2024 || parcel.subdivision?.name || parcel.sitePlan?.title);
+          const hasOwner = plotEdition === 'pro' && !!parcel.assesseeName;
+          const hasStructure = !!(parcel.yearBuilt || parcel.buildingSize || parcel.bedrooms || parcel.bathrooms || parcel.buildingType);
+          const hasLand = parcel.acres != null;
+          const hasValue = parcel.netValue != null;
+          const tabs: { key: typeof parcelTab; label: string; show: boolean }[] = [
+            { key: 'overview', label: 'Overview', show: hasOverview },
+            { key: 'owner', label: 'Owner', show: hasOwner },
+            { key: 'structure', label: 'Structure', show: hasStructure },
+            { key: 'land', label: 'Land', show: hasLand },
+            { key: 'value', label: 'Value', show: hasValue },
+          ];
+          const visibleTabs = tabs.filter(t => t.show);
+          const activeTab = visibleTabs.some(t => t.key === parcelTab) ? parcelTab : (visibleTabs[0]?.key ?? 'overview');
+          const fmtUSD = (v: number) => `$${v.toLocaleString()}`;
+          return (
+            <div className="rounded-lg border border-card-border bg-surface-container-low/60 px-3 py-2 space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5">
+                  <MaterialIcon icon="location_searching" className="text-[12px] text-primary" />
+                  <span className="text-[9px] font-bold uppercase tracking-[0.15em] text-on-surface-variant">
+                    Parcel Details
+                  </span>
+                </div>
+                {parcel.apn && (
+                  <span className="font-mono text-[9px] text-on-surface-variant">{parcel.apn}</span>
+                )}
+              </div>
+
+              {visibleTabs.length > 1 && (
+                <div className="flex gap-1 border-b border-card-border/50 -mx-1 px-1 overflow-x-auto">
+                  {visibleTabs.map(t => (
+                    <button
+                      key={t.key}
+                      onClick={() => setParcelTab(t.key)}
+                      className={cn(
+                        'px-2 py-1 text-[10px] font-bold uppercase tracking-wider whitespace-nowrap transition-colors border-b-2',
+                        activeTab === t.key
+                          ? 'text-primary border-primary'
+                          : 'text-on-surface-variant border-transparent hover:text-on-surface'
+                      )}
+                    >
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {activeTab === 'overview' && (
+                <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
+                  {parcel.zoningCode && (
+                    <div className="col-span-2 flex items-baseline gap-2">
+                      <span className="text-on-surface-variant shrink-0">Zoning</span>
+                      <span className="font-semibold text-on-surface">{parcel.zoningCode}</span>
+                      {parcel.zoningDesc && (
+                        <span className="text-on-surface-variant truncate">· {parcel.zoningDesc}</span>
+                      )}
+                    </div>
+                  )}
+                  {parcel.generalPlanCode && (
+                    <div className="col-span-2 flex items-baseline gap-2">
+                      <span className="text-on-surface-variant shrink-0">Gen. Plan</span>
+                      <span className="font-semibold text-on-surface">{parcel.generalPlanCode}</span>
+                      {parcel.generalPlanDesc && (
+                        <span className="text-on-surface-variant truncate">· {parcel.generalPlanDesc}</span>
+                      )}
+                    </div>
+                  )}
+                  {parcel.acres != null && (
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-on-surface-variant">Acres</span>
+                      <span className="font-semibold text-on-surface">{parcel.acres.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {parcel.use2024 && (
+                    <div className="col-span-2 flex items-baseline gap-2">
+                      <span className="text-on-surface-variant shrink-0">Use</span>
+                      <span className="text-on-surface">{parcel.use2024}</span>
+                    </div>
+                  )}
+                  {parcel.development2024 && (
+                    <div className="col-span-2 flex items-baseline gap-2">
+                      <span className="text-on-surface-variant shrink-0">Status</span>
+                      <span className="text-on-surface">{parcel.development2024}</span>
+                    </div>
+                  )}
+                  {parcel.subdivision?.name && (
+                    <div className="col-span-2 flex items-baseline gap-2">
+                      <span className="text-on-surface-variant shrink-0">Subdivision</span>
+                      <span className="font-semibold text-on-surface">{parcel.subdivision.name}</span>
+                      {parcel.subdivision.tract && (
+                        <span className="text-on-surface-variant text-[10px]">· {parcel.subdivision.tract}</span>
+                      )}
+                      {parcel.subdivision.status && (
+                        <span className="text-on-surface-variant text-[10px]">· {parcel.subdivision.status}</span>
+                      )}
+                    </div>
+                  )}
+                  {parcel.sitePlan?.title && (
+                    <div className="col-span-2 flex items-baseline gap-2">
+                      <span className="text-on-surface-variant shrink-0">Site Plan</span>
+                      <span className="font-semibold text-on-surface">{parcel.sitePlan.title}</span>
+                      {parcel.sitePlan.projectNumber && (
+                        <span className="text-on-surface-variant text-[10px]">· #{parcel.sitePlan.projectNumber}</span>
+                      )}
+                      {parcel.sitePlan.status && (
+                        <span className="text-on-surface-variant text-[10px]">· {parcel.sitePlan.status}</span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {activeTab === 'owner' && hasOwner && (
+                <div className="space-y-1 text-[11px]">
+                  <div className="font-semibold text-on-surface">{parcel.assesseeName}</div>
+                  <div className="text-[10px] text-on-surface-variant uppercase tracking-widest">Assessor record</div>
+                </div>
+              )}
+
+              {activeTab === 'structure' && (
+                <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
+                  {parcel.yearBuilt != null && (
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-on-surface-variant">Built</span>
+                      <span className="font-semibold text-on-surface">{parcel.yearBuilt}</span>
+                    </div>
+                  )}
+                  {parcel.buildingSize != null && (
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-on-surface-variant">Sqft</span>
+                      <span className="font-semibold text-on-surface">{parcel.buildingSize.toLocaleString()}</span>
+                    </div>
+                  )}
+                  {parcel.bedrooms != null && parcel.bedrooms !== '' && (
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-on-surface-variant">Beds</span>
+                      <span className="font-semibold text-on-surface">{parcel.bedrooms}</span>
+                    </div>
+                  )}
+                  {parcel.bathrooms != null && parcel.bathrooms !== '' && (
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-on-surface-variant">Baths</span>
+                      <span className="font-semibold text-on-surface">{parcel.bathrooms}</span>
+                    </div>
+                  )}
+                  {parcel.buildingType && (
+                    <div className="col-span-2 flex items-baseline gap-2">
+                      <span className="text-on-surface-variant shrink-0">Type</span>
+                      <span className="text-on-surface">{parcel.buildingType}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {activeTab === 'land' && (
+                <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
+                  {parcel.acres != null && (
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-on-surface-variant">Acres</span>
+                      <span className="font-semibold text-on-surface">{parcel.acres.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {parcel.use2024 && (
+                    <div className="col-span-2 flex items-baseline gap-2">
+                      <span className="text-on-surface-variant shrink-0">Use</span>
+                      <span className="text-on-surface">{parcel.use2024}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {activeTab === 'value' && parcel.netValue != null && (
+                <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
+                  <div className="col-span-2 flex items-baseline gap-2">
+                    <span className="text-on-surface-variant">Net assessed</span>
+                    <span className="font-bold text-on-surface text-[13px]">{fmtUSD(parcel.netValue)}</span>
+                  </div>
+                  <div className="col-span-2 text-[9px] text-on-surface-variant italic">
+                    Public assessor record · not market value
+                  </div>
+                </div>
+              )}
             </div>
-            <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
-              {parcel.zoningCode && (
-                <div className="col-span-2 flex items-baseline gap-2">
-                  <span className="text-on-surface-variant shrink-0">Zoning</span>
-                  <span className="font-semibold text-on-surface">{parcel.zoningCode}</span>
-                  {parcel.zoningDesc && (
-                    <span className="text-on-surface-variant truncate">· {parcel.zoningDesc}</span>
-                  )}
-                </div>
-              )}
-              {parcel.generalPlanCode && (
-                <div className="col-span-2 flex items-baseline gap-2">
-                  <span className="text-on-surface-variant shrink-0">Gen. Plan</span>
-                  <span className="font-semibold text-on-surface">{parcel.generalPlanCode}</span>
-                  {parcel.generalPlanDesc && (
-                    <span className="text-on-surface-variant truncate">· {parcel.generalPlanDesc}</span>
-                  )}
-                </div>
-              )}
-              {parcel.acres != null && (
-                <div className="flex items-baseline gap-2">
-                  <span className="text-on-surface-variant">Acres</span>
-                  <span className="font-semibold text-on-surface">{parcel.acres.toFixed(2)}</span>
-                </div>
-              )}
-              {parcel.apn && (
-                <div className="flex items-baseline gap-2">
-                  <span className="text-on-surface-variant">APN</span>
-                  <span className="font-mono text-[10px] text-on-surface">{parcel.apn}</span>
-                </div>
-              )}
-              {parcel.use2024 && (
-                <div className="col-span-2 flex items-baseline gap-2">
-                  <span className="text-on-surface-variant shrink-0">Use</span>
-                  <span className="text-on-surface">{parcel.use2024}</span>
-                </div>
-              )}
-              {parcel.development2024 && (
-                <div className="col-span-2 flex items-baseline gap-2">
-                  <span className="text-on-surface-variant shrink-0">Status</span>
-                  <span className="text-on-surface">{parcel.development2024}</span>
-                </div>
-              )}
-              {parcel.subdivision?.name && (
-                <div className="col-span-2 flex items-baseline gap-2">
-                  <span className="text-on-surface-variant shrink-0">Subdivision</span>
-                  <span className="font-semibold text-on-surface">{parcel.subdivision.name}</span>
-                  {parcel.subdivision.tract && (
-                    <span className="text-on-surface-variant text-[10px]">· {parcel.subdivision.tract}</span>
-                  )}
-                  {parcel.subdivision.status && (
-                    <span className="text-on-surface-variant text-[10px]">· {parcel.subdivision.status}</span>
-                  )}
-                </div>
-              )}
-              {parcel.sitePlan?.title && (
-                <div className="col-span-2 flex items-baseline gap-2">
-                  <span className="text-on-surface-variant shrink-0">Site Plan</span>
-                  <span className="font-semibold text-on-surface">{parcel.sitePlan.title}</span>
-                  {parcel.sitePlan.projectNumber && (
-                    <span className="text-on-surface-variant text-[10px]">· #{parcel.sitePlan.projectNumber}</span>
-                  )}
-                  {parcel.sitePlan.status && (
-                    <span className="text-on-surface-variant text-[10px]">· {parcel.sitePlan.status}</span>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* ════════════════════════════════════════════════════════ */}
         {/* REFERENCE PROPERTY CARD — market context, not call workflow */}

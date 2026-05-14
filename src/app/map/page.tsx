@@ -55,6 +55,11 @@ export default function MapPage() {
   // Zoning overlay is wired but not surfaced — the toggle didn't pull its
   // weight visually. Code stays for when we revive it with a better design.
   const [showZoning] = useState(false);
+  // Parcel overlay — full Plot-owned parcel polygons from local DB. The
+  // picker (Layer button on toolbar) controls visibility + color mode.
+  const [showParcels, setShowParcels] = useState(false);
+  const [parcelColorMode, setParcelColorMode] = useState<import('@/components/map/ParcelOverlay').ParcelColorMode>('land_use');
+  const [layerPickerOpen, setLayerPickerOpen] = useState(false);
   const [view3D, setView3D] = useState(false);
   const has3DSupport = !!process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID;
   const [show3DCoach, setShow3DCoach] = useState(false);
@@ -792,6 +797,72 @@ export default function MapPage() {
               <MaterialIcon icon="ads_click" className="text-[20px]" />
             </button>
 
+            {/* Layers button — toggles parcel polygon overlay and opens a
+                small picker for color mode. The overlay is the Plot-owned
+                parcel data (Kings County, etc.), rendered live as the user
+                pans, color-driven by the picked attribute. */}
+            <div className="relative">
+              <button
+                onClick={() => {
+                  if (showParcels) {
+                    setShowParcels(false);
+                    setLayerPickerOpen(false);
+                  } else {
+                    setShowParcels(true);
+                    setLayerPickerOpen(true);
+                  }
+                }}
+                onContextMenu={(e) => { e.preventDefault(); setLayerPickerOpen(o => !o); }}
+                title="Parcel layer (right-click for color modes)"
+                className={`relative w-10 h-10 flex items-center justify-center rounded-xl shadow-lg transition-all ${
+                  showParcels ? 'bg-sky-500 text-white' : 'bg-surface text-on-surface-variant hover:text-sky-400'
+                }`}
+              >
+                <span className="material-symbols-outlined text-[20px]">layers</span>
+              </button>
+              {layerPickerOpen && (
+                <>
+                  {/* Invisible scrim — click anywhere outside the picker
+                      to dismiss it. Stays behind the picker (z-40 vs z-50)
+                      and doesn't block the map under itself when off. */}
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setLayerPickerOpen(false)}
+                  />
+                <div className="absolute right-12 top-0 z-50 w-56 rounded-xl bg-surface border border-card-border shadow-xl p-2 space-y-1">
+                  <div className="text-[9px] uppercase tracking-widest text-on-surface-variant px-2 pt-1 pb-0.5">
+                    Parcel color
+                  </div>
+                  {([
+                    { key: 'land_use',   label: 'Land use',        hint: 'R/C/M/Ag/Vacant' },
+                    { key: 'value',      label: 'Net assessed $',  hint: 'Heatmap by value' },
+                    { key: 'year_built', label: 'Year built',      hint: 'Age heatmap' },
+                    { key: 'developed',  label: 'Developed',       hint: 'Has building vs vacant' },
+                    { key: 'occupancy',  label: 'Owner-occupied',  hint: 'Coming soon' },
+                    { key: 'none',       label: 'Outline only',    hint: 'No fill' },
+                  ] as const).map(opt => (
+                    <button
+                      key={opt.key}
+                      onClick={() => {
+                        setParcelColorMode(opt.key);
+                        setLayerPickerOpen(false);
+                      }}
+                      className={`w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded-md text-left text-[11px] transition-colors ${
+                        parcelColorMode === opt.key ? 'bg-sky-500/20 text-sky-300' : 'hover:bg-surface-container-high text-on-surface'
+                      }`}
+                    >
+                      <span className="font-semibold">{opt.label}</span>
+                      <span className="text-[9px] text-on-surface-variant">{opt.hint}</span>
+                    </button>
+                  ))}
+                  <div className="text-[9px] text-on-surface-variant px-2 pt-1 pb-0.5 italic">
+                    Polygons appear at zoom 14+
+                  </div>
+                </div>
+                </>
+              )}
+            </div>
+
             {/* 3D toggle. Entering: Tilt3DController animates tilt to 67°.
                 Exiting: dispatch a single flight that resets tilt to 0,
                 heading to north, and zoom to 17 (street names visible)
@@ -1098,6 +1169,33 @@ export default function MapPage() {
             prospectPins={prospectList.map(a => ({ lat: a.lat, lng: a.lng, address: a.address }))}
             onProspectPinClick={removeFromProspectList}
             showZoningOverlay={showZoning}
+            showParcelOverlay={showParcels}
+            parcelColorMode={parcelColorMode}
+            onParcelClick={(apn, latLng) => {
+              // Open the standard PropertyPopup against this parcel click.
+              // PropertyPopup loads /api/parcel?lat&lng internally and the
+              // resolver returns the full assessor stack. We pass a minimal
+              // Lead-shaped stub so the existing popup machinery doesn't
+              // need to learn a separate parcel-only mode. The "apn"
+              // becomes the stub id so React keys are stable for the
+              // session.
+              const stub: Lead = {
+                id: `parcel:${apn}`,
+                user_id: '',
+                name: '',
+                property_address: null,
+                owner_name: null,
+                phone: null,
+                phone_2: null,
+                phone_3: null,
+                email: null,
+                status: 'New',
+                latitude: latLng.lat,
+                longitude: latLng.lng,
+                created_at: new Date().toISOString(),
+              } as unknown as Lead;
+              setSelectedLead(stub);
+            }}
             view3D={view3D}
             flight={flight}
             navigateTo={navigateTarget}

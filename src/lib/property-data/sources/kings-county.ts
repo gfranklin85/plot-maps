@@ -28,6 +28,7 @@
 import path from 'path';
 import { promises as fs } from 'fs';
 import * as shapefile from 'shapefile';
+import proj4 from 'proj4';
 import type {
   PropertyDataSource,
   PropertyDataContribution,
@@ -36,6 +37,68 @@ import type {
   SnapshotResult,
 } from '../types';
 import { supabaseAdmin } from '@/lib/supabase-server';
+
+// Kings County (and most Central Valley counties) publish parcel
+// geometry in California State Plane Zone 4, NAD83 US Survey Feet.
+// EPSG:2228 is the canonical identifier. proj4 ships ~5 base projections
+// out of the box; we register 2228 explicitly so .forward() / .inverse()
+// resolve it. The target is WGS84 lat/lng (EPSG:4326) which is what
+// Google Maps + PostGIS prefer for serving to a web client.
+// California State Plane Zone 4, NAD83, US Survey Feet.
+// Official parameters per epsg.io/2228:
+//   Lambert Conformal Conic
+//   Standard parallels: 36°00'N (lat_1) and 37°15'N (lat_2)
+//   False origin: 35°20'N, 119°00'W (lat_0, lon_0)
+//   False easting: 6,561,666.667 US ft (= 2,000,000 m / 0.3048006096012192)
+//   False northing: 1,640,416.667 US ft (= 500,000 m / 0.3048006096012192)
+// Prior version of this defs() had lat_0=36.5 and lon_0=-120.5, which
+// were wrong — outputs landed ~150 km north and ~50 km west of true
+// position. Confirmed Zone 4 values from EPSG registry.
+proj4.defs(
+  'EPSG:2228',
+  '+proj=lcc +lat_1=36 +lat_2=37.25 ' +
+    '+lat_0=35.33333333333334 +lon_0=-119 ' +
+    '+x_0=2000000.0001016 +y_0=500000.0001016001 ' +
+    '+ellps=GRS80 +datum=NAD83 +to_meter=0.3048006096012192 +no_defs',
+);
+const toWGS84 = proj4('EPSG:2228', 'EPSG:4326');
+
+// Reproject a [x, y] coordinate pair from State Plane Zone 4 to
+// WGS84 lat/lng. Returns [lng, lat] (GeoJSON axis order).
+function reprojectCoord(xy: number[]): [number, number] {
+  const [lng, lat] = toWGS84.forward([xy[0], xy[1]]);
+  return [lng, lat];
+}
+
+// Build an EWKT MultiPolygon string from a shapefile feature's geometry.
+// PostGIS accepts EWKT (Extended Well-Known Text with SRID prefix) as a
+// direct insert value — no need for ST_GeomFromText wrapping in JS.
+// Returns null if the geometry is missing or malformed.
+function featureToEWKT(geom: { type: string; coordinates: unknown }): string | null {
+  if (!geom || !geom.coordinates) return null;
+  // Shapefile polygons come through as either Polygon or MultiPolygon.
+  // Normalize both to MultiPolygon for consistent storage.
+  const ringsToWKT = (rings: number[][][]): string => {
+    return rings
+      .map(ring => {
+        const projected = ring.map(reprojectCoord);
+        return '(' + projected.map(([x, y]) => `${x} ${y}`).join(',') + ')';
+      })
+      .join(',');
+  };
+  if (geom.type === 'Polygon') {
+    const rings = geom.coordinates as number[][][];
+    return `SRID=4326;MULTIPOLYGON(((${ringsToWKT(rings).slice(1, -1)})))`;
+  }
+  if (geom.type === 'MultiPolygon') {
+    const polys = geom.coordinates as number[][][][];
+    const body = polys
+      .map(poly => `(${ringsToWKT(poly)})`)
+      .join(',');
+    return `SRID=4326;MULTIPOLYGON(${body})`;
+  }
+  return null;
+}
 
 const LICENSE = 'public record (CA Govt Code § 6250 et seq.); Kings County Assessor — purchased flat-file export 2026-05-11';
 const DEFAULT_BASENAME = 'KingsCountyParcels_5_11_26';
@@ -189,7 +252,20 @@ export const KINGS_COUNTY_SHAPEFILE: PropertyDataSource = {
       );
     }
 
-    const source = await shapefile.open(shpPath, dbfPath);
+    // Read the .shp + .dbf into memory before handing to shapefile.open.
+    // The package's default path-resolution code path runs the filename
+    // through fetch(), which on Node's undici treats a Windows path like
+    // "C:\..." as having scheme "c" and throws "unknown scheme." Passing
+    // Uint8Arrays bypasses path-source entirely. Memory cost is the size
+    // of the two files; the .dbf is the heavy one (~1.4 GB for Kings).
+    const [shpBuf, dbfBuf] = await Promise.all([
+      fs.readFile(shpPath),
+      fs.readFile(dbfPath),
+    ]);
+    const source = await shapefile.open(
+      new Uint8Array(shpBuf.buffer, shpBuf.byteOffset, shpBuf.byteLength),
+      new Uint8Array(dbfBuf.buffer, dbfBuf.byteOffset, dbfBuf.byteLength),
+    );
 
     let totalIngested = 0;
     // totalUpdated stays at 0 in v1 — Supabase upsert doesn't distinguish
@@ -211,16 +287,27 @@ export const KINGS_COUNTY_SHAPEFILE: PropertyDataSource = {
       apn: string;
       row: Record<string, unknown>;
       basics: ParcelBasicsAttrs;
+      geomEWKT: string | null;
     };
     let queue: SpinePending[] = [];
 
     const flush = async () => {
       if (queue.length === 0) return;
 
+      // Dedupe by APN within this batch. The Kings export contains
+      // occasional duplicate APN rows (parcel splits caught mid-roll,
+      // condo unit children sharing the parent APN, plain data-entry
+      // dupes). Postgres refuses ON CONFLICT against the same target
+      // twice in one statement, so we collapse to last-write-wins
+      // before sending.
+      const byApn = new Map<string, SpinePending>();
+      for (const item of queue) byApn.set(item.apn, item);
+      const deduped = Array.from(byApn.values());
+
       // Step 1: upsert spine rows in one round trip per batch.
       // Supabase upsert on a unique APN key. We use insert with
       // onConflict to merge.
-      const spineRows = queue.map(q => q.row);
+      const spineRows = deduped.map(q => q.row);
       const { data: upserted, error: upsertErr } = await supabaseAdmin
         .from('properties')
         .upsert(spineRows, { onConflict: 'apn' })
@@ -251,7 +338,7 @@ export const KINGS_COUNTY_SHAPEFILE: PropertyDataSource = {
           .in('property_id', propertyIds)
           .eq('source_id', KINGS_COUNTY_SHAPEFILE.id);
 
-        const layerRows = queue
+        const layerRows = deduped
           .map(q => {
             const pid = q.apn ? idByApn.get(q.apn) : null;
             if (!pid) return null;
@@ -273,6 +360,24 @@ export const KINGS_COUNTY_SHAPEFILE: PropertyDataSource = {
         }
       }
 
+      // Step 3: push polygon geometries via the set_parcel_geoms RPC.
+      // Skip the call if no parcels in this batch had usable geometry.
+      const geomPayload = deduped
+        .filter(q => q.geomEWKT)
+        .map(q => ({ apn: q.apn, ewkt: q.geomEWKT as string }));
+      if (geomPayload.length > 0) {
+        const { error: geomErr } = await supabaseAdmin.rpc(
+          'set_parcel_geoms',
+          { payload: geomPayload },
+        );
+        if (geomErr) {
+          // Don't fail the whole snapshot on geometry — the spine + layer
+          // data are still good. Log and continue; operators can re-run
+          // later or backfill via a dedicated geometry-only ingest.
+          console.error('Geometry RPC failed for batch:', geomErr.message);
+        }
+      }
+
       queue = [];
     };
 
@@ -290,6 +395,13 @@ export const KINGS_COUNTY_SHAPEFILE: PropertyDataSource = {
       // Allow apn-only rows in the spine (we just won't render them on the
       // map, but they're queryable by APN search later).
       const basics = buildParcelBasics(props);
+      // Extract polygon geometry. The shapefile feature carries it as a
+      // GeoJSON-shaped object in State Plane Zone 4 (per the .prj file);
+      // we reproject to WGS84 and serialize to EWKT for direct Postgres
+      // insert via geom column. Missing/malformed geometries become null —
+      // the parcel still goes into the spine, it just won't have a polygon
+      // for the map to render.
+      const geomEWKT = feature.geometry ? featureToEWKT(feature.geometry) : null;
       const spineRow: Record<string, unknown> = {
         apn,
         fips_county_code: '06031', // Kings County, CA
@@ -316,12 +428,16 @@ export const KINGS_COUNTY_SHAPEFILE: PropertyDataSource = {
           return Number.isFinite(parsed) && parsed > 1700 && parsed < 2100 ? parsed : null;
         })(),
         assessee_name: s(props, 'AssesseeNa'),
+        // NOTE: geom is intentionally NOT in the upsert payload — Supabase's
+        // JSON path can't push EWKT into a geometry column directly. We
+        // attach geometry via the set_parcel_geoms RPC after the spine
+        // upsert completes (see flush()).
         spine_source: KINGS_COUNTY_SHAPEFILE.id,
         spine_acquired_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
 
-      queue.push({ apn, row: spineRow, basics });
+      queue.push({ apn, row: spineRow, basics, geomEWKT });
       read++;
       if (queue.length >= BATCH_SIZE) {
         await flush();

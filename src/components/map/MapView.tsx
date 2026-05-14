@@ -11,6 +11,7 @@ import { Lead, STATUS_COLORS, LISTING_STATUS_COLORS } from "@/types";
 import { MAP_CENTER, MAP_ZOOM } from "@/lib/constants";
 import { useTheme } from "next-themes";
 import ZoningOverlay from "./ZoningOverlay";
+import ParcelOverlay, { type ParcelColorMode } from "./ParcelOverlay";
 import AdvancedLeadMarkers from "./AdvancedLeadMarkers";
 import GamepadFlightController, { type GamepadActions, type FlightMode, type ReticleTarget } from "./GamepadFlightController";
 import { useCameraChoreographer, type FlyToOptions } from "@/lib/useCameraChoreographer";
@@ -39,6 +40,15 @@ interface Props {
   prospectPins?: { lat: number; lng: number; address: string }[];
   onProspectPinClick?: (address: string) => void;
   showZoningOverlay?: boolean;
+  /** Show parcel polygons over the map (Kings County etc.). Color rendering
+   *  is driven by parcelColorMode. Hidden by default; user toggles via the
+   *  layer picker on the page. */
+  showParcelOverlay?: boolean;
+  parcelColorMode?: ParcelColorMode;
+  /** Fires when the user clicks a parcel polygon. Carries the APN and the
+   *  lat/lng of the click. The page uses this to look up / open the
+   *  PropertyPopup against the resolver. */
+  onParcelClick?: (apn: string, latLng: { lat: number; lng: number }) => void;
   view3D?: boolean;
   // Choreographed camera move. Pass a new object to trigger a flight;
   // the choreographer animates from the current camera state to the
@@ -528,7 +538,7 @@ function PendingSkiptracePins({ pins }: { pins: { id: string; lat: number; lng: 
   return null;
 }
 
-export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClick, center, navigateTo, zoom, mapType = "roadmap", pinMode = "dots", prospectMode = false, prospectPins = [], onProspectPinClick, showZoningOverlay = false, view3D = false, flight = null, gamepadEnabled = false, gamepadActions, gamepadMode = 'overhead', gamepadDebugSuspendMoveCamera = false, gamepadDebugForceFallbackPath = false, gamepadDebugTickleAfterMoveCamera = false, gamepadAirplaneTargets, onGamepadReticleTargetChange, onGamepadFocalScreenYChange, onGamepadStatusChange }: Props) {
+export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClick, center, navigateTo, zoom, mapType = "roadmap", pinMode = "dots", prospectMode = false, prospectPins = [], onProspectPinClick, showZoningOverlay = false, showParcelOverlay = false, parcelColorMode = 'land_use', onParcelClick, view3D = false, flight = null, gamepadEnabled = false, gamepadActions, gamepadMode = 'overhead', gamepadDebugSuspendMoveCamera = false, gamepadDebugForceFallbackPath = false, gamepadDebugTickleAfterMoveCamera = false, gamepadAirplaneTargets, onGamepadReticleTargetChange, onGamepadFocalScreenYChange, onGamepadStatusChange }: Props) {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme !== 'light';
   const isSatellite = mapType === "satellite" || mapType === "hybrid";
@@ -589,6 +599,11 @@ export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClic
         )}
         <PoiClickCatcher prospectMode={prospectMode} onMapClick={onMapClick} />
         <ZoningOverlay visible={showZoningOverlay} />
+        <ParcelOverlay
+          visible={showParcelOverlay}
+          colorMode={parcelColorMode}
+          onParcelClick={onParcelClick}
+        />
         {/* AdvancedMarkerElement requires a Map ID. With one configured we
             render the rich pin family (per-status animations, hover labels,
             detail cards). Without one we fall back to the legacy SVG-icon

@@ -55,8 +55,27 @@ interface LayerRow {
   source_url: string | null;
 }
 
+// Score a contribution by how "rich" it is. Richer = the source carries
+// more authoritative detail for that layer type. When two sources
+// contribute the same layer for the same property (e.g. both Lemoore and
+// Kings County contribute parcel_basics), we fold the lower-richness
+// contribution first so the higher one overwrites it. Without this,
+// merge order is whatever Postgres returns, and a thin source (Lemoore's
+// parcel_basics carries acres=0, no owner, no structure) silently
+// clobbers the rich one (Kings County). County assessor sources are the
+// source-of-truth for parcel_basics; municipal GIS sources are not.
+function richnessScore(c: PropertyDataContribution): number {
+  if (c.layerType !== 'parcel_basics') return 0;
+  // Count fields actually populated on this contribution. Cheap, no
+  // hardcoded source list, generalizes to any future county source.
+  return Object.values(c.attrs).filter(v => v !== null && v !== undefined && v !== '' && v !== 0).length;
+}
+
 // Flatten contributions (from DB or live) into the ResolvedProperty shape.
 function fold(contributions: PropertyDataContribution[]): Omit<ResolvedProperty, 'hit'> {
+  // Sort so thinner contributions fold first; richer ones overwrite.
+  // Stable within equal scores so non-parcel_basics layers keep order.
+  contributions = [...contributions].sort((a, b) => richnessScore(a) - richnessScore(b));
   const out: Omit<ResolvedProperty, 'hit'> = {
     apn: null, address: null,
     zoningCode: null, zoningDesc: null,
@@ -83,7 +102,12 @@ function fold(contributions: PropertyDataContribution[]): Omit<ResolvedProperty,
     } else if (c.layerType === 'parcel_basics') {
       const a = c.attrs as ParcelBasicsAttrs;
       out.apn = a.apn ?? out.apn;
-      out.acres = a.acres ?? out.acres;
+      // Treat 0 acres as "no real value" — every real parcel has some
+      // acreage; a literal 0 means the source didn't populate this field
+      // and used the default (Lemoore GIS does this). Without this
+      // guard, a thin source with acres=0 would render "0.00 acres".
+      const incomingAcres = a.acres != null && a.acres > 0 ? a.acres : null;
+      out.acres = incomingAcres ?? out.acres;
       out.use2024 = a.use ?? out.use2024;
       out.development2024 = a.development ?? out.development2024;
       out.hyperlinks.code = a.codeHyperlink ?? out.hyperlinks.code;
@@ -214,6 +238,29 @@ async function writeBack(
   } catch (err) {
     console.error('Property resolver write-back failed:', err);
   }
+}
+
+// Look up a property by APN — deterministic, used when the caller already
+// knows the parcel identity (e.g. polygon click on the map). Returns the
+// same shape as resolveProperty so callers can use either entry point
+// interchangeably. No live-source fallback: APN-targeted lookups are
+// only meaningful when the parcel is already in the local DB.
+export async function resolvePropertyByApn(apn: string): Promise<ResolvedProperty> {
+  const { data } = await supabaseAdmin
+    .from('properties')
+    .select('id, apn, address, lat, lng')
+    .eq('apn', apn)
+    .maybeSingle();
+  if (!data) return emptyResolvedProperty();
+  const row = data as PropertyRow;
+  const layers = await loadLayersFor(row.id);
+  const folded = fold(layers);
+  return {
+    hit: true,
+    ...folded,
+    apn: folded.apn ?? row.apn,
+    address: folded.address ?? row.address,
+  };
 }
 
 export async function resolveProperty(lat: number, lng: number): Promise<ResolvedProperty> {

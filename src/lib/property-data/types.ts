@@ -58,6 +58,63 @@ export interface ParcelBasicsAttrs {
   use?: string | null;          // current use code/description from county
   development?: string | null;  // current development status
   codeHyperlink?: string | null;
+  // ── County assessor extensions (Kings County etc) ─────────────────
+  // All public-record fields. No contact data here.
+  assesseeName?: string | null;
+  landUseCode?: string | null;
+  zoningCode?: string | null;   // assessor's zoning code (may differ from
+                                // municipal zoning layer)
+  taxabilityFull?: string | null;
+  tra?: string | null;          // tax rate area
+  netValue?: number | null;
+  landValue?: number | null;
+  structureValue?: number | null;
+  community?: string | null;    // community/city per assessor
+  mailingAddress1?: string | null;
+  mailingAddress2?: string | null;
+  mailingAddress3?: string | null;
+  mailingAddress4?: string | null;
+  situsAddress1?: string | null;
+  situsAddress2?: string | null;
+  // Structure fields
+  yearBuilt?: string | number | null;
+  effectiveYear?: string | number | null;
+  buildingType?: string | null;
+  buildingSize?: number | null;
+  buildingUsedFor?: string | null;
+  storiesCount?: string | number | null;
+  unitsCount?: string | number | null;
+  condition?: string | null;
+  qualityClass?: string | null;
+  bedrooms?: string | number | null;
+  bathrooms?: string | number | null;
+  halfBaths?: string | number | null;
+  construction?: string | null;
+  foundation?: string | null;
+  exteriorType?: string | null;
+  roofCover?: string | null;
+  heating?: string | null;
+  coolingCentral?: string | null;
+  fireplace?: string | null;
+  garage?: string | null;
+  attachGarageSqft?: number | null;
+  detachGarageSqft?: number | null;
+  poolSpa?: string | null;
+  solar?: string | null;
+  hasWell?: string | null;
+  hasOrchard?: string | null;
+  hasVineyard?: string | null;
+  subdivisionName?: string | null;
+  // Agricultural
+  homesiteAcres?: string | number | null;
+  growingAcres?: string | number | null;
+  primeAcres?: string | number | null;
+  openSpaceAcres?: string | number | null;
+  urbanAcres?: string | number | null;
+  // Misc
+  neighborhoodCode?: string | null;
+  waterSource?: string | null;
+  sewerCode?: string | null;
 }
 
 // One fact-contribution returned by a source for a single point.
@@ -109,7 +166,9 @@ export interface SnapshotResult {
 
 // What the resolver returns to the route — the shape PropertyPopup
 // expects. Stable across sources; resolver flattens contributions into
-// this view.
+// this view. Assessor extensions (assesseeName, yearBuilt, bedrooms,
+// etc.) are surfaced when a richer source like Kings County contributes
+// them; older sources just leave them null.
 export interface ResolvedProperty {
   hit: boolean;
   apn: string | null;
@@ -128,6 +187,15 @@ export interface ResolvedProperty {
     zoning: string | null;
     code: string | null;
   };
+  // Assessor extensions — populated when a county-data source contributes
+  // them via parcel_basics. Optional on the popup side.
+  assesseeName: string | null;
+  yearBuilt: string | number | null;
+  buildingSize: number | null;
+  bedrooms: string | number | null;
+  bathrooms: string | number | null;
+  buildingType: string | null;
+  netValue: number | null;
   raw: Record<string, unknown>;
 }
 
@@ -146,6 +214,13 @@ export function emptyResolvedProperty(): ResolvedProperty {
     subdivision: null,
     sitePlan: null,
     hyperlinks: { generalPlan: null, zoning: null, code: null },
+    assesseeName: null,
+    yearBuilt: null,
+    buildingSize: null,
+    bedrooms: null,
+    bathrooms: null,
+    buildingType: null,
+    netValue: null,
     raw: {},
   };
 }

@@ -64,6 +64,8 @@ function fold(contributions: PropertyDataContribution[]): Omit<ResolvedProperty,
     acres: null, use2024: null, development2024: null,
     subdivision: null, sitePlan: null,
     hyperlinks: { generalPlan: null, zoning: null, code: null },
+    assesseeName: null, yearBuilt: null, buildingSize: null,
+    bedrooms: null, bathrooms: null, buildingType: null, netValue: null,
     raw: {},
   };
 
@@ -85,6 +87,15 @@ function fold(contributions: PropertyDataContribution[]): Omit<ResolvedProperty,
       out.use2024 = a.use ?? out.use2024;
       out.development2024 = a.development ?? out.development2024;
       out.hyperlinks.code = a.codeHyperlink ?? out.hyperlinks.code;
+      // Assessor extensions — populated from richer county sources like
+      // Kings County. Older sources leave these undefined and we keep null.
+      out.assesseeName = a.assesseeName ?? out.assesseeName;
+      out.yearBuilt = a.yearBuilt ?? out.yearBuilt;
+      out.buildingSize = a.buildingSize ?? out.buildingSize;
+      out.bedrooms = a.bedrooms ?? out.bedrooms;
+      out.bathrooms = a.bathrooms ?? out.bathrooms;
+      out.buildingType = a.buildingType ?? out.buildingType;
+      out.netValue = a.netValue ?? out.netValue;
     } else if (c.layerType === 'subdivision') {
       out.subdivision = c.attrs as SubdivisionAttrs;
     } else if (c.layerType === 'site_plan') {

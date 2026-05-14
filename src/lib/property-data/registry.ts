@@ -6,10 +6,12 @@
 
 import type { PropertyDataSource } from './types';
 import { LEMOORE_GIS_LIVE, LEMOORE_GIS_SNAPSHOT } from './sources/lemoore-gis';
+import { KINGS_COUNTY_SHAPEFILE } from './sources/kings-county';
 
 export const REGISTERED_SOURCES: PropertyDataSource[] = [
   LEMOORE_GIS_LIVE,
   LEMOORE_GIS_SNAPSHOT,
+  KINGS_COUNTY_SHAPEFILE,
 ];
 
 export function getSourceById(id: string): PropertyDataSource | null {

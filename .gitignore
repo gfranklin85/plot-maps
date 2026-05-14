@@ -40,3 +40,9 @@ next-env.d.ts
 
 # IDE local state
 .claude/
+
+# Local parcel / property-data source files. These can be huge (Kings County
+# parcel .dbf is ~1.4GB). They never belong in git. Property data adapters
+# read from /data/* by convention; the path is configurable via env vars in
+# production where needed.
+/data/

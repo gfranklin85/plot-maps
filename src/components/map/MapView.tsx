@@ -49,6 +49,11 @@ interface Props {
    *  lat/lng of the click. The page uses this to look up / open the
    *  PropertyPopup against the resolver. */
   onParcelClick?: (apn: string, latLng: { lat: number; lng: number }) => void;
+  /** Fires when the cursor enters or leaves a parcel polygon. The page
+   *  feeds this into the airplane-mode reticle so flying over a parcel
+   *  shows the grab-ready hand icon. Pin DOM hover still wins on overlap;
+   *  the page does the precedence. */
+  onParcelHoverChange?: (apn: string | null, latLng: { lat: number; lng: number } | null) => void;
   view3D?: boolean;
   // Choreographed camera move. Pass a new object to trigger a flight;
   // the choreographer animates from the current camera state to the
@@ -538,7 +543,7 @@ function PendingSkiptracePins({ pins }: { pins: { id: string; lat: number; lng: 
   return null;
 }
 
-export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClick, center, navigateTo, zoom, mapType = "roadmap", pinMode = "dots", prospectMode = false, prospectPins = [], onProspectPinClick, showZoningOverlay = false, showParcelOverlay = false, parcelColorMode = 'land_use', onParcelClick, view3D = false, flight = null, gamepadEnabled = false, gamepadActions, gamepadMode = 'overhead', gamepadDebugSuspendMoveCamera = false, gamepadDebugForceFallbackPath = false, gamepadDebugTickleAfterMoveCamera = false, gamepadAirplaneTargets, onGamepadReticleTargetChange, onGamepadFocalScreenYChange, onGamepadStatusChange }: Props) {
+export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClick, center, navigateTo, zoom, mapType = "roadmap", pinMode = "dots", prospectMode = false, prospectPins = [], onProspectPinClick, showZoningOverlay = false, showParcelOverlay = false, parcelColorMode = 'land_use', onParcelClick, onParcelHoverChange, view3D = false, flight = null, gamepadEnabled = false, gamepadActions, gamepadMode = 'overhead', gamepadDebugSuspendMoveCamera = false, gamepadDebugForceFallbackPath = false, gamepadDebugTickleAfterMoveCamera = false, gamepadAirplaneTargets, onGamepadReticleTargetChange, onGamepadFocalScreenYChange, onGamepadStatusChange }: Props) {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme !== 'light';
   const isSatellite = mapType === "satellite" || mapType === "hybrid";
@@ -603,6 +608,7 @@ export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClic
           visible={showParcelOverlay}
           colorMode={parcelColorMode}
           onParcelClick={onParcelClick}
+          onParcelHoverChange={onParcelHoverChange}
         />
         {/* AdvancedMarkerElement requires a Map ID. With one configured we
             render the rich pin family (per-status animations, hover labels,

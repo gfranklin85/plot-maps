@@ -119,10 +119,18 @@ export default function MapPage() {
   // Latest hover target as a ref so onGrabStart (which fires inside the
   // gamepad RAF loop) can read the current value without re-deriving.
   const reticleTargetRef = useRef<Lead | null>(null);
+  // Parallel ref for parcel-under-reticle. ParcelOverlay drives this via
+  // its mouseover/mouseout listeners. Pin (reticleTargetRef) wins on
+  // overlap — the grab handler checks the lead ref first.
+  const reticleParcelRef = useRef<{ apn: string; lat: number; lng: number } | null>(null);
   // Grabbed lead as a ref so onFireArmed (also fires inside the RAF loop)
   // can read the current grabbed lead without the gamepadActions useMemo
   // having to re-create on every grab/release.
   const grabbedLeadRef = useRef<Lead | null>(null);
+  // Brief toast surfaced when the user tries to fire-armed on a parcel
+  // grab. Parcel grabs open the popup; firing requires pinning to the
+  // user's list first so /api/inquiry/send has a real Lead.
+  const [reticleToast, setReticleToast] = useState<string | null>(null);
 
   // navigateTarget kept for compat with MapView's CenterController prop;
   // every flow now uses the camera choreographer's dispatchFlight() instead,
@@ -505,14 +513,34 @@ export default function MapPage() {
     (target: { id: string; lat: number; lng: number } | null) => {
       if (target === null) {
         reticleTargetRef.current = null;
-        setReticleHovering(false);
+        // Reticle is "hovering" if a parcel is still under it, even when
+        // the controller reports no lead. Pin precedence is enforced by
+        // the grab handler reading reticleTargetRef first.
+        setReticleHovering(reticleParcelRef.current !== null);
       } else {
         const lead = leadsById.get(target.id) || null;
         reticleTargetRef.current = lead;
-        setReticleHovering(!!lead);
+        setReticleHovering(!!lead || reticleParcelRef.current !== null);
       }
     },
     [leadsById],
+  );
+
+  // ParcelOverlay tells us when the DOM cursor enters/leaves a parcel
+  // polygon. In airplane mode the synthesized pointermove (commit e764410)
+  // keeps these events firing under the stationary reticle during flight.
+  // Pin DOM hover wins on overlap.
+  const handleParcelHoverChange = useCallback(
+    (apn: string | null, latLng: { lat: number; lng: number } | null) => {
+      if (apn === null || latLng === null) {
+        reticleParcelRef.current = null;
+        setReticleHovering(reticleTargetRef.current !== null);
+      } else {
+        reticleParcelRef.current = { apn, lat: latLng.lat, lng: latLng.lng };
+        setReticleHovering(true);
+      }
+    },
+    [],
   );
 
   const [mobileControlsOpen, setMobileControlsOpen] = useState(false);
@@ -617,14 +645,39 @@ export default function MapPage() {
         setWalkMode(prev => !prev);
       },
       onGrabStart: () => {
-        // LT pressed while reticle was hovering. Snapshot the lead the
-        // reticle was over and store it; the rest of the app can consume
-        // grabbedLead from state. Phase B1: just stores. Phase B2 will
-        // open menus / cards off this state.
-        const target = reticleTargetRef.current;
-        if (target) {
-          setGrabbedLead(target);
-          grabbedLeadRef.current = target;
+        // LT pressed while reticle was hovering. Pin wins over parcel on
+        // overlap. If a real lead is under the reticle, snapshot it as
+        // today. Otherwise, if a parcel is under the reticle, synthesize
+        // a `parcel:<APN>` stub Lead so the existing grabbedLead-based UI
+        // (popup, fire path) keeps working without a separate branch.
+        const lead = reticleTargetRef.current;
+        if (lead) {
+          setGrabbedLead(lead);
+          grabbedLeadRef.current = lead;
+          return;
+        }
+        const parcel = reticleParcelRef.current;
+        if (parcel) {
+          const stub: Lead = {
+            id: `parcel:${parcel.apn}`,
+            user_id: '',
+            name: '',
+            property_address: null,
+            owner_name: null,
+            phone: null,
+            phone_2: null,
+            phone_3: null,
+            email: null,
+            status: 'New',
+            latitude: parcel.lat,
+            longitude: parcel.lng,
+            created_at: new Date().toISOString(),
+          } as unknown as Lead;
+          setGrabbedLead(stub);
+          grabbedLeadRef.current = stub;
+          // Also open the popup so the user can pin-to-list / call / mail
+          // off the parcel data without a separate confirm.
+          setSelectedLead(stub);
         }
       },
       onGrabEnd: () => {
@@ -646,6 +699,14 @@ export default function MapPage() {
         // on the next leads refresh.
         const lead = grabbedLeadRef.current;
         if (!lead) return;
+        // Parcel grab — there's no Lead row to send against yet. The
+        // popup (already opened by onGrabStart) is where the user pins
+        // to their list, which creates a real Lead they can fire on next.
+        if (typeof lead.id === 'string' && lead.id.startsWith('parcel:')) {
+          setReticleToast('Pin this parcel to your list first to fire.');
+          window.setTimeout(() => setReticleToast(null), 2400);
+          return;
+        }
         void (async () => {
           try {
             const armedRes = await fetch('/api/profile/arm-channel', { method: 'GET' });
@@ -1171,6 +1232,7 @@ export default function MapPage() {
             showZoningOverlay={showZoning}
             showParcelOverlay={showParcels}
             parcelColorMode={parcelColorMode}
+            onParcelHoverChange={handleParcelHoverChange}
             onParcelClick={(apn, latLng) => {
               // Open the standard PropertyPopup against this parcel click.
               // PropertyPopup loads /api/parcel?lat&lng internally and the
@@ -1399,6 +1461,15 @@ export default function MapPage() {
       {prospectToast && (
         <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-emerald-500 text-white px-4 py-2 rounded-lg shadow-xl text-sm font-semibold">
           + {prospectToast}
+        </div>
+      )}
+
+      {/* Reticle toast — fired when the gamepad tries to fire-armed on a
+          parcel grab (no Lead row exists yet). Surfaces just below the
+          prospect toast so they never collide visually. */}
+      {reticleToast && (
+        <div className="fixed top-32 left-1/2 -translate-x-1/2 z-50 bg-amber-500 text-white px-4 py-2 rounded-lg shadow-xl text-sm font-semibold">
+          {reticleToast}
         </div>
       )}
 

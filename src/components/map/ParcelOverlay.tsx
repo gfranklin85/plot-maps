@@ -33,6 +33,11 @@ interface Props {
   /** Fires when the user clicks a parcel polygon. Pass the APN so the
    *  page can open the property popup against existing resolver flow. */
   onParcelClick?: (apn: string, latLng: { lat: number; lng: number }) => void;
+  /** Fires when the cursor enters or leaves a parcel polygon. Used by
+   *  airplane-mode to drive the reticle's hover-ready state when flying
+   *  over a parcel. Page combines this with pin-DOM hover from the
+   *  gamepad controller and lets the pin win on overlap. */
+  onParcelHoverChange?: (apn: string | null, latLng: { lat: number; lng: number } | null) => void;
   /** Minimum zoom level before we even ask the server. Below this we
    *  stay quiet — the viewport would return 5000+ polygons and the
    *  map would chug. */
@@ -111,10 +116,18 @@ export default function ParcelOverlay({
   visible,
   colorMode,
   onParcelClick,
+  onParcelHoverChange,
   minZoom = MIN_ZOOM_DEFAULT,
 }: Props) {
   const map = useMap();
   const dataLayerRef = useRef<google.maps.Data | null>(null);
+  // Currently-hovered feature, kept here so mouseout can revert its style
+  // without leaking a closure through the listener.
+  const hoveredFeatureRef = useRef<google.maps.Data.Feature | null>(null);
+  // Latest hover callback as a ref so we don't have to re-subscribe the
+  // mouseover/mouseout listeners every time the page identity changes.
+  const onParcelHoverChangeRef = useRef(onParcelHoverChange);
+  onParcelHoverChangeRef.current = onParcelHoverChange;
   // Track what we've fetched so panning back over loaded area is free.
   // We key by string bbox at low precision; effectively this is a
   // viewport-history cache. New viewport = new fetch only if it's not
@@ -178,6 +191,50 @@ export default function ParcelOverlay({
     });
     return () => google.maps.event.removeListener(listener);
   }, [onParcelClick]);
+
+  // ── Hover handlers — paint a brighter style + report APN up. ─────
+  // Brighter stroke + bumped fill opacity makes "I'm over this parcel"
+  // legible during flight. Reverts on mouseout. APN/latLng are reported
+  // up to the page so airplane-mode can drive the reticle hover state
+  // (parcel-under-reticle = hand icon). Pin DOM hover still wins on
+  // overlap; the page does the precedence.
+  useEffect(() => {
+    if (!dataLayerRef.current) return;
+    const layer = dataLayerRef.current;
+    const overListener = layer.addListener('mouseover', (e: google.maps.Data.MouseEvent) => {
+      const feature = e.feature;
+      const apn = feature.getProperty('apn') as string | null;
+      // Revert previously hovered feature if it was different.
+      if (hoveredFeatureRef.current && hoveredFeatureRef.current !== feature) {
+        layer.revertStyle(hoveredFeatureRef.current);
+      }
+      hoveredFeatureRef.current = feature;
+      layer.overrideStyle(feature, {
+        strokeColor: '#fbbf24',
+        strokeWeight: 2,
+        strokeOpacity: 1,
+        fillOpacity: 0.55,
+      });
+      if (apn && e.latLng) {
+        onParcelHoverChangeRef.current?.(apn, { lat: e.latLng.lat(), lng: e.latLng.lng() });
+      }
+    });
+    const outListener = layer.addListener('mouseout', (e: google.maps.Data.MouseEvent) => {
+      if (hoveredFeatureRef.current === e.feature) {
+        layer.revertStyle(e.feature);
+        hoveredFeatureRef.current = null;
+        onParcelHoverChangeRef.current?.(null, null);
+      }
+    });
+    return () => {
+      google.maps.event.removeListener(overListener);
+      google.maps.event.removeListener(outListener);
+      if (hoveredFeatureRef.current) {
+        layer.revertStyle(hoveredFeatureRef.current);
+        hoveredFeatureRef.current = null;
+      }
+    };
+  }, []);
 
   // ── Viewport-driven fetch on idle. ────────────────────────────────
   useEffect(() => {

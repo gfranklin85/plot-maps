@@ -25,6 +25,7 @@ import { useReticlePosition } from "@/lib/useReticlePosition";
 import { playShotSound, type ShotChannel } from "@/lib/shotSounds";
 import ShotAnimation, { type Shot } from "@/components/map/ShotAnimation";
 import ChannelHUD from "@/components/map/ChannelHUD";
+import type { ParcelHitTester } from "@/components/map/ParcelOverlay";
 
 const FILTER_TABS: { label: string; key: string; statuses: LeadStatus[] }[] = [
   { label: "All", key: "all", statuses: [] },
@@ -121,9 +122,15 @@ export default function MapPage() {
   // RAF loop) can read the current value without re-deriving.
   const reticleTargetRef = useRef<Lead | null>(null);
   // Parallel ref for parcel-under-reticle. ParcelOverlay drives this via
-  // its mouseover/mouseout listeners. Pin (reticleTargetRef) wins on
-  // overlap — the shoot handler checks the lead ref first.
+  // its mouseover/mouseout listeners (mouse path) AND the gamepad
+  // controller drives it via its per-frame parcel hit-test (reticle
+  // path). Pin (reticleTargetRef) wins on overlap — the shoot handler
+  // checks the lead ref first.
   const reticleParcelRef = useRef<{ apn: string; lat: number; lng: number } | null>(null);
+  // ParcelOverlay writes its hit-tester here; the gamepad controller
+  // reads it each frame to ask "what parcel is under the reticle pixel?"
+  // Null while the layer is hidden or before features have loaded.
+  const parcelHitTesterRef = useRef<ParcelHitTester | null>(null);
   // Brief toast surfaced when the shoot action can't fire (target rejects
   // the armed channel, or the target is a parcel without a Lead row).
   const [reticleToast, setReticleToast] = useState<string | null>(null);
@@ -1201,6 +1208,7 @@ export default function MapPage() {
             showParcelOverlay={showParcels}
             parcelColorMode={parcelColorMode}
             onParcelHoverChange={handleParcelHoverChange}
+            parcelHitTesterRef={parcelHitTesterRef}
             onParcelClick={(apn, latLng) => {
               // Open the standard PropertyPopup against this parcel click.
               // PropertyPopup loads /api/parcel?lat&lng internally and the
@@ -1251,6 +1259,7 @@ export default function MapPage() {
             gamepadReticleXFraction={reticlePosition.xFraction}
             gamepadReticleYFraction={reticlePosition.yFraction}
             onGamepadReticleTargetChange={handleReticleTargetChange}
+            onGamepadParcelHoverChange={handleParcelHoverChange}
             onGamepadStatusChange={handleGamepadStatus}
           />
         )}

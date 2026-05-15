@@ -1,7 +1,19 @@
 'use client';
 
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, type MutableRefObject } from 'react';
 import { useMap } from '@vis.gl/react-google-maps';
+
+export interface ParcelHitTestResult {
+  apn: string;
+  lat: number;
+  lng: number;
+}
+
+/** Pixel→parcel hit-test exposed for the gamepad reticle. The controller
+ *  hands a {x, y} container-pixel each frame and gets back the parcel
+ *  underneath (or null). Bypasses Google's flaky-during-flight mouseover
+ *  events entirely — we own the geometry, so we ask our own data. */
+export type ParcelHitTester = (x: number, y: number) => ParcelHitTestResult | null;
 
 // Color modes the overlay can render. Each one is a styling function over
 // the polygon properties returned by /api/parcels/viewport — no extra
@@ -38,6 +50,12 @@ interface Props {
    *  over a parcel. Page combines this with pin-DOM hover from the
    *  gamepad controller and lets the pin win on overlap. */
   onParcelHoverChange?: (apn: string | null, latLng: { lat: number; lng: number } | null) => void;
+  /** Optional ref the overlay writes its hit-tester into. Lets the
+   *  gamepad reticle ask "what parcel is under (x, y)?" each frame
+   *  without depending on Google's mouseover events (which are flaky
+   *  during camera motion). The ref is unset while the layer is
+   *  hidden or before features have loaded. */
+  hitTesterRef?: MutableRefObject<ParcelHitTester | null>;
   /** Minimum zoom level before we even ask the server. Below this we
    *  stay quiet — the viewport would return 5000+ polygons and the
    *  map would chug. */
@@ -117,6 +135,7 @@ export default function ParcelOverlay({
   colorMode,
   onParcelClick,
   onParcelHoverChange,
+  hitTesterRef,
   minZoom = MIN_ZOOM_DEFAULT,
 }: Props) {
   const map = useMap();
@@ -128,6 +147,24 @@ export default function ParcelOverlay({
   // mouseover/mouseout listeners every time the page identity changes.
   const onParcelHoverChangeRef = useRef(onParcelHoverChange);
   onParcelHoverChangeRef.current = onParcelHoverChange;
+  // OverlayView for pixel↔latLng projection. Google's Map.getProjection()
+  // only exposes fromLatLngToPoint (world-pixel space), not container
+  // pixels — OverlayView.getProjection() does. We mount a hidden one
+  // for its projection-accessor side effect; it has no visual.
+  const projectionOverlayRef = useRef<google.maps.OverlayView | null>(null);
+  const projectionReadyRef = useRef<boolean>(false);
+  // Per-feature geometry index: APN → { feature, bounds (for cheap
+  // bbox prefilter), polygons (for exact containsLocation hit-test).
+  // A single feature can have multiple rings (MultiPolygon) — we store
+  // each ring as its own google.maps.Polygon so containsLocation works
+  // ring-by-ring.
+  type Indexed = {
+    feature: google.maps.Data.Feature;
+    apn: string;
+    bounds: google.maps.LatLngBounds;
+    polys: google.maps.Polygon[];
+  };
+  const geomIndexRef = useRef<Map<string, Indexed>>(new Map());
   // Track what we've fetched so panning back over loaded area is free.
   // We key by string bbox at low precision; effectively this is a
   // viewport-history cache. New viewport = new fetch only if it's not
@@ -171,6 +208,28 @@ export default function ParcelOverlay({
     applyStyle();
   }, [map, applyStyle]);
 
+  // ── Hidden OverlayView for container-pixel ↔ latLng projection. ─
+  // Mounted once per map. No DOM output; we only consume its
+  // getProjection().fromContainerPixelToLatLng() for the reticle
+  // hit-test. Without it we'd need to do center+offset arithmetic
+  // by hand, which gets imprecise under tilt and rotation.
+  useEffect(() => {
+    if (!map) return;
+    class ProjOverlay extends google.maps.OverlayView {
+      onAdd() { projectionReadyRef.current = true; }
+      onRemove() { projectionReadyRef.current = false; }
+      draw() { /* nothing to draw */ }
+    }
+    const ov = new ProjOverlay();
+    projectionOverlayRef.current = ov;
+    ov.setMap(map);
+    return () => {
+      ov.setMap(null);
+      projectionOverlayRef.current = null;
+      projectionReadyRef.current = false;
+    };
+  }, [map]);
+
   // ── Reapply style on colorMode change. ───────────────────────────
   useEffect(() => { applyStyle(); }, [colorMode, applyStyle]);
 
@@ -179,6 +238,95 @@ export default function ParcelOverlay({
     if (!map || !dataLayerRef.current) return;
     dataLayerRef.current.setMap(visible ? map : null);
   }, [map, visible]);
+
+  // ── Geometry indexing + reticle hit-test plumbing. ───────────────
+  // For each feature we add to the Data layer, we also build a parallel
+  // index keyed by APN so the gamepad reticle can ask "what parcel is
+  // under (pixel x, y)?" each frame. The index is rebuilt as features
+  // come in via the viewport-fetch loop and torn down when the layer
+  // is toggled off. Google's Data layer doesn't expose a `getGeometry()`
+  // that gives us LatLng arrays directly; we iterate paths via
+  // forEachLatLng. A MultiPolygon contributes multiple paths.
+
+  const indexFeatureGeometry = useCallback((feature: google.maps.Data.Feature, apn: string) => {
+    const geom = feature.getGeometry();
+    if (!geom) return;
+    const bounds = new google.maps.LatLngBounds();
+    const ringPaths: google.maps.LatLng[][] = [];
+
+    // Polygon: getArray() returns LinearRing[]; first ring is outer,
+    // rest are holes. We treat each LinearRing as its own path for
+    // hit-test simplicity (a point inside a hole still hits the parcel
+    // — that's the common case and matches user expectation).
+    // MultiPolygon: getArray() returns Polygon[]; recurse one level.
+    function ingestPolygon(poly: google.maps.Data.Polygon) {
+      const rings = poly.getArray();
+      for (const ring of rings) {
+        const ringPath: google.maps.LatLng[] = [];
+        ring.getArray().forEach(latLng => {
+          ringPath.push(latLng);
+          bounds.extend(latLng);
+        });
+        if (ringPath.length >= 3) ringPaths.push(ringPath);
+      }
+    }
+
+    const type = geom.getType();
+    if (type === 'Polygon') {
+      ingestPolygon(geom as google.maps.Data.Polygon);
+    } else if (type === 'MultiPolygon') {
+      const mp = geom as google.maps.Data.MultiPolygon;
+      for (const poly of mp.getArray()) ingestPolygon(poly);
+    } else {
+      return;  // Points/LineStrings don't belong in a parcel layer
+    }
+
+    // One google.maps.Polygon per ring keeps containsLocation() honest;
+    // we don't render these — they exist only as hit-test geometry. We
+    // never call setMap() on them, so they have zero visual cost.
+    const polys = ringPaths.map(path => new google.maps.Polygon({ paths: path }));
+    geomIndexRef.current.set(apn, { feature, apn, bounds, polys });
+  }, []);
+
+  // Pixel→latLng→APN hit-tester. The gamepad RAF loop calls this each
+  // frame at the reticle pixel; we bbox-prefilter before the exact
+  // containsLocation check, which keeps the per-frame cost down to a
+  // handful of polygon checks even with thousands of parcels loaded.
+  const hitTestAt = useCallback<ParcelHitTester>((x, y) => {
+    const ov = projectionOverlayRef.current;
+    if (!ov || !projectionReadyRef.current) return null;
+    const proj = ov.getProjection();
+    if (!proj) return null;
+    const latLng = proj.fromContainerPixelToLatLng(new google.maps.Point(x, y));
+    if (!latLng) return null;
+    // Walk the index. Bounds-first filter, then exact containsLocation.
+    // Could index by spatial bucket for huge counts but 5000-parcel cap
+    // keeps this fine.
+    const idx = geomIndexRef.current;
+    let hit: ParcelHitTestResult | null = null;
+    idx.forEach(entry => {
+      if (hit) return;
+      if (!entry.bounds.contains(latLng)) return;
+      for (const poly of entry.polys) {
+        if (google.maps.geometry.poly.containsLocation(latLng, poly)) {
+          hit = { apn: entry.apn, lat: latLng.lat(), lng: latLng.lng() };
+          return;
+        }
+      }
+    });
+    return hit;
+  }, []);
+
+  // Publish the hit-tester through the shared ref the page handed down.
+  // Clears on unmount so callers can no-op gracefully when the layer
+  // isn't mounted.
+  useEffect(() => {
+    if (!hitTesterRef) return;
+    hitTesterRef.current = hitTestAt;
+    return () => {
+      if (hitTesterRef) hitTesterRef.current = null;
+    };
+  }, [hitTesterRef, hitTestAt]);
 
   // ── Click handler — fire callback with the APN. ─────────────────
   useEffect(() => {
@@ -276,14 +424,17 @@ export default function ParcelOverlay({
         // Add new features only — keep what's already on screen. The
         // fetchedFeaturesRef set tracks APNs we've added so panning the
         // map doesn't duplicate features when the viewport overlaps a
-        // previously fetched region.
+        // previously fetched region. For each added feature we also
+        // build a polygon-ring index keyed by APN so the gamepad
+        // reticle can run an exact containsLocation hit-test against
+        // it each frame without depending on Google's mouseover events.
         const layer = dataLayerRef.current;
         let added = 0;
         for (const f of features) {
           const apn = f.properties.apn ?? '';
           if (!apn || fetchedFeaturesRef.current.has(apn)) continue;
           fetchedFeaturesRef.current.add(apn);
-          layer.addGeoJson(
+          const newFeatures = layer.addGeoJson(
             {
               type: 'Feature',
               id: apn,
@@ -292,6 +443,11 @@ export default function ParcelOverlay({
             },
             { idPropertyName: 'apn' },
           );
+          // Build the geometry index entry for the (one) new feature.
+          // We expect exactly one back per call, but loop for safety.
+          for (const feat of newFeatures) {
+            indexFeatureGeometry(feat, apn);
+          }
           added++;
           if (fetchedFeaturesRef.current.size > MAX_FEATURES_RENDERED) {
             // Hard cap to keep the browser happy. New parcels at the cap
@@ -318,6 +474,7 @@ export default function ParcelOverlay({
   useEffect(() => {
     if (visible) return;
     fetchedFeaturesRef.current.clear();
+    geomIndexRef.current.clear();
     if (dataLayerRef.current) {
       dataLayerRef.current.forEach(f => dataLayerRef.current!.remove(f));
     }

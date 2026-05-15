@@ -11,7 +11,7 @@ import { Lead, STATUS_COLORS, LISTING_STATUS_COLORS } from "@/types";
 import { MAP_CENTER, MAP_ZOOM } from "@/lib/constants";
 import { useTheme } from "next-themes";
 import ZoningOverlay from "./ZoningOverlay";
-import ParcelOverlay, { type ParcelColorMode } from "./ParcelOverlay";
+import ParcelOverlay, { type ParcelColorMode, type ParcelHitTester } from "./ParcelOverlay";
 import AdvancedLeadMarkers from "./AdvancedLeadMarkers";
 import GamepadFlightController, { type GamepadActions, type FlightMode, type ReticleTarget } from "./GamepadFlightController";
 import { useCameraChoreographer, type FlyToOptions } from "@/lib/useCameraChoreographer";
@@ -54,6 +54,12 @@ interface Props {
    *  shows the grab-ready hand icon. Pin DOM hover still wins on overlap;
    *  the page does the precedence. */
   onParcelHoverChange?: (apn: string | null, latLng: { lat: number; lng: number } | null) => void;
+  /** Shared ref ParcelOverlay writes its hit-tester into. The gamepad
+   *  controller reads it each frame to do an exact containsLocation
+   *  hit-test against the reticle pixel, bypassing Google's mouseover
+   *  events (which are flaky during camera motion under a stationary
+   *  cursor). */
+  parcelHitTesterRef?: React.MutableRefObject<ParcelHitTester | null>;
   view3D?: boolean;
   // Choreographed camera move. Pass a new object to trigger a flight;
   // the choreographer animates from the current camera state to the
@@ -87,6 +93,10 @@ interface Props {
   gamepadReticleYFraction?: number;
   /** Fires when the reticle's hovered target changes (incl. null). */
   onGamepadReticleTargetChange?: (target: ReticleTarget | null) => void;
+  /** Fires when the controller's per-frame parcel hit-test changes
+   *  which APN is under the reticle. Page wires this to the same
+   *  parcel-hover state that mouse-over events drive. */
+  onGamepadParcelHoverChange?: (apn: string | null, latLng: { lat: number; lng: number } | null) => void;
   /** Fires with the focal-point screen-Y as a 0..1 viewport fraction.
    *  Retained for potential consumers; not wired through page.tsx since
    *  drag-to-place owns the reticle position now. */
@@ -550,7 +560,7 @@ function PendingSkiptracePins({ pins }: { pins: { id: string; lat: number; lng: 
   return null;
 }
 
-export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClick, center, navigateTo, zoom, mapType = "roadmap", pinMode = "dots", prospectMode = false, prospectPins = [], onProspectPinClick, showZoningOverlay = false, showParcelOverlay = false, parcelColorMode = 'land_use', onParcelClick, onParcelHoverChange, view3D = false, flight = null, gamepadEnabled = false, gamepadActions, gamepadMode = 'overhead', gamepadDebugSuspendMoveCamera = false, gamepadDebugForceFallbackPath = false, gamepadDebugTickleAfterMoveCamera = false, gamepadAirplaneTargets, gamepadReticleXFraction, gamepadReticleYFraction, onGamepadReticleTargetChange, onGamepadFocalScreenYChange, onGamepadStatusChange }: Props) {
+export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClick, center, navigateTo, zoom, mapType = "roadmap", pinMode = "dots", prospectMode = false, prospectPins = [], onProspectPinClick, showZoningOverlay = false, showParcelOverlay = false, parcelColorMode = 'land_use', onParcelClick, onParcelHoverChange, parcelHitTesterRef, view3D = false, flight = null, gamepadEnabled = false, gamepadActions, gamepadMode = 'overhead', gamepadDebugSuspendMoveCamera = false, gamepadDebugForceFallbackPath = false, gamepadDebugTickleAfterMoveCamera = false, gamepadAirplaneTargets, gamepadReticleXFraction, gamepadReticleYFraction, onGamepadReticleTargetChange, onGamepadParcelHoverChange, onGamepadFocalScreenYChange, onGamepadStatusChange }: Props) {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme !== 'light';
   const isSatellite = mapType === "satellite" || mapType === "hybrid";
@@ -602,7 +612,9 @@ export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClic
             airplaneTargets={gamepadAirplaneTargets}
             reticleXFraction={gamepadReticleXFraction}
             reticleYFraction={gamepadReticleYFraction}
+            parcelHitTesterRef={parcelHitTesterRef}
             onReticleTargetChange={onGamepadReticleTargetChange}
+            onParcelHoverChange={onGamepadParcelHoverChange}
             onFocalScreenYChange={onGamepadFocalScreenYChange}
             actions={gamepadActions || {}}
             onStatusChange={onGamepadStatusChange}
@@ -618,6 +630,7 @@ export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClic
           colorMode={parcelColorMode}
           onParcelClick={onParcelClick}
           onParcelHoverChange={onParcelHoverChange}
+          hitTesterRef={parcelHitTesterRef}
         />
         {/* AdvancedMarkerElement requires a Map ID. With one configured we
             render the rich pin family (per-status animations, hover labels,

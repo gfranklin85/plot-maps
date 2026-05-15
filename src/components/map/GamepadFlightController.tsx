@@ -57,6 +57,20 @@ interface Props {
    */
   onReticleTargetChange?: (target: ReticleTarget | null) => void;
   /**
+   * Shared ref containing the parcel-hit-tester function (set by
+   * ParcelOverlay). The controller calls it each frame at the reticle
+   * pixel when the pin-DOM hit-test misses, so flying over a parcel
+   * makes the reticle react even without real mouse motion. Null while
+   * the parcel layer is off or before any features have loaded.
+   */
+  parcelHitTesterRef?: React.MutableRefObject<((x: number, y: number) => { apn: string; lat: number; lng: number } | null) | null>;
+  /**
+   * Fires when the parcel under the reticle changes. Drives page-side
+   * reticleParcelRef + reticleHovering state so the reticle gets the
+   * hand-icon over parcels (just like over pins).
+   */
+  onParcelHoverChange?: (apn: string | null, latLng: { lat: number; lng: number } | null) => void;
+  /**
    * Reticle screen position as 0..1 viewport fractions. User-draggable
    * and persisted in localStorage; the controller samples its hit-test
    * pixel from this position and synthesizes pointermove events here
@@ -206,7 +220,9 @@ export default function GamepadFlightController({
   airplaneTargets,
   reticleXFraction = 0.5,
   reticleYFraction = 0.42,
+  parcelHitTesterRef,
   onReticleTargetChange,
+  onParcelHoverChange,
   onFocalScreenYChange,
   onStatusChange,
   debugSuspendMoveCamera = false,
@@ -246,6 +262,12 @@ export default function GamepadFlightController({
   onReticleTargetChangeRef.current = onReticleTargetChange;
   const onFocalScreenYChangeRef = useRef(onFocalScreenYChange);
   onFocalScreenYChangeRef.current = onFocalScreenYChange;
+  const onParcelHoverChangeRef = useRef(onParcelHoverChange);
+  onParcelHoverChangeRef.current = onParcelHoverChange;
+  // Last APN reported via onParcelHoverChange so we only fire the
+  // callback on actual transitions, not every frame the cursor stays
+  // inside the same parcel.
+  const lastReportedParcelApnRef = useRef<string | null>(null);
   // User-set reticle position. Live refs so the per-frame hit-test
   // samples the up-to-date position without subscribing to re-renders.
   const reticleXFractionRef = useRef<number>(reticleXFraction);
@@ -330,40 +352,72 @@ export default function GamepadFlightController({
       // localStorage) and walk up the DOM until we find an element
       // with that attribute. Zero projection math; works regardless of
       // how the map renders tilt, vector vs raster, etc.
-      if (modeRef.current === 'airplane' && airplaneTargetsRef.current && airplaneTargetsRef.current.length > 0) {
+      if (modeRef.current === 'airplane') {
         // Map div = the element that wraps the gmp-map-3d / gm-style
         // root. The reticle position is a 0..1 viewport fraction set
         // by the user dragging the visual reticle; we sample the pixel
         // at exactly that fraction inside the map's rect.
         const mapDiv = (map as unknown as { getDiv?: () => HTMLElement }).getDiv?.();
         let hitId: string | null = null;
+        let parcelHit: { apn: string; lat: number; lng: number } | null = null;
+
         if (mapDiv) {
           const rect = mapDiv.getBoundingClientRect();
-          const cx = rect.left + rect.width * reticleXFractionRef.current;
-          const cy = rect.top + rect.height * reticleYFractionRef.current;
+          // Document-space coords for the pin DOM hit-test.
+          const cxDoc = rect.left + rect.width * reticleXFractionRef.current;
+          const cyDoc = rect.top + rect.height * reticleYFractionRef.current;
+          // Container-space coords for the ParcelOverlay hit-tester.
+          const cxLocal = rect.width * reticleXFractionRef.current;
+          const cyLocal = rect.height * reticleYFractionRef.current;
+
+          // Pin hit-test first — pins win over parcels on overlap.
           // elementsFromPoint gives us the full stack at that pixel —
           // necessary because pin DOM may have inner elements blocking
           // the data-lead-id wrapper from being the topmost node.
-          const stack = typeof document.elementsFromPoint === 'function'
-            ? document.elementsFromPoint(cx, cy)
-            : (() => {
-                const el = document.elementFromPoint(cx, cy);
-                return el ? [el] : [];
-              })();
-          for (const node of stack) {
-            const found = (node as HTMLElement).closest?.('[data-lead-id]') as HTMLElement | null;
-            if (found && found.dataset.leadId) {
-              hitId = found.dataset.leadId;
-              break;
+          if (airplaneTargetsRef.current && airplaneTargetsRef.current.length > 0) {
+            const stack = typeof document.elementsFromPoint === 'function'
+              ? document.elementsFromPoint(cxDoc, cyDoc)
+              : (() => {
+                  const el = document.elementFromPoint(cxDoc, cyDoc);
+                  return el ? [el] : [];
+                })();
+            for (const node of stack) {
+              const found = (node as HTMLElement).closest?.('[data-lead-id]') as HTMLElement | null;
+              if (found && found.dataset.leadId) {
+                hitId = found.dataset.leadId;
+                break;
+              }
             }
+          }
+
+          // Parcel hit-test only when pin missed. ParcelOverlay's
+          // containsLocation-based tester works during camera motion
+          // (it asks our own geometry, not Google's mouseover events
+          // which only fire on real cursor motion).
+          if (!hitId) {
+            const tester = parcelHitTesterRef?.current;
+            if (tester) parcelHit = tester(cxLocal, cyLocal);
           }
         }
 
-        const hit = hitId ? (airplaneTargetsRef.current.find(t => t.id === hitId) || null) : null;
-        reticleHoveringRef.current = !!hit;
-        if ((hit?.id ?? null) !== lastReportedTargetIdRef.current) {
-          lastReportedTargetIdRef.current = hit?.id ?? null;
-          onReticleTargetChangeRef.current?.(hit);
+        const pinHit = hitId && airplaneTargetsRef.current
+          ? (airplaneTargetsRef.current.find(t => t.id === hitId) || null)
+          : null;
+        reticleHoveringRef.current = !!pinHit || !!parcelHit;
+
+        if ((pinHit?.id ?? null) !== lastReportedTargetIdRef.current) {
+          lastReportedTargetIdRef.current = pinHit?.id ?? null;
+          onReticleTargetChangeRef.current?.(pinHit);
+        }
+        // Report parcel-under-reticle transitions to page-side state.
+        const newParcelApn = pinHit ? null : (parcelHit?.apn ?? null);
+        if (newParcelApn !== lastReportedParcelApnRef.current) {
+          lastReportedParcelApnRef.current = newParcelApn;
+          if (newParcelApn && parcelHit) {
+            onParcelHoverChangeRef.current?.(newParcelApn, { lat: parcelHit.lat, lng: parcelHit.lng });
+          } else {
+            onParcelHoverChangeRef.current?.(null, null);
+          }
         }
       } else {
         // Outside airplane mode, ensure no stale hover sticks around.
@@ -371,6 +425,10 @@ export default function GamepadFlightController({
         if (lastReportedTargetIdRef.current !== null) {
           lastReportedTargetIdRef.current = null;
           onReticleTargetChangeRef.current?.(null);
+        }
+        if (lastReportedParcelApnRef.current !== null) {
+          lastReportedParcelApnRef.current = null;
+          onParcelHoverChangeRef.current?.(null, null);
         }
       }
 

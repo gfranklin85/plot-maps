@@ -123,6 +123,17 @@ function formatDate(dateStr: string | null): string {
   return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+// Compact "label · value" row used throughout the parcel card sections.
+// span2 makes the row stretch the full grid width for longer values.
+function Row({ label, value, span2 = false }: { label: string; value: string; span2?: boolean }) {
+  return (
+    <div className={cn('flex items-baseline gap-2', span2 && 'col-span-2')}>
+      <span className="text-on-surface-variant shrink-0">{label}</span>
+      <span className="font-semibold text-on-surface truncate">{value}</span>
+    </div>
+  );
+}
+
 export default function PropertyPopup({ lead, onUpdate, walkMode = false, onWalkHere, onToggleProspectMode, prospectMode }: Props) {
   const { profile } = useProfile();
   const { user } = useAuth();
@@ -187,46 +198,19 @@ export default function PropertyPopup({ lead, onUpdate, walkMode = false, onWalk
     }
   };
 
-  // Parcel info: zoning/general-plan/subdivision/site-plan from municipal
-  // sources (Lemoore GIS), plus the rich assessor extensions surfaced by
-  // county sources (Kings County for now, more counties to follow). The
-  // resolver flattens contributions into a single shape; we render what's
-  // present and hide what isn't.
-  const [parcel, setParcel] = useState<{
-    hit: boolean;
-    apn: string | null;
-    address: string | null;
-    zoningCode: string | null;
-    zoningDesc: string | null;
-    generalPlanCode: string | null;
-    generalPlanDesc: string | null;
-    acres: number | null;
-    use2024: string | null;
-    development2024: string | null;
-    subdivision: {
-      name: string | null;
-      tract: string | null;
-      applicant: string | null;
-      units: string | null;
-      status: string | null;
-    } | null;
-    sitePlan: {
-      projectNumber: string | null;
-      title: string | null;
-      applicant: string | null;
-      units: string | null;
-      status: string | null;
-    } | null;
-    // Assessor extensions (Kings County and similar rich sources)
-    assesseeName: string | null;
-    yearBuilt: string | number | null;
-    buildingSize: number | null;
-    bedrooms: string | number | null;
-    bathrooms: string | number | null;
-    buildingType: string | null;
-    netValue: number | null;
-  } | null>(null);
-  const [parcelTab, setParcelTab] = useState<'overview' | 'owner' | 'structure' | 'land' | 'value'>('overview');
+  // Parcel info — full ResolvedProperty shape from /api/parcel. Municipal
+  // sources (Lemoore GIS) contribute zoning/general-plan/pipeline; county
+  // sources (Kings County) contribute the rich assessor extensions. The
+  // resolver folds them into one shape; we render every section that has
+  // anything to show and silently omit the rest.
+  const [parcel, setParcel] = useState<import('@/lib/property-data/types').ResolvedProperty | null>(null);
+
+  // Which expand-sections are open. Default: everything collapsed except
+  // the always-visible at-a-glance row. Buyer-mode controller experience:
+  // sections expand on A/select; collapsed sections show a one-line preview.
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
+  const toggleSection = (key: string) =>
+    setExpandedSections(prev => ({ ...prev, [key]: !prev[key] }));
 
   useEffect(() => {
     let cancelled = false;
@@ -357,28 +341,231 @@ export default function PropertyPopup({ lead, onUpdate, walkMode = false, onWalk
           </div>
         </div>
 
-        {/* ── PARCEL DETAILS — tabbed view ── */}
+        {/* ── PARCEL DETAILS — single-view + expand/collapse ── */}
         {parcel?.hit && (() => {
-          // Decide which tabs have anything to show. Empty tabs are hidden
-          // so a Lemoore-only popup stays compact, while a Kings popup with
-          // assessor + structure + valuation gets the full set.
-          const hasOverview = !!(parcel.apn || parcel.acres != null || parcel.zoningCode || parcel.generalPlanCode || parcel.use2024 || parcel.development2024 || parcel.subdivision?.name || parcel.sitePlan?.title);
-          const hasOwner = plotEdition === 'pro' && !!parcel.assesseeName;
-          const hasStructure = !!(parcel.yearBuilt || parcel.buildingSize || parcel.bedrooms || parcel.bathrooms || parcel.buildingType);
-          const hasLand = parcel.acres != null;
-          const hasValue = parcel.netValue != null;
-          const tabs: { key: typeof parcelTab; label: string; show: boolean }[] = [
-            { key: 'overview', label: 'Overview', show: hasOverview },
-            { key: 'owner', label: 'Owner', show: hasOwner },
-            { key: 'structure', label: 'Structure', show: hasStructure },
-            { key: 'land', label: 'Land', show: hasLand },
-            { key: 'value', label: 'Value', show: hasValue },
-          ];
-          const visibleTabs = tabs.filter(t => t.show);
-          const activeTab = visibleTabs.some(t => t.key === parcelTab) ? parcelTab : (visibleTabs[0]?.key ?? 'overview');
           const fmtUSD = (v: number) => `$${v.toLocaleString()}`;
+          const fmtNum = (v: number | string | null | undefined): string => {
+            if (v == null || v === '') return '';
+            if (typeof v === 'number') return v.toLocaleString();
+            return v.toString();
+          };
+          const isPro = plotEdition === 'pro';
+
+          // ── Always-visible at-a-glance row ────────────────────────
+          // The seven fields that drive a prospecting decision at a
+          // glance. We render whatever's present in a two-column grid
+          // and skip anything null.
+          const glanceItems: { label: string; value: string }[] = [];
+          if (parcel.acres != null) glanceItems.push({ label: 'Acres', value: parcel.acres.toFixed(2) });
+          if (parcel.yearBuilt != null) glanceItems.push({ label: 'Built', value: String(parcel.yearBuilt) });
+          if (parcel.buildingSize != null && parcel.buildingSize > 0) glanceItems.push({ label: 'Sqft', value: parcel.buildingSize.toLocaleString() });
+          if (parcel.bedrooms != null && parcel.bedrooms !== '' && parcel.bedrooms !== 0) glanceItems.push({ label: 'Beds', value: fmtNum(parcel.bedrooms) });
+          if (parcel.bathrooms != null && parcel.bathrooms !== '' && parcel.bathrooms !== 0) glanceItems.push({ label: 'Baths', value: fmtNum(parcel.bathrooms) });
+          if (parcel.netValue != null) glanceItems.push({ label: 'Net assessed', value: fmtUSD(parcel.netValue) });
+          if (parcel.zoningCode) glanceItems.push({ label: 'Zoning', value: parcel.zoningCode });
+
+          // ── Absentee detection (Pro only) ─────────────────────────
+          // If the assessee's mailing address differs from the parcel's
+          // situs address, the owner doesn't live there — a huge
+          // prospecting signal. Compare loosely (uppercase, collapse
+          // whitespace) because punctuation/casing varies in the roll.
+          const norm = (s?: string | null) => (s ?? '').replace(/\s+/g, ' ').trim().toUpperCase();
+          const situsForMatch = norm(parcel.address);
+          const mailingFull = [parcel.mailingAddress1, parcel.mailingAddress2, parcel.mailingAddress3, parcel.mailingAddress4]
+            .map(p => p ?? '').filter(Boolean).join(' / ');
+          const mailingForMatch = norm(mailingFull);
+          const isAbsentee = isPro && !!parcel.assesseeName && !!mailingForMatch && !!situsForMatch && !mailingForMatch.includes(situsForMatch.split(',')[0] ?? '_');
+
+          // ── Section definitions ───────────────────────────────────
+          // Each section: a key, a header label, a preview string for
+          // the collapsed state (one-glance summary), and a render
+          // function for the expanded body. Sections with no data
+          // self-skip (preview returns null).
+
+          type Section = { key: string; header: string; preview: string | null; body: React.ReactNode };
+
+          const sections: Section[] = [];
+
+          // Owner (Pro only — assessee name + mailing address)
+          if (isPro && parcel.assesseeName) {
+            sections.push({
+              key: 'owner',
+              header: 'Owner',
+              preview: parcel.assesseeName + (isAbsentee ? ' · ABSENTEE' : ''),
+              body: (
+                <div className="space-y-1 text-[11px]">
+                  <div className="font-semibold text-on-surface">{parcel.assesseeName}</div>
+                  {mailingFull && (
+                    <div>
+                      <div className="text-[10px] text-on-surface-variant uppercase tracking-widest">Tax mailing address</div>
+                      <div className="text-on-surface-variant whitespace-pre-line">{mailingFull.replace(/ \/ /g, '\n')}</div>
+                    </div>
+                  )}
+                  {isAbsentee && (
+                    <div className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-500/15 border border-amber-500/40 px-2 py-0.5 text-[10px] font-bold text-amber-400">
+                      <MaterialIcon icon="flight_takeoff" className="text-[11px]" />
+                      Absentee owner — mailing address differs from parcel
+                    </div>
+                  )}
+                </div>
+              ),
+            });
+          }
+
+          // Structure details — everything past beds/baths/sqft/year
+          const structurePreviewParts: string[] = [];
+          if (parcel.storiesCount != null && parcel.storiesCount !== '') structurePreviewParts.push(`${parcel.storiesCount} story`);
+          if (parcel.buildingType) structurePreviewParts.push(parcel.buildingType);
+          if (parcel.construction) structurePreviewParts.push(parcel.construction);
+          if (parcel.condition) structurePreviewParts.push(parcel.condition);
+          const hasStructureExtras = !!(parcel.effectiveYear || parcel.unitsCount || parcel.halfBaths != null || parcel.qualityClass ||
+            parcel.construction || parcel.foundation || parcel.exteriorType || parcel.roofCover || parcel.storiesCount || parcel.buildingUsedFor);
+          if (hasStructureExtras) {
+            sections.push({
+              key: 'structure',
+              header: 'Structure',
+              preview: structurePreviewParts.slice(0, 3).join(' · ') || null,
+              body: (
+                <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
+                  {parcel.effectiveYear && parcel.effectiveYear !== parcel.yearBuilt && (
+                    <Row label="Effective yr" value={String(parcel.effectiveYear)} />
+                  )}
+                  {parcel.storiesCount != null && parcel.storiesCount !== '' && parcel.storiesCount !== 0 && (
+                    <Row label="Stories" value={fmtNum(parcel.storiesCount)} />
+                  )}
+                  {parcel.unitsCount != null && parcel.unitsCount !== '' && parcel.unitsCount !== 0 && (
+                    <Row label="Units" value={fmtNum(parcel.unitsCount)} />
+                  )}
+                  {parcel.halfBaths != null && parcel.halfBaths !== '' && parcel.halfBaths !== 0 && (
+                    <Row label="½ Baths" value={fmtNum(parcel.halfBaths)} />
+                  )}
+                  {parcel.buildingType && <Row label="Type" value={parcel.buildingType} />}
+                  {parcel.buildingUsedFor && <Row label="Used for" value={parcel.buildingUsedFor} />}
+                  {parcel.condition && <Row label="Condition" value={parcel.condition} />}
+                  {parcel.qualityClass && <Row label="Quality" value={parcel.qualityClass} />}
+                  {parcel.construction && <Row label="Construction" value={parcel.construction} span2 />}
+                  {parcel.foundation && <Row label="Foundation" value={parcel.foundation} span2 />}
+                  {parcel.exteriorType && <Row label="Exterior" value={parcel.exteriorType} />}
+                  {parcel.roofCover && <Row label="Roof" value={parcel.roofCover} />}
+                </div>
+              ),
+            });
+          }
+
+          // Land & ag
+          const isAg = !!(parcel.hasOrchard === 'Y' || parcel.hasVineyard === 'Y' || parcel.hasWell === 'Y' ||
+            (parcel.growingAcres != null && parcel.growingAcres !== '' && parcel.growingAcres !== 0));
+          const landPreviewParts: string[] = [];
+          if (parcel.acres != null) landPreviewParts.push(`${parcel.acres.toFixed(2)} ac`);
+          if (parcel.use2024) landPreviewParts.push(parcel.use2024);
+          if (isAg) landPreviewParts.push('agricultural');
+          const hasLandExtras = !!(parcel.use2024 || parcel.development2024 || parcel.generalPlanCode || parcel.subdivisionName ||
+            parcel.subdivision?.name || parcel.sitePlan?.title || parcel.homesiteAcres || parcel.growingAcres ||
+            parcel.primeAcres || parcel.openSpaceAcres || parcel.urbanAcres || isAg);
+          if (hasLandExtras) {
+            sections.push({
+              key: 'land',
+              header: 'Land & planning',
+              preview: landPreviewParts.slice(0, 3).join(' · ') || null,
+              body: (
+                <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
+                  {parcel.use2024 && <Row label="Use" value={parcel.use2024} span2 />}
+                  {parcel.development2024 && <Row label="Status" value={parcel.development2024} span2 />}
+                  {parcel.generalPlanCode && <Row label="Gen. Plan" value={`${parcel.generalPlanCode}${parcel.generalPlanDesc ? ` · ${parcel.generalPlanDesc}` : ''}`} span2 />}
+                  {parcel.subdivisionName && <Row label="Subdivision" value={parcel.subdivisionName} span2 />}
+                  {parcel.subdivision?.name && parcel.subdivision.name !== parcel.subdivisionName && (
+                    <Row label="Pipeline" value={`${parcel.subdivision.name}${parcel.subdivision.status ? ` · ${parcel.subdivision.status}` : ''}`} span2 />
+                  )}
+                  {parcel.sitePlan?.title && (
+                    <Row label="Site plan" value={`${parcel.sitePlan.title}${parcel.sitePlan.status ? ` · ${parcel.sitePlan.status}` : ''}`} span2 />
+                  )}
+                  {parcel.homesiteAcres != null && parcel.homesiteAcres !== '' && parcel.homesiteAcres !== 0 && (
+                    <Row label="Homesite ac" value={fmtNum(parcel.homesiteAcres)} />
+                  )}
+                  {parcel.growingAcres != null && parcel.growingAcres !== '' && parcel.growingAcres !== 0 && (
+                    <Row label="Growing ac" value={fmtNum(parcel.growingAcres)} />
+                  )}
+                  {parcel.primeAcres != null && parcel.primeAcres !== '' && parcel.primeAcres !== 0 && (
+                    <Row label="Prime ac" value={fmtNum(parcel.primeAcres)} />
+                  )}
+                  {parcel.openSpaceAcres != null && parcel.openSpaceAcres !== '' && parcel.openSpaceAcres !== 0 && (
+                    <Row label="Open ac" value={fmtNum(parcel.openSpaceAcres)} />
+                  )}
+                  {parcel.urbanAcres != null && parcel.urbanAcres !== '' && parcel.urbanAcres !== 0 && (
+                    <Row label="Urban ac" value={fmtNum(parcel.urbanAcres)} />
+                  )}
+                  {parcel.hasWell === 'Y' && <Row label="Well" value="Yes" />}
+                  {parcel.hasOrchard === 'Y' && <Row label="Orchard" value="Yes" />}
+                  {parcel.hasVineyard === 'Y' && <Row label="Vineyard" value="Yes" />}
+                </div>
+              ),
+            });
+          }
+
+          // Amenities
+          const amenityPreviewParts: string[] = [];
+          if (parcel.poolSpa && parcel.poolSpa !== 'N' && parcel.poolSpa !== '') amenityPreviewParts.push('pool');
+          if (parcel.solar && parcel.solar !== 'N' && parcel.solar !== '') amenityPreviewParts.push('solar');
+          if (parcel.fireplace && parcel.fireplace !== 'N' && parcel.fireplace !== '') amenityPreviewParts.push('fireplace');
+          if (parcel.garage && parcel.garage !== 'N' && parcel.garage !== '') amenityPreviewParts.push('garage');
+          const hasAmenities = !!(parcel.heating || parcel.coolingCentral || parcel.fireplace || parcel.garage ||
+            parcel.attachGarageSqft || parcel.detachGarageSqft || parcel.poolSpa || parcel.solar);
+          if (hasAmenities) {
+            sections.push({
+              key: 'amenities',
+              header: 'Amenities & mechanical',
+              preview: amenityPreviewParts.slice(0, 4).join(' · ') || null,
+              body: (
+                <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
+                  {parcel.heating && <Row label="Heating" value={parcel.heating} />}
+                  {parcel.coolingCentral && <Row label="A/C" value={parcel.coolingCentral} />}
+                  {parcel.fireplace && parcel.fireplace !== 'N' && <Row label="Fireplace" value={parcel.fireplace} />}
+                  {parcel.garage && parcel.garage !== 'N' && <Row label="Garage" value={parcel.garage} />}
+                  {parcel.attachGarageSqft != null && parcel.attachGarageSqft > 0 && (
+                    <Row label="Garage (att)" value={`${parcel.attachGarageSqft} sqft`} />
+                  )}
+                  {parcel.detachGarageSqft != null && parcel.detachGarageSqft > 0 && (
+                    <Row label="Garage (det)" value={`${parcel.detachGarageSqft} sqft`} />
+                  )}
+                  {parcel.poolSpa && parcel.poolSpa !== 'N' && <Row label="Pool/Spa" value={parcel.poolSpa} />}
+                  {parcel.solar && parcel.solar !== 'N' && <Row label="Solar" value={parcel.solar} />}
+                  {parcel.waterSource && <Row label="Water" value={parcel.waterSource} />}
+                  {parcel.sewerCode && <Row label="Sewer" value={parcel.sewerCode} />}
+                </div>
+              ),
+            });
+          }
+
+          // Valuation breakdown
+          const valuePreviewParts: string[] = [];
+          if (parcel.landValue != null && parcel.landValue > 0) valuePreviewParts.push(`Land ${fmtUSD(parcel.landValue)}`);
+          if (parcel.structureValue != null && parcel.structureValue > 0) valuePreviewParts.push(`Bldg ${fmtUSD(parcel.structureValue)}`);
+          const hasValuation = !!(parcel.landValue || parcel.structureValue || parcel.tra || parcel.taxabilityFull);
+          if (hasValuation) {
+            sections.push({
+              key: 'valuation',
+              header: 'Valuation breakdown',
+              preview: valuePreviewParts.slice(0, 2).join(' · ') || null,
+              body: (
+                <div className="space-y-1 text-[11px]">
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+                    {parcel.landValue != null && parcel.landValue > 0 && <Row label="Land $" value={fmtUSD(parcel.landValue)} />}
+                    {parcel.structureValue != null && parcel.structureValue > 0 && <Row label="Structure $" value={fmtUSD(parcel.structureValue)} />}
+                    {parcel.netValue != null && <Row label="Net assessed" value={fmtUSD(parcel.netValue)} span2 />}
+                    {parcel.tra && <Row label="TRA" value={parcel.tra} />}
+                    {parcel.taxabilityFull && <Row label="Taxability" value={parcel.taxabilityFull} />}
+                  </div>
+                  <div className="text-[9px] text-on-surface-variant italic">
+                    Public assessor record · not market value (Prop 13 anchors to purchase year)
+                  </div>
+                </div>
+              ),
+            });
+          }
+
           return (
             <div className="rounded-lg border border-card-border bg-surface-container-low/60 px-3 py-2 space-y-2">
+              {/* Header row: Parcel Details label + APN */}
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-1.5">
                   <MaterialIcon icon="location_searching" className="text-[12px] text-primary" />
@@ -391,160 +578,62 @@ export default function PropertyPopup({ lead, onUpdate, walkMode = false, onWalk
                 )}
               </div>
 
-              {visibleTabs.length > 1 && (
-                <div className="flex gap-1 border-b border-card-border/50 -mx-1 px-1 overflow-x-auto">
-                  {visibleTabs.map(t => (
-                    <button
-                      key={t.key}
-                      onClick={() => setParcelTab(t.key)}
-                      className={cn(
-                        'px-2 py-1 text-[10px] font-bold uppercase tracking-wider whitespace-nowrap transition-colors border-b-2',
-                        activeTab === t.key
-                          ? 'text-primary border-primary'
-                          : 'text-on-surface-variant border-transparent hover:text-on-surface'
-                      )}
-                    >
-                      {t.label}
-                    </button>
+              {/* At-a-glance row: the 5-7 fields that drive a decision. */}
+              {glanceItems.length > 0 && (
+                <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
+                  {glanceItems.map((it, i) => (
+                    <Row key={i} label={it.label} value={it.value} />
                   ))}
                 </div>
               )}
 
-              {activeTab === 'overview' && (
-                <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
-                  {parcel.zoningCode && (
-                    <div className="col-span-2 flex items-baseline gap-2">
-                      <span className="text-on-surface-variant shrink-0">Zoning</span>
-                      <span className="font-semibold text-on-surface">{parcel.zoningCode}</span>
-                      {parcel.zoningDesc && (
-                        <span className="text-on-surface-variant truncate">· {parcel.zoningDesc}</span>
-                      )}
-                    </div>
-                  )}
-                  {parcel.generalPlanCode && (
-                    <div className="col-span-2 flex items-baseline gap-2">
-                      <span className="text-on-surface-variant shrink-0">Gen. Plan</span>
-                      <span className="font-semibold text-on-surface">{parcel.generalPlanCode}</span>
-                      {parcel.generalPlanDesc && (
-                        <span className="text-on-surface-variant truncate">· {parcel.generalPlanDesc}</span>
-                      )}
-                    </div>
-                  )}
-                  {parcel.acres != null && (
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-on-surface-variant">Acres</span>
-                      <span className="font-semibold text-on-surface">{parcel.acres.toFixed(2)}</span>
-                    </div>
-                  )}
-                  {parcel.use2024 && (
-                    <div className="col-span-2 flex items-baseline gap-2">
-                      <span className="text-on-surface-variant shrink-0">Use</span>
-                      <span className="text-on-surface">{parcel.use2024}</span>
-                    </div>
-                  )}
-                  {parcel.development2024 && (
-                    <div className="col-span-2 flex items-baseline gap-2">
-                      <span className="text-on-surface-variant shrink-0">Status</span>
-                      <span className="text-on-surface">{parcel.development2024}</span>
-                    </div>
-                  )}
-                  {parcel.subdivision?.name && (
-                    <div className="col-span-2 flex items-baseline gap-2">
-                      <span className="text-on-surface-variant shrink-0">Subdivision</span>
-                      <span className="font-semibold text-on-surface">{parcel.subdivision.name}</span>
-                      {parcel.subdivision.tract && (
-                        <span className="text-on-surface-variant text-[10px]">· {parcel.subdivision.tract}</span>
-                      )}
-                      {parcel.subdivision.status && (
-                        <span className="text-on-surface-variant text-[10px]">· {parcel.subdivision.status}</span>
-                      )}
-                    </div>
-                  )}
-                  {parcel.sitePlan?.title && (
-                    <div className="col-span-2 flex items-baseline gap-2">
-                      <span className="text-on-surface-variant shrink-0">Site Plan</span>
-                      <span className="font-semibold text-on-surface">{parcel.sitePlan.title}</span>
-                      {parcel.sitePlan.projectNumber && (
-                        <span className="text-on-surface-variant text-[10px]">· #{parcel.sitePlan.projectNumber}</span>
-                      )}
-                      {parcel.sitePlan.status && (
-                        <span className="text-on-surface-variant text-[10px]">· {parcel.sitePlan.status}</span>
-                      )}
-                    </div>
-                  )}
-                </div>
+              {/* Absentee badge — surface up top for Pro when applicable.
+                  Even if the Owner section is collapsed, the badge is
+                  what makes the parcel actionable as a prospect. */}
+              {isAbsentee && !expandedSections['owner'] && (
+                <button
+                  onClick={() => toggleSection('owner')}
+                  className="w-full flex items-center gap-1.5 rounded-md bg-amber-500/10 border border-amber-500/30 px-2 py-1 text-[10px] font-bold text-amber-400 hover:bg-amber-500/15 transition-colors"
+                >
+                  <MaterialIcon icon="flight_takeoff" className="text-[12px]" />
+                  Absentee owner
+                  <span className="ml-auto text-[9px] text-amber-400/70 font-medium">tap for details</span>
+                </button>
               )}
 
-              {activeTab === 'owner' && hasOwner && (
-                <div className="space-y-1 text-[11px]">
-                  <div className="font-semibold text-on-surface">{parcel.assesseeName}</div>
-                  <div className="text-[10px] text-on-surface-variant uppercase tracking-widest">Assessor record</div>
-                </div>
-              )}
-
-              {activeTab === 'structure' && (
-                <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
-                  {parcel.yearBuilt != null && (
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-on-surface-variant">Built</span>
-                      <span className="font-semibold text-on-surface">{parcel.yearBuilt}</span>
-                    </div>
-                  )}
-                  {parcel.buildingSize != null && (
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-on-surface-variant">Sqft</span>
-                      <span className="font-semibold text-on-surface">{parcel.buildingSize.toLocaleString()}</span>
-                    </div>
-                  )}
-                  {parcel.bedrooms != null && parcel.bedrooms !== '' && (
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-on-surface-variant">Beds</span>
-                      <span className="font-semibold text-on-surface">{parcel.bedrooms}</span>
-                    </div>
-                  )}
-                  {parcel.bathrooms != null && parcel.bathrooms !== '' && (
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-on-surface-variant">Baths</span>
-                      <span className="font-semibold text-on-surface">{parcel.bathrooms}</span>
-                    </div>
-                  )}
-                  {parcel.buildingType && (
-                    <div className="col-span-2 flex items-baseline gap-2">
-                      <span className="text-on-surface-variant shrink-0">Type</span>
-                      <span className="text-on-surface">{parcel.buildingType}</span>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {activeTab === 'land' && (
-                <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
-                  {parcel.acres != null && (
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-on-surface-variant">Acres</span>
-                      <span className="font-semibold text-on-surface">{parcel.acres.toFixed(2)}</span>
-                    </div>
-                  )}
-                  {parcel.use2024 && (
-                    <div className="col-span-2 flex items-baseline gap-2">
-                      <span className="text-on-surface-variant shrink-0">Use</span>
-                      <span className="text-on-surface">{parcel.use2024}</span>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {activeTab === 'value' && parcel.netValue != null && (
-                <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
-                  <div className="col-span-2 flex items-baseline gap-2">
-                    <span className="text-on-surface-variant">Net assessed</span>
-                    <span className="font-bold text-on-surface text-[13px]">{fmtUSD(parcel.netValue)}</span>
+              {/* Expand/collapse sections. Each row is a header with a
+                  one-line preview; clicking expands the body inline. */}
+              {sections.map(section => {
+                const open = !!expandedSections[section.key];
+                return (
+                  <div key={section.key} className="rounded-md border border-card-border/50 overflow-hidden">
+                    <button
+                      onClick={() => toggleSection(section.key)}
+                      className="w-full flex items-center justify-between gap-2 px-2 py-1.5 hover:bg-surface-container-high/50 transition-colors text-left"
+                    >
+                      <div className="flex items-baseline gap-2 min-w-0">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-on-surface shrink-0">
+                          {section.header}
+                        </span>
+                        {!open && section.preview && (
+                          <span className="text-[10px] text-on-surface-variant truncate">
+                            {section.preview}
+                          </span>
+                        )}
+                      </div>
+                      <MaterialIcon
+                        icon={open ? 'expand_less' : 'expand_more'}
+                        className="text-[16px] text-on-surface-variant shrink-0"
+                      />
+                    </button>
+                    {open && (
+                      <div className="px-2 pb-2 pt-1 border-t border-card-border/30">
+                        {section.body}
+                      </div>
+                    )}
                   </div>
-                  <div className="col-span-2 text-[9px] text-on-surface-variant italic">
-                    Public assessor record · not market value
-                  </div>
-                </div>
-              )}
+                );
+              })}
             </div>
           );
         })()}

@@ -83,7 +83,7 @@ export async function GET(req: Request) {
   // columns + geom). For viewports that return thousands of features
   // this is one round trip not N.
   const ids = rows.map(r => r.id);
-  let netValueByApn = new Map<string, number>();
+  const netValueByApn = new Map<string, number>();
   if (ids.length > 0) {
     const { data: layerRows } = await supabaseAdmin
       .from('property_layers')

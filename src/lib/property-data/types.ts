@@ -188,14 +188,62 @@ export interface ResolvedProperty {
     code: string | null;
   };
   // Assessor extensions — populated when a county-data source contributes
-  // them via parcel_basics. Optional on the popup side.
+  // them via parcel_basics. Optional on the popup side. Names mirror the
+  // ParcelBasicsAttrs shape so the resolver fold is mechanical.
   assesseeName: string | null;
+  // Owner mailing address (where the tax bill goes). When mailing !=
+  // situs, the parcel is owned by someone who doesn't live there — the
+  // popup surfaces an "absentee" badge for Pro users.
+  mailingAddress1: string | null;
+  mailingAddress2: string | null;
+  mailingAddress3: string | null;
+  mailingAddress4: string | null;
+  // Structure
   yearBuilt: string | number | null;
+  effectiveYear: string | number | null;
   buildingSize: number | null;
+  buildingType: string | null;
+  buildingUsedFor: string | null;
+  storiesCount: string | number | null;
+  unitsCount: string | number | null;
   bedrooms: string | number | null;
   bathrooms: string | number | null;
-  buildingType: string | null;
+  halfBaths: string | number | null;
+  condition: string | null;
+  qualityClass: string | null;
+  construction: string | null;
+  foundation: string | null;
+  exteriorType: string | null;
+  roofCover: string | null;
+  // Mechanical / amenities
+  heating: string | null;
+  coolingCentral: string | null;
+  fireplace: string | null;
+  garage: string | null;
+  attachGarageSqft: number | null;
+  detachGarageSqft: number | null;
+  poolSpa: string | null;
+  solar: string | null;
+  // Land / agricultural
+  hasWell: string | null;
+  hasOrchard: string | null;
+  hasVineyard: string | null;
+  homesiteAcres: string | number | null;
+  growingAcres: string | number | null;
+  primeAcres: string | number | null;
+  openSpaceAcres: string | number | null;
+  urbanAcres: string | number | null;
+  // Utility / infrastructure
+  waterSource: string | null;
+  sewerCode: string | null;
+  // Valuation breakdown
+  landValue: number | null;
+  structureValue: number | null;
   netValue: number | null;
+  tra: string | null;
+  taxabilityFull: string | null;
+  // Subdivision per assessor (separate from municipal subdivision pipeline)
+  subdivisionName: string | null;
   raw: Record<string, unknown>;
 }
 
@@ -215,12 +263,50 @@ export function emptyResolvedProperty(): ResolvedProperty {
     sitePlan: null,
     hyperlinks: { generalPlan: null, zoning: null, code: null },
     assesseeName: null,
+    mailingAddress1: null,
+    mailingAddress2: null,
+    mailingAddress3: null,
+    mailingAddress4: null,
     yearBuilt: null,
+    effectiveYear: null,
     buildingSize: null,
+    buildingType: null,
+    buildingUsedFor: null,
+    storiesCount: null,
+    unitsCount: null,
     bedrooms: null,
     bathrooms: null,
-    buildingType: null,
+    halfBaths: null,
+    condition: null,
+    qualityClass: null,
+    construction: null,
+    foundation: null,
+    exteriorType: null,
+    roofCover: null,
+    heating: null,
+    coolingCentral: null,
+    fireplace: null,
+    garage: null,
+    attachGarageSqft: null,
+    detachGarageSqft: null,
+    poolSpa: null,
+    solar: null,
+    hasWell: null,
+    hasOrchard: null,
+    hasVineyard: null,
+    homesiteAcres: null,
+    growingAcres: null,
+    primeAcres: null,
+    openSpaceAcres: null,
+    urbanAcres: null,
+    waterSource: null,
+    sewerCode: null,
+    landValue: null,
+    structureValue: null,
     netValue: null,
+    tra: null,
+    taxabilityFull: null,
+    subdivisionName: null,
     raw: {},
   };
 }

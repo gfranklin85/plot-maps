@@ -83,8 +83,27 @@ function fold(contributions: PropertyDataContribution[]): Omit<ResolvedProperty,
     acres: null, use2024: null, development2024: null,
     subdivision: null, sitePlan: null,
     hyperlinks: { generalPlan: null, zoning: null, code: null },
-    assesseeName: null, yearBuilt: null, buildingSize: null,
-    bedrooms: null, bathrooms: null, buildingType: null, netValue: null,
+    assesseeName: null,
+    mailingAddress1: null, mailingAddress2: null,
+    mailingAddress3: null, mailingAddress4: null,
+    yearBuilt: null, effectiveYear: null,
+    buildingSize: null, buildingType: null, buildingUsedFor: null,
+    storiesCount: null, unitsCount: null,
+    bedrooms: null, bathrooms: null, halfBaths: null,
+    condition: null, qualityClass: null,
+    construction: null, foundation: null,
+    exteriorType: null, roofCover: null,
+    heating: null, coolingCentral: null,
+    fireplace: null, garage: null,
+    attachGarageSqft: null, detachGarageSqft: null,
+    poolSpa: null, solar: null,
+    hasWell: null, hasOrchard: null, hasVineyard: null,
+    homesiteAcres: null, growingAcres: null, primeAcres: null,
+    openSpaceAcres: null, urbanAcres: null,
+    waterSource: null, sewerCode: null,
+    landValue: null, structureValue: null, netValue: null,
+    tra: null, taxabilityFull: null,
+    subdivisionName: null,
     raw: {},
   };
 
@@ -114,12 +133,56 @@ function fold(contributions: PropertyDataContribution[]): Omit<ResolvedProperty,
       // Assessor extensions — populated from richer county sources like
       // Kings County. Older sources leave these undefined and we keep null.
       out.assesseeName = a.assesseeName ?? out.assesseeName;
+      out.mailingAddress1 = a.mailingAddress1 ?? out.mailingAddress1;
+      out.mailingAddress2 = a.mailingAddress2 ?? out.mailingAddress2;
+      out.mailingAddress3 = a.mailingAddress3 ?? out.mailingAddress3;
+      out.mailingAddress4 = a.mailingAddress4 ?? out.mailingAddress4;
+      // Structure
       out.yearBuilt = a.yearBuilt ?? out.yearBuilt;
+      out.effectiveYear = a.effectiveYear ?? out.effectiveYear;
       out.buildingSize = a.buildingSize ?? out.buildingSize;
+      out.buildingType = a.buildingType ?? out.buildingType;
+      out.buildingUsedFor = a.buildingUsedFor ?? out.buildingUsedFor;
+      out.storiesCount = a.storiesCount ?? out.storiesCount;
+      out.unitsCount = a.unitsCount ?? out.unitsCount;
       out.bedrooms = a.bedrooms ?? out.bedrooms;
       out.bathrooms = a.bathrooms ?? out.bathrooms;
-      out.buildingType = a.buildingType ?? out.buildingType;
+      out.halfBaths = a.halfBaths ?? out.halfBaths;
+      out.condition = a.condition ?? out.condition;
+      out.qualityClass = a.qualityClass ?? out.qualityClass;
+      out.construction = a.construction ?? out.construction;
+      out.foundation = a.foundation ?? out.foundation;
+      out.exteriorType = a.exteriorType ?? out.exteriorType;
+      out.roofCover = a.roofCover ?? out.roofCover;
+      // Mechanical / amenities
+      out.heating = a.heating ?? out.heating;
+      out.coolingCentral = a.coolingCentral ?? out.coolingCentral;
+      out.fireplace = a.fireplace ?? out.fireplace;
+      out.garage = a.garage ?? out.garage;
+      out.attachGarageSqft = a.attachGarageSqft ?? out.attachGarageSqft;
+      out.detachGarageSqft = a.detachGarageSqft ?? out.detachGarageSqft;
+      out.poolSpa = a.poolSpa ?? out.poolSpa;
+      out.solar = a.solar ?? out.solar;
+      // Land / ag
+      out.hasWell = a.hasWell ?? out.hasWell;
+      out.hasOrchard = a.hasOrchard ?? out.hasOrchard;
+      out.hasVineyard = a.hasVineyard ?? out.hasVineyard;
+      out.homesiteAcres = a.homesiteAcres ?? out.homesiteAcres;
+      out.growingAcres = a.growingAcres ?? out.growingAcres;
+      out.primeAcres = a.primeAcres ?? out.primeAcres;
+      out.openSpaceAcres = a.openSpaceAcres ?? out.openSpaceAcres;
+      out.urbanAcres = a.urbanAcres ?? out.urbanAcres;
+      // Utility
+      out.waterSource = a.waterSource ?? out.waterSource;
+      out.sewerCode = a.sewerCode ?? out.sewerCode;
+      // Valuation
+      out.landValue = a.landValue ?? out.landValue;
+      out.structureValue = a.structureValue ?? out.structureValue;
       out.netValue = a.netValue ?? out.netValue;
+      out.tra = a.tra ?? out.tra;
+      out.taxabilityFull = a.taxabilityFull ?? out.taxabilityFull;
+      // Assessor's subdivision (separate from municipal pipeline)
+      out.subdivisionName = a.subdivisionName ?? out.subdivisionName;
     } else if (c.layerType === 'subdivision') {
       out.subdivision = c.attrs as SubdivisionAttrs;
     } else if (c.layerType === 'site_plan') {

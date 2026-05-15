@@ -84,11 +84,11 @@ function colorForYearBuilt(p: ParcelFeatureProps): string {
   return '#06b6d4';                  // 2010+
 }
 
-function colorForOccupancy(_p: ParcelFeatureProps): string {
+function colorForOccupancy(): string {
   // True owner-occupied detection requires comparing mailing vs situs
   // addresses — that data isn't on the viewport feature today (we'd need
   // to add it to parcels_in_bbox). For now this mode is a placeholder
-  // that paints by has-assessee-name; v2 will use the address comparison.
+  // single color; v2 will use the address comparison.
   return '#3b82f6';
 }
 
@@ -101,7 +101,7 @@ function colorFor(mode: ParcelColorMode, p: ParcelFeatureProps): string {
     case 'land_use':   return colorForLandUse(p);
     case 'value':      return colorForValue(p);
     case 'year_built': return colorForYearBuilt(p);
-    case 'occupancy':  return colorForOccupancy(p);
+    case 'occupancy':  return colorForOccupancy();
     case 'developed':  return colorForDeveloped(p);
     default:           return '#475569';
   }

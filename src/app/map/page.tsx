@@ -22,6 +22,7 @@ import GamepadStatusChip from "@/components/map/GamepadStatusChip";
 import MapReticle from "@/components/map/MapReticle";
 import type { GamepadActions } from "@/components/map/GamepadFlightController";
 import { usePhone } from "@/lib/phone-context";
+import { useReticlePosition } from "@/lib/useReticlePosition";
 
 const FILTER_TABS: { label: string; key: string; statuses: LeadStatus[] }[] = [
   { label: "All", key: "all", statuses: [] },
@@ -497,9 +498,11 @@ export default function MapPage() {
       .map(l => ({ id: l.id, lat: l.latitude as number, lng: l.longitude as number }));
   }, [flightMode, filteredLeads]);
 
-  // Reticle screen-Y fraction for visual placement (controller updates
-  // each frame as a function of camera tilt).
-  const [reticleTopFraction, setReticleTopFraction] = useState(0.5);
+  // User-placed reticle position (localStorage-backed). The reticle
+  // can be dragged anywhere on the map; this hook persists the position
+  // and seeds the default. Both the visual MapReticle and the
+  // controller's hit-test sample point read from this.
+  const { position: reticlePosition, setPosition: setReticlePosition, resetPosition: resetReticlePosition } = useReticlePosition();
 
   // Lookup helper for resolving a target id back to a full Lead so the
   // grab handler can store the original Lead, not just the id.
@@ -1280,20 +1283,26 @@ export default function MapPage() {
             gamepadDebugForceFallbackPath={debugForceFallbackPath}
             gamepadDebugTickleAfterMoveCamera={debugTickleAfterMoveCamera}
             gamepadAirplaneTargets={airplaneTargets}
+            gamepadReticleXFraction={reticlePosition.xFraction}
+            gamepadReticleYFraction={reticlePosition.yFraction}
             onGamepadReticleTargetChange={handleReticleTargetChange}
-            onGamepadFocalScreenYChange={setReticleTopFraction}
             onGamepadStatusChange={handleGamepadStatus}
           />
         )}
 
         {/* Center reticle — visible only in airplane mode. Driven by
             page-level reticleHovering / grabbedLead state; the gamepad
-            controller decides LT semantics from reticleHovering. */}
+            controller decides LT semantics from reticleHovering. The
+            position is user-draggable; useReticlePosition persists the
+            choice in localStorage and double-click resets to default. */}
         <MapReticle
           visible={!walkMode && flightMode === 'airplane'}
           hovering={reticleHovering}
           grabbed={!!grabbedLead}
-          topFraction={reticleTopFraction}
+          xFraction={reticlePosition.xFraction}
+          yFraction={reticlePosition.yFraction}
+          onPositionChange={setReticlePosition}
+          onResetPosition={resetReticlePosition}
         />
 
         {/* Tiny orbit-direction indicator while grabbed + orbit set.

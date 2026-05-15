@@ -64,9 +64,20 @@ interface Props {
    */
   onReticleTargetChange?: (target: ReticleTarget | null) => void;
   /**
+   * Reticle screen position as 0..1 viewport fractions. User-draggable
+   * and persisted in localStorage; the controller samples its hit-test
+   * pixel from this position and synthesizes pointermove events here
+   * during flight so Google's parcel-overlay hover hit-test fires at
+   * the reticle (not the OS cursor's last known position).
+   */
+  reticleXFraction?: number;
+  reticleYFraction?: number;
+  /**
    * Reports the focal-point screen-Y as a 0..1 viewport fraction so the
    * page can position the reticle visual on the actual visual center,
    * not CSS-center (which sits below the focal point under tilt).
+   * Retained for potential consumers but not used while drag-to-place
+   * owns the reticle position.
    */
   onFocalScreenYChange?: (fraction: number) => void;
   /** Reports controller status up to the page so it can render a toast. */
@@ -224,6 +235,8 @@ export default function GamepadFlightController({
   actions,
   mode = 'overhead',
   airplaneTargets,
+  reticleXFraction = 0.5,
+  reticleYFraction = 0.42,
   onReticleTargetChange,
   onFocalScreenYChange,
   onStatusChange,
@@ -264,9 +277,14 @@ export default function GamepadFlightController({
   onReticleTargetChangeRef.current = onReticleTargetChange;
   const onFocalScreenYChangeRef = useRef(onFocalScreenYChange);
   onFocalScreenYChangeRef.current = onFocalScreenYChange;
+  // User-set reticle position. Live refs so the per-frame hit-test
+  // samples the up-to-date position without subscribing to re-renders.
+  const reticleXFractionRef = useRef<number>(reticleXFraction);
+  reticleXFractionRef.current = reticleXFraction;
+  const reticleYFractionRef = useRef<number>(reticleYFraction);
+  reticleYFractionRef.current = reticleYFraction;
   // Track last reported target id to avoid firing the callback every frame.
   const lastReportedTargetIdRef = useRef<string | null>(null);
-  const lastReportedFocalYRef = useRef<number>(0.5);
   // Live reticle-hovering flag the LT-press handler reads each frame.
   const reticleHoveringRef = useRef(false);
   // Last known mouse cursor position in viewport coords. Used to synthesize
@@ -358,31 +376,22 @@ export default function GamepadFlightController({
       // ── Reticle hover detection (airplane mode only) ────────────────
       // Use the browser's native hit-testing — same machinery the mouse
       // cursor uses. Each lead pin has data-lead-id stamped on its
-      // wrapper div by AdvancedLeadMarkers. We sample the pixel under
-      // the reticle (screen center, with a small tilt-aware vertical
-      // shift) and walk up the DOM until we find an element with that
-      // attribute. Zero projection math; works regardless of how the
-      // map renders tilt, vector vs raster, etc.
+      // wrapper div by AdvancedLeadMarkers. We sample the pixel at the
+      // user-placed reticle position (drag-to-place; persisted in
+      // localStorage) and walk up the DOM until we find an element
+      // with that attribute. Zero projection math; works regardless of
+      // how the map renders tilt, vector vs raster, etc.
       if (modeRef.current === 'airplane' && airplaneTargetsRef.current && airplaneTargetsRef.current.length > 0) {
-        // Reticle visual position: 0.5 at flat, ~0.42 at 65° tilt.
-        // (Linear fit to keep the reticle close to where the user
-        // perceives the focal point with high tilt.)
-        const focalY = 0.5 - (cam.tilt / 67) * 0.08;
-        if (Math.abs(focalY - lastReportedFocalYRef.current) > 0.005) {
-          lastReportedFocalYRef.current = focalY;
-          onFocalScreenYChangeRef.current?.(focalY);
-        }
-
         // Map div = the element that wraps the gmp-map-3d / gm-style
-        // root. We use the root document.elementFromPoint and walk up
-        // looking for [data-lead-id]. The reticle is centered horizontally
-        // and offset vertically per focalY in the map container.
+        // root. The reticle position is a 0..1 viewport fraction set
+        // by the user dragging the visual reticle; we sample the pixel
+        // at exactly that fraction inside the map's rect.
         const mapDiv = (map as unknown as { getDiv?: () => HTMLElement }).getDiv?.();
         let hitId: string | null = null;
         if (mapDiv) {
           const rect = mapDiv.getBoundingClientRect();
-          const cx = rect.left + rect.width / 2;
-          const cy = rect.top + rect.height * focalY;
+          const cx = rect.left + rect.width * reticleXFractionRef.current;
+          const cy = rect.top + rect.height * reticleYFractionRef.current;
           // elementsFromPoint gives us the full stack at that pixel —
           // necessary because pin DOM may have inner elements blocking
           // the data-lead-id wrapper from being the topmost node.
@@ -835,13 +844,27 @@ export default function GamepadFlightController({
         Math.abs(a.strafe) > 0.5 ||
         Math.abs(a.yaw) > 0.05;
 
-      if (isDriving && lastMousePosRef.current) {
+      if (isDriving) {
         const nowMs = elapsedMs;
         if (nowMs - lastSyntheticPointerMsRef.current > 33) {
-          lastSyntheticPointerMsRef.current = nowMs;
-          const { x, y } = lastMousePosRef.current;
           const mapDiv = (map as unknown as { getDiv?: () => HTMLElement }).getDiv?.();
-          if (mapDiv) {
+          // In airplane mode the synthetic event targets the reticle
+          // pixel (where the user is *aiming*, not where the OS cursor
+          // happens to be). In overhead mode we fall back to the real
+          // cursor's last position.
+          let targetXY: { x: number; y: number } | null = null;
+          if (mapDiv && modeRef.current === 'airplane') {
+            const rect = mapDiv.getBoundingClientRect();
+            targetXY = {
+              x: rect.left + rect.width * reticleXFractionRef.current,
+              y: rect.top + rect.height * reticleYFractionRef.current,
+            };
+          } else if (lastMousePosRef.current) {
+            targetXY = { ...lastMousePosRef.current };
+          }
+          if (mapDiv && targetXY) {
+            lastSyntheticPointerMsRef.current = nowMs;
+            const { x, y } = targetXY;
             try {
               const evt = new PointerEvent('pointermove', {
                 bubbles: true,

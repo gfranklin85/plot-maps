@@ -80,9 +80,16 @@ interface Props {
   gamepadDebugTickleAfterMoveCamera?: boolean;
   /** Targetable leads in airplane mode for reticle hover detection. */
   gamepadAirplaneTargets?: ReticleTarget[];
+  /** User-set reticle screen position (drag-to-place). 0..1 viewport
+   *  fractions; the controller samples its hit-test pixel and dispatches
+   *  synthetic pointermove events at this position. */
+  gamepadReticleXFraction?: number;
+  gamepadReticleYFraction?: number;
   /** Fires when the reticle's hovered target changes (incl. null). */
   onGamepadReticleTargetChange?: (target: ReticleTarget | null) => void;
-  /** Fires with the focal-point screen-Y as a 0..1 viewport fraction. */
+  /** Fires with the focal-point screen-Y as a 0..1 viewport fraction.
+   *  Retained for potential consumers; not wired through page.tsx since
+   *  drag-to-place owns the reticle position now. */
   onGamepadFocalScreenYChange?: (fraction: number) => void;
   onGamepadStatusChange?: (connected: boolean, label: string | null) => void;
 }
@@ -543,7 +550,7 @@ function PendingSkiptracePins({ pins }: { pins: { id: string; lat: number; lng: 
   return null;
 }
 
-export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClick, center, navigateTo, zoom, mapType = "roadmap", pinMode = "dots", prospectMode = false, prospectPins = [], onProspectPinClick, showZoningOverlay = false, showParcelOverlay = false, parcelColorMode = 'land_use', onParcelClick, onParcelHoverChange, view3D = false, flight = null, gamepadEnabled = false, gamepadActions, gamepadMode = 'overhead', gamepadDebugSuspendMoveCamera = false, gamepadDebugForceFallbackPath = false, gamepadDebugTickleAfterMoveCamera = false, gamepadAirplaneTargets, onGamepadReticleTargetChange, onGamepadFocalScreenYChange, onGamepadStatusChange }: Props) {
+export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClick, center, navigateTo, zoom, mapType = "roadmap", pinMode = "dots", prospectMode = false, prospectPins = [], onProspectPinClick, showZoningOverlay = false, showParcelOverlay = false, parcelColorMode = 'land_use', onParcelClick, onParcelHoverChange, view3D = false, flight = null, gamepadEnabled = false, gamepadActions, gamepadMode = 'overhead', gamepadDebugSuspendMoveCamera = false, gamepadDebugForceFallbackPath = false, gamepadDebugTickleAfterMoveCamera = false, gamepadAirplaneTargets, gamepadReticleXFraction, gamepadReticleYFraction, onGamepadReticleTargetChange, onGamepadFocalScreenYChange, onGamepadStatusChange }: Props) {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme !== 'light';
   const isSatellite = mapType === "satellite" || mapType === "hybrid";
@@ -593,6 +600,8 @@ export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClic
             view3D={view3D}
             mode={gamepadMode}
             airplaneTargets={gamepadAirplaneTargets}
+            reticleXFraction={gamepadReticleXFraction}
+            reticleYFraction={gamepadReticleYFraction}
             onReticleTargetChange={onGamepadReticleTargetChange}
             onFocalScreenYChange={onGamepadFocalScreenYChange}
             actions={gamepadActions || {}}

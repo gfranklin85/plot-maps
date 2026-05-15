@@ -18,6 +18,12 @@ export interface UserProfile {
   aiVoiceId: string;
   subscriptionStatus: string;
   isAdmin: boolean;
+  /** Admin-only feature flag. When true, the map page renders the
+   *  Photorealistic 3D Tiles surface (gmp-map-3d / Map3DElement)
+   *  instead of the standard Maps JS API. Billed per session against
+   *  the Google Cloud project; gated to admins until we've measured
+   *  real cost-per-session and decided on a user tier model. */
+  enable3DTilesAdmin: boolean;
   notifications: {
     email: boolean;
     push: boolean;
@@ -39,6 +45,7 @@ const defaultProfile: UserProfile = {
   aiVoiceId: 'rachel',
   subscriptionStatus: '',
   isAdmin: false,
+  enable3DTilesAdmin: false,
   notifications: {
     email: true,
     push: true,
@@ -123,6 +130,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
           aiVoiceId: data.ai_voice_id || 'rachel',
           subscriptionStatus: data.subscription_status || '',
           isAdmin: data.is_admin || false,
+          enable3DTilesAdmin: data.enable_3d_tiles_admin || false,
           notifications: {
             email: data.notification_email ?? true,
             push: data.notification_push ?? true,

@@ -21,8 +21,10 @@ import Mobile3DCoachOverlay from "@/components/map/Mobile3DCoachOverlay";
 import GamepadStatusChip from "@/components/map/GamepadStatusChip";
 import MapReticle from "@/components/map/MapReticle";
 import type { GamepadActions } from "@/components/map/GamepadFlightController";
-import { usePhone } from "@/lib/phone-context";
 import { useReticlePosition } from "@/lib/useReticlePosition";
+import { playShotSound, type ShotChannel } from "@/lib/shotSounds";
+import ShotAnimation, { type Shot } from "@/components/map/ShotAnimation";
+import ChannelHUD from "@/components/map/ChannelHUD";
 
 const FILTER_TABS: { label: string; key: string; statuses: LeadStatus[] }[] = [
   { label: "All", key: "all", statuses: [] },
@@ -115,23 +117,29 @@ export default function MapPage() {
   // 2s hold while grabbed records an orbit direction (Phase B3 will
   // animate the orbit; B1 just stores the direction).
   const [reticleHovering, setReticleHovering] = useState(false);
-  const [grabbedLead, setGrabbedLead] = useState<Lead | null>(null);
-  const [orbitDirection, setOrbitDirection] = useState<'cw' | 'ccw' | null>(null);
-  // Latest hover target as a ref so onGrabStart (which fires inside the
-  // gamepad RAF loop) can read the current value without re-deriving.
+  // Latest hover target as a ref so onShoot (fires inside the gamepad
+  // RAF loop) can read the current value without re-deriving.
   const reticleTargetRef = useRef<Lead | null>(null);
   // Parallel ref for parcel-under-reticle. ParcelOverlay drives this via
   // its mouseover/mouseout listeners. Pin (reticleTargetRef) wins on
-  // overlap — the grab handler checks the lead ref first.
+  // overlap — the shoot handler checks the lead ref first.
   const reticleParcelRef = useRef<{ apn: string; lat: number; lng: number } | null>(null);
-  // Grabbed lead as a ref so onFireArmed (also fires inside the RAF loop)
-  // can read the current grabbed lead without the gamepadActions useMemo
-  // having to re-create on every grab/release.
-  const grabbedLeadRef = useRef<Lead | null>(null);
-  // Brief toast surfaced when the user tries to fire-armed on a parcel
-  // grab. Parcel grabs open the popup; firing requires pinning to the
-  // user's list first so /api/inquiry/send has a real Lead.
+  // Brief toast surfaced when the shoot action can't fire (target rejects
+  // the armed channel, or the target is a parcel without a Lead row).
   const [reticleToast, setReticleToast] = useState<string | null>(null);
+
+  // ── Airplane-mode armed channel + shot animation ─────────────────────
+  // The "weapon" the user is currently shooting with. X rotates through
+  // text → mail → call. Default = text since it's the cheapest, fastest
+  // first contact. Live ref mirrors the state so onShoot (inside the
+  // gamepad RAF loop) reads the current value without re-creating the
+  // actions object every rotate.
+  const [armedChannel, setArmedChannel] = useState<ShotChannel>('text_invite');
+  const armedChannelRef = useRef<ShotChannel>('text_invite');
+  armedChannelRef.current = armedChannel;
+  // Current shot animation; cleared after the visual finishes.
+  const [shot, setShot] = useState<Shot | null>(null);
+  const shotCounterRef = useRef<number>(0);
 
   // navigateTarget kept for compat with MapView's CenterController prop;
   // every flow now uses the camera choreographer's dispatchFlight() instead,
@@ -163,7 +171,6 @@ export default function MapPage() {
   // GamepadFlightController owns the input loop and reports up via
   // onGamepadStatusChange. Once a controller has ever connected this session,
   // we keep the chip mounted so disconnect events can announce themselves.
-  const { makeCall } = usePhone();
   const [gamepad, setGamepad] = useState<{ connected: boolean; everConnected: boolean }>({ connected: false, everConnected: false });
   const handleGamepadStatus = useCallback((connected: boolean) => {
     setGamepad(prev => ({ connected, everConnected: prev.everConnected || connected }));
@@ -580,83 +587,86 @@ export default function MapPage() {
       }
     }
 
+    function showReticleToast(message: string) {
+      setReticleToast(message);
+      window.setTimeout(() => setReticleToast(null), 2400);
+    }
+
+    const CHANNEL_ROTATION: ShotChannel[] = ['text_invite', 'direct_mail', 'phone_call'];
+
     return {
-      onPrimary: () => {
-        // A — open popup. If no selection yet, pick nearest visible lead.
-        if (selectedLead) return; // popup already shows when selectedLead is set
-        if (!mapCenter) return;
-        const withCoords = filteredLeads.filter(l => l.latitude != null && l.longitude != null);
-        if (withCoords.length === 0) return;
-        let nearest = withCoords[0];
-        let nearestD = Infinity;
-        for (const l of withCoords) {
-          const dLat = (l.latitude as number) - mapCenter.lat;
-          const dLng = (l.longitude as number) - mapCenter.lng;
-          const d = dLat * dLat + dLng * dLng;
-          if (d < nearestD) { nearestD = d; nearest = l; }
+      onShoot: () => {
+        // A — fire the armed channel at whatever's under the reticle.
+        // Lead wins over parcel on overlap. Parcels can't fire (no
+        // Lead row to send against yet) — toast suggests pinning.
+        const lead = reticleTargetRef.current;
+        const parcel = reticleParcelRef.current;
+        if (!lead && !parcel) return;  // empty reticle — silent no-op
+
+        const channel = armedChannelRef.current;
+
+        if (parcel && !lead) {
+          showReticleToast('Pin this parcel to your list first to fire.');
+          return;
         }
-        setSelectedLead(nearest);
-      },
-      onCancel: () => {
-        if (walkMode) { setWalkMode(false); return; }
-        if (selectedLead) setSelectedLead(null);
-      },
-      onSkiptrace: () => {
-        // PropertyPopup owns the skiptrace UI; ensure the popup is open
-        // first (the user can then press X again or click the button).
-        // For now, surface the selection so the lines-of-light animation
-        // is visible to the user. A future refactor can fire the lookup
-        // directly via a ref into PropertyPopup.
-        if (!selectedLead) return;
-        // No-op for now — PropertyPopup auto-shows the trigger button
-        // when the lead has no owner data. The user presses A first to
-        // open the popup, then X is reserved for the skiptrace trigger.
-        // We document this in the chip help so users know.
-      },
-      onDial: () => {
-        if (!selectedLead) return;
-        const phone = selectedLead.phone || selectedLead.phone_2 || selectedLead.phone_3;
-        if (!phone) return;
-        const isDesktop = typeof window !== 'undefined' && window.matchMedia('(min-width: 768px)').matches;
-        if (isDesktop) {
-          makeCall(phone, selectedLead.owner_name || selectedLead.name || 'Unknown', selectedLead.id);
-        } else {
-          window.location.href = `tel:${phone}`;
+        if (!lead) return;
+
+        // Channel-specific can-fire checks. If the target rejects the
+        // armed channel, toast and bail — user rotates with X and tries
+        // again.
+        if (channel === 'text_invite' && lead.text_declined) {
+          showReticleToast('Text declined here. Press X to switch channel.');
+          return;
         }
+        if (channel === 'phone_call' && !lead.phone && !lead.phone_2 && !lead.phone_3) {
+          showReticleToast('No phone on file. Press X to switch channel.');
+          return;
+        }
+
+        // Fire the shot — visual + sound run in parallel with the API
+        // dispatch so the user feels the trigger pull instantly.
+        shotCounterRef.current += 1;
+        setShot({
+          id: shotCounterRef.current,
+          channel,
+          xFraction: reticlePosition.xFraction,
+          yFraction: reticlePosition.yFraction,
+        });
+        window.setTimeout(() => setShot(null), 320);
+        try { playShotSound(channel); } catch { /* ignore */ }
+
+        void (async () => {
+          try {
+            await fetch('/api/inquiry/send', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                leadId: lead.id,
+                channel,
+                ...(channel === 'phone_call' ? { phase: 'primer' } : {}),
+              }),
+            });
+          } catch (err) {
+            console.error('onShoot inquiry/send failed', err);
+          }
+        })();
       },
-      onCyclePrev: () => cycleLead(-1),
-      onCycleNext: () => cycleLead(1),
-      onDropProspect: () => {
-        if (!mapCenter) return;
-        // Reuse the bare-ground click path so the orange pin behaves
-        // identically to a mouse-click drop. handleMapClick already
-        // gates on prospectMode, so RB is a no-op outside it.
-        if (!prospectMode) return;
-        handleMapClick(mapCenter);
-      },
-      onRecenter: () => {
-        if (!profile.defaultMapCenter) return;
-        dispatchFlight({
-          center: profile.defaultMapCenter,
-          zoom: 14,
-          duration: 1100,
-          easing: 'easeInOutCubic',
+      onRotateChannel: () => {
+        // X — cycle armed channel. Local state is the source of truth
+        // for the current session; we don't persist to /api/profile/
+        // arm-channel here because rotation is a frequent gameplay
+        // gesture and we don't want a network round-trip per press.
+        setArmedChannel(curr => {
+          const idx = CHANNEL_ROTATION.indexOf(curr);
+          return CHANNEL_ROTATION[(idx + 1) % CHANNEL_ROTATION.length];
         });
       },
-      onToggleWalk: () => {
-        if (!isSubscribed) return;
-        setWalkMode(prev => !prev);
-      },
-      onGrabStart: () => {
-        // LT pressed while reticle was hovering. Pin wins over parcel on
-        // overlap. If a real lead is under the reticle, snapshot it as
-        // today. Otherwise, if a parcel is under the reticle, synthesize
-        // a `parcel:<APN>` stub Lead so the existing grabbedLead-based UI
-        // (popup, fire path) keeps working without a separate branch.
+      onInspect: () => {
+        // Y — open info card for the hovered target only. Empty reticle
+        // is a no-op (game-loop contract). Lead wins over parcel.
         const lead = reticleTargetRef.current;
         if (lead) {
-          setGrabbedLead(lead);
-          grabbedLeadRef.current = lead;
+          setSelectedLead(lead);
           return;
         }
         const parcel = reticleParcelRef.current;
@@ -676,66 +686,21 @@ export default function MapPage() {
             longitude: parcel.lng,
             created_at: new Date().toISOString(),
           } as unknown as Lead;
-          setGrabbedLead(stub);
-          grabbedLeadRef.current = stub;
-          // Also open the popup so the user can pin-to-list / call / mail
-          // off the parcel data without a separate confirm.
           setSelectedLead(stub);
         }
       },
-      onGrabEnd: () => {
-        // LT released. Drop the grab. Orbit state (if any) ends here too.
-        setGrabbedLead(null);
-        grabbedLeadRef.current = null;
-        setOrbitDirection(null);
+      onCancel: () => {
+        if (walkMode) { setWalkMode(false); return; }
+        if (selectedLead) setSelectedLead(null);
       },
-      onOrbitInit: (direction) => {
-        // Right-X held 2s in a direction while grabbed. B1 just records
-        // the direction in state — actual orbit camera animation is
-        // Phase B3. For now this is the hook the next phase plugs into.
-        setOrbitDirection(direction);
-      },
-      onFireArmed: () => {
-        // RT pressed while LT-grabbed. Read the user's armed channel and
-        // dispatch /api/inquiry/send for the grabbed lead. The popup never
-        // opens; this is a fire-and-update flow, the marker overlay paints
-        // on the next leads refresh.
-        const lead = grabbedLeadRef.current;
-        if (!lead) return;
-        // Parcel grab — there's no Lead row to send against yet. The
-        // popup (already opened by onGrabStart) is where the user pins
-        // to their list, which creates a real Lead they can fire on next.
-        if (typeof lead.id === 'string' && lead.id.startsWith('parcel:')) {
-          setReticleToast('Pin this parcel to your list first to fire.');
-          window.setTimeout(() => setReticleToast(null), 2400);
-          return;
-        }
-        void (async () => {
-          try {
-            const armedRes = await fetch('/api/profile/arm-channel', { method: 'GET' });
-            const armed = await armedRes.json().catch(() => ({}));
-            const channel = armed?.armed_channel;
-            if (!channel) return;
-            await fetch('/api/inquiry/send', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                leadId: lead.id,
-                channel,
-                ...(channel === 'phone_call' ? { phase: 'primer' } : {}),
-              }),
-            });
-          } catch (err) {
-            console.error('onFireArmed inquiry/send failed', err);
-          }
-        })();
-      },
+      onCyclePrev: () => cycleLead(-1),
+      onCycleNext: () => cycleLead(1),
     };
     // handleMapClick is stable enough; including all deps would re-create
     // the actions every render. The ones that matter for behavior change
-    // (selectedLead, walkMode, prospectMode, etc.) are listed.
+    // (selectedLead, walkMode, etc.) are listed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedLead, mapCenter, filteredLeads, walkMode, prospectMode, isSubscribed, makeCall, dispatchFlight, profile.defaultMapCenter]);
+  }, [selectedLead, mapCenter, filteredLeads, walkMode, dispatchFlight, reticlePosition]);
 
   return (
     <div className="relative h-[calc(100vh-3.5rem)] md:h-[calc(100vh-5rem)] w-full">
@@ -1290,31 +1255,34 @@ export default function MapPage() {
           />
         )}
 
-        {/* Center reticle — visible only in airplane mode. Driven by
-            page-level reticleHovering / grabbedLead state; the gamepad
-            controller decides LT semantics from reticleHovering. The
-            position is user-draggable; useReticlePosition persists the
-            choice in localStorage and double-click resets to default. */}
+        {/* Center reticle — visible only in airplane mode. Position is
+            user-draggable; useReticlePosition persists the choice in
+            localStorage and double-click resets to default. The
+            `grabbed` prop is gone with the LT grab-gate; the reticle
+            now just shows "hovering or not" since shoot/inspect are
+            edge-triggered A/Y presses, not held states. */}
         <MapReticle
           visible={!walkMode && flightMode === 'airplane'}
           hovering={reticleHovering}
-          grabbed={!!grabbedLead}
+          grabbed={false}
           xFraction={reticlePosition.xFraction}
           yFraction={reticlePosition.yFraction}
           onPositionChange={setReticlePosition}
           onResetPosition={resetReticlePosition}
         />
 
-        {/* Tiny orbit-direction indicator while grabbed + orbit set.
-            B1 just shows we captured the dwell — B3 will animate orbit. */}
-        {grabbedLead && orbitDirection && (
-          <div
-            aria-hidden
-            className="pointer-events-none absolute left-1/2 top-1/2 z-30 -translate-x-1/2 translate-y-8 rounded-full bg-emerald-500/85 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-white shadow-lg"
-          >
-            Orbit {orbitDirection === 'cw' ? 'CW' : 'CCW'}
-          </div>
-        )}
+        {/* Armed-channel chip beside the reticle so the player always
+            knows what'll fire on A. Plays a swap animation on rotate. */}
+        <ChannelHUD
+          visible={!walkMode && flightMode === 'airplane'}
+          channel={armedChannel}
+          reticleXFraction={reticlePosition.xFraction}
+          reticleYFraction={reticlePosition.yFraction}
+        />
+
+        {/* Shot animation — fires at the reticle position whenever A
+            successfully dispatches an outreach. Cleared after ~320ms. */}
+        <ShotAnimation shot={shot} />
 
         {/* Empty state — bottom center */}
         {!loading && leads.length === 0 && !walkMode && (

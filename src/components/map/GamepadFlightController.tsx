@@ -6,27 +6,20 @@ import { useGamepad } from '@/lib/useGamepad';
 import { clamp, type ButtonName } from '@/lib/gamepadActions';
 
 export interface GamepadActions {
-  onPrimary?: () => void;          // A — open popup for selected/closest lead
-  onCancel?: () => void;           // B — close popup / exit walk
-  onSkiptrace?: () => void;        // X
-  onDial?: () => void;             // Y
-  onCyclePrev?: () => void;        // D-pad up/left
-  onCycleNext?: () => void;        // D-pad down/right
-  onDropProspect?: () => void;     // RB
-  onRecenter?: () => void;         // Start
-  onToggleWalk?: () => void;       // Back
-  /** Fired when LT crosses to pressed AND the reticle is hovering a target. */
-  onGrabStart?: () => void;
-  /** Fired when LT releases after a grab was active. */
-  onGrabEnd?: () => void;
-  /** Fired when right-X has been held in one direction for >=2s while grabbed.
-   *  direction = 'cw' (right) or 'ccw' (left). Camera should begin orbit. */
-  onOrbitInit?: (direction: 'cw' | 'ccw') => void;
-  /** Fired on RT press onset while LT-grabbed. The page reads the user's
-   *  armed channel from profile and dispatches to /api/inquiry/send for the
-   *  currently grabbed lead. RT zoom is suppressed for the duration of this
-   *  press so the trigger pull feels like a discrete fire, not a zoom slide. */
-  onFireArmed?: () => void;
+  /** A — Shoot. Fires the user's armed channel at whatever's under the
+   *  reticle. Page checks for a target and dispatches; no-op if nothing
+   *  is hovered. Decoupled from LT/RT so triggers can stay full-time zoom. */
+  onShoot?: () => void;
+  /** X — Rotate armed channel (text → mail → call → text). */
+  onRotateChannel?: () => void;
+  /** Y — Inspect. Open the info card for the hovered target. */
+  onInspect?: () => void;
+  /** B — Cancel / close popup. */
+  onCancel?: () => void;
+  /** D-pad up/left — fly to previous nearest target. */
+  onCyclePrev?: () => void;
+  /** D-pad down/right — fly to next nearest target. */
+  onCycleNext?: () => void;
 }
 
 export type FlightMode = 'overhead' | 'airplane';
@@ -201,33 +194,9 @@ const AIR_YAW_DRAG = 0.94;
 const AIR_YAW_MAX = 30;              // deg/s top speed
 
 // ── Trigger press detection ───────────────────────────────────────────
-// Triggers do continuous zoom while held. LT also gates "grab" mode when
-// pressed while the reticle is hovering a target (decision made at press
-// onset, not continuously — flying over a target after pressing LT
-// shouldn't switch you from zooming to grabbing mid-press).
+// LT/RT are pure zoom — no grab gate, no fire-armed modifier. The shoot
+// action is on A; nothing else competes for the triggers.
 const TRIGGER_PRESS_THRESHOLD = 0.4;
-
-interface TriggerPressState {
-  pressing: boolean;
-  /** Set on press onset if reticle was hovering at that moment. */
-  startedAsGrab: boolean;
-  /** RT only — set on press onset when LT is already grabbing. While true,
-   *  RT contributes no zoom; it's a fire-the-armed-channel trigger pull. */
-  firedArmed?: boolean;
-}
-
-// ── Right-X orbit-init dwell ──────────────────────────────────────────
-// While grabbed, holding right-X in one direction for this long fires
-// onOrbitInit with the chosen direction. The 2-second dwell is the gate
-// that distinguishes "I want to orbit" from "I bumped the stick."
-const ORBIT_INIT_DWELL_MS = 2000;
-const ORBIT_INIT_DEFLECTION = 0.5; // stick must be at least this magnitude to count
-
-interface OrbitInitState {
-  direction: 'cw' | 'ccw' | null;
-  heldSinceMs: number;
-  fired: boolean; // one-shot per grab session
-}
 
 export default function GamepadFlightController({
   enabled,
@@ -298,26 +267,6 @@ export default function GamepadFlightController({
   // Trigger press state. LT also tracks whether the press began over a
   // hovering reticle target — that locks LT into "grab gate" mode for
   // the duration of the hold.
-  const ltStateRef = useRef<TriggerPressState>({ pressing: false, startedAsGrab: false });
-  const rtStateRef = useRef<TriggerPressState>({ pressing: false, startedAsGrab: false });
-
-  // Right-X orbit-init dwell tracker. Resets on grab end.
-  const orbitInitRef = useRef<OrbitInitState>({ direction: null, heldSinceMs: 0, fired: false });
-
-  // Grab snapshot. Set on LT-hold onset. We capture the held lead's
-  // lat/lng AND the camera's offset from it AND the heading at that
-  // moment. As heading changes during grab, we rotate the offset
-  // around the held point so the camera circles it without imposing
-  // any forward-throw model of our own (Maps' projection handles
-  // whatever the actual focal point is).
-  const grabbedRef = useRef<{
-    lat: number;
-    lng: number;
-    offsetLat: number;
-    offsetLng: number;
-    headingAtGrab: number;
-  } | null>(null);
-
   // Reset our owned camera state whenever the map instance changes (e.g.
   // walk mode toggle). Otherwise we carry stale center/heading from before.
   useEffect(() => {
@@ -426,122 +375,34 @@ export default function GamepadFlightController({
       }
 
       // ── Edge-triggered button actions ───────────────────────────────
+      // Game-loop bindings: A=shoot (fire armed channel at hovered target),
+      // X=rotate (cycle armed channel), Y=inspect (open info card),
+      // B=cancel. Triggers are full-time zoom; there's no grab modifier.
+      // Every parcel in covered counties is a target, so a grab-gate
+      // would have eaten zoom across the whole map.
       if (justPressed.size > 0) {
         const fire = (name: ButtonName, fn?: () => void) => {
           if (justPressed.has(name) && fn) fn();
         };
-        fire('a', actionsRef.current.onPrimary);
+        fire('a', actionsRef.current.onShoot);
+        fire('x', actionsRef.current.onRotateChannel);
+        fire('y', actionsRef.current.onInspect);
         fire('b', actionsRef.current.onCancel);
-        fire('x', actionsRef.current.onSkiptrace);
-        fire('y', actionsRef.current.onDial);
-        fire('rb', actionsRef.current.onDropProspect);
-        fire('start', actionsRef.current.onRecenter);
-        fire('back', actionsRef.current.onToggleWalk);
         if (justPressed.has('up') || justPressed.has('left')) actionsRef.current.onCyclePrev?.();
         if (justPressed.has('down') || justPressed.has('right')) actionsRef.current.onCycleNext?.();
       }
 
       // ── Trigger handling ────────────────────────────────────────────
-      // LT held = continuous zoom in (always when not grabbing).
-      // RT held = continuous zoom out (always except when firing-armed).
-      //   - At LT press onset: if the reticle is hovering a target, this
-      //     entire press is a grab (no zoom). Otherwise, this press is a
-      //     zoom hold (no grab). Decision is sticky for the duration of
-      //     the press — flying over a target while LT is already held
-      //     does not switch modes.
-      //   - During a grab press: LT contributes no zoom. Left-Y reels
-      //     zoom on the grabbed lat/lng (handled in the airplane branch
-      //     below). Right-X dwell may fire onOrbitInit.
-      //   - On grab release: fire onGrabEnd, reset orbit-init dwell.
+      // LT held = continuous zoom in. RT held = continuous zoom out.
+      // Both full-time, no gameplay modifiers. The shoot action lives
+      // on A; nothing else competes with the triggers anymore.
       let triggerZoomDelta = 0;
-      let leftYIsReel = false;
 
-      // RT
-      {
-        const rt = rtStateRef.current;
-        const isPressed = triggers.right >= TRIGGER_PRESS_THRESHOLD;
-        // RT-while-LT-grabbed = fire the armed channel. We tag the press as
-        // "fire" on onset (when LT is already grabbing) and suppress RT zoom
-        // for the remainder of that press, so the user gets a discrete trigger
-        // pull rather than a zoom slide.
-        if (isPressed && !rt.pressing) {
-          rt.pressing = true;
-          rt.startedAsGrab = false; // RT never grabs
-          rt.firedArmed = ltStateRef.current.startedAsGrab;
-          if (rt.firedArmed) {
-            actionsRef.current.onFireArmed?.();
-          }
-        } else if (!isPressed && rt.pressing) {
-          rt.pressing = false;
-          rt.firedArmed = false;
-        }
-        if (isPressed && !rt.firedArmed) triggerZoomDelta -= triggers.right; // zoom out
+      if (triggers.right >= TRIGGER_PRESS_THRESHOLD) {
+        triggerZoomDelta -= triggers.right;
       }
-
-      // LT — grab gate or zoom in.
-      {
-        const lt = ltStateRef.current;
-        const isPressed = triggers.left >= TRIGGER_PRESS_THRESHOLD;
-        if (isPressed && !lt.pressing) {
-          lt.pressing = true;
-          lt.startedAsGrab = reticleHoveringRef.current && modeRef.current === 'airplane';
-          if (lt.startedAsGrab) {
-            actionsRef.current.onGrabStart?.();
-            orbitInitRef.current = { direction: null, heldSinceMs: 0, fired: false };
-            // Snapshot the held lead AND the camera's current offset
-            // from it. We use the actual offset (not a computed one)
-            // so the screen doesn't jump on grab — whatever the user
-            // sees in the moment of pressing LT is preserved.
-            const targetId = lastReportedTargetIdRef.current;
-            const target = targetId
-              ? (airplaneTargetsRef.current ?? []).find(t => t.id === targetId)
-              : null;
-            grabbedRef.current = target ? {
-              lat: target.lat,
-              lng: target.lng,
-              offsetLat: cam.lat - target.lat,
-              offsetLng: cam.lng - target.lng,
-              headingAtGrab: cam.heading,
-            } : null;
-          }
-        } else if (!isPressed && lt.pressing) {
-          lt.pressing = false;
-          if (lt.startedAsGrab) {
-            actionsRef.current.onGrabEnd?.();
-            orbitInitRef.current = { direction: null, heldSinceMs: 0, fired: false };
-            grabbedRef.current = null;
-          }
-          lt.startedAsGrab = false;
-        }
-        if (isPressed && !lt.startedAsGrab) {
-          triggerZoomDelta += triggers.left; // zoom in
-        }
-        if (isPressed && lt.startedAsGrab) {
-          leftYIsReel = true; // hand left-Y over to reel-zoom this frame
-        }
-      }
-
-      // ── Right-X orbit-init dwell (grab-only) ────────────────────────
-      // While grabbed, holding right-X past ORBIT_INIT_DEFLECTION in one
-      // direction for ORBIT_INIT_DWELL_MS fires onOrbitInit once. Direction
-      // is captured at the start of the dwell — flipping the stick mid-
-      // dwell resets the timer.
-      if (ltStateRef.current.startedAsGrab) {
-        const oi = orbitInitRef.current;
-        const dir: 'cw' | 'ccw' | null =
-          rightStick.x > ORBIT_INIT_DEFLECTION ? 'cw' :
-          rightStick.x < -ORBIT_INIT_DEFLECTION ? 'ccw' :
-          null;
-        if (dir === null) {
-          oi.direction = null;
-          oi.heldSinceMs = 0;
-        } else if (oi.direction !== dir) {
-          oi.direction = dir;
-          oi.heldSinceMs = elapsedMs;
-        } else if (!oi.fired && elapsedMs - oi.heldSinceMs >= ORBIT_INIT_DWELL_MS) {
-          oi.fired = true;
-          actionsRef.current.onOrbitInit?.(dir);
-        }
+      if (triggers.left >= TRIGGER_PRESS_THRESHOLD) {
+        triggerZoomDelta += triggers.left;
       }
 
       // ── Physics integration ─────────────────────────────────────────
@@ -588,32 +449,17 @@ export default function GamepadFlightController({
         //             hand-compensates with left-X strafe in the
         //             opposite direction to hold position.
         //   Right Y → tilt only (altitude is trigger-driven).
-        //
-        // While LT-grabbed (leftYIsReel === true):
-        //   Left Y  → reel-zoom (positive Y = stick down = zoom out =
-        //             pull tether longer; negative Y = zoom in = reel in).
-        //   Left X  → suppressed (no strafe — you're tethered)
-        //   Right X → suppressed for yaw (the right-X dwell is being
-        //             watched for orbit-init; we don't want it also to
-        //             rotate the heading mid-grab)
-        //   Right Y → tilt still works
+        // Triggers (LT/RT) are pure zoom; the shoot action lives on A
+        // and doesn't touch flight feel.
         const air = airRef.current;
 
-        if (leftYIsReel) {
-          // Bleed throttle / strafe / yaw quickly so existing momentum
-          // doesn't carry through into the grabbed state.
-          air.throttle *= Math.pow(0.85, dragExp);
-          air.strafe *= Math.pow(0.85, dragExp);
-          air.yaw *= Math.pow(0.85, dragExp);
-        } else {
-          air.throttle += -ly * AIR_THROTTLE_ACCEL * boost * dt;
-          air.strafe += lx * AIR_STRAFE_ACCEL * boost * dt;
-          air.yaw += rx * AIR_YAW_ACCEL * boost * dt;
+        air.throttle += -ly * AIR_THROTTLE_ACCEL * boost * dt;
+        air.strafe += lx * AIR_STRAFE_ACCEL * boost * dt;
+        air.yaw += rx * AIR_YAW_ACCEL * boost * dt;
 
-          air.throttle *= Math.pow(AIR_THROTTLE_DRAG, dragExp);
-          air.strafe *= Math.pow(AIR_STRAFE_DRAG, dragExp);
-          air.yaw *= Math.pow(AIR_YAW_DRAG, dragExp);
-        }
+        air.throttle *= Math.pow(AIR_THROTTLE_DRAG, dragExp);
+        air.strafe *= Math.pow(AIR_STRAFE_DRAG, dragExp);
+        air.yaw *= Math.pow(AIR_YAW_DRAG, dragExp);
 
         air.throttle = clamp(air.throttle, -AIR_THROTTLE_MAX * 0.4, AIR_THROTTLE_MAX);
         air.strafe = clamp(air.strafe, -AIR_STRAFE_MAX, AIR_STRAFE_MAX);
@@ -634,14 +480,8 @@ export default function GamepadFlightController({
         vel.panY = -air.throttle;
         vel.heading = air.yaw;
 
-        // Zoom: trigger holds OR left-Y reel during grab. Reel uses the
-        // same slow rate as a trigger hold so the feel is consistent.
-        // ly is positive when stick is down → that means zoom out (longer
-        // tether). Convert: reelZoomDelta = +ly  (positive ly = tether
-        // longer = zoom out = negative zoom delta in Maps semantics →
-        // we want stick-down to zoom out, so apply -ly to match).
-        const reelDelta = leftYIsReel ? -ly : 0;
-        vel.zoom = (triggerZoomDelta + reelDelta) * ZOOM_ACCEL_S2 * boost * dt;
+        // Zoom is trigger-driven only.
+        vel.zoom = triggerZoomDelta * ZOOM_ACCEL_S2 * boost * dt;
       }
 
       // ── Apply velocity → camera state ───────────────────────────────
@@ -675,35 +515,6 @@ export default function GamepadFlightController({
 
       const headingDeltaThisFrame = vel.heading * dt;
       cam.heading = (cam.heading + headingDeltaThisFrame + 360) % 360;
-
-      // ── Grab lock — orbit the held point at the original radius ────
-      // At grab onset we captured the camera's offset from the held lead
-      // AND the heading at that moment. As heading changes during grab,
-      // we rotate that original offset vector by the heading delta so
-      // the camera circles the held point at the same radius the user
-      // started with. No forward-throw assumptions — whatever offset
-      // Maps had at grab-time is preserved, the screen doesn't jump.
-      if (ltStateRef.current.startedAsGrab && grabbedRef.current) {
-        const g = grabbedRef.current;
-        const headingDeltaSinceGrab = ((cam.heading - g.headingAtGrab + 540) % 360) - 180;
-        const rad = (headingDeltaSinceGrab * Math.PI) / 180;
-        const cos = Math.cos(rad), sin = Math.sin(rad);
-        // Rotate the original offset around the held point by the
-        // heading delta. Heading is degrees clockwise from north, so a
-        // positive heading delta should rotate the camera's offset
-        // clockwise around the held lead in screen-space (X=east,
-        // Y=north). lng degrees ≠ lat degrees away from the equator,
-        // so scale lng by cos(lat) into a lat-equivalent X for the
-        // rotation, then back when writing camera lng.
-        const cosLat = Math.cos((g.lat * Math.PI) / 180) || 1;
-        const offX = g.offsetLng * cosLat; // lat-equivalent X (east)
-        const offY = g.offsetLat;          // Y (north)
-        // Clockwise rotation: [cos, sin; -sin, cos]
-        const rotX = offX * cos + offY * sin;
-        const rotY = -offX * sin + offY * cos;
-        cam.lat = g.lat + rotY;
-        cam.lng = g.lng + rotX / cosLat;
-      }
 
       // ── Sideways pivot fake (overhead only) ─────────────────────────
       // When heading rotates by Δθ this frame, also pan the camera laterally

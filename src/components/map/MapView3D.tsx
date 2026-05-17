@@ -57,10 +57,10 @@ const HOVER_PAN_FREQ_Y = 0.11;
 
 // LB/RB dolly zoom — moves the eye forward (LB) or backward (RB) along
 // the current view direction. Rate is multiplied by current range so
-// it feels equally responsive at any altitude. At this value, one
-// second of hold travels ~120% of current range — a snappy dolly that
-// noticeably changes what's framed.
-const ZOOM_DOLLY_RATE_PER_SEC = 1.2;
+// it feels equally responsive at any altitude. At 3.0, one second of
+// hold travels ~3× current range — a meaningful descent in a beat,
+// so dropping from cruise altitude to rooftop level is one quick pull.
+const ZOOM_DOLLY_RATE_PER_SEC = 3.0;
 
 
 const METERS_PER_DEG_LAT = 111_320;
@@ -141,24 +141,49 @@ function fpToMap3D(cam: FpCam): {
   // at a saturated pitch; releasing the stick lets pitch coast back.
   const map3dTilt = clamp(90 + cam.pitch, 0, 85);
 
-  // Place focal point along the view ray at `range` meters ahead.
-  // pitch>0 (looking up) → vertDist positive → focal ABOVE eye.
-  // pitch<0 (looking down) → vertDist negative → focal BELOW eye.
-  const horizDist = cam.range * Math.cos((cam.pitch * Math.PI) / 180);
-  const vertDist = cam.range * Math.sin((cam.pitch * Math.PI) / 180);
+  // Place focal point along the view ray. Key constraint Google enforces:
+  // Map3D silently clamps focal-point altitude to >= 0 (ground level).
+  // If we write a negative focal altitude, Google ignores our entire
+  // {center, range} pair and re-derives the camera position based on
+  // its own clamped focal — meaning OUR cam.altitude is no longer the
+  // actual rendered eye altitude. That's why dolly-down hits an
+  // invisible floor at ~30m: focal goes underground long before eye
+  // does, Google clamps, camera position drifts away from what we want.
+  //
+  // Fix: dynamically shorten `range` so the focal lands AT ground level
+  // when looking down, never below. Math: focal_altitude = eye_altitude
+  // + range * sin(pitch). We want focal_altitude >= 0, so when looking
+  // down (pitch < 0), max usable range = -eye_altitude / sin(pitch).
+  // We pick the smaller of cam.range and that ground-distance, so the
+  // focal-point sits exactly on the ground (not underneath).
+  const pitchRad = (cam.pitch * Math.PI) / 180;
+  const sinPitch = Math.sin(pitchRad);
+  let useRange = cam.range;
+  if (sinPitch < 0 && cam.altitude > 0) {
+    const maxRangeBeforeGround = -cam.altitude / sinPitch;
+    if (maxRangeBeforeGround < useRange) useRange = maxRangeBeforeGround;
+  }
+  // Floor so range can't go to zero (degenerate camera).
+  if (useRange < 1) useRange = 1;
+
+  const horizDist = useRange * Math.cos(pitchRad);
+  const vertDist = useRange * sinPitch;
   const headingRad = (cam.heading * Math.PI) / 180;
   const dEast = horizDist * Math.sin(headingRad);
   const dNorth = horizDist * Math.cos(headingRad);
   const cosLat = Math.cos((cam.lat * Math.PI) / 180) || 1;
+  // Floor focal altitude at 0 (terrain). The math above should keep
+  // it >= 0, but belt-and-suspenders.
+  const focalAlt = Math.max(0, cam.altitude + vertDist);
   return {
     center: {
       lat: cam.lat + dNorth / METERS_PER_DEG_LAT,
       lng: cam.lng + dEast / (METERS_PER_DEG_LAT * cosLat),
-      altitude: cam.altitude + vertDist,
+      altitude: focalAlt,
     },
     heading: cam.heading,
     tilt: map3dTilt,
-    range: cam.range,
+    range: useRange,
   };
 }
 
@@ -194,11 +219,15 @@ function Inner({
     el.setAttribute('default-labels-disabled', 'false');
     containerRef.current.appendChild(el);
     elRef.current = el;
-    // Seed first-person camera at the seed location, ~300m altitude,
-    // looking forward + slightly down (pitch -30, so map3d tilt = 60).
+    // Seed at ~80m altitude — comfortable cruise over residential
+    // (well above rooftops, below low-altitude clouds), looking
+    // forward + slightly down (pitch -25). Previous 300m put the
+    // user in a "satellite-view" mindset instead of "flying around
+    // the neighborhood." Lower seed gets them straight to the
+    // useful zone.
     camRef.current = {
-      lat: seed.lat, lng: seed.lng, altitude: 300,
-      heading: 0, pitch: -30, range: 700,
+      lat: seed.lat, lng: seed.lng, altitude: 80,
+      heading: 0, pitch: -25, range: 700,
     };
     airRef.current = { throttle: 0, strafe: 0, yaw: 0 };
     velRef.current = { panX: 0, panY: 0, heading: 0, tilt: 0 };

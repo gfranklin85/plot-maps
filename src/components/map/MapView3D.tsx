@@ -55,17 +55,13 @@ const HOVER_PAN_AMPL_PX = 1.4;
 const HOVER_PAN_FREQ_X = 0.07;
 const HOVER_PAN_FREQ_Y = 0.11;
 
-// Zoom on LB (in) / RB (out). Log-scale rate — at this value, one
-// second of hold = range changes by 2^2.5 = ~5.7×. Tap-and-release
-// nudges the range by ~12%; hold for a beat to make a real altitude
-// change. The previous 0.7 was so slow the visual change over a few
-// frames was imperceptible.
-const ZOOM_RATE_PER_SEC = 2.5;
+// LB/RB dolly zoom — moves the eye forward (LB) or backward (RB) along
+// the current view direction. Rate is multiplied by current range so
+// it feels equally responsive at any altitude. At this value, one
+// second of hold travels ~120% of current range — a snappy dolly that
+// noticeably changes what's framed.
+const ZOOM_DOLLY_RATE_PER_SEC = 1.2;
 
-const TILT_MIN = 0;
-const TILT_MAX = 85;
-const RANGE_MIN = 1;
-const RANGE_MAX = 40000;
 
 const METERS_PER_DEG_LAT = 111_320;
 
@@ -76,7 +72,10 @@ const METERS_PER_DEG_LAT = 111_320;
 // zoom-17 2D session. Anchored empirically — too low felt sluggish,
 // too high (the prior failed port) flew past the world.
 function metersPerScreenPixel(range: number): number {
-  return range / 4500;
+  // Anchor tuned to feel like the 2D path's screen-pan speed. Range
+  // 700m default; at this divisor a full-stick push covers ground
+  // at roughly the same rate as a typical zoom-17 2D fly.
+  return range / 1500;
 }
 
 function shapeStick(v: number): number {
@@ -135,8 +134,12 @@ function fpToMap3D(cam: FpCam): {
   //
   // Conversion: map3dTilt = 90 + pitch (since pitch=0 corresponds to
   // tilt=90 = horizon, and pitch<0 corresponds to tilt<90 = look down).
-  // Looking up (pitch>0) maps to tilt>90 which Google rejects; we clamp.
-  const map3dTilt = clamp(90 + cam.pitch, TILT_MIN, TILT_MAX);
+  // Google clamps tilt at 0-85 internally; we still clamp here only
+  // because Map3DElement throws on out-of-range writes. The internal
+  // value of cam.pitch is allowed to overshoot — only the WRITE is
+  // bounded. This way the user's "look up" gesture doesn't get stuck
+  // at a saturated pitch; releasing the stick lets pitch coast back.
+  const map3dTilt = clamp(90 + cam.pitch, 0, 85);
 
   // Place focal point along the view ray at `range` meters ahead.
   // pitch>0 (looking up) → vertDist positive → focal ABOVE eye.
@@ -236,13 +239,30 @@ function Inner({
         if (justPressed.has('down') || justPressed.has('right')) actionsRef.current?.onCycleNext?.();
       }
 
-      // ── LB/RB → zoom (range adjust) ───────────────────────────────
-      // LB = zoom in (range shrinks), RB = zoom out (range grows).
-      // Log-scale rate so each second of hold roughly halves/doubles.
-      if (pressed.has('lb') && !pressed.has('rb')) {
-        cam.range = clamp(cam.range * Math.pow(2, -ZOOM_RATE_PER_SEC * dt), RANGE_MIN, RANGE_MAX);
-      } else if (pressed.has('rb') && !pressed.has('lb')) {
-        cam.range = clamp(cam.range * Math.pow(2,  ZOOM_RATE_PER_SEC * dt), RANGE_MIN, RANGE_MAX);
+      // ── LB/RB → zoom (dolly: move eye forward / back along view) ──
+      // In first-person, "zoom in" can't just shrink cam.range — that
+      // moves the focal point closer to a stationary eye, which is
+      // visually invisible (no perspective change). To actually feel
+      // like zooming, we translate the eye position forward/backward
+      // along the current view direction. Forward = closer to whatever
+      // you're looking at. Backward = pulling away.
+      let zoomSign = 0;
+      if (pressed.has('lb') && !pressed.has('rb')) zoomSign = -1;  // LB = forward (closer)
+      else if (pressed.has('rb') && !pressed.has('lb')) zoomSign = 1;  // RB = backward (away)
+      if (zoomSign !== 0) {
+        // Move along view direction (heading + pitch). Speed scales with
+        // current range so it feels equally responsive at any altitude.
+        const moveMeters = zoomSign * cam.range * ZOOM_DOLLY_RATE_PER_SEC * dt;
+        const pitchRad = (cam.pitch * Math.PI) / 180;
+        const headingRad = (cam.heading * Math.PI) / 180;
+        const horizMove = moveMeters * Math.cos(pitchRad);
+        const vertMove  = moveMeters * Math.sin(pitchRad);
+        const dEast  = horizMove * Math.sin(headingRad);
+        const dNorth = horizMove * Math.cos(headingRad);
+        const cosLat = Math.cos((cam.lat * Math.PI) / 180) || 1;
+        cam.lat += dNorth / METERS_PER_DEG_LAT;
+        cam.lng += dEast  / (METERS_PER_DEG_LAT * cosLat);
+        cam.altitude += vertMove;
       }
 
       // ── Physics integration — same as 2D airplane branch ──────────
@@ -317,17 +337,17 @@ function Inner({
       // eye position + view direction every frame in fpToMap3D.
       cam.heading = (cam.heading + vel.heading * dt + 360) % 360;
       // Pitch convention: stick-up (ry<0) pitches view UP toward sky;
-      // negative pitch = looking down, positive = looking up. Range
-      // intentionally wide so we can experiment with low-altitude
-      // horizon framing; clamps below come from Map3D's own tilt
-      // ceiling, not from us.
-      cam.pitch = clamp(cam.pitch + vel.tilt * dt, -89, 89);
+      // negative pitch = looking down, positive = looking up. No
+      // app-side clamp — Map3D's own tilt ceiling will do whatever
+      // it does. Tilt into the ground if you want to, let's learn
+      // what happens.
+      cam.pitch += vel.tilt * dt;
 
       // Apply hover wave as a brief modulation, not accumulating drift.
       const map3d = fpToMap3D({
         ...cam,
         heading: (cam.heading + hoverHeading + 360) % 360,
-        pitch: clamp(cam.pitch + hoverTilt, -89, 89),
+        pitch: cam.pitch + hoverTilt,
       });
 
       // ── Write to element ──────────────────────────────────────────

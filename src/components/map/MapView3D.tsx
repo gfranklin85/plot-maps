@@ -10,16 +10,22 @@ import type { GamepadActions } from "./GamepadFlightController";
 
 // ── Photorealistic 3D Tiles surface (Map3DElement / <gmp-map-3d>) ───
 //
-// Admin-only renderer behind profiles.enable_3d_tiles_admin. Same
-// gameplay vocabulary as the 2D path (A/X/Y/B/D-pad) and same heavy-
-// helicopter airplane physics — velocity + drag + cubic stick
-// shaping, glide-to-stop on stick release. Only the camera-write
-// step is renderer-specific (Map3D's center/heading/tilt/range vs
-// the 2D path's moveCamera()).
+// Admin-only renderer behind profiles.enable_3d_tiles_admin. This is a
+// completely different Google API surface from the standard Maps JS
+// API — billed per session against the Google Cloud project, with
+// real photogrammetric buildings, terrain, and 0-90° tilt.
+//
+// Control parity with the 2D path: A/X/Y/B/D-pad bindings are the
+// same as GamepadFlightController. Page never has to know which
+// surface is rendering — same actions object flows through. Only the
+// camera-write step differs (Map3DElement camera properties instead
+// of map.moveCamera()).
 
 const API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
 
-// Camera state we own + write each gamepad frame.
+// Map3D camera state we own + write each gamepad frame. Mirrors the
+// camRef shape inside GamepadFlightController so the input handling
+// can stay structurally similar.
 interface Map3DCam {
   lat: number;
   lng: number;
@@ -29,19 +35,9 @@ interface Map3DCam {
   range: number;
 }
 
-// Velocity state — heavy-helicopter physics. Throttle/strafe drive
-// camera position in heading-rotated space (forward/sideways); yaw
-// rotates heading; tilt rotates tilt; zoom adjusts range. Each has
-// its own accel + drag + max so the feel can be tuned independently.
-interface AirVel {
-  throttle: number;   // meters/sec forward/back along heading
-  strafe: number;     // meters/sec sideways
-  yaw: number;        // deg/sec heading
-  tilt: number;       // deg/sec tilt
-  zoom: number;       // log-range/sec (multiplicative)
-}
-
-// Web-component element type for Map3DElement.
+// Web-component element type. The React types from
+// @vis.gl/react-google-maps don't ship a wrapper for Map3DElement
+// yet; we talk to it as an HTMLElement with known property surface.
 type Map3DElement = HTMLElement & {
   center: { lat: number; lng: number; altitude?: number };
   heading: number;
@@ -49,57 +45,28 @@ type Map3DElement = HTMLElement & {
   range: number;
 };
 
-// ── Physics tuning (mirror of the 2D airplane mode, in 3D units) ───
-// Throttle/strafe are meters/sec (3D world has real distances) instead
-// of the 2D path's screen-pixels/sec. We compute the meters-per-pixel
-// equivalent from current range so the perceived feel matches.
-
-// Throttle — forward/back (left-Y). Slow cruise-y decay so a brief
-// press carries you forward smoothly.
-const THROTTLE_ACCEL_M_S2 = 600;     // m/s² per unit stick at base scale
-const THROTTLE_DRAG = 0.965;
-const THROTTLE_MAX_M_S = 300;
-
-// Strafe — sideways (left-X). Same shape as throttle so they compose
-// when the user hand-compensates yaw with strafe (drone-pilot style).
-const STRAFE_ACCEL_M_S2 = 500;
-const STRAFE_DRAG = 0.96;
-const STRAFE_MAX_M_S = 260;
-
-// Yaw — heading rotation (right-X). Heavy and slow so the world
-// turns deliberately.
-const YAW_ACCEL_DEG_S2 = 75;
-const YAW_DRAG = 0.94;
-const YAW_MAX_DEG_S = 30;
-
-// Tilt — camera-pitch (right-Y). More responsive than yaw, less
-// inertia. Velocity-driven with drag like everything else.
-const TILT_ACCEL_DEG_S2 = 220;
-const TILT_DRAG = 0.86;
-const TILT_MAX_DEG_S = 70;
-
-// Zoom — log-range/sec. The trigger drives a velocity that decays;
-// this gives a satisfying "lean in to swoop, release to coast in"
-// feel instead of the hard-stop of pure direct input.
-const ZOOM_ACCEL_S2 = 6;
-const ZOOM_DRAG = 0.85;
-const ZOOM_MAX_S = 2.5;
-
-const TRIGGER_PRESS_THRESHOLD = 0.4;
-const TILT_MIN = 0;
-const TILT_MAX = 90;
+// Tuning matched to the 2D-path airplane mode in spirit (heavy
+// helicopter, decay-driven), translated to Map3DElement's units.
+// Range (meters from center) replaces zoom-level; pan-meters replaces
+// pan-pixels at a scale anchored on the current range.
+// RANGE_MIN is how close the camera can get to the focal point in
+// meters. Map3DElement renders all the way down to ~1m; we set the
+// floor at 1 so flight can take the user to street level and below
+// (peering up at building facades). RANGE_MAX bumped to 40 km so the
+// wide-overhead view can pull back to county scale for navigation.
 const RANGE_MIN = 1;
 const RANGE_MAX = 40000;
-
-// Earth scale.
+const PAN_BASE_PIXELS_PER_SEC = 700;
+const YAW_DEG_PER_SEC = 90;
+const TILT_DEG_PER_SEC = 70;
+// Multiplicative zoom: at full trigger we want noticeable motion at
+// both ends. 3.5 means at full press the range halves roughly every
+// 200ms, fast enough to swoop in but not so fast it overshoots.
+const RANGE_FACTOR_PER_SEC = 3.5;
+const TILT_MIN = 0;
+const TILT_MAX = 90;
 const METERS_PER_DEG_LAT = 111_320;
-
-// Stick shaping — cubic-ish curve so light touches give light push
-// and hard pushes give hard push. This asymmetry is what makes flight
-// feel "weighted." Identical to the 2D path.
-function shapeStick(v: number): number {
-  return Math.sign(v) * Math.pow(Math.abs(v), 1.6);
-}
+const TRIGGER_PRESS_THRESHOLD = 0.4;
 
 function clamp(n: number, lo: number, hi: number) { return n < lo ? lo : n > hi ? hi : n; }
 
@@ -116,9 +83,10 @@ function Inner({
   const maps3d = useMapsLibrary('maps3d');
   const elRef = useRef<Map3DElement | null>(null);
   const camRef = useRef<Map3DCam | null>(null);
-  const velRef = useRef<AirVel>({ throttle: 0, strafe: 0, yaw: 0, tilt: 0, zoom: 0 });
   const containerRef = useRef<HTMLDivElement | null>(null);
 
+  // Pin latest actions through a ref so the gamepad loop can read them
+  // without re-subscribing every render. Same pattern as the 2D path.
   const actionsRef = useRef<GamepadActions | undefined>(gamepadActions);
   actionsRef.current = gamepadActions;
 
@@ -132,6 +100,10 @@ function Inner({
     el.style.height = '100%';
     el.setAttribute('mode', 'hybrid');
     el.setAttribute('default-labels-disabled', 'false');
+    // Altitude anchored at ground (0). Camera height is then entirely
+    // a function of range + tilt, which is what the user controls.
+    // Old altitude=250 was floating the focal point in the air and
+    // capping how low the camera could ever sit.
     el.center = { lat: seed.lat, lng: seed.lng, altitude: 0 };
     el.heading = 0;
     el.tilt = 60;
@@ -142,7 +114,6 @@ function Inner({
       lat: seed.lat, lng: seed.lng, altitude: 0,
       heading: 0, tilt: 60, range: 700,
     };
-    velRef.current = { throttle: 0, strafe: 0, yaw: 0, tilt: 0, zoom: 0 };
     return () => {
       el.remove();
       elRef.current = null;
@@ -155,15 +126,12 @@ function Inner({
     onFrame: ({ dt, leftStick, rightStick, triggers, justPressed }) => {
       const el = elRef.current;
       const cam = camRef.current;
-      const vel = velRef.current;
       if (!el || !cam) return;
 
-      // Drag is computed as drag^(60*dt) so it's frame-rate independent.
-      // At 60fps and dt=1/60, drag^1 = drag (its raw value).
-      const dragExp = 60 * dt;
-
       // ── Edge-triggered button actions ─────────────────────────────
-      // Identical bindings to the 2D-path controller.
+      // Identical bindings to the 2D-path controller. A=shoot,
+      // X=rotate channel, Y=inspect, B=cancel, D-pad cycles.
+      // Same actions object the page builds and passes through.
       if (justPressed.size > 0) {
         const fire = (name: ButtonName, fn?: () => void) => {
           if (justPressed.has(name) && fn) fn();
@@ -176,82 +144,38 @@ function Inner({
         if (justPressed.has('down') || justPressed.has('right')) actionsRef.current?.onCycleNext?.();
       }
 
-      // ── Stick → acceleration (cubic-shaped) ────────────────────────
-      const lx = shapeStick(leftStick.x);
-      const ly = shapeStick(leftStick.y);
-      const rx = shapeStick(rightStick.x);
-      const ry = shapeStick(rightStick.y);
-
-      // Throttle (left-Y inverted: stick up = forward). Strafe (left-X).
-      vel.throttle += -ly * THROTTLE_ACCEL_M_S2 * dt;
-      vel.strafe   +=  lx * STRAFE_ACCEL_M_S2 * dt;
-      vel.yaw      +=  rx * YAW_ACCEL_DEG_S2 * dt;
-      vel.tilt     += -ry * TILT_ACCEL_DEG_S2 * dt;
-
-      // Drag.
-      vel.throttle *= Math.pow(THROTTLE_DRAG, dragExp);
-      vel.strafe   *= Math.pow(STRAFE_DRAG, dragExp);
-      vel.yaw      *= Math.pow(YAW_DRAG, dragExp);
-      vel.tilt     *= Math.pow(TILT_DRAG, dragExp);
-
-      // Caps.
-      vel.throttle = clamp(vel.throttle, -THROTTLE_MAX_M_S * 0.4, THROTTLE_MAX_M_S);
-      vel.strafe   = clamp(vel.strafe,   -STRAFE_MAX_M_S, STRAFE_MAX_M_S);
-      vel.yaw      = clamp(vel.yaw,      -YAW_MAX_DEG_S, YAW_MAX_DEG_S);
-      vel.tilt     = clamp(vel.tilt,     -TILT_MAX_DEG_S, TILT_MAX_DEG_S);
-
-      // Dead-zone for residuals — without this, drift can creep when
-      // velocities are tiny but non-zero.
-      if (Math.abs(vel.throttle) < 0.5) vel.throttle = 0;
-      if (Math.abs(vel.strafe)   < 0.5) vel.strafe = 0;
-      if (Math.abs(vel.yaw)      < 0.05) vel.yaw = 0;
-      if (Math.abs(vel.tilt)     < 0.05) vel.tilt = 0;
-
-      // ── Zoom (triggers → velocity with drag) ───────────────────────
-      // LT zooms in (range shrinks → negative log-range delta).
-      // RT zooms out (range grows → positive).
-      const lt = triggers.left  >= TRIGGER_PRESS_THRESHOLD ? triggers.left  : 0;
-      const rt = triggers.right >= TRIGGER_PRESS_THRESHOLD ? triggers.right : 0;
-      vel.zoom += (rt - lt) * ZOOM_ACCEL_S2 * dt;
-      vel.zoom *= Math.pow(ZOOM_DRAG, dragExp);
-      vel.zoom  = clamp(vel.zoom, -ZOOM_MAX_S, ZOOM_MAX_S);
-      if (Math.abs(vel.zoom) < 0.005) vel.zoom = 0;
-
-      // ── Apply velocities → camera state ───────────────────────────
-      // Throttle + strafe pan the camera in heading-rotated meters.
-      // Scale by range so flying at high altitude feels faster than
-      // crawling at street level (same screen-pixel feel either way).
-      const scale = cam.range / 700;  // anchored at seed range
-      const forwardMeters = vel.throttle * dt * scale;
-      const sideMeters    = vel.strafe   * dt * scale;
+      // ── Pan (left stick) — meters in heading-rotated frame ─────────
+      const lx = leftStick.x;
+      const ly = leftStick.y;
+      const metersPerPx = cam.range / 1000;
+      const dxMeters = lx * PAN_BASE_PIXELS_PER_SEC * metersPerPx * dt;
+      const dyMeters = -ly * PAN_BASE_PIXELS_PER_SEC * metersPerPx * dt;
       const headingRad = (cam.heading * Math.PI) / 180;
       const cosH = Math.cos(headingRad);
       const sinH = Math.sin(headingRad);
-      const eastMeters  =  sideMeters * cosH + forwardMeters * sinH;
-      const northMeters = -sideMeters * sinH + forwardMeters * cosH;
+      const eastMeters = dxMeters * cosH + dyMeters * sinH;
+      const northMeters = -dxMeters * sinH + dyMeters * cosH;
       const cosLat = Math.cos((cam.lat * Math.PI) / 180) || 1;
       cam.lat += northMeters / METERS_PER_DEG_LAT;
       cam.lng += eastMeters / (METERS_PER_DEG_LAT * cosLat);
 
-      // Heading + tilt advance by their velocities.
-      cam.heading = (cam.heading + vel.yaw * dt + 360) % 360;
-      cam.tilt    = clamp(cam.tilt + vel.tilt * dt, TILT_MIN, TILT_MAX);
-      if ((cam.tilt === TILT_MIN && vel.tilt < 0) || (cam.tilt === TILT_MAX && vel.tilt > 0)) {
-        vel.tilt = 0;
-      }
+      // ── Yaw (right-X) + Tilt (right-Y) ─────────────────────────────
+      cam.heading = (cam.heading + rightStick.x * YAW_DEG_PER_SEC * dt + 360) % 360;
+      cam.tilt = clamp(cam.tilt - rightStick.y * TILT_DEG_PER_SEC * dt, TILT_MIN, TILT_MAX);
 
-      // Range advances multiplicatively from zoom velocity.
-      // vel.zoom is a log-range/sec — apply as exp() per dt.
-      cam.range = clamp(cam.range * Math.exp(vel.zoom * dt), RANGE_MIN, RANGE_MAX);
-      if ((cam.range === RANGE_MIN && vel.zoom < 0) || (cam.range === RANGE_MAX && vel.zoom > 0)) {
-        vel.zoom = 0;
+      // ── Range (LT zoom in / RT zoom out) ───────────────────────────
+      if (triggers.left >= TRIGGER_PRESS_THRESHOLD || triggers.right >= TRIGGER_PRESS_THRESHOLD) {
+        const inRate = triggers.left * RANGE_FACTOR_PER_SEC;
+        const outRate = triggers.right * RANGE_FACTOR_PER_SEC;
+        const factor = Math.pow(1 / (1 + inRate), dt) * Math.pow(1 + outRate, dt);
+        cam.range = clamp(cam.range * factor, RANGE_MIN, RANGE_MAX);
       }
 
       // ── Write to element ──────────────────────────────────────────
-      el.center  = { lat: cam.lat, lng: cam.lng, altitude: cam.altitude };
+      el.center = { lat: cam.lat, lng: cam.lng, altitude: cam.altitude };
       el.heading = cam.heading;
-      el.tilt    = cam.tilt;
-      el.range   = cam.range;
+      el.tilt = cam.tilt;
+      el.range = cam.range;
     },
   });
 
@@ -268,6 +192,8 @@ function Inner({
 // libraries. Same shape as MapView so MapDynamic can swap between
 // them by reading the admin flag.
 export default function MapView3D(props: MapViewProps) {
+  // Avoid re-mounting <Inner> every render — the element creation
+  // effect should fire only once per session.
   const memoCenter = useMemo(() => props.center ?? null, [props.center]);
   return (
     <APIProvider apiKey={API_KEY} libraries={['places', 'marker', 'maps3d']}>

@@ -300,7 +300,7 @@ function splitMailingAddress(
   // line1 is everything before the first comma; the rest may have city/state-zip.
   const line1 = parts[0];
   // Prefer explicit columns; fall back to parsing.
-  let city = lead.city || parts[1] || '';
+  const city = lead.city || parts[1] || '';
   let state = lead.state || '';
   let zip = lead.zip || '';
   if (parts[2]) {

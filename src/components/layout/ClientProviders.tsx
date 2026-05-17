@@ -17,7 +17,7 @@ import type { ReactNode } from 'react';
 export default function ClientProviders({ children }: { children: ReactNode }) {
   return (
     <ConsentProvider>
-      <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
+      <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
         <AuthProvider>
           <Suspense fallback={null}>
             <PostHogProvider>

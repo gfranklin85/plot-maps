@@ -1,5 +1,6 @@
 'use client';
 
+import { motion } from 'framer-motion';
 import MaterialIcon from '@/components/ui/MaterialIcon';
 
 interface Usage {
@@ -35,11 +36,16 @@ interface CardProps {
   image?: string;
 }
 
-function ToolCard({ href, icon, iconTint, hoverBorder, hoverText, title, subtitle, bullets, badge, image }: CardProps) {
+function ToolCard({ href, icon, iconTint, hoverBorder, hoverText, title, subtitle, bullets, badge, image, index = 0 }: CardProps & { index?: number }) {
   return (
-    <a
+    <motion.a
       href={href}
-      className={`relative flex flex-col rounded-2xl border border-card-border bg-card shadow-lg hover:shadow-xl transition-all group p-5 overflow-hidden ${hoverBorder}`}
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.45, delay: index * 0.08, ease: [0.2, 0.7, 0.2, 1] }}
+      whileHover={{ y: -3 }}
+      className={`paper-texture blueprint-grid relative flex flex-col rounded-2xl border border-card-border bg-card shadow-paper-md hover:shadow-paper-lg transition-shadow group p-5 overflow-hidden ${hoverBorder}`}
+      style={{ ['--grid-opacity' as string]: '0.035' }}
     >
       {image && (
         <>
@@ -47,7 +53,7 @@ function ToolCard({ href, icon, iconTint, hoverBorder, hoverText, title, subtitl
           <img
             src={image}
             alt=""
-            className="absolute inset-0 w-full h-full object-cover opacity-10 group-hover:opacity-20 transition-opacity"
+            className="absolute inset-0 w-full h-full object-cover opacity-[0.06] group-hover:opacity-[0.12] transition-opacity"
             loading="lazy"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-card via-card/90 to-card/60" />
@@ -67,7 +73,7 @@ function ToolCard({ href, icon, iconTint, hoverBorder, hoverText, title, subtitl
       )}
 
       <div className="relative flex flex-col">
-        <div className={`w-11 h-11 rounded-xl flex items-center justify-center mb-3 ${iconTint}`}>
+        <div className={`w-11 h-11 rounded-xl flex items-center justify-center mb-3 transition-transform group-hover:scale-110 ${iconTint}`}>
           <MaterialIcon icon={icon} className="text-[24px]" />
         </div>
 
@@ -85,7 +91,7 @@ function ToolCard({ href, icon, iconTint, hoverBorder, hoverText, title, subtitl
           ))}
         </ul>
       </div>
-    </a>
+    </motion.a>
   );
 }
 
@@ -97,11 +103,12 @@ export default function OutreachTools({ usage }: Props) {
       <h3 className="font-headline text-lg font-bold text-on-surface mb-3">What do you want to do?</h3>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <ToolCard
+          index={0}
           href="/imports"
           icon="upload_file"
-          iconTint="bg-emerald-500/15 text-emerald-400 group-hover:bg-emerald-500/25"
-          hoverBorder="hover:border-emerald-500/40"
-          hoverText="group-hover:text-emerald-400"
+          iconTint="bg-status-cold/20 text-status-cold/90 group-hover:bg-status-cold/30"
+          hoverBorder="hover:border-status-cold/50"
+          hoverText="group-hover:text-status-cold"
           title="Import Inventory"
           subtitle="Load listings, leads, and reference data"
           image="/card-mls.png"
@@ -112,6 +119,7 @@ export default function OutreachTools({ usage }: Props) {
           ]}
         />
         <ToolCard
+          index={1}
           href="/map"
           icon="map"
           iconTint="bg-primary/15 text-primary group-hover:bg-primary/25"
@@ -127,11 +135,12 @@ export default function OutreachTools({ usage }: Props) {
           ]}
         />
         <ToolCard
+          index={2}
           href="/setup-number"
           icon="phone_in_talk"
-          iconTint="bg-orange-500/15 text-orange-400 group-hover:bg-orange-500/25"
-          hoverBorder="hover:border-orange-500/40"
-          hoverText="group-hover:text-orange-400"
+          iconTint="bg-stake/15 text-stake group-hover:bg-stake/25"
+          hoverBorder="hover:border-stake/40"
+          hoverText="group-hover:text-stake"
           title="Dialer"
           subtitle="Call directly from the map"
           image="/card-dialer.png"
@@ -143,11 +152,12 @@ export default function OutreachTools({ usage }: Props) {
           badge={badge}
         />
         <ToolCard
+          index={3}
           href="/ai-assistant"
           icon="smart_toy"
-          iconTint="bg-violet-500/15 text-violet-400 group-hover:bg-violet-500/25"
-          hoverBorder="hover:border-violet-500/40"
-          hoverText="group-hover:text-violet-400"
+          iconTint="bg-blueprint/15 text-blueprint group-hover:bg-blueprint/25"
+          hoverBorder="hover:border-blueprint/40"
+          hoverText="group-hover:text-blueprint"
           title="AI Receptionist"
           subtitle="Answers inbound calls — never cold outbound"
           image="/card-leads.png"

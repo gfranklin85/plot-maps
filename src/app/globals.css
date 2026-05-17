@@ -31,48 +31,103 @@ html, body {
   --app-height: 100dvh;
 }
 
-/* ─── Light Theme ─── */
+/* ─── Light Theme — "Plat Book" ─────────────────────────────────
+   Plot's canonical brand palette. Cream parchment canvas, oxide-coral
+   primary action, blueprint navy ink, safety-orange stake accent
+   reserved for "mark this parcel" moments. Status palette lifted
+   from real zoning legends. See:
+     memory/project_brand_palette_direction.md
+     memory/project_design_roadmap_spatial_product_world.md
+   ─────────────────────────────────────────────────────────────── */
 :root {
-  --color-primary: 0 88 190;
-  --color-primary-container: 33 112 228;
-  --color-primary-fixed: 216 226 255;
-  --color-primary-fixed-dim: 173 198 255;
+  /* Primary action — zoning coral / oxide red */
+  --color-primary: 200 85 61;            /* #C8553D */
+  --color-primary-container: 168 67 47;  /* #A8432F — hover/pressed */
+  --color-primary-fixed: 245 222 213;
+  --color-primary-fixed-dim: 232 195 180;
   --color-on-primary: 255 255 255;
-  --color-on-primary-container: 254 252 255;
+  --color-on-primary-container: 60 18 8;
 
-  --color-surface: 248 249 255;
-  --color-surface-dim: 203 219 245;
-  --color-surface-bright: 248 249 255;
-  --color-surface-container: 229 238 255;
+  /* Surfaces — parchment cream family */
+  --color-surface: 244 234 213;             /* #F4EAD5 canvas */
+  --color-surface-dim: 232 220 196;
+  --color-surface-bright: 251 245 230;      /* #FBF5E6 */
+  --color-surface-container: 248 240 222;
   --color-surface-container-lowest: 255 255 255;
-  --color-surface-container-low: 239 244 255;
-  --color-surface-container-high: 220 233 255;
-  --color-surface-container-highest: 211 228 254;
-  --color-surface-variant: 211 228 254;
-  --color-surface-tint: 0 90 194;
+  --color-surface-container-low: 251 245 230;  /* #FBF5E6 */
+  --color-surface-container-high: 240 228 205;
+  --color-surface-container-highest: 232 220 196;
+  --color-surface-variant: 240 228 205;
+  --color-surface-tint: 200 85 61;
 
-  --color-on-surface: 26 28 32;
-  --color-on-surface-variant: 66 71 84;
+  /* Ink — blueprint navy for primary text */
+  --color-on-surface: 26 31 46;            /* #1A1F2E */
+  --color-on-surface-variant: 74 66 54;    /* #4A4236 — warm sepia muted, deeper for cream contrast */
 
-  --color-secondary: 84 95 115;
-  --color-secondary-container: 213 224 248;
+  /* Secondary — warm grey-brown family */
+  --color-secondary: 92 80 64;            /* deeper warm grey for cream contrast */
+  --color-secondary-container: 232 220 196;
   --color-on-secondary: 255 255 255;
-  --color-on-secondary-container: 88 99 119;
+  --color-on-secondary-container: 60 50 35;
 
-  --color-outline: 114 119 133;
-  --color-outline-variant: 194 198 214;
+  /* Hairlines — aged paper rule lines */
+  --color-outline: 155 146 130;            /* #9B9282 */
+  --color-outline-variant: 217 204 174;    /* #D9CCAE */
 
-  --color-inverse-surface: 33 49 69;
-  --color-inverse-on-surface: 234 241 255;
+  --color-inverse-surface: 26 31 46;
+  --color-inverse-on-surface: 244 234 213;
 
-  --color-background: 248 249 255;
-  --color-on-background: 26 28 32;
+  --color-background: 244 234 213;         /* #F4EAD5 */
+  --color-on-background: 26 31 46;
 
-  --color-card: 255 255 255;
-  --color-card-border: 226 232 240;
-  --color-card-border-hover: 129 140 248;
-  --color-input-bg: 241 245 249;
-  --color-input-border: 226 232 240;
+  --color-card: 251 245 230;               /* #FBF5E6 */
+  --color-card-border: 217 204 174;        /* #D9CCAE */
+  --color-card-border-hover: 200 85 61;    /* coral on hover */
+  --color-input-bg: 255 255 255;
+  --color-input-border: 217 204 174;
+
+  /* ─── New Plot Maps brand tokens ─── */
+  /* Stake accent — safety orange. Reserve ONLY for "mark this parcel"
+     moments (prospect pins, stake-planting animations, claim CTAs).
+     Do not use for general UI — it loses meaning if overused. */
+  --color-stake: 242 107 31;               /* #F26B1F */
+  --color-stake-hover: 217 90 22;
+  --color-on-stake: 255 255 255;
+
+  /* Blueprint navy — for data ink: parcel IDs, coordinates, mono
+     numeric text, table rules, technical chrome. */
+  --color-blueprint: 29 53 87;             /* #1D3557 */
+  --color-blueprint-soft: 122 160 209;     /* #7AA0D1 — for dark surfaces */
+
+  /* Zoning-legend status palette — domain-derived semantic colors.
+     Use these for lead status, listing status, parcel-type indicators. */
+  --color-status-commercial: 217 107 90;   /* #D96B5A coral */
+  --color-status-industrial: 181 115 158;  /* #B5739E muted magenta */
+  --color-status-pending: 232 168 124;     /* #E8A87C peach */
+  --color-status-active: 232 197 71;       /* #E8C547 lemon */
+  --color-status-cold: 122 155 118;        /* #7A9B76 sage */
+  --color-status-neutral: 155 146 130;     /* #9B9282 warm grey */
+
+  /* ─── Paper-shadow elevation system ─────────────────────────────
+     Replaces generic Tailwind shadows. Warm-tinted (sepia rather than
+     pure black) with longer/softer falloff to suggest paper weight
+     on a parchment surface. Use via the shadow-* utility classes
+     below, or directly via var() in component CSS. */
+  --shadow-paper-sm:
+    0 1px 1px rgba(60, 40, 20, 0.04),
+    0 2px 4px rgba(60, 40, 20, 0.06);
+  --shadow-paper-md:
+    0 2px 3px rgba(60, 40, 20, 0.05),
+    0 6px 12px rgba(60, 40, 20, 0.08),
+    0 1px 0 rgba(255, 255, 255, 0.6) inset;
+  --shadow-paper-lg:
+    0 4px 6px rgba(60, 40, 20, 0.06),
+    0 12px 24px rgba(60, 40, 20, 0.10),
+    0 1px 0 rgba(255, 255, 255, 0.7) inset;
+  --shadow-paper-xl:
+    0 8px 12px rgba(60, 40, 20, 0.08),
+    0 24px 48px rgba(60, 40, 20, 0.14),
+    0 1px 0 rgba(255, 255, 255, 0.8) inset;
 }
 
 /* ─── Dark Theme ─── */
@@ -120,13 +175,20 @@ html, body {
 }
 
 body {
-  font-family: "Inter", sans-serif;
+  font-family: var(--font-geist-sans), "Inter", sans-serif;
   background-color: rgb(var(--color-background));
   color: rgb(var(--color-on-surface));
 }
 
 h1, h2, h3, h4, h5, h6 {
-  font-family: "Manrope", sans-serif;
+  font-family: var(--font-geist-sans), "Manrope", sans-serif;
+  letter-spacing: -0.01em;
+}
+
+/* Tabular / mono: parcel IDs, coordinates, prices, technical data.
+   Use the .font-mono Tailwind class or wrap in <code>. */
+code, .font-mono {
+  font-family: var(--font-geist-mono), "JetBrains Mono", monospace;
 }
 
 .material-symbols-outlined {
@@ -149,6 +211,47 @@ h1, h2, h3, h4, h5, h6 {
     background: rgb(var(--color-card) / 0.7);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
+  }
+
+  /* ─── Paper texture overlay ───
+     Adds subtle paper-grain to any surface. Apply by adding the class
+     to a relatively-positioned element. The texture sits above the bg
+     but below content (via z-index 0 + content z-index >=1 if needed).
+     Tune --paper-opacity per-surface if you need it stronger/weaker. */
+  .paper-texture {
+    position: relative;
+  }
+  .paper-texture::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: url('/textures/paper-grain.png');
+    background-size: 512px 512px;
+    background-repeat: repeat;
+    opacity: var(--paper-opacity, 0.06);
+    mix-blend-mode: multiply;
+    pointer-events: none;
+    border-radius: inherit;
+  }
+
+  /* ─── Blueprint grid overlay ───
+     Plot Maps signature engineered-tech texture. 80px tile with
+     major boundary lines + 4 minor divisions in blueprint navy.
+     Same usage pattern as .paper-texture. Pair them for layered
+     paper+grid surfaces (apply both classes). */
+  .blueprint-grid {
+    position: relative;
+  }
+  .blueprint-grid::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: url('/textures/blueprint-grid.svg');
+    background-size: 80px 80px;
+    background-repeat: repeat;
+    opacity: var(--grid-opacity, 0.08);
+    pointer-events: none;
+    border-radius: inherit;
   }
 }
 

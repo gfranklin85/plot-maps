@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import MaterialIcon from '@/components/ui/MaterialIcon';
 import ProspectSearch from '@/components/dashboard/ProspectSearch';
 import OutreachTools from '@/components/dashboard/OutreachTools';
+import BlueprintGridBackdrop from '@/components/motion/BlueprintGridBackdrop';
 import { useProfile } from '@/lib/profile-context';
 import { useAuth } from '@/lib/auth-context';
 
@@ -71,16 +72,19 @@ export default function Dashboard() {
   return (
     <div className="p-4 md:p-8 max-w-6xl mx-auto space-y-10">
       {/* ═══ HERO ═══ */}
-      <div className="max-w-2xl mx-auto text-center space-y-4 pt-2">
-        <div>
-          <h2 className="font-headline text-2xl md:text-3xl font-extrabold text-on-surface">
-            Circle Prospect Any Listing
-          </h2>
-          <p className="text-sm md:text-base text-secondary mt-1">
-            Enter a property. We&apos;ll map the neighbors and get you calling.
-          </p>
+      <div className="relative -mx-4 md:-mx-8 px-4 md:px-8 py-8 md:py-12">
+        <BlueprintGridBackdrop />
+        <div className="relative max-w-2xl mx-auto text-center space-y-4 pt-2">
+          <div>
+            <h2 className="font-headline text-3xl md:text-5xl font-extrabold text-on-surface tracking-tight">
+              Circle Prospect Any Listing
+            </h2>
+            <p className="text-sm md:text-base text-secondary mt-2">
+              Enter a property. We&apos;ll map the neighbors and get you calling.
+            </p>
+          </div>
+          <ProspectSearch />
         </div>
-        <ProspectSearch />
       </div>
 
       {/* ═══ 5-CARD ACTION ROW ═══ */}

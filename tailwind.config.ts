@@ -77,11 +77,45 @@ const config: Config = {
         "card-border-hover": "rgb(var(--color-card-border-hover) / <alpha-value>)",
         "input-bg": "rgb(var(--color-input-bg) / <alpha-value>)",
         "input-border": "rgb(var(--color-input-border) / <alpha-value>)",
+        // ─── Plot Maps brand tokens ───
+        // Safety-orange accent reserved for "mark this parcel" moments.
+        // Don't use for general UI — it loses meaning if overused.
+        stake: {
+          DEFAULT: "rgb(var(--color-stake) / <alpha-value>)",
+          hover: "rgb(var(--color-stake-hover) / <alpha-value>)",
+        },
+        "on-stake": "rgb(var(--color-on-stake) / <alpha-value>)",
+        // Blueprint navy for data ink, parcel IDs, coordinates, mono text.
+        blueprint: {
+          DEFAULT: "rgb(var(--color-blueprint) / <alpha-value>)",
+          soft: "rgb(var(--color-blueprint-soft) / <alpha-value>)",
+        },
+        // Zoning-legend status palette — domain-derived semantic colors.
+        status: {
+          commercial: "rgb(var(--color-status-commercial) / <alpha-value>)",
+          industrial: "rgb(var(--color-status-industrial) / <alpha-value>)",
+          pending: "rgb(var(--color-status-pending) / <alpha-value>)",
+          active: "rgb(var(--color-status-active) / <alpha-value>)",
+          cold: "rgb(var(--color-status-cold) / <alpha-value>)",
+          neutral: "rgb(var(--color-status-neutral) / <alpha-value>)",
+        },
+      },
+      // ─── Paper-shadow elevation system ───
+      // Warm-tinted shadows that suggest paper weight on parchment.
+      // Replace generic Tailwind shadows (shadow-md, shadow-lg) with these.
+      boxShadow: {
+        "paper-sm": "var(--shadow-paper-sm)",
+        "paper-md": "var(--shadow-paper-md)",
+        "paper-lg": "var(--shadow-paper-lg)",
+        "paper-xl": "var(--shadow-paper-xl)",
       },
       fontFamily: {
-        headline: ["Manrope", "sans-serif"],
-        body: ["Inter", "sans-serif"],
-        label: ["Inter", "sans-serif"],
+        // Plot Maps: Geist Sans for everything, Geist Mono for data/coords.
+        // Fallbacks preserved for graceful degradation.
+        headline: ["var(--font-geist-sans)", "Manrope", "sans-serif"],
+        body: ["var(--font-geist-sans)", "Inter", "sans-serif"],
+        label: ["var(--font-geist-sans)", "Inter", "sans-serif"],
+        mono: ["var(--font-geist-mono)", "JetBrains Mono", "monospace"],
       },
       borderRadius: {
         DEFAULT: "0.125rem",

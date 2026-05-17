@@ -301,6 +301,7 @@ function splitMailingAddress(
   const line1 = parts[0];
   // Prefer explicit columns; fall back to parsing.
   const city = lead.city || parts[1] || '';
+  // state + zip are reassigned inside the parts[2] block below; city is not.
   let state = lead.state || '';
   let zip = lead.zip || '';
   if (parts[2]) {

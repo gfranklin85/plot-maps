@@ -6,6 +6,7 @@ import { supabaseAdmin } from '@/lib/supabase-server';
 import { silentLookup } from '@/lib/skiptrace-silent';
 import { reverseGeocodeServer } from '@/lib/geocode-server';
 import { logCost } from '@/lib/cost-tracker';
+import { sendPostcard, lobEnvironment } from '@/lib/lob';
 
 type Channel = 'text_invite' | 'direct_mail' | 'phone_call';
 type Phase = 'primer' | 'fire';
@@ -123,7 +124,7 @@ export async function POST(request: Request) {
   // Load profile (edition + arming) and the property
   const { data: profile } = await supabaseAdmin
     .from('profiles')
-    .select('plot_edition, armed_channel, armed_mail_template_id, twilio_phone_number')
+    .select('plot_edition, armed_channel, armed_mail_template_id, twilio_phone_number, full_name')
     .eq('id', user.id)
     .single();
 
@@ -275,11 +276,49 @@ async function handleTextInvite(args: {
 }
 
 // ── direct_mail ──────────────────────────────────────────────────────────
+
+// Plot's return address. TEMPORARY — Greg's home address used while
+// we're in test mode (Lob never actually mails anything in test). Swap
+// to a PO Box / virtual mailbox before flipping LOB_ENVIRONMENT=live.
+// Search for "PLOT_RETURN_ADDRESS" to find the swap point when ready.
+const PLOT_RETURN_ADDRESS = {
+  name: 'PLOT MAPS',
+  address_line1: '523 PUFFIN LANE',
+  address_city: 'LEMOORE',
+  address_state: 'CA',
+  address_zip: '93245',
+};
+
+// Parse "123 Main St, Lemoore, CA 93245" style into street + city + state + zip,
+// preferring explicit lead columns when present. Lob requires components, not
+// a single formatted line.
+function splitMailingAddress(
+  lead: { property_address: string | null; city: string | null; state: string | null; zip: string | null }
+): { line1: string; city: string; state: string; zip: string } | null {
+  if (!lead.property_address) return null;
+  const parts = lead.property_address.split(',').map((s) => s.trim());
+  // line1 is everything before the first comma; the rest may have city/state-zip.
+  const line1 = parts[0];
+  // Prefer explicit columns; fall back to parsing.
+  let city = lead.city || parts[1] || '';
+  let state = lead.state || '';
+  let zip = lead.zip || '';
+  if (parts[2]) {
+    const m = parts[2].match(/([A-Z]{2})\s+(\d{5}(?:-\d{4})?)/i);
+    if (m) {
+      state = state || m[1].toUpperCase();
+      zip = zip || m[2];
+    }
+  }
+  if (!line1 || !city || !state || !zip) return null;
+  return { line1, city, state, zip };
+}
+
 async function handleDirectMail(args: {
   user: { id: string };
   edition: 'lite' | 'pro';
   lead: { id: string; property_address: string | null; city: string | null; state: string | null; zip: string | null };
-  profile: { armed_mail_template_id?: string | null } | null;
+  profile: { armed_mail_template_id?: string | null; full_name?: string | null } | null;
 }) {
   const { user, edition, lead, profile } = args;
 
@@ -296,13 +335,20 @@ async function handleDirectMail(args: {
   if (!template) {
     return NextResponse.json({ error: 'Armed template not found' }, { status: 404 });
   }
-  if (!lead.property_address) {
-    return NextResponse.json({ error: 'No mailing address available' }, { status: 422 });
+
+  // Decompose mailing address into Lob's component fields. Bail with a
+  // useful error rather than letting Lob fail with a cryptic 422.
+  const mailingAddress = splitMailingAddress(lead);
+  if (!mailingAddress) {
+    return NextResponse.json(
+      { error: 'Property address is incomplete (needs street, city, state, zip)' },
+      { status: 422 }
+    );
   }
 
-  // Phase 1: stub the provider call. Provider integration (Lob/PostGrid/Click2Mail)
-  // wires into mail_provider_id later; for now we record the inquiry as queued so the
-  // marker overlay paints and the user-facing flow works end to end.
+  // 1) Record the inquiry first (queued). We need its id to mint a
+  //    claim token, and we want the row to exist even if the Lob send
+  //    later fails so the failure_reason captures something useful.
   const { data: inquiry, error: inqErr } = await supabaseAdmin
     .from('property_inquiries')
     .insert({
@@ -312,14 +358,160 @@ async function handleDirectMail(args: {
       channel: 'direct_mail',
       status: 'queued',
       template_id: template.id,
-      sent_at: new Date().toISOString(),
+      mail_provider: 'lob',
     })
     .select('id')
     .single();
   if (inqErr || !inquiry) {
+    console.error('inquiry insert error', inqErr);
     return NextResponse.json({ error: 'Failed to record inquiry' }, { status: 500 });
   }
-  return NextResponse.json({ inquiry_id: inquiry.id, status: 'queued' });
+
+  // 2) Mint a claim token (same flow as text_invite — the postcard
+  //    links the owner to the same self-score page).
+  const token = newToken();
+  const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 60).toISOString(); // 60 days for mail
+  await supabaseAdmin.from('claim_tokens').insert({
+    token,
+    lead_id: lead.id,
+    inquiry_id: inquiry.id,
+    expires_at: expiresAt,
+  });
+  const claimUrl = `${appUrl()}/claim/${token}`;
+
+  // 3) Compose the postcard. v1 templates are intentionally minimal —
+  //    the production-grade Surveyor-voiced template is a separate
+  //    design workstream (see brand/ docs). For now, body_text from the
+  //    user's armed template renders on the back; the front is a simple
+  //    title block. Both are inline HTML for max merge-var flexibility.
+  const senderName = profile?.full_name || 'A Surveyor';
+  const front = renderPostcardFrontHtml({ senderName });
+  const back = renderPostcardBackHtml({
+    bodyText: template.body_text,
+    claimUrl,
+    senderName,
+  });
+
+  // 4) Send via Lob. Test mode by default; throws on Lob error.
+  try {
+    const result = await sendPostcard({
+      to: {
+        name: 'Property Owner', // We deliberately omit the owner's name from the postcard outer — see TEXT_INVITE_BODY invariant.
+        address_line1: mailingAddress.line1,
+        address_city: mailingAddress.city,
+        address_state: mailingAddress.state,
+        address_zip: mailingAddress.zip,
+      },
+      from: PLOT_RETURN_ADDRESS,
+      front,
+      back,
+      size: '4x6',
+      mailType: 'usps_first_class',
+      useType: 'marketing',
+      description: `Plot status inquiry — lead ${lead.id}`,
+      metadata: {
+        inquiry_id: inquiry.id,
+        lead_id: lead.id,
+        user_id: user.id,
+        plot_env: lobEnvironment(),
+      },
+      userId: user.id,
+    });
+
+    // 5) Reconcile inquiry with provider response.
+    await supabaseAdmin
+      .from('property_inquiries')
+      .update({
+        status: 'sent',
+        sent_at: new Date().toISOString(),
+        mail_provider_id: result.id,
+        mail_provider_url: result.url,
+        mail_provider_status: 'postcard.created',
+        mail_expected_delivery_date: result.expectedDeliveryDate,
+        // ~$0.92 per 4x6 first-class, tracked in cents
+        cost_cents: 92,
+      })
+      .eq('id', inquiry.id);
+
+    return NextResponse.json({
+      inquiry_id: inquiry.id,
+      status: 'sent',
+      lob_postcard_id: result.id,
+      preview_url: result.url,
+      expected_delivery_date: result.expectedDeliveryDate,
+      environment: result.environment,
+    });
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : 'unknown error';
+    console.error('Lob send error', err);
+    await supabaseAdmin
+      .from('property_inquiries')
+      .update({ status: 'failed', failure_reason: reason })
+      .eq('id', inquiry.id);
+    return NextResponse.json({ error: reason, code: 'lob_send_failed' }, { status: 502 });
+  }
+}
+
+// ── Postcard HTML templates (v1, intentionally minimal) ──────────────
+// The production artwork is a separate design workstream. v1 just
+// needs to be valid Lob HTML at the right dimensions (4x6 → 1275x1875
+// at 300 DPI rendered surface). Handlebars-style {{merge}} variables
+// are passed via mergeVariables in sendPostcard (not used in v1
+// because we render the strings server-side — kept inline for clarity).
+function renderPostcardFrontHtml(args: { senderName: string }): string {
+  // Front side: address is auto-overlaid by Lob; we just need a hero block.
+  // 4x6 inches at 300 DPI = 1275 x 1875 pixels (with 1/8" bleed per side).
+  // Lob's template guide: https://docs.lob.com/#tag/Postcards
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><style>
+  @page { size: 6.25in 4.25in; margin: 0; }
+  body { margin: 0; padding: 0.5in 0.5in 0.5in 0.5in; font-family: Georgia, serif;
+         color: #1A1F2E; background: #F4EAD5; width: 5.25in; height: 3.25in;
+         display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
+  .mark { font-size: 14pt; letter-spacing: 0.2em; text-transform: uppercase; opacity: 0.55; margin-bottom: 0.3in; }
+  .headline { font-size: 36pt; font-weight: 800; line-height: 1.1; margin: 0; color: #C8553D; }
+  .sub { font-size: 14pt; margin-top: 0.25in; opacity: 0.7; }
+</style></head>
+<body>
+  <div class="mark">Plot · Survey No. 79-22</div>
+  <div class="headline">A Surveyor is<br/>mapping your neighborhood.</div>
+  <div class="sub">From the desk of ${escapeHtml(args.senderName)}</div>
+</body></html>`;
+}
+
+function renderPostcardBackHtml(args: { bodyText: string; claimUrl: string; senderName: string }): string {
+  // Back side: Lob requires leaving room for address block + barcode.
+  // Per Lob's 4x6 template, address block lives in the lower-right
+  // and the upper-left ~3in x 4in is safe artwork area.
+  const bodyHtml = escapeHtml(args.bodyText).replace(/\n/g, '<br/>');
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><style>
+  @page { size: 6.25in 4.25in; margin: 0; }
+  body { margin: 0; padding: 0; font-family: Georgia, serif;
+         color: #1A1F2E; background: #FBF5E6; width: 6.25in; height: 4.25in; position: relative; }
+  .pad { padding: 0.4in 0.5in; width: 3.25in; }
+  .body-text { font-size: 11pt; line-height: 1.4; margin: 0 0 0.2in 0; }
+  .cta { font-size: 12pt; font-weight: 700; color: #C8553D; margin-top: 0.15in; }
+  .url { font-family: 'Courier New', monospace; font-size: 9pt; word-break: break-all; }
+  .sig { margin-top: 0.25in; font-size: 10pt; opacity: 0.7; font-style: italic; }
+</style></head>
+<body>
+  <div class="pad">
+    <p class="body-text">${bodyHtml}</p>
+    <div class="cta">Tell us what you'd do:</div>
+    <div class="url">${escapeHtml(args.claimUrl)}</div>
+    <div class="sig">— ${escapeHtml(args.senderName)}, via Plot</div>
+  </div>
+</body></html>`;
+}
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 // ── phone_call ───────────────────────────────────────────────────────────

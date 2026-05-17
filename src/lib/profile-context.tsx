@@ -198,6 +198,9 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         dbUpdate.notification_push = partial.notifications.push;
         dbUpdate.notification_sms = partial.notifications.sms;
       }
+      if (partial.enable3DTilesAdmin !== undefined) {
+        dbUpdate.enable_3d_tiles_admin = partial.enable3DTilesAdmin;
+      }
 
       if (Object.keys(dbUpdate).length > 0) {
         dbUpdate.updated_at = new Date().toISOString();

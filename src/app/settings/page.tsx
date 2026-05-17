@@ -473,6 +473,34 @@ export default function SettingsPage() {
         )}
       </div>
 
+      {/* Admin: 3D Tiles renderer toggle. Visible only to admins.
+          Photorealistic 3D Tiles is billed per session against the
+          Google Cloud project, so we keep this gated until we've
+          decided on a user-tier model. The DB column has its own
+          RLS policy enforcing admin-only writes server-side. */}
+      {profile.isAdmin && (
+        <section className="glass-card rounded-2xl p-6 space-y-4">
+          <div>
+            <h2 className="text-lg font-bold text-on-surface">Admin</h2>
+            <p className="text-xs text-on-surface-variant mt-1">Internal-only controls. Visible to admins.</p>
+          </div>
+          <label className="flex items-start justify-between gap-4 cursor-pointer">
+            <div>
+              <div className="text-sm font-semibold text-on-surface">Photorealistic 3D Tiles renderer</div>
+              <div className="text-xs text-on-surface-variant mt-1">
+                Routes the map to Google&apos;s Map3DElement (gmp-map-3d) with real photogrammetric buildings and terrain. Billed per session against the project&apos;s Google Cloud budget.
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              checked={profile.enable3DTilesAdmin}
+              onChange={(e) => updateProfile({ enable3DTilesAdmin: e.target.checked })}
+              className="mt-1 h-5 w-5 rounded border-card-border accent-primary"
+            />
+          </label>
+        </section>
+      )}
+
       {/* Sign Out */}
       <section className="glass-card rounded-2xl p-6">
         <button

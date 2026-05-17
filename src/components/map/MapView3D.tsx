@@ -66,10 +66,6 @@ const TILT_MIN = 0;
 const TILT_MAX = 85;
 const RANGE_MIN = 1;
 const RANGE_MAX = 40000;
-// Hard floor on the camera's eye altitude above seed-altitude. The
-// first-person camera math can derive an eye that sits underground if
-// the user pitches down hard at low altitude; we clamp before writing.
-const EYE_ALTITUDE_MIN = 5;
 
 const METERS_PER_DEG_LAT = 111_320;
 
@@ -320,30 +316,18 @@ function Inner({
       // first-person because we re-derive focal point from current
       // eye position + view direction every frame in fpToMap3D.
       cam.heading = (cam.heading + vel.heading * dt + 360) % 360;
-      // Pitch convention: stick-up (ry<0) should pitch view UP toward
-      // sky. vel.tilt comes from `vel.tilt -= ry * accel` so stick-up
-      // makes vel.tilt POSITIVE. Pitch sign: in cam-space we use
-      // negative=looking-down, positive=looking-up. So apply +vel.tilt.
-      // The previous version had this inverted — flipping now.
-      // Range: [-85 looking nearly straight down, +5 looking slightly
-      // above horizon]. Pitch >0 needs altitude headroom to render the
-      // horizon properly; capped at +5° at low altitude (handled below).
-      cam.pitch = clamp(cam.pitch + vel.tilt * dt, -85, 5);
-
-      // Ground-clearance guard: if the derived eye position would sit
-      // below the altitude floor, prevent the pitch/altitude combo from
-      // breaking the math. Map3D's focal point is in the view
-      // direction; for pitch < 0 (looking down), the focal point is
-      // below the eye and that's fine. For pitch > 0 (looking up) it
-      // sits above. The eye altitude doesn't change with rotation, but
-      // we still clamp altitude to floor to prevent flying underground.
-      if (cam.altitude < EYE_ALTITUDE_MIN) cam.altitude = EYE_ALTITUDE_MIN;
+      // Pitch convention: stick-up (ry<0) pitches view UP toward sky;
+      // negative pitch = looking down, positive = looking up. Range
+      // intentionally wide so we can experiment with low-altitude
+      // horizon framing; clamps below come from Map3D's own tilt
+      // ceiling, not from us.
+      cam.pitch = clamp(cam.pitch + vel.tilt * dt, -89, 89);
 
       // Apply hover wave as a brief modulation, not accumulating drift.
       const map3d = fpToMap3D({
         ...cam,
         heading: (cam.heading + hoverHeading + 360) % 360,
-        pitch: clamp(cam.pitch + hoverTilt, -85, 5),
+        pitch: clamp(cam.pitch + hoverTilt, -89, 89),
       });
 
       // ── Write to element ──────────────────────────────────────────

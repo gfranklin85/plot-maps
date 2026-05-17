@@ -1,7 +1,14 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createMiddlewareClient } from '@/lib/supabase-middleware';
 
-const PUBLIC_PATHS = ['/login', '/signup', '/auth', '/subscribe', '/landing', '/privacy', '/terms', '/cookies', '/support'];
+// Public marketing / informational pages reachable without login.
+const PUBLIC_PATHS = ['/login', '/signup', '/auth', '/subscribe', '/landing', '/privacy', '/terms', '/cookies', '/support', '/waitlist'];
+
+// Logged-in pages reachable even for users without beta access. The
+// app proper is gated; these are the "you're on the waitlist" / "log
+// out" surfaces that need to work for non-beta users so they aren't
+// trapped.
+const BETA_BYPASS_PATHS = ['/waitlist', '/auth', '/login'];
 
 export async function middleware(request: NextRequest) {
   const { supabase, response } = createMiddlewareClient(request);
@@ -18,7 +25,7 @@ export async function middleware(request: NextRequest) {
       landingUrl.pathname = '/landing';
       return NextResponse.rewrite(landingUrl);
     }
-    return response;
+    // Logged-in root falls through to beta-gate check below.
   }
 
   // Not logged in on protected page → redirect to login
@@ -33,6 +40,25 @@ export async function middleware(request: NextRequest) {
     const homeUrl = request.nextUrl.clone();
     homeUrl.pathname = '/';
     return NextResponse.redirect(homeUrl);
+  }
+
+  // ── Private beta gate ────────────────────────────────────────────
+  // Logged in but missing beta_access → forced to /waitlist. Admins
+  // are auto-granted beta_access via DB trigger, so this also gates
+  // by-omission anyone who isn't an admin and hasn't been explicitly
+  // flipped on. Bypass list keeps logout/waitlist reachable so a
+  // gated user isn't trapped.
+  if (user && !BETA_BYPASS_PATHS.some((p) => pathname.startsWith(p))) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('beta_access')
+      .eq('id', user.id)
+      .single();
+    if (!profile?.beta_access) {
+      const waitlistUrl = request.nextUrl.clone();
+      waitlistUrl.pathname = '/waitlist';
+      return NextResponse.redirect(waitlistUrl);
+    }
   }
 
   return response;

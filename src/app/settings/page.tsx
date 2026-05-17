@@ -473,17 +473,16 @@ export default function SettingsPage() {
         )}
       </div>
 
-      {/* Admin: 3D Tiles renderer toggle. Visible only to admins.
-          Photorealistic 3D Tiles is billed per session against the
-          Google Cloud project, so we keep this gated until we've
-          decided on a user-tier model. The DB column has its own
-          RLS policy enforcing admin-only writes server-side. */}
+      {/* Admin-only section. Visible when profile.isAdmin === true. */}
       {profile.isAdmin && (
-        <section className="glass-card rounded-2xl p-6 space-y-4">
+        <section className="glass-card rounded-2xl p-6 space-y-6">
           <div>
             <h2 className="text-lg font-bold text-on-surface">Admin</h2>
             <p className="text-xs text-on-surface-variant mt-1">Internal-only controls. Visible to admins.</p>
           </div>
+
+          {/* 3D Tiles renderer toggle. Photorealistic 3D Tiles is
+              billed per session against the Google Cloud project. */}
           <label className="flex items-start justify-between gap-4 cursor-pointer">
             <div>
               <div className="text-sm font-semibold text-on-surface">Photorealistic 3D Tiles renderer</div>
@@ -498,6 +497,9 @@ export default function SettingsPage() {
               className="mt-1 h-5 w-5 rounded border-card-border accent-primary"
             />
           </label>
+
+          {/* Private beta gate — grant/revoke beta_access per email. */}
+          <BetaAccessAdmin />
         </section>
       )}
 
@@ -512,6 +514,129 @@ export default function SettingsPage() {
         </button>
       </section>
       <p className="text-xs text-secondary -mt-4">Saves profile, map preferences, and script. Call scripts save automatically when edited.</p>
+    </div>
+  );
+}
+
+/* ── Private Beta Access (admin) ── */
+interface BetaProfile { id: string; email: string; full_name: string | null; beta_access: boolean; is_admin: boolean; created_at: string }
+interface WaitlistEntry { id: string; email: string; note: string | null; created_at: string; invited_at: string | null }
+
+function BetaAccessAdmin() {
+  const [data, setData] = useState<{ waitlist: WaitlistEntry[]; profiles: BetaProfile[] } | null>(null);
+  const [email, setEmail] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  const load = useCallback(async () => {
+    const res = await fetch('/api/admin/beta-access');
+    if (res.ok) setData(await res.json());
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function flip(targetEmail: string, grant: boolean) {
+    setBusy(true);
+    setError('');
+    const res = await fetch('/api/admin/beta-access', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: targetEmail, grant }),
+    });
+    setBusy(false);
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      setError(body.error || 'failed');
+      return;
+    }
+    setEmail('');
+    load();
+  }
+
+  return (
+    <div className="space-y-4 pt-4 border-t border-card-border">
+      <div>
+        <div className="text-sm font-semibold text-on-surface">Private beta access</div>
+        <div className="text-xs text-on-surface-variant mt-1">
+          Grant or revoke <code className="font-mono">beta_access</code> by email. Admins are auto-whitelisted and don&apos;t need to be added here.
+        </div>
+      </div>
+
+      <form
+        onSubmit={(e) => { e.preventDefault(); if (email.trim()) flip(email.trim().toLowerCase(), true); }}
+        className="flex gap-2"
+      >
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="user@example.com"
+          className="flex-1 px-3 py-2 rounded-lg bg-input-bg border border-card-border text-sm text-on-surface"
+        />
+        <button
+          type="submit"
+          disabled={busy || !email.trim()}
+          className="px-4 py-2 rounded-lg bg-primary text-on-primary text-sm font-semibold disabled:opacity-50"
+        >
+          Grant
+        </button>
+      </form>
+      {error && <p className="text-xs text-red-400">{error}</p>}
+
+      {data && (
+        <div className="space-y-3">
+          {/* Profiles with beta access */}
+          <div>
+            <div className="text-xs font-semibold text-on-surface-variant uppercase tracking-wider mb-2">Whitelisted ({data.profiles.filter(p => p.beta_access).length})</div>
+            <div className="space-y-1">
+              {data.profiles.filter(p => p.beta_access).map(p => (
+                <div key={p.id} className="flex items-center justify-between gap-2 text-xs">
+                  <div>
+                    <span className="text-on-surface">{p.email}</span>
+                    {p.is_admin && <span className="ml-2 px-1.5 py-0.5 rounded bg-primary/20 text-primary text-[10px] font-bold uppercase">admin</span>}
+                  </div>
+                  {!p.is_admin && (
+                    <button
+                      onClick={() => flip(p.email, false)}
+                      disabled={busy}
+                      className="text-red-400 hover:text-red-300 text-[11px]"
+                    >
+                      Revoke
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Waitlist */}
+          {data.waitlist.length > 0 && (
+            <div>
+              <div className="text-xs font-semibold text-on-surface-variant uppercase tracking-wider mb-2">Waitlist ({data.waitlist.filter(w => !w.invited_at).length} pending)</div>
+              <div className="space-y-1 max-h-40 overflow-y-auto">
+                {data.waitlist.map(w => (
+                  <div key={w.id} className="flex items-center justify-between gap-2 text-xs">
+                    <div>
+                      <span className="text-on-surface">{w.email}</span>
+                      {w.note && <span className="ml-2 text-on-surface-variant">· {w.note}</span>}
+                      {w.invited_at && <span className="ml-2 text-[10px] text-emerald-400">invited</span>}
+                    </div>
+                    {!w.invited_at && (
+                      <button
+                        onClick={() => flip(w.email, true)}
+                        disabled={busy}
+                        className="text-emerald-400 hover:text-emerald-300 text-[11px]"
+                      >
+                        Invite
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

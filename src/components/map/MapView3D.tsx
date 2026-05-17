@@ -61,8 +61,12 @@ const ZOOM_RATE_PER_SEC = 0.7;  // log2-range per second at full press
 
 const TILT_MIN = 0;
 const TILT_MAX = 85;
-const RANGE_MIN = 5;
+const RANGE_MIN = 1;
 const RANGE_MAX = 40000;
+// Hard floor on the camera's eye altitude above seed-altitude. The
+// first-person camera math can derive an eye that sits underground if
+// the user pitches down hard at low altitude; we clamp before writing.
+const EYE_ALTITUDE_MIN = 5;
 
 const METERS_PER_DEG_LAT = 111_320;
 
@@ -121,14 +125,23 @@ function fpToMap3D(cam: FpCam): {
   tilt: number;
   range: number;
 } {
-  // pitch in [-90, 90]. Map3D's tilt is in [0, 90], where 0 = looking
-  // straight down, 90 = looking at horizon. So map3dTilt = 90 + pitch
-  // (pitch=0 horizon → tilt 90; pitch=-90 looking up → tilt 180 not
-  // allowed; we clamp pitch to keep tilt valid).
+  // Pitch convention in our model:
+  //   pitch =  0  → looking at the horizon
+  //   pitch = -45 → looking 45° below horizon (toward ground)
+  //   pitch = +5  → looking 5° above horizon (toward sky)
+  //
+  // Map3D's tilt convention:
+  //   tilt =  0  → camera looking straight down at ground (top-down)
+  //   tilt = 85  → camera nearly horizontal (Google's hard ceiling)
+  //
+  // Conversion: map3dTilt = 90 + pitch (since pitch=0 corresponds to
+  // tilt=90 = horizon, and pitch<0 corresponds to tilt<90 = look down).
+  // Looking up (pitch>0) maps to tilt>90 which Google rejects; we clamp.
   const map3dTilt = clamp(90 + cam.pitch, TILT_MIN, TILT_MAX);
-  // Place focal point along the view ray at `range` meters.
-  // Project the ray from the eye position in direction (heading, pitch)
-  // out to `range`, that's the focal point.
+
+  // Place focal point along the view ray at `range` meters ahead.
+  // pitch>0 (looking up) → vertDist positive → focal ABOVE eye.
+  // pitch<0 (looking down) → vertDist negative → focal BELOW eye.
   const horizDist = cam.range * Math.cos((cam.pitch * Math.PI) / 180);
   const vertDist = cam.range * Math.sin((cam.pitch * Math.PI) / 180);
   const headingRad = (cam.heading * Math.PI) / 180;
@@ -139,7 +152,7 @@ function fpToMap3D(cam: FpCam): {
     center: {
       lat: cam.lat + dNorth / METERS_PER_DEG_LAT,
       lng: cam.lng + dEast / (METERS_PER_DEG_LAT * cosLat),
-      altitude: cam.altitude - vertDist,  // pitch down (negative) → focal below eye
+      altitude: cam.altitude + vertDist,
     },
     heading: cam.heading,
     tilt: map3dTilt,
@@ -303,16 +316,31 @@ function Inner({
       // put, view direction changes). For Map3D this is naturally
       // first-person because we re-derive focal point from current
       // eye position + view direction every frame in fpToMap3D.
-      cam.heading = (cam.heading + (vel.heading + hoverHeading * 0) * dt + 360) % 360;
-      // pitch convention: positive vel.tilt = rotate view UP (look more
-      // toward sky). +pitch in cam-space = looking down; so apply -vel.tilt.
-      cam.pitch = clamp(cam.pitch - vel.tilt * dt, -85, 0);
+      cam.heading = (cam.heading + vel.heading * dt + 360) % 360;
+      // Pitch convention: stick-up (ry<0) should pitch view UP toward
+      // sky. vel.tilt comes from `vel.tilt -= ry * accel` so stick-up
+      // makes vel.tilt POSITIVE. Pitch sign: in cam-space we use
+      // negative=looking-down, positive=looking-up. So apply +vel.tilt.
+      // The previous version had this inverted — flipping now.
+      // Range: [-85 looking nearly straight down, +5 looking slightly
+      // above horizon]. Pitch >0 needs altitude headroom to render the
+      // horizon properly; capped at +5° at low altitude (handled below).
+      cam.pitch = clamp(cam.pitch + vel.tilt * dt, -85, 5);
+
+      // Ground-clearance guard: if the derived eye position would sit
+      // below the altitude floor, prevent the pitch/altitude combo from
+      // breaking the math. Map3D's focal point is in the view
+      // direction; for pitch < 0 (looking down), the focal point is
+      // below the eye and that's fine. For pitch > 0 (looking up) it
+      // sits above. The eye altitude doesn't change with rotation, but
+      // we still clamp altitude to floor to prevent flying underground.
+      if (cam.altitude < EYE_ALTITUDE_MIN) cam.altitude = EYE_ALTITUDE_MIN;
 
       // Apply hover wave as a brief modulation, not accumulating drift.
       const map3d = fpToMap3D({
         ...cam,
         heading: (cam.heading + hoverHeading + 360) % 360,
-        pitch: clamp(cam.pitch + hoverTilt, -85, 0),
+        pitch: clamp(cam.pitch + hoverTilt, -85, 5),
       });
 
       // ── Write to element ──────────────────────────────────────────

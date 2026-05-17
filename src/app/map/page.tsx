@@ -24,7 +24,6 @@ import type { GamepadActions } from "@/components/map/GamepadFlightController";
 import { useReticlePosition } from "@/lib/useReticlePosition";
 import { playShotSound, type ShotChannel } from "@/lib/shotSounds";
 import ShotAnimation, { type Shot } from "@/components/map/ShotAnimation";
-import ChannelHUD from "@/components/map/ChannelHUD";
 import type { ParcelHitTester } from "@/components/map/ParcelOverlay";
 
 const FILTER_TABS: { label: string; key: string; statuses: LeadStatus[] }[] = [
@@ -1268,15 +1267,6 @@ export default function MapPage() {
           yFraction={reticlePosition.yFraction}
           onPositionChange={setReticlePosition}
           onResetPosition={resetReticlePosition}
-        />
-
-        {/* Armed-channel chip beside the reticle so the player always
-            knows what'll fire on A. Plays a swap animation on rotate. */}
-        <ChannelHUD
-          visible={!walkMode && flightMode === 'airplane'}
-          channel={armedChannel}
-          reticleXFraction={reticlePosition.xFraction}
-          reticleYFraction={reticlePosition.yFraction}
         />
 
         {/* Shot animation — fires at the reticle position whenever A

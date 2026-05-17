@@ -50,18 +50,21 @@ type Map3DElement = HTMLElement & {
 // Range (meters from center) replaces zoom-level; pan-meters replaces
 // pan-pixels at a scale anchored on the current range.
 // RANGE_MIN is how close the camera can get to the focal point in
-// meters. Photorealistic 3D Tiles can render down to ground-level
-// detail; the old 80m floor was capping flight high above the world.
-// Drop to 10m so the user can dive between buildings, walk-around
-// near street level. RANGE_MAX stays at 8km for the wide overhead.
-const RANGE_MIN = 10;
-const RANGE_MAX = 8000;
+// meters. Map3DElement renders all the way down to ~1m; we set the
+// floor at 1 so flight can take the user to street level and below
+// (peering up at building facades). RANGE_MAX bumped to 40 km so the
+// wide-overhead view can pull back to county scale for navigation.
+const RANGE_MIN = 1;
+const RANGE_MAX = 40000;
 const PAN_BASE_PIXELS_PER_SEC = 700;
 const YAW_DEG_PER_SEC = 90;
 const TILT_DEG_PER_SEC = 70;
-const RANGE_FACTOR_PER_SEC = 1.8;
+// Multiplicative zoom: at full trigger we want noticeable motion at
+// both ends. 3.5 means at full press the range halves roughly every
+// 200ms, fast enough to swoop in but not so fast it overshoots.
+const RANGE_FACTOR_PER_SEC = 3.5;
 const TILT_MIN = 0;
-const TILT_MAX = 85;
+const TILT_MAX = 90;
 const METERS_PER_DEG_LAT = 111_320;
 const TRIGGER_PRESS_THRESHOLD = 0.4;
 
@@ -97,14 +100,18 @@ function Inner({
     el.style.height = '100%';
     el.setAttribute('mode', 'hybrid');
     el.setAttribute('default-labels-disabled', 'false');
-    el.center = { lat: seed.lat, lng: seed.lng, altitude: 250 };
+    // Altitude anchored at ground (0). Camera height is then entirely
+    // a function of range + tilt, which is what the user controls.
+    // Old altitude=250 was floating the focal point in the air and
+    // capping how low the camera could ever sit.
+    el.center = { lat: seed.lat, lng: seed.lng, altitude: 0 };
     el.heading = 0;
     el.tilt = 60;
     el.range = 700;
     containerRef.current.appendChild(el);
     elRef.current = el;
     camRef.current = {
-      lat: seed.lat, lng: seed.lng, altitude: 250,
+      lat: seed.lat, lng: seed.lng, altitude: 0,
       heading: 0, tilt: 60, range: 700,
     };
     return () => {

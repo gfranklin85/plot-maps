@@ -55,9 +55,12 @@ const HOVER_PAN_AMPL_PX = 1.4;
 const HOVER_PAN_FREQ_X = 0.07;
 const HOVER_PAN_FREQ_Y = 0.11;
 
-// Zoom on LB (in) / RB (out). Slow paced like a real climb/descend —
-// each second of hold roughly halves or doubles range. Capped.
-const ZOOM_RATE_PER_SEC = 0.7;  // log2-range per second at full press
+// Zoom on LB (in) / RB (out). Log-scale rate — at this value, one
+// second of hold = range changes by 2^2.5 = ~5.7×. Tap-and-release
+// nudges the range by ~12%; hold for a beat to make a real altitude
+// change. The previous 0.7 was so slow the visual change over a few
+// frames was imperceptible.
+const ZOOM_RATE_PER_SEC = 2.5;
 
 const TILT_MIN = 0;
 const TILT_MAX = 85;

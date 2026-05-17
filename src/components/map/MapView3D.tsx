@@ -10,21 +10,26 @@ import type { GamepadActions } from "./GamepadFlightController";
 
 // ── Photorealistic 3D Tiles surface (Map3DElement / <gmp-map-3d>) ───
 //
-// Admin-only renderer behind profiles.enable_3d_tiles_admin. The
-// gamepad input model and physics constants are MIRRORED FROM the 2D
-// airplane mode in GamepadFlightController.tsx — same accel, drag,
-// max, shaping. Only the camera-write step differs: this writes
-// Map3D's center/heading/tilt/range; the 2D path writes via
-// moveCamera()/setCenter().
+// Admin-only renderer behind profiles.enable_3d_tiles_admin. Airplane
+// physics mirror the 2D path's GamepadFlightController airplane branch:
+// throttle/strafe/yaw with accel + drag + max; cubic stick shaping; LB
+// pan boost; an idle hover wave so the camera always feels alive.
+//
+// Two important deviations from a naive Map3D wiring:
+//
+// 1. Camera is FIRST-PERSON, not orbit. Tilt rotates the view, not the
+//    camera's world position. See project_first_person_camera_moat.md.
+//    We maintain an apparent camera position; on every tilt/heading
+//    change, we shift Map3D's focal-point so the camera stays put.
+//
+// 2. Zoom lives on LB (in) / RB (out), not triggers. Triggers are
+//    reserved for future fire / countermeasure / radar-lock bindings
+//    (dogfight mode prep). LB/RB give a gentle, paced zoom that's
+//    what real "descend / ascend" feels like.
 
 const API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
 
-// ── Physics constants (copied verbatim from GamepadFlightController) ─
-// These are the airplane-mode tuned values that gave the 2D path its
-// heavy-helicopter feel. They translate to 3D unchanged because the
-// rendering surface is just a different camera-write target; the
-// stick→accel→velocity→drag→position loop is identical.
-
+// ── Physics constants (copied from the 2D airplane mode) ──────────
 const AIR_THROTTLE_ACCEL = 700;
 const AIR_THROTTLE_DRAG = 0.965;
 const AIR_THROTTLE_MAX = 360;
@@ -37,18 +42,40 @@ const AIR_YAW_MAX = 30;
 const TILT_ACCEL_DEG_S2 = 220;
 const TILT_DRAG = 0.86;
 const TILT_MAX_DEG_S = 70;
-const ZOOM_ACCEL_S2 = 8;
-const TRIGGER_PRESS_THRESHOLD = 0.4;
-const PAN_BOOST_MULT = 2.4;
+// PAN_BOOST_MULT lives in the 2D path on LB-hold; we use LB/RB for
+// zoom in 3D so the boost is intentionally removed here.
+
+// Hover wave (camera always feels alive even with no stick input).
+// Identical values to GamepadFlightController.
+const HOVER_HEADING_AMPL = 0.6;
+const HOVER_HEADING_FREQ = 0.18;
+const HOVER_TILT_AMPL = 0.3;
+const HOVER_TILT_FREQ = 0.12;
+const HOVER_PAN_AMPL_PX = 1.4;
+const HOVER_PAN_FREQ_X = 0.07;
+const HOVER_PAN_FREQ_Y = 0.11;
+
+// Zoom on LB (in) / RB (out). Slow paced like a real climb/descend —
+// each second of hold roughly halves or doubles range. Capped.
+const ZOOM_RATE_PER_SEC = 0.7;  // log2-range per second at full press
 
 const TILT_MIN = 0;
 const TILT_MAX = 85;
-const RANGE_MIN = 1;
+const RANGE_MIN = 5;
 const RANGE_MAX = 40000;
 
 const METERS_PER_DEG_LAT = 111_320;
 
-// Stick shaping — identical to GamepadFlightController.shapeStick.
+// pan velocity (screen px / sec) → meters at current range. Tuned to
+// match the 2D path's perceived speed at typical fly altitude. The 2D
+// path's vel.panX is screen pixels at a known zoom level; at range
+// ~700m (default 3D seed) the perceived feel should match a typical
+// zoom-17 2D session. Anchored empirically — too low felt sluggish,
+// too high (the prior failed port) flew past the world.
+function metersPerScreenPixel(range: number): number {
+  return range / 4500;
+}
+
 function shapeStick(v: number): number {
   return Math.sign(v) * Math.pow(Math.abs(v), 1.6);
 }
@@ -63,18 +90,62 @@ type Map3DElement = HTMLElement & {
   range: number;
 };
 
-// Owned camera + velocity state.
-interface Map3DCam {
+// First-person camera state. This is what the user is actually flying.
+// We derive Map3D's orbit parameters (center + range + tilt + heading)
+// from this on every write.
+interface FpCam {
+  // First-person eye position in the world.
   lat: number;
   lng: number;
-  altitude: number;
-  heading: number;
-  tilt: number;
+  altitude: number;        // meters above ground
+  // View direction.
+  heading: number;         // compass bearing of look direction (degrees)
+  pitch: number;           // view pitch (degrees). 0 = looking at horizon,
+                           // +60 = looking down 60°, -10 = looking slightly up.
+  // Virtual focal distance. Map3D needs a focal point; we keep it at a
+  // fixed distance ahead-and-below so range stays consistent across
+  // pitch changes (otherwise tiny pitches would explode range).
   range: number;
 }
 
 interface AirState { throttle: number; strafe: number; yaw: number; }
-interface VelState { panX: number; panY: number; heading: number; tilt: number; zoom: number; }
+interface VelState { panX: number; panY: number; heading: number; tilt: number; }
+
+// Convert first-person eye position + view direction → Map3D's
+// {center, range, tilt, heading}. Map3D's center is the focal point
+// on the ground that the camera orbits at distance `range`; tilt is
+// the angle of the camera-to-focal vector from vertical.
+function fpToMap3D(cam: FpCam): {
+  center: { lat: number; lng: number; altitude: number };
+  heading: number;
+  tilt: number;
+  range: number;
+} {
+  // pitch in [-90, 90]. Map3D's tilt is in [0, 90], where 0 = looking
+  // straight down, 90 = looking at horizon. So map3dTilt = 90 + pitch
+  // (pitch=0 horizon → tilt 90; pitch=-90 looking up → tilt 180 not
+  // allowed; we clamp pitch to keep tilt valid).
+  const map3dTilt = clamp(90 + cam.pitch, TILT_MIN, TILT_MAX);
+  // Place focal point along the view ray at `range` meters.
+  // Project the ray from the eye position in direction (heading, pitch)
+  // out to `range`, that's the focal point.
+  const horizDist = cam.range * Math.cos((cam.pitch * Math.PI) / 180);
+  const vertDist = cam.range * Math.sin((cam.pitch * Math.PI) / 180);
+  const headingRad = (cam.heading * Math.PI) / 180;
+  const dEast = horizDist * Math.sin(headingRad);
+  const dNorth = horizDist * Math.cos(headingRad);
+  const cosLat = Math.cos((cam.lat * Math.PI) / 180) || 1;
+  return {
+    center: {
+      lat: cam.lat + dNorth / METERS_PER_DEG_LAT,
+      lng: cam.lng + dEast / (METERS_PER_DEG_LAT * cosLat),
+      altitude: cam.altitude - vertDist,  // pitch down (negative) → focal below eye
+    },
+    heading: cam.heading,
+    tilt: map3dTilt,
+    range: cam.range,
+  };
+}
 
 function Inner({
   center,
@@ -87,10 +158,11 @@ function Inner({
 }) {
   const maps3d = useMapsLibrary('maps3d');
   const elRef = useRef<Map3DElement | null>(null);
-  const camRef = useRef<Map3DCam | null>(null);
+  const camRef = useRef<FpCam | null>(null);
   const airRef = useRef<AirState>({ throttle: 0, strafe: 0, yaw: 0 });
-  const velRef = useRef<VelState>({ panX: 0, panY: 0, heading: 0, tilt: 0, zoom: 0 });
+  const velRef = useRef<VelState>({ panX: 0, panY: 0, heading: 0, tilt: 0 });
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const elapsedMsRef = useRef<number>(0);
 
   const actionsRef = useRef<GamepadActions | undefined>(gamepadActions);
   actionsRef.current = gamepadActions;
@@ -105,18 +177,22 @@ function Inner({
     el.style.height = '100%';
     el.setAttribute('mode', 'hybrid');
     el.setAttribute('default-labels-disabled', 'false');
-    el.center = { lat: seed.lat, lng: seed.lng, altitude: 0 };
-    el.heading = 0;
-    el.tilt = 60;
-    el.range = 700;
     containerRef.current.appendChild(el);
     elRef.current = el;
+    // Seed first-person camera at the seed location, ~300m altitude,
+    // looking forward + slightly down (pitch -30, so map3d tilt = 60).
     camRef.current = {
-      lat: seed.lat, lng: seed.lng, altitude: 0,
-      heading: 0, tilt: 60, range: 700,
+      lat: seed.lat, lng: seed.lng, altitude: 300,
+      heading: 0, pitch: -30, range: 700,
     };
     airRef.current = { throttle: 0, strafe: 0, yaw: 0 };
-    velRef.current = { panX: 0, panY: 0, heading: 0, tilt: 0, zoom: 0 };
+    velRef.current = { panX: 0, panY: 0, heading: 0, tilt: 0 };
+    // Initial write to Map3D.
+    const m3d = fpToMap3D(camRef.current);
+    el.center = m3d.center;
+    el.heading = m3d.heading;
+    el.tilt = m3d.tilt;
+    el.range = m3d.range;
     return () => {
       el.remove();
       elRef.current = null;
@@ -126,12 +202,14 @@ function Inner({
 
   useGamepad({
     enabled: gamepadEnabled && !!elRef.current,
-    onFrame: ({ dt, leftStick, rightStick, triggers, pressed, justPressed }) => {
+    onFrame: ({ dt, elapsedMs, leftStick, rightStick, pressed, justPressed }) => {
       const el = elRef.current;
       const cam = camRef.current;
       const air = airRef.current;
       const vel = velRef.current;
       if (!el || !cam) return;
+
+      elapsedMsRef.current = elapsedMs;
 
       // ── Edge-triggered button actions (same as 2D) ────────────────
       if (justPressed.size > 0) {
@@ -146,14 +224,20 @@ function Inner({
         if (justPressed.has('down') || justPressed.has('right')) actionsRef.current?.onCycleNext?.();
       }
 
-      // ── Triggers → zoom delta (same as 2D) ────────────────────────
-      let triggerZoomDelta = 0;
-      if (triggers.right >= TRIGGER_PRESS_THRESHOLD) triggerZoomDelta -= triggers.right;
-      if (triggers.left >= TRIGGER_PRESS_THRESHOLD)  triggerZoomDelta += triggers.left;
+      // ── LB/RB → zoom (range adjust) ───────────────────────────────
+      // LB = zoom in (range shrinks), RB = zoom out (range grows).
+      // Log-scale rate so each second of hold roughly halves/doubles.
+      if (pressed.has('lb') && !pressed.has('rb')) {
+        cam.range = clamp(cam.range * Math.pow(2, -ZOOM_RATE_PER_SEC * dt), RANGE_MIN, RANGE_MAX);
+      } else if (pressed.has('rb') && !pressed.has('lb')) {
+        cam.range = clamp(cam.range * Math.pow(2,  ZOOM_RATE_PER_SEC * dt), RANGE_MIN, RANGE_MAX);
+      }
 
-      // ── Physics integration — line-for-line mirror of the 2D
-      //    airplane branch in GamepadFlightController.tsx ────────────
-      const boost = pressed.has('lb') ? PAN_BOOST_MULT : 1;
+      // ── Physics integration — same as 2D airplane branch ──────────
+      // No LB boost on pan since LB now means zoom. (The 2D path's
+      // PAN_BOOST_MULT is preserved as a constant for future use but
+      // not applied here.)
+      const boost = 1;
       const dragExp = 60 * dt;
 
       const lx = shapeStick(leftStick.x);
@@ -175,74 +259,67 @@ function Inner({
       if (Math.abs(air.strafe)   < 0.5) air.strafe = 0;
       if (Math.abs(air.yaw)      < 0.05) air.yaw = 0;
 
-      // Tilt: direct velocity-driven (same as 2D airplane: vel.tilt -= ry).
+      // Tilt (right-Y): direct velocity-driven (same as 2D airplane).
+      // Stick up (ry < 0) raises view; stick down (ry > 0) lowers view.
       vel.tilt -= ry * TILT_ACCEL_DEG_S2 * boost * dt;
       vel.tilt *= Math.pow(TILT_DRAG, dragExp);
       vel.tilt = clamp(vel.tilt, -TILT_MAX_DEG_S, TILT_MAX_DEG_S);
       if (Math.abs(vel.tilt) < 0.05) vel.tilt = 0;
 
-      // Translate airplane state into the shared vel struct (same as 2D).
+      // Translate airplane state into pan vel.
       vel.panX = air.strafe;
       vel.panY = -air.throttle;
       vel.heading = air.yaw;
 
-      // Zoom is trigger-driven, with its own velocity + drag (same as 2D).
-      vel.zoom = triggerZoomDelta * ZOOM_ACCEL_S2 * boost * dt;
-      // Note: 2D path uses moveCamera with absolute zoom delta this frame
-      // rather than a persistent zoom velocity; we mirror exactly.
+      // ── Idle hover wave (camera always feels alive) ───────────────
+      // Identical math to the 2D path. Tiny constant sinusoids on
+      // heading, tilt, and screen-pan so even with no stick input the
+      // camera breathes. Drowned out during active piloting.
+      const tSec = elapsedMs / 1000;
+      const hoverHeading = Math.sin(tSec * 2 * Math.PI * HOVER_HEADING_FREQ) * HOVER_HEADING_AMPL;
+      const hoverTilt    = Math.sin(tSec * 2 * Math.PI * HOVER_TILT_FREQ)    * HOVER_TILT_AMPL;
+      const hoverPanX    = Math.sin(tSec * 2 * Math.PI * HOVER_PAN_FREQ_X)   * HOVER_PAN_AMPL_PX;
+      const hoverPanY    = Math.sin(tSec * 2 * Math.PI * HOVER_PAN_FREQ_Y)   * HOVER_PAN_AMPL_PX;
 
-      // ── Apply velocity → camera state ─────────────────────────────
-      // 2D path converts vel.panX/panY (screen pixels/sec) to lat/lng
-      // using meters-per-pixel = 1 / (2 ^ zoom) via projection math. We
-      // do the equivalent for Map3D: at range R and a typical 35° FOV,
-      // visible-width ≈ 2 * R * tan(17.5°) ≈ 0.63 * R meters. For an
-      // 800-pixel-wide viewport, metersPerPx ≈ R / 1270. So a screen-
-      // pixel velocity translates 1:1 to a meters velocity scaled by
-      // current range. Same screen feel at any altitude.
-      const metersPerPx = cam.range / 1270;
-
-      const dxScreenPx = vel.panX * dt;  // screen pixels this frame
-      const dyScreenPx = vel.panY * dt;
-      const dxMeters = dxScreenPx * metersPerPx;
-      const dyMeters = dyScreenPx * metersPerPx;
-
-      // Rotate by heading: pan-X is screen-right, pan-Y is screen-down.
-      // In 3D world, that's a vector in heading-rotated meters.
+      // ── Apply velocities → first-person camera state ──────────────
+      // Pan in screen-pixels/sec → meters in heading-rotated frame.
+      const m_per_px = metersPerScreenPixel(cam.range);
+      const dxScreenPx = (vel.panX + hoverPanX) * dt;
+      const dyScreenPx = (vel.panY + hoverPanY) * dt;
+      const dxMeters = dxScreenPx * m_per_px;
+      const dyMeters = dyScreenPx * m_per_px;
       const headingRad = (cam.heading * Math.PI) / 180;
       const cosH = Math.cos(headingRad);
       const sinH = Math.sin(headingRad);
-      // screen-right ≈ heading + 90°. screen-up (-dy) ≈ heading.
+      // screen-X (right) → east-component rotated by heading;
+      // screen-Y (down) → south, i.e. negative-north.
       const eastMeters  =  dxMeters * cosH - dyMeters * sinH;
-      const northMeters =  dxMeters * sinH + dyMeters * cosH;
+      const northMeters = -dxMeters * sinH - dyMeters * cosH;
       const cosLat = Math.cos((cam.lat * Math.PI) / 180) || 1;
-      cam.lat -= northMeters / METERS_PER_DEG_LAT;
+      cam.lat += northMeters / METERS_PER_DEG_LAT;
       cam.lng += eastMeters  / (METERS_PER_DEG_LAT * cosLat);
 
-      // Heading + tilt (same accumulation as 2D).
-      cam.heading = (cam.heading + vel.heading * dt + 360) % 360;
-      cam.tilt = clamp(cam.tilt + vel.tilt * dt, TILT_MIN, TILT_MAX);
-      if ((cam.tilt === TILT_MIN && vel.tilt < 0) || (cam.tilt === TILT_MAX && vel.tilt > 0)) {
-        vel.tilt = 0;
-      }
+      // Heading + pitch (first-person rotation — camera position stays
+      // put, view direction changes). For Map3D this is naturally
+      // first-person because we re-derive focal point from current
+      // eye position + view direction every frame in fpToMap3D.
+      cam.heading = (cam.heading + (vel.heading + hoverHeading * 0) * dt + 360) % 360;
+      // pitch convention: positive vel.tilt = rotate view UP (look more
+      // toward sky). +pitch in cam-space = looking down; so apply -vel.tilt.
+      cam.pitch = clamp(cam.pitch - vel.tilt * dt, -85, 0);
 
-      // Zoom maps to range. 2D path uses zoom levels (log scale, ~3-21);
-      // a positive vel.zoom delta means zoom in (lower zoom number? no,
-      // 2D vel.zoom positive = zoom in = closer = higher zoom number).
-      // For Map3D, zoom in = range shrinks. So a positive vel.zoom this
-      // frame should DECREASE range. Match the 2D path's clamp behavior.
-      // Scale: 2D vel.zoom is at most ZOOM_MAX_S * dt ≈ 0.027 zoom-
-      // levels per frame; one zoom level ~= 2x range. Mirror by treating
-      // vel.zoom as a log2-range velocity: range *= 2^(-vel.zoom * dt).
-      if (vel.zoom !== 0) {
-        const factor = Math.pow(2, -vel.zoom);
-        cam.range = clamp(cam.range * factor, RANGE_MIN, RANGE_MAX);
-      }
+      // Apply hover wave as a brief modulation, not accumulating drift.
+      const map3d = fpToMap3D({
+        ...cam,
+        heading: (cam.heading + hoverHeading + 360) % 360,
+        pitch: clamp(cam.pitch + hoverTilt, -85, 0),
+      });
 
       // ── Write to element ──────────────────────────────────────────
-      el.center  = { lat: cam.lat, lng: cam.lng, altitude: cam.altitude };
-      el.heading = cam.heading;
-      el.tilt    = cam.tilt;
-      el.range   = cam.range;
+      el.center  = map3d.center;
+      el.heading = map3d.heading;
+      el.tilt    = map3d.tilt;
+      el.range   = map3d.range;
     },
   });
 

@@ -899,41 +899,10 @@ export default function MapPage() {
               )}
             </div>
 
-            {/* 3D toggle. Entering: Tilt3DController animates tilt to 67°.
-                Exiting: dispatch a single flight that resets tilt to 0,
-                heading to north, and zoom to 17 (street names visible)
-                in one smooth motion — much nicer than the previous behavior
-                of just snapping tilt to 0 with whatever rotation was left. */}
-            <button
-              onClick={() => {
-                if (!has3DSupport) {
-                  alert('3D requires NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID with Photorealistic 3D Tiles enabled in Google Cloud Console.');
-                  return;
-                }
-                if (view3D) {
-                  // Exiting — fly back to a clean overhead view
-                  setView3D(false);
-                  dispatchFlight({
-                    tilt: 0,
-                    heading: 0,
-                    zoom: 17,
-                    duration: 700,
-                    easing: 'easeInOutCubic',
-                  });
-                } else {
-                  setView3D(true);
-                }
-              }}
-              title={has3DSupport ? (view3D ? 'Exit 3D' : 'View in 3D') : '3D not configured — set NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID'}
-              className={`relative w-10 h-10 flex items-center justify-center rounded-xl shadow-lg transition-all ${
-                view3D ? 'bg-violet-500 text-white' : 'bg-surface text-on-surface-variant hover:text-violet-400'
-              } ${!has3DSupport ? 'opacity-60' : ''}`}
-            >
-              <span className="text-[12px] font-black tracking-tighter">3D</span>
-              {!has3DSupport && (
-                <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-amber-400" />
-              )}
-            </button>
+            {/* (3D-tilt toolbar button removed: mouse + shift handles
+                tilt on the standard map; airplane mode brings real
+                flight; photoreal admin toggle below brings the full
+                3D world. A separate "3D" button was redundant noise.) */}
 
             {/* Photorealistic 3D Tiles toggle — admin-only. Lives here
                 next to the rest of the map controls instead of buried

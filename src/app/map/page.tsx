@@ -21,6 +21,8 @@ import Mobile3DCoachOverlay from "@/components/map/Mobile3DCoachOverlay";
 import GamepadStatusChip from "@/components/map/GamepadStatusChip";
 import MapReticle from "@/components/map/MapReticle";
 import MapToolbar from "@/components/map/MapToolbar";
+import FlightTuningPanel from "@/components/map/FlightTuningPanel";
+import { useFlightTuning } from "@/lib/useFlightTuning";
 import type { GamepadActions } from "@/components/map/GamepadFlightController";
 import { useReticlePosition } from "@/lib/useReticlePosition";
 import { playShotSound, type ShotChannel } from "@/lib/shotSounds";
@@ -517,6 +519,10 @@ export default function MapPage() {
   // and seeds the default. Both the visual MapReticle and the
   // controller's hit-test sample point read from this.
   const { position: reticlePosition, setPosition: setReticlePosition, resetPosition: resetReticlePosition } = useReticlePosition();
+  // Flight feel tuning — single master multiplier + preset chips.
+  // Lives in a toolbar-opened panel; live-previews changes while open.
+  const { tuning: flightTuning, setPreset: setFlightPreset, setMultiplier: setFlightMultiplier } = useFlightTuning();
+  const [flightTuningOpen, setFlightTuningOpen] = useState(false);
 
   // Lookup helper for resolving a target id back to a full Lead so the
   // grab handler can store the original Lead, not just the id.
@@ -832,7 +838,25 @@ export default function MapPage() {
                   ? 'bg-emerald-500 text-white shadow-lg'
                   : undefined,
               },
+              {
+                key: 'tune',
+                icon: 'tune',
+                label: 'Flight feel',
+                onClick: () => setFlightTuningOpen(v => !v),
+                active: flightTuningOpen,
+              },
             ]}
+          />
+
+          {/* Flight tuning panel — anchored to the toolbar. Live-preview
+              while open. Mouse-only for v1; full controller-navigable
+              UI is its own design sprint. */}
+          <FlightTuningPanel
+            visible={flightTuningOpen}
+            tuning={flightTuning}
+            onPresetChange={setFlightPreset}
+            onMultiplierChange={setFlightMultiplier}
+            onClose={() => setFlightTuningOpen(false)}
           />
 
           {/* Mobile search — sits inline at top of screen on small
@@ -1057,6 +1081,7 @@ export default function MapPage() {
             onGamepadReticleTargetChange={handleReticleTargetChange}
             onGamepadParcelHoverChange={handleParcelHoverChange}
             onGamepadStatusChange={handleGamepadStatus}
+            flightSpeedMultiplier={flightTuning.multiplier}
           />
         )}
 

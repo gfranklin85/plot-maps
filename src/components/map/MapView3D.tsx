@@ -192,10 +192,12 @@ function Inner({
   center,
   gamepadEnabled,
   gamepadActions,
+  flightSpeedMultiplier = 1.0,
 }: {
   center?: { lat: number; lng: number } | null;
   gamepadEnabled: boolean;
   gamepadActions?: GamepadActions;
+  flightSpeedMultiplier?: number;
 }) {
   const maps3d = useMapsLibrary('maps3d');
   const elRef = useRef<Map3DElement | null>(null);
@@ -207,6 +209,11 @@ function Inner({
 
   const actionsRef = useRef<GamepadActions | undefined>(gamepadActions);
   actionsRef.current = gamepadActions;
+  // Live multiplier ref so per-frame loop reads the latest value
+  // without re-subscribing — moving the slider changes flight
+  // feel immediately while panel is open.
+  const speedMultRef = useRef<number>(flightSpeedMultiplier);
+  speedMultRef.current = flightSpeedMultiplier;
 
   // Mount the gmp-map-3d element once the maps3d library is loaded.
   useEffect(() => {
@@ -282,7 +289,9 @@ function Inner({
       if (zoomSign !== 0) {
         // Move along view direction (heading + pitch). Speed scales with
         // current range so it feels equally responsive at any altitude.
-        const moveMeters = zoomSign * cam.range * ZOOM_DOLLY_RATE_PER_SEC * dt;
+        // User's flight-speed multiplier also applies so the dolly
+        // matches the rest of the flight feel as the slider moves.
+        const moveMeters = zoomSign * cam.range * ZOOM_DOLLY_RATE_PER_SEC * speedMultRef.current * dt;
         const pitchRad = (cam.pitch * Math.PI) / 180;
         const headingRad = (cam.heading * Math.PI) / 180;
         const horizMove = moveMeters * Math.cos(pitchRad);
@@ -298,8 +307,10 @@ function Inner({
       // ── Physics integration — same as 2D airplane branch ──────────
       // No LB boost on pan since LB now means zoom. (The 2D path's
       // PAN_BOOST_MULT is preserved as a constant for future use but
-      // not applied here.)
-      const boost = 1;
+      // not applied here.) The flight-speed multiplier from
+      // useFlightTuning rolls into `boost` so every accel term scales
+      // uniformly — same single-knob behavior as the 2D path.
+      const boost = speedMultRef.current;
       const dragExp = 60 * dt;
 
       const lx = shapeStick(leftStick.x);
@@ -405,6 +416,7 @@ export default function MapView3D(props: MapViewProps) {
         center={memoCenter}
         gamepadEnabled={!!props.gamepadEnabled}
         gamepadActions={props.gamepadActions}
+        flightSpeedMultiplier={props.flightSpeedMultiplier}
       />
     </APIProvider>
   );

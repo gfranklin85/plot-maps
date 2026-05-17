@@ -105,6 +105,10 @@ interface Props {
    *  pipeline. Tests whether a follow-up call can rescue hover without
    *  giving up moveCamera's smoothness. */
   debugTickleAfterMoveCamera?: boolean;
+  /** Master flight-speed multiplier from user tuning (useFlightTuning).
+   *  Scales pan/yaw/tilt/zoom acceleration uniformly. 1.0 = the
+   *  default tuned-to-cessna feel; 0.6 = newcomer; 1.6 = pro. */
+  flightSpeedMultiplier?: number;
 }
 
 // ── Heavy helicopter physics constants ────────────────────────────────
@@ -228,6 +232,7 @@ export default function GamepadFlightController({
   debugSuspendMoveCamera = false,
   debugForceFallbackPath = false,
   debugTickleAfterMoveCamera = false,
+  flightSpeedMultiplier = 1.0,
 }: Props) {
   const map = useMap();
 
@@ -274,6 +279,11 @@ export default function GamepadFlightController({
   reticleXFractionRef.current = reticleXFraction;
   const reticleYFractionRef = useRef<number>(reticleYFraction);
   reticleYFractionRef.current = reticleYFraction;
+  // User flight-speed multiplier from useFlightTuning — applied to
+  // accel terms each frame so live-sliding the panel produces
+  // immediate feel change without re-subscribing the RAF loop.
+  const flightSpeedMultiplierRef = useRef<number>(flightSpeedMultiplier);
+  flightSpeedMultiplierRef.current = flightSpeedMultiplier;
   // Track last reported target id to avoid firing the callback every frame.
   const lastReportedTargetIdRef = useRef<string | null>(null);
   // Live reticle-hovering flag the LT-press handler reads each frame.
@@ -464,7 +474,12 @@ export default function GamepadFlightController({
       }
 
       // ── Physics integration ─────────────────────────────────────────
-      const boost = pressed.has('lb') ? PAN_BOOST_MULT : 1;
+      // `boost` combines LB-hold boost AND the user's master flight-
+      // speed multiplier (from useFlightTuning). Multiplying both into
+      // every accel term scales pan / yaw / tilt / zoom uniformly so
+      // the slider feels like a single "overall speed" knob.
+      const lbBoost = pressed.has('lb') ? PAN_BOOST_MULT : 1;
+      const boost = lbBoost * flightSpeedMultiplierRef.current;
       const vel = velRef.current;
       const dragExp = 60 * dt;
 

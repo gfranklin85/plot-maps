@@ -57,10 +57,11 @@ const HOVER_PAN_FREQ_Y = 0.11;
 
 // LB/RB dolly zoom — moves the eye forward (LB) or backward (RB) along
 // the current view direction. Rate is multiplied by current range so
-// it feels equally responsive at any altitude. At 3.0, one second of
-// hold travels ~3× current range — a meaningful descent in a beat,
-// so dropping from cruise altitude to rooftop level is one quick pull.
-const ZOOM_DOLLY_RATE_PER_SEC = 3.0;
+// it feels equally responsive at any altitude. 1.5 means a 1-second
+// hold travels ~1.5× current range — meaningful descent without
+// catapulting past where you wanted to land. Tap-and-release is ~5%
+// of current range, a precise nudge.
+const ZOOM_DOLLY_RATE_PER_SEC = 1.5;
 
 
 const METERS_PER_DEG_LAT = 111_320;

@@ -473,32 +473,17 @@ export default function SettingsPage() {
         )}
       </div>
 
-      {/* Admin-only section. Visible when profile.isAdmin === true. */}
+      {/* Admin-only section. Visible when profile.isAdmin === true.
+          The Photorealistic 3D Tiles toggle moved to the map toolbar
+          (next to the 3D button) since that's where the admin is when
+          they want to flip renderers. This section holds the private
+          beta access controls — invite/revoke users by email. */}
       {profile.isAdmin && (
         <section className="glass-card rounded-2xl p-6 space-y-6">
           <div>
             <h2 className="text-lg font-bold text-on-surface">Admin</h2>
             <p className="text-xs text-on-surface-variant mt-1">Internal-only controls. Visible to admins.</p>
           </div>
-
-          {/* 3D Tiles renderer toggle. Photorealistic 3D Tiles is
-              billed per session against the Google Cloud project. */}
-          <label className="flex items-start justify-between gap-4 cursor-pointer">
-            <div>
-              <div className="text-sm font-semibold text-on-surface">Photorealistic 3D Tiles renderer</div>
-              <div className="text-xs text-on-surface-variant mt-1">
-                Routes the map to Google&apos;s Map3DElement (gmp-map-3d) with real photogrammetric buildings and terrain. Billed per session against the project&apos;s Google Cloud budget.
-              </div>
-            </div>
-            <input
-              type="checkbox"
-              checked={profile.enable3DTilesAdmin}
-              onChange={(e) => updateProfile({ enable3DTilesAdmin: e.target.checked })}
-              className="mt-1 h-5 w-5 rounded border-card-border accent-primary"
-            />
-          </label>
-
-          {/* Private beta gate — grant/revoke beta_access per email. */}
           <BetaAccessAdmin />
         </section>
       )}

@@ -49,7 +49,12 @@ type Map3DElement = HTMLElement & {
 // helicopter, decay-driven), translated to Map3DElement's units.
 // Range (meters from center) replaces zoom-level; pan-meters replaces
 // pan-pixels at a scale anchored on the current range.
-const RANGE_MIN = 80;
+// RANGE_MIN is how close the camera can get to the focal point in
+// meters. Photorealistic 3D Tiles can render down to ground-level
+// detail; the old 80m floor was capping flight high above the world.
+// Drop to 10m so the user can dive between buildings, walk-around
+// near street level. RANGE_MAX stays at 8km for the wide overhead.
+const RANGE_MIN = 10;
 const RANGE_MAX = 8000;
 const PAN_BASE_PIXELS_PER_SEC = 700;
 const YAW_DEG_PER_SEC = 90;

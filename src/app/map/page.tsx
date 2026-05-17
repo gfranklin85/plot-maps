@@ -39,7 +39,7 @@ const FILTER_TABS: { label: string; key: string; statuses: LeadStatus[] }[] = [
 
 
 export default function MapPage() {
-  const { profile } = useProfile();
+  const { profile, updateProfile } = useProfile();
   const { user } = useAuth();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
@@ -934,6 +934,27 @@ export default function MapPage() {
                 <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-amber-400" />
               )}
             </button>
+
+            {/* Photorealistic 3D Tiles toggle — admin-only. Lives here
+                next to the rest of the map controls instead of buried
+                in Settings, since this is where the admin is when
+                deciding whether to fly the photoreal world or the
+                standard vector map. Persists via the same profile
+                flag the Settings toggle wrote to before. */}
+            {profile.isAdmin && (
+              <button
+                onClick={() => updateProfile({ enable3DTilesAdmin: !profile.enable3DTilesAdmin })}
+                title={profile.enable3DTilesAdmin ? 'Exit Photorealistic 3D Tiles' : 'Photorealistic 3D Tiles (admin)'}
+                className={`relative w-10 h-10 flex items-center justify-center rounded-xl shadow-lg transition-all ${
+                  profile.enable3DTilesAdmin
+                    ? 'bg-gradient-to-br from-amber-500 to-rose-500 text-white'
+                    : 'bg-surface text-on-surface-variant hover:text-amber-400'
+                }`}
+              >
+                <span className="material-symbols-outlined text-[18px]">terrain</span>
+                <span className="absolute -top-1 -right-1 px-1 rounded-full bg-amber-500 text-white text-[8px] font-bold tracking-wider">ADM</span>
+              </button>
+            )}
 
             {/* Airplane / cockpit flight mode. Game-feel input model:
                 left stick = throttle + yaw, right stick = climb/dive +

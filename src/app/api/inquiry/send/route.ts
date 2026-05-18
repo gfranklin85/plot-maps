@@ -6,7 +6,7 @@ import { supabaseAdmin } from '@/lib/supabase-server';
 import { silentLookup } from '@/lib/skiptrace-silent';
 import { reverseGeocodeServer } from '@/lib/geocode-server';
 import { logCost } from '@/lib/cost-tracker';
-import { sendPostcard, lobEnvironment } from '@/lib/lob';
+import { sendPostcard, postgridEnvironment } from '@/lib/postgrid';
 
 type Channel = 'text_invite' | 'direct_mail' | 'phone_call';
 type Phase = 'primer' | 'fire';
@@ -278,20 +278,22 @@ async function handleTextInvite(args: {
 // ── direct_mail ──────────────────────────────────────────────────────────
 
 // Plot's return address. TEMPORARY — Greg's home address used while
-// we're in test mode (Lob never actually mails anything in test). Swap
-// to a PO Box / virtual mailbox before flipping LOB_ENVIRONMENT=live.
-// Search for "PLOT_RETURN_ADDRESS" to find the swap point when ready.
+// we're in test mode (PostGrid never actually mails anything in test).
+// Swap to a PO Box / virtual mailbox before flipping
+// POSTGRID_ENVIRONMENT=live. Search for "PLOT_RETURN_ADDRESS" to find
+// the swap point when ready.
 const PLOT_RETURN_ADDRESS = {
-  name: 'PLOT MAPS',
-  address_line1: '523 PUFFIN LANE',
-  address_city: 'LEMOORE',
-  address_state: 'CA',
-  address_zip: '93245',
+  companyName: 'PLOT MAPS',
+  addressLine1: '523 PUFFIN LANE',
+  city: 'LEMOORE',
+  provinceOrState: 'CA',
+  postalOrZip: '93245',
+  countryCode: 'US',
 };
 
 // Parse "123 Main St, Lemoore, CA 93245" style into street + city + state + zip,
-// preferring explicit lead columns when present. Lob requires components, not
-// a single formatted line.
+// preferring explicit lead columns when present. PostGrid (like most mail
+// APIs) requires address components, not a single formatted line.
 function splitMailingAddress(
   lead: { property_address: string | null; city: string | null; state: string | null; zip: string | null }
 ): { line1: string; city: string; state: string; zip: string } | null {
@@ -337,8 +339,8 @@ async function handleDirectMail(args: {
     return NextResponse.json({ error: 'Armed template not found' }, { status: 404 });
   }
 
-  // Decompose mailing address into Lob's component fields. Bail with a
-  // useful error rather than letting Lob fail with a cryptic 422.
+  // Decompose mailing address into component fields. Bail with a useful
+  // error rather than letting the provider fail with a cryptic 422.
   const mailingAddress = splitMailingAddress(lead);
   if (!mailingAddress) {
     return NextResponse.json(
@@ -348,8 +350,8 @@ async function handleDirectMail(args: {
   }
 
   // 1) Record the inquiry first (queued). We need its id to mint a
-  //    claim token, and we want the row to exist even if the Lob send
-  //    later fails so the failure_reason captures something useful.
+  //    claim token, and we want the row to exist even if the PostGrid
+  //    send later fails so the failure_reason captures something useful.
   const { data: inquiry, error: inqErr } = await supabaseAdmin
     .from('property_inquiries')
     .insert({
@@ -359,7 +361,7 @@ async function handleDirectMail(args: {
       channel: 'direct_mail',
       status: 'queued',
       template_id: template.id,
-      mail_provider: 'lob',
+      mail_provider: 'postgrid',
     })
     .select('id')
     .single();
@@ -384,7 +386,7 @@ async function handleDirectMail(args: {
   //    the production-grade Surveyor-voiced template is a separate
   //    design workstream (see brand/ docs). For now, body_text from the
   //    user's armed template renders on the back; the front is a simple
-  //    title block. Both are inline HTML for max merge-var flexibility.
+  //    title block. Both are inline HTML.
   const senderName = profile?.full_name || 'A Surveyor';
   const front = renderPostcardFrontHtml({ senderName });
   const back = renderPostcardBackHtml({
@@ -393,28 +395,33 @@ async function handleDirectMail(args: {
     senderName,
   });
 
-  // 4) Send via Lob. Test mode by default; throws on Lob error.
+  // 4) Send via PostGrid. Test mode by default; throws on PostGrid error.
   try {
     const result = await sendPostcard({
       to: {
-        name: 'Property Owner', // We deliberately omit the owner's name from the postcard outer — see TEXT_INVITE_BODY invariant.
-        address_line1: mailingAddress.line1,
-        address_city: mailingAddress.city,
-        address_state: mailingAddress.state,
-        address_zip: mailingAddress.zip,
+        // We deliberately omit the owner's name from the postcard's
+        // outer recipient block — see TEXT_INVITE_BODY invariant. A
+        // wrong-number recipient must not be handed the owner's identity.
+        // PostGrid requires firstName or companyName on contacts, so we
+        // use a generic companyName as the recipient line.
+        companyName: 'Property Owner',
+        addressLine1: mailingAddress.line1,
+        city: mailingAddress.city,
+        provinceOrState: mailingAddress.state,
+        postalOrZip: mailingAddress.zip,
+        countryCode: 'US',
       },
       from: PLOT_RETURN_ADDRESS,
-      front,
-      back,
-      size: '4x6',
-      mailType: 'usps_first_class',
-      useType: 'marketing',
+      frontHTML: front,
+      backHTML: back,
+      size: '6x4', // PostGrid convention is width x height; equivalent to Lob "4x6"
+      mailingClass: 'first_class',
       description: `Plot status inquiry — lead ${lead.id}`,
       metadata: {
         inquiry_id: inquiry.id,
         lead_id: lead.id,
         user_id: user.id,
-        plot_env: lobEnvironment(),
+        plot_env: postgridEnvironment(),
       },
       userId: user.id,
     });
@@ -427,29 +434,29 @@ async function handleDirectMail(args: {
         sent_at: new Date().toISOString(),
         mail_provider_id: result.id,
         mail_provider_url: result.url,
-        mail_provider_status: 'postcard.created',
+        mail_provider_status: result.status, // PostGrid: 'ready' initially
         mail_expected_delivery_date: result.expectedDeliveryDate,
-        // ~$0.92 per 4x6 first-class, tracked in cents
-        cost_cents: 92,
+        // ~$0.862 per 6x4 first-class at PostGrid Starter, tracked in cents
+        cost_cents: 86,
       })
       .eq('id', inquiry.id);
 
     return NextResponse.json({
       inquiry_id: inquiry.id,
       status: 'sent',
-      lob_postcard_id: result.id,
+      postcard_id: result.id,
       preview_url: result.url,
       expected_delivery_date: result.expectedDeliveryDate,
       environment: result.environment,
     });
   } catch (err) {
     const reason = err instanceof Error ? err.message : 'unknown error';
-    console.error('Lob send error', err);
+    console.error('PostGrid send error', err);
     await supabaseAdmin
       .from('property_inquiries')
       .update({ status: 'failed', failure_reason: reason })
       .eq('id', inquiry.id);
-    return NextResponse.json({ error: reason, code: 'lob_send_failed' }, { status: 502 });
+    return NextResponse.json({ error: reason, code: 'postgrid_send_failed' }, { status: 502 });
   }
 }
 

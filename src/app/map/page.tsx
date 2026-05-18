@@ -24,6 +24,7 @@ import MapToolbar from "@/components/map/MapToolbar";
 import FlightTuningPanel from "@/components/map/FlightTuningPanel";
 import { useFlightTuning } from "@/lib/useFlightTuning";
 import DestinationsPanel from "@/components/map/DestinationsPanel";
+import AltitudeGauge from "@/components/map/AltitudeGauge";
 import type { GamepadActions } from "@/components/map/GamepadFlightController";
 import { useReticlePosition } from "@/lib/useReticlePosition";
 import { playShotSound, type ShotChannel } from "@/lib/shotSounds";
@@ -531,6 +532,9 @@ export default function MapPage() {
     lat: number; lng: number; altitude: number; heading: number;
     pitch: number; range: number; durationMs?: number;
   } | null>(null);
+  // Live altitude from the 3D path's per-frame loop. Drives the
+  // AltitudeGauge HUD. Reported ~5×/sec from MapView3D.
+  const [currentAltitudeM, setCurrentAltitudeM] = useState<number>(0);
 
   // Lookup helper for resolving a target id back to a full Lead so the
   // grab handler can store the original Lead, not just the id.
@@ -1120,6 +1124,7 @@ export default function MapPage() {
             climbRateMultiplier={flightTuning.climbRate}
             turnRateMultiplier={flightTuning.turnRate}
             flyToTarget={flyToTarget}
+            onAltitudeChange={setCurrentAltitudeM}
           />
         )}
 
@@ -1137,6 +1142,15 @@ export default function MapPage() {
           yFraction={reticlePosition.yFraction}
           onPositionChange={setReticlePosition}
           onResetPosition={resetReticlePosition}
+        />
+
+        {/* Altitude gauge — live readout of the eye altitude over
+            ground. Only meaningful on the 3D Tiles photoreal path
+            since that's the surface that actually fires altitude
+            updates; 2D path uses zoom levels instead. */}
+        <AltitudeGauge
+          visible={!walkMode && profile.enable3DTilesAdmin}
+          altitudeMeters={currentAltitudeM}
         />
 
         {/* Shot animation — fires at the reticle position whenever A

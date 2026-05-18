@@ -115,6 +115,11 @@ export interface MapViewProps {
    *  with snappy throttle (or vice versa). Applies in both 2D and
    *  3D paths. Default 1.0. */
   turnRateMultiplier?: number;
+  /** Live altitude reporting from the 3D path's per-frame loop.
+   *  Throttled to ~5×/sec. Page uses it to drive the AltitudeGauge
+   *  HUD readout. 2D path doesn't fire this (altitude isn't a
+   *  meaningful concept on the tilted 2D surface). */
+  onAltitudeChange?: (meters: number) => void;
   /** Cinematic flight target. Set to a new object reference to trigger
    *  an animated transition from current camera pose to the target. The
    *  3D path implements this; the 2D path ignores. */

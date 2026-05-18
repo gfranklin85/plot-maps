@@ -134,12 +134,8 @@ interface RecordEventResult {
 }
 
 async function recordEvent(args: RecordEventArgs): Promise<RecordEventResult> {
-  // Table name is still `lob_webhook_events` from the Lob era — column
-  // names are provider-agnostic but the table name is not. Renamed in
-  // a follow-up migration (lob-rename-to-mail-provider-migration.sql).
-  // Until that runs, we keep writing here.
-  const { error } = await supabaseAdmin.from('lob_webhook_events').insert({
-    lob_event_id: args.eventId,
+  const { error } = await supabaseAdmin.from('mail_provider_webhook_events').insert({
+    provider_event_id: args.eventId,
     event_type: args.eventType,
     resource_id: args.resourceId,
     resource_type: args.resourceType,
@@ -149,7 +145,7 @@ async function recordEvent(args: RecordEventArgs): Promise<RecordEventResult> {
   });
 
   if (error) {
-    // 23505 = unique_violation on lob_event_id → idempotent re-delivery.
+    // 23505 = unique_violation on provider_event_id → idempotent re-delivery.
     if ((error as { code?: string }).code === '23505') {
       return { alreadyRecorded: true };
     }

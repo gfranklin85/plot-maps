@@ -220,6 +220,7 @@ function Inner({
   climbRateMultiplier = 1.0,
   turnRateMultiplier = 1.0,
   flyToTarget,
+  onAltitudeChange,
 }: {
   center?: { lat: number; lng: number } | null;
   gamepadEnabled: boolean;
@@ -228,6 +229,7 @@ function Inner({
   climbRateMultiplier?: number;
   turnRateMultiplier?: number;
   flyToTarget?: FlyToTarget | null;
+  onAltitudeChange?: (meters: number) => void;
 }) {
   const maps3d = useMapsLibrary('maps3d');
   const elRef = useRef<Map3DElement | null>(null);
@@ -253,6 +255,13 @@ function Inner({
   // vice versa).
   const turnMultRef = useRef<number>(turnRateMultiplier);
   turnMultRef.current = turnRateMultiplier;
+  // Altitude reporting throttle — the per-frame loop pings the page's
+  // AltitudeGauge via onAltitudeChange, but only ~5×/sec to avoid
+  // React state churn at 60Hz.
+  const onAltitudeChangeRef = useRef(onAltitudeChange);
+  onAltitudeChangeRef.current = onAltitudeChange;
+  const lastAltitudeReportMsRef = useRef<number>(0);
+  const lastReportedAltitudeRef = useRef<number>(-1);
   // Cinematic flight animation state. When non-null, the per-frame
   // gamepad input is suppressed and we interpolate from `from` to
   // `to` over `durationMs`. After arrival, returns to normal flight.
@@ -327,6 +336,15 @@ function Inner({
       el.heading = m3d.heading;
       el.tilt = m3d.tilt;
       el.range = m3d.range;
+      // Throttled altitude report during the cinematic flight too,
+      // so the altimeter sweeps through during the arc.
+      if (now - lastAltitudeReportMsRef.current > 100) {
+        if (Math.abs(cam.altitude - lastReportedAltitudeRef.current) > 0.5) {
+          lastReportedAltitudeRef.current = cam.altitude;
+          onAltitudeChangeRef.current?.(cam.altitude);
+        }
+        lastAltitudeReportMsRef.current = now;
+      }
       if (t >= 1) {
         flyAnimRef.current = null;  // done
         return;
@@ -369,6 +387,9 @@ function Inner({
     el.heading = m3d.heading;
     el.tilt = m3d.tilt;
     el.range = m3d.range;
+    // Initial altitude report so the gauge shows a value immediately
+    // (don't wait for the first gamepad frame).
+    onAltitudeChangeRef.current?.(camRef.current.altitude);
     return () => {
       el.remove();
       elRef.current = null;
@@ -532,6 +553,21 @@ function Inner({
       el.heading = map3d.heading;
       el.tilt    = map3d.tilt;
       el.range   = map3d.range;
+
+      // ── Altitude reporting (throttled ~5×/sec) ─────────────────────
+      // Pings the page's AltitudeGauge with the live eye altitude.
+      // Throttled to avoid React state churn at 60Hz, and gated on
+      // a meaningful change (>0.5m) so resting flight doesn't fire
+      // an update every report window.
+      const now = elapsedMs;
+      if (now - lastAltitudeReportMsRef.current > 200) {
+        const alt = cam.altitude;
+        if (Math.abs(alt - lastReportedAltitudeRef.current) > 0.5) {
+          lastReportedAltitudeRef.current = alt;
+          onAltitudeChangeRef.current?.(alt);
+        }
+        lastAltitudeReportMsRef.current = now;
+      }
     },
   });
 
@@ -556,6 +592,7 @@ export default function MapView3D(props: MapViewProps) {
         climbRateMultiplier={props.climbRateMultiplier}
         turnRateMultiplier={props.turnRateMultiplier}
         flyToTarget={props.flyToTarget}
+        onAltitudeChange={props.onAltitudeChange}
       />
     </APIProvider>
   );

@@ -9,9 +9,8 @@ row.
 When PostGrid sends an event, Plot:
 
 1. Verifies the HMAC signature using `POSTGRID_WEBHOOK_SIGNING_SECRET`.
-2. Records the event into the audit log table (`lob_webhook_events`
-   currently; rename pending — see migration history). Records even if
-   signature verification fails, for forensic visibility.
+2. Records the event into the audit log table (`mail_provider_webhook_events`),
+   even if signature verification fails, for forensic visibility.
 3. Updates the matching `property_inquiries` row's `mail_provider_status`
    and (for terminal events) the top-level `status`.
 
@@ -55,8 +54,8 @@ PostGrid dashboard → your webhook → look for a "Send Test Event" or
 
 Check Supabase:
 ```sql
-SELECT received_at, lob_event_id, event_type, signature_valid, payload
-FROM lob_webhook_events
+SELECT received_at, provider_event_id, event_type, signature_valid, payload
+FROM mail_provider_webhook_events
 ORDER BY received_at DESC
 LIMIT 5;
 ```
@@ -93,8 +92,8 @@ We still 200 to PostGrid (so attackers can't tell we noticed) and still
 record the row in the audit log with `signature_valid = false`. Query:
 
 ```sql
-SELECT received_at, lob_event_id, event_type, payload
-FROM lob_webhook_events
+SELECT received_at, provider_event_id, event_type, payload
+FROM mail_provider_webhook_events
 WHERE signature_valid = false
 ORDER BY received_at DESC
 LIMIT 50;

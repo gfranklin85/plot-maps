@@ -523,7 +523,7 @@ export default function MapPage() {
   const { position: reticlePosition, setPosition: setReticlePosition, resetPosition: resetReticlePosition } = useReticlePosition();
   // Flight feel tuning — single master multiplier + preset chips.
   // Lives in a toolbar-opened panel; live-previews changes while open.
-  const { tuning: flightTuning, setPreset: setFlightPreset, setMultiplier: setFlightMultiplier, setClimbRate: setFlightClimbRate, setTurnRate: setFlightTurnRate } = useFlightTuning();
+  const { tuning: flightTuning, setMultiplier: setFlightMultiplier, setClimbRate: setFlightClimbRate, setTurnRate: setFlightTurnRate, setTiltRate: setFlightTiltRate, resetToDefault: resetFlightTuning } = useFlightTuning();
   const [flightTuningOpen, setFlightTuningOpen] = useState(false);
   // Destinations overlay — curated cities + search + Home. Sets
   // flyToTarget which MapView3D animates the camera toward.
@@ -873,10 +873,11 @@ export default function MapPage() {
           <FlightTuningPanel
             visible={flightTuningOpen}
             tuning={flightTuning}
-            onPresetChange={setFlightPreset}
             onMultiplierChange={setFlightMultiplier}
-            onClimbRateChange={setFlightClimbRate}
             onTurnRateChange={setFlightTurnRate}
+            onTiltRateChange={setFlightTiltRate}
+            onClimbRateChange={setFlightClimbRate}
+            onReset={resetFlightTuning}
             onClose={() => setFlightTuningOpen(false)}
           />
 
@@ -1123,6 +1124,7 @@ export default function MapPage() {
             flightSpeedMultiplier={flightTuning.multiplier}
             climbRateMultiplier={flightTuning.climbRate}
             turnRateMultiplier={flightTuning.turnRate}
+            tiltRateMultiplier={flightTuning.tiltRate}
             flyToTarget={flyToTarget}
             onAltitudeChange={setCurrentAltitudeM}
           />

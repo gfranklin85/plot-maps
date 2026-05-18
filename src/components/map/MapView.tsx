@@ -115,6 +115,10 @@ export interface MapViewProps {
    *  with snappy throttle (or vice versa). Applies in both 2D and
    *  3D paths. Default 1.0. */
   turnRateMultiplier?: number;
+  /** Tilt rate multiplier — scales tilt (right-Y look up/down) only.
+   *  Independent of flight speed so slowing pan doesn't slow how
+   *  fast the user can look up. Default 1.0. */
+  tiltRateMultiplier?: number;
   /** Live altitude reporting from the 3D path's per-frame loop.
    *  Throttled to ~5×/sec. Page uses it to drive the AltitudeGauge
    *  HUD readout. 2D path doesn't fire this (altitude isn't a
@@ -590,7 +594,7 @@ function PendingSkiptracePins({ pins }: { pins: { id: string; lat: number; lng: 
   return null;
 }
 
-export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClick, center, navigateTo, zoom, mapType = "roadmap", pinMode = "dots", prospectMode = false, prospectPins = [], onProspectPinClick, showZoningOverlay = false, showParcelOverlay = false, parcelColorMode = 'land_use', onParcelClick, onParcelHoverChange, parcelHitTesterRef, view3D = false, flight = null, gamepadEnabled = false, gamepadActions, gamepadMode = 'overhead', gamepadDebugSuspendMoveCamera = false, gamepadDebugForceFallbackPath = false, gamepadDebugTickleAfterMoveCamera = false, gamepadAirplaneTargets, gamepadReticleXFraction, gamepadReticleYFraction, onGamepadReticleTargetChange, onGamepadParcelHoverChange, onGamepadFocalScreenYChange, onGamepadStatusChange, flightSpeedMultiplier = 1.0, turnRateMultiplier = 1.0 }: MapViewProps) {
+export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClick, center, navigateTo, zoom, mapType = "roadmap", pinMode = "dots", prospectMode = false, prospectPins = [], onProspectPinClick, showZoningOverlay = false, showParcelOverlay = false, parcelColorMode = 'land_use', onParcelClick, onParcelHoverChange, parcelHitTesterRef, view3D = false, flight = null, gamepadEnabled = false, gamepadActions, gamepadMode = 'overhead', gamepadDebugSuspendMoveCamera = false, gamepadDebugForceFallbackPath = false, gamepadDebugTickleAfterMoveCamera = false, gamepadAirplaneTargets, gamepadReticleXFraction, gamepadReticleYFraction, onGamepadReticleTargetChange, onGamepadParcelHoverChange, onGamepadFocalScreenYChange, onGamepadStatusChange, flightSpeedMultiplier = 1.0, turnRateMultiplier = 1.0, tiltRateMultiplier = 1.0 }: MapViewProps) {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme !== 'light';
   const isSatellite = mapType === "satellite" || mapType === "hybrid";
@@ -653,6 +657,7 @@ export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClic
             debugTickleAfterMoveCamera={gamepadDebugTickleAfterMoveCamera}
             flightSpeedMultiplier={flightSpeedMultiplier}
             turnRateMultiplier={turnRateMultiplier}
+            tiltRateMultiplier={tiltRateMultiplier}
           />
         )}
         <PoiClickCatcher prospectMode={prospectMode} onMapClick={onMapClick} />

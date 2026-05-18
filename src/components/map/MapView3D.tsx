@@ -30,18 +30,21 @@ import type { GamepadActions } from "./GamepadFlightController";
 const API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
 
 // ── Physics constants (copied from the 2D airplane mode) ──────────
-// Base physics constants — tuned 2026-05-17 so the 1.0× slider value
-// (Pilot preset) is a TRUE cruise pace, not "already pretty fast" as
-// before. Previously the slider's 0.5× still felt like a race; the
-// floor needed to actually crawl. Cut accel + max ~2.8× from the
-// earlier "1.0×" tuning. The slider's new top (2.5× now feels like
-// the old Pro) covers the full range of "drift slow" to "race fast."
-const AIR_THROTTLE_ACCEL = 250;
+// Base physics constants — tuned 2026-05-17 so 1.0× = HELICOPTER
+// cruise feel: slow enough for low-altitude weaving between
+// buildings, fast enough to feel responsive. User taste-tunes from
+// mid-slider in both directions.
+//
+// Previous "1.0×" was still too fast at the bottom; this round cuts
+// throttle/strafe another ~1.5× and yaw stays where it was (turn
+// rate gets its own slider anyway). Tilt is now broken out as its
+// own slider so cutting its base doesn't fight pan tuning.
+const AIR_THROTTLE_ACCEL = 170;
 const AIR_THROTTLE_DRAG = 0.965;
-const AIR_THROTTLE_MAX = 130;
-const AIR_STRAFE_ACCEL = 220;
+const AIR_THROTTLE_MAX = 85;
+const AIR_STRAFE_ACCEL = 150;
 const AIR_STRAFE_DRAG = 0.96;
-const AIR_STRAFE_MAX = 115;
+const AIR_STRAFE_MAX = 75;
 const AIR_YAW_ACCEL = 28;
 const AIR_YAW_DRAG = 0.94;
 const AIR_YAW_MAX = 11;
@@ -68,9 +71,11 @@ const HOVER_PAN_FREQ_Y = 0.11;
 // a full pull descends fast. Combined with the user's climb-rate
 // slider (which scales the max), this gives real flight-control feel
 // instead of a button's binary "moving / not moving."
-// 0.5 base means: full trigger + 1.0 climb-rate slider = ~50% of
-// current range traveled per second. Light-touch trigger = trickle.
-const ZOOM_DOLLY_RATE_PER_SEC = 0.5;
+// 0.2 base — Greg flagged 0.5 was "spaceship fast" at the middle
+// slider value. At 0.2: full trigger + 1.0× climb-rate slider =
+// ~20% of current range traveled per second. Light-touch trigger
+// + low slider = barely drifting. Fine modulation, real feel.
+const ZOOM_DOLLY_RATE_PER_SEC = 0.2;
 
 
 const METERS_PER_DEG_LAT = 111_320;
@@ -219,6 +224,7 @@ function Inner({
   flightSpeedMultiplier = 1.0,
   climbRateMultiplier = 1.0,
   turnRateMultiplier = 1.0,
+  tiltRateMultiplier = 1.0,
   flyToTarget,
   onAltitudeChange,
 }: {
@@ -228,6 +234,7 @@ function Inner({
   flightSpeedMultiplier?: number;
   climbRateMultiplier?: number;
   turnRateMultiplier?: number;
+  tiltRateMultiplier?: number;
   flyToTarget?: FlyToTarget | null;
   onAltitudeChange?: (meters: number) => void;
 }) {
@@ -255,6 +262,12 @@ function Inner({
   // vice versa).
   const turnMultRef = useRef<number>(turnRateMultiplier);
   turnMultRef.current = turnRateMultiplier;
+  // Separate ref for tilt rate (pitch / right-Y look up/down). Greg
+  // flagged that bundling tilt with flight speed felt wrong — slowing
+  // pan also slowed tilt, making the camera barely able to look up.
+  // Independent so tilt always feels right regardless of pan slider.
+  const tiltMultRef = useRef<number>(tiltRateMultiplier);
+  tiltMultRef.current = tiltRateMultiplier;
   // Altitude reporting throttle — the per-frame loop pings the page's
   // AltitudeGauge via onAltitudeChange, but only ~5×/sec to avoid
   // React state churn at 60Hz.
@@ -468,6 +481,7 @@ function Inner({
       // possible without one slider doing both jobs.
       const boost = speedMultRef.current;
       const boostYaw = turnMultRef.current;
+      const boostTilt = tiltMultRef.current;
       const dragExp = 60 * dt;
 
       const lx = shapeStick(leftStick.x);
@@ -491,7 +505,7 @@ function Inner({
 
       // Tilt (right-Y): direct velocity-driven (same as 2D airplane).
       // Stick up (ry < 0) raises view; stick down (ry > 0) lowers view.
-      vel.tilt -= ry * TILT_ACCEL_DEG_S2 * boost * dt;
+      vel.tilt -= ry * TILT_ACCEL_DEG_S2 * boostTilt * dt;
       vel.tilt *= Math.pow(TILT_DRAG, dragExp);
       vel.tilt = clamp(vel.tilt, -TILT_MAX_DEG_S, TILT_MAX_DEG_S);
       if (Math.abs(vel.tilt) < 0.05) vel.tilt = 0;
@@ -591,6 +605,7 @@ export default function MapView3D(props: MapViewProps) {
         flightSpeedMultiplier={props.flightSpeedMultiplier}
         climbRateMultiplier={props.climbRateMultiplier}
         turnRateMultiplier={props.turnRateMultiplier}
+        tiltRateMultiplier={props.tiltRateMultiplier}
         flyToTarget={props.flyToTarget}
         onAltitudeChange={props.onAltitudeChange}
       />

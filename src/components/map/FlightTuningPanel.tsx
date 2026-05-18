@@ -1,50 +1,42 @@
 "use client";
 
 import MaterialIcon from "@/components/ui/MaterialIcon";
-import {
-  type FlightPreset,
-  type FlightTuning,
-  PRESET_MULTIPLIERS,
-} from "@/lib/useFlightTuning";
+import type { FlightTuning } from "@/lib/useFlightTuning";
 
 interface Props {
   visible: boolean;
   tuning: FlightTuning;
-  onPresetChange: (preset: FlightPreset) => void;
   onMultiplierChange: (multiplier: number) => void;
-  onClimbRateChange: (climbRate: number) => void;
   onTurnRateChange: (turnRate: number) => void;
+  onTiltRateChange: (tiltRate: number) => void;
+  onClimbRateChange: (climbRate: number) => void;
+  onReset: () => void;
   onClose: () => void;
 }
 
-const PRESET_META: Record<Exclude<FlightPreset, 'custom'>, { label: string; hint: string }> = {
-  newcomer: { label: 'Newcomer', hint: 'Slow, forgiving' },
-  pilot:    { label: 'Pilot',    hint: 'Balanced cruise' },
-  pro:      { label: 'Pro',      hint: 'Snappy, twitchy' },
-};
-
 /**
- * Flight tuning UI. Preset chips set all three axes to the same
- * preset. Three independent sliders:
- *   - Flight speed — pan (left stick) + tilt (right-Y look-up/down).
- *   - Turn rate — yaw (right-X horizontal rotation).
- *   - Climb rate — LT/RT descent/ascent (NOT camera zoom; eye moves
- *     through the world).
+ * Flight tuning UI. Four independent sliders, no preset chips:
+ *   - Flight Speed — pan (left stick).
+ *   - Turn Rate — yaw (right-X horizontal rotation).
+ *   - Tilt Rate — pitch (right-Y look up/down).
+ *   - Climb Rate — LT/RT descent/ascent.
  *
- * Idle hover wave compensation is time-driven and intentionally NOT
- * tunable — protects the "alive even at rest" feel from being
- * disrupted by user settings.
+ * Defaults all sit at 1.0× (mid-slider) — the helicopter-cruise
+ * pace. Users tune from there.
  *
- * Mouse-only for v1. Live preview — moving any slider changes flight
- * feel immediately while flying.
+ * Idle hover wave compensation is NOT exposed; it's time-driven and
+ * protects the "alive at rest" feel from user disruption.
+ *
+ * Live preview — moving any slider changes feel immediately.
  */
 export default function FlightTuningPanel({
   visible,
   tuning,
-  onPresetChange,
   onMultiplierChange,
-  onClimbRateChange,
   onTurnRateChange,
+  onTiltRateChange,
+  onClimbRateChange,
+  onReset,
   onClose,
 }: Props) {
   if (!visible) return null;
@@ -54,7 +46,7 @@ export default function FlightTuningPanel({
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-sm font-bold text-on-surface">Flight feel</h3>
-          <p className="text-[10px] text-on-surface-variant mt-0.5">Speed = move. Turn = rotate. Climb = ascend/descend.</p>
+          <p className="text-[10px] text-on-surface-variant mt-0.5">Speed = pan. Turn = yaw. Tilt = look. Climb = ascend/descend.</p>
         </div>
         <button
           onClick={onClose}
@@ -65,127 +57,86 @@ export default function FlightTuningPanel({
         </button>
       </div>
 
-      {/* Preset chips — set both axes to the same preset for one-tap tuning. */}
-      <div className="flex gap-1.5">
-        {(Object.keys(PRESET_META) as Array<keyof typeof PRESET_META>).map((key) => {
-          const meta = PRESET_META[key];
-          const isActive = tuning.preset === key;
-          return (
-            <button
-              key={key}
-              onClick={() => onPresetChange(key)}
-              className={`flex-1 flex flex-col items-center gap-0.5 px-2 py-2 rounded-lg text-[11px] font-bold transition-all ${
-                isActive
-                  ? 'bg-primary text-white shadow-md'
-                  : 'bg-surface-container text-on-surface-variant hover:text-on-surface'
-              }`}
-            >
-              <span>{meta.label}</span>
-              <span className="text-[9px] font-normal opacity-70">{meta.hint}</span>
-            </button>
-          );
-        })}
-      </div>
+      <Slider
+        label="Flight speed"
+        value={tuning.multiplier}
+        leftEnd="Slow"
+        rightEnd="Fast"
+        onChange={onMultiplierChange}
+      />
+      <Slider
+        label="Turn rate"
+        value={tuning.turnRate}
+        leftEnd="Cinematic"
+        rightEnd="Snappy"
+        onChange={onTurnRateChange}
+      />
+      <Slider
+        label="Tilt rate"
+        value={tuning.tiltRate}
+        leftEnd="Slow"
+        rightEnd="Quick"
+        onChange={onTiltRateChange}
+      />
+      <Slider
+        label="Climb rate"
+        value={tuning.climbRate}
+        leftEnd="Cinematic"
+        rightEnd="Rapid"
+        onChange={onClimbRateChange}
+      />
 
-      {/* Flight speed slider — pan / yaw / tilt */}
-      <div>
-        <div className="flex items-center justify-between mb-1.5">
-          <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">
-            Flight speed
-          </label>
-          <span className="text-[10px] font-mono text-on-surface tabular-nums">
-            {tuning.multiplier.toFixed(2)}×
-          </span>
-        </div>
-        <input
-          type="range"
-          min={0.1}
-          max={2.5}
-          step={0.05}
-          value={tuning.multiplier}
-          onChange={(e) => onMultiplierChange(parseFloat(e.target.value))}
-          className="w-full accent-primary"
-        />
-        <div className="flex items-center justify-between mt-1 text-[9px] text-on-surface-variant">
-          <span>Slow</span>
-          <span className="opacity-50">·</span>
-          <span>{PRESET_MULTIPLIERS.newcomer}×</span>
-          <span className="opacity-50">·</span>
-          <span className="font-semibold">{PRESET_MULTIPLIERS.pilot}×</span>
-          <span className="opacity-50">·</span>
-          <span>{PRESET_MULTIPLIERS.pro}×</span>
-          <span className="opacity-50">·</span>
-          <span>Fast</span>
-        </div>
+      <div className="flex items-center justify-between pt-1">
+        <p className="text-[9px] text-on-surface-variant italic">
+          Live preview — fly while you adjust.
+        </p>
+        <button
+          onClick={onReset}
+          className="text-[10px] font-semibold text-on-surface-variant hover:text-on-surface transition-colors"
+          title="Reset all sliders to default"
+        >
+          Reset
+        </button>
       </div>
+    </div>
+  );
+}
 
-      {/* Turn rate slider — right-X yaw */}
-      <div>
-        <div className="flex items-center justify-between mb-1.5">
-          <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">
-            Turn rate
-          </label>
-          <span className="text-[10px] font-mono text-on-surface tabular-nums">
-            {tuning.turnRate.toFixed(2)}×
-          </span>
-        </div>
-        <input
-          type="range"
-          min={0.1}
-          max={2.5}
-          step={0.05}
-          value={tuning.turnRate}
-          onChange={(e) => onTurnRateChange(parseFloat(e.target.value))}
-          className="w-full accent-primary"
-        />
-        <div className="flex items-center justify-between mt-1 text-[9px] text-on-surface-variant">
-          <span>Cinematic</span>
-          <span className="opacity-50">·</span>
-          <span>{PRESET_MULTIPLIERS.newcomer}×</span>
-          <span className="opacity-50">·</span>
-          <span className="font-semibold">{PRESET_MULTIPLIERS.pilot}×</span>
-          <span className="opacity-50">·</span>
-          <span>{PRESET_MULTIPLIERS.pro}×</span>
-          <span className="opacity-50">·</span>
-          <span>Snappy</span>
-        </div>
+interface SliderProps {
+  label: string;
+  value: number;
+  leftEnd: string;
+  rightEnd: string;
+  onChange: (v: number) => void;
+}
+
+function Slider({ label, value, leftEnd, rightEnd, onChange }: SliderProps) {
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">
+          {label}
+        </label>
+        <span className="text-[10px] font-mono text-on-surface tabular-nums">
+          {value.toFixed(2)}×
+        </span>
       </div>
-
-      {/* Climb rate slider — LT/RT descent/ascent */}
-      <div>
-        <div className="flex items-center justify-between mb-1.5">
-          <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">
-            Climb rate
-          </label>
-          <span className="text-[10px] font-mono text-on-surface tabular-nums">
-            {tuning.climbRate.toFixed(2)}×
-          </span>
-        </div>
-        <input
-          type="range"
-          min={0.1}
-          max={2.5}
-          step={0.05}
-          value={tuning.climbRate}
-          onChange={(e) => onClimbRateChange(parseFloat(e.target.value))}
-          className="w-full accent-primary"
-        />
-        <div className="flex items-center justify-between mt-1 text-[9px] text-on-surface-variant">
-          <span>Cinematic</span>
-          <span className="opacity-50">·</span>
-          <span>{PRESET_MULTIPLIERS.newcomer}×</span>
-          <span className="opacity-50">·</span>
-          <span className="font-semibold">{PRESET_MULTIPLIERS.pilot}×</span>
-          <span className="opacity-50">·</span>
-          <span>{PRESET_MULTIPLIERS.pro}×</span>
-          <span className="opacity-50">·</span>
-          <span>Rapid</span>
-        </div>
+      <input
+        type="range"
+        min={0.1}
+        max={2.5}
+        step={0.05}
+        value={value}
+        onChange={(e) => onChange(parseFloat(e.target.value))}
+        className="w-full accent-primary"
+      />
+      <div className="flex items-center justify-between mt-0.5 text-[9px] text-on-surface-variant">
+        <span>{leftEnd}</span>
+        <span className="opacity-50">·</span>
+        <span className="font-semibold">1×</span>
+        <span className="opacity-50">·</span>
+        <span>{rightEnd}</span>
       </div>
-
-      <p className="text-[9px] text-on-surface-variant italic">
-        Live preview — fly while you adjust to feel the change.
-      </p>
     </div>
   );
 }

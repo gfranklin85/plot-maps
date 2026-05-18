@@ -114,6 +114,10 @@ interface Props {
    *  Independent of flight speed so users can dial cinematic-slow
    *  horizon pans without slowing their pan/throttle. Default 1.0. */
   turnRateMultiplier?: number;
+  /** Tilt-rate multiplier — scales tilt (right-Y look up/down)
+   *  acceleration only. Independent of flight speed so slowing
+   *  pan doesn't slow how fast the user can look up. Default 1.0. */
+  tiltRateMultiplier?: number;
 }
 
 // ── Heavy helicopter physics constants ────────────────────────────────
@@ -239,6 +243,7 @@ export default function GamepadFlightController({
   debugTickleAfterMoveCamera = false,
   flightSpeedMultiplier = 1.0,
   turnRateMultiplier = 1.0,
+  tiltRateMultiplier = 1.0,
 }: Props) {
   const map = useMap();
 
@@ -294,6 +299,8 @@ export default function GamepadFlightController({
   // the latest slider value without re-subscribing.
   const turnRateMultiplierRef = useRef<number>(turnRateMultiplier);
   turnRateMultiplierRef.current = turnRateMultiplier;
+  const tiltRateMultiplierRef = useRef<number>(tiltRateMultiplier);
+  tiltRateMultiplierRef.current = tiltRateMultiplier;
   // Track last reported target id to avoid firing the callback every frame.
   const lastReportedTargetIdRef = useRef<string | null>(null);
   // Live reticle-hovering flag the LT-press handler reads each frame.
@@ -493,6 +500,7 @@ export default function GamepadFlightController({
       const lbBoost = pressed.has('lb') ? PAN_BOOST_MULT : 1;
       const boost = lbBoost * flightSpeedMultiplierRef.current;
       const boostYaw = lbBoost * turnRateMultiplierRef.current;
+      const boostTilt = lbBoost * tiltRateMultiplierRef.current;
       const vel = velRef.current;
       const dragExp = 60 * dt;
 
@@ -507,7 +515,7 @@ export default function GamepadFlightController({
         vel.panX += lx * PAN_ACCEL_PX_S2 * boost * dt;
         vel.panY += ly * PAN_ACCEL_PX_S2 * boost * dt;
         vel.heading += rx * HEAD_ACCEL_DEG_S2 * boostYaw * dt;
-        vel.tilt -= ry * TILT_ACCEL_DEG_S2 * boost * dt; // up = look up
+        vel.tilt -= ry * TILT_ACCEL_DEG_S2 * boostTilt * dt; // up = look up
         vel.zoom += triggerZoomDelta * ZOOM_ACCEL_S2 * boost * dt;
 
         vel.panX *= Math.pow(PAN_DRAG, dragExp);
@@ -556,7 +564,7 @@ export default function GamepadFlightController({
         if (Math.abs(air.yaw) < 0.05) air.yaw = 0;
 
         // Tilt: direct velocity-driven, always available.
-        vel.tilt -= ry * TILT_ACCEL_DEG_S2 * boost * dt;
+        vel.tilt -= ry * TILT_ACCEL_DEG_S2 * boostTilt * dt;
         vel.tilt *= Math.pow(TILT_DRAG, dragExp);
         vel.tilt = clamp(vel.tilt, -TILT_MAX_DEG_S, TILT_MAX_DEG_S);
         if (Math.abs(vel.tilt) < 0.05) vel.tilt = 0;

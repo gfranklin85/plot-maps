@@ -18,13 +18,6 @@ import { useCameraChoreographer, type FlyToOptions } from "@/lib/useCameraChoreo
 import { AtmosphereProvider } from "@/lib/atmosphere/AtmosphereContext";
 import AtmosphereOverlay from "./AtmosphereOverlay";
 
-// Atmosphere feature flag. Same flag used by MapView3D — flip
-// NEXT_PUBLIC_PLOT_ATMOSPHERE=1 in .env.local to render the time-of-day
-// grade on both surfaces.
-const ATMOSPHERE_ENABLED =
-  process.env.NEXT_PUBLIC_PLOT_ATMOSPHERE === '1' ||
-  process.env.NEXT_PUBLIC_PLOT_ATMOSPHERE === 'true';
-
 // Theme-aware pin colors
 const PIN_THEME = {
   dark: { bg: 'rgba(10,16,32,0.92)', bgStrong: 'rgba(10,16,32,0.95)', text: 'white', subText: '#94a3b8' },
@@ -721,7 +714,7 @@ export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClic
         {prospectPins.length > 0 && <ProspectPins pins={prospectPins} onPinClick={onProspectPinClick} />}
       </Map>
     </APIProvider>
-    <AtmosphereOverlay enabled={ATMOSPHERE_ENABLED} />
+    <AtmosphereOverlay />
     </div>
     </AtmosphereProvider>
   );

@@ -10,14 +10,6 @@ import type { GamepadActions } from "./GamepadFlightController";
 import { AtmosphereProvider } from "@/lib/atmosphere/AtmosphereContext";
 import AtmosphereOverlay from "./AtmosphereOverlay";
 
-// Atmosphere feature flag. Phase 4a ships behind an env toggle so we
-// can ship the code without forcing the visual on for every user
-// before Greg's seen it on his own map. Flip to '1' (or any truthy
-// string) in .env.local to render the time-of-day grade.
-const ATMOSPHERE_ENABLED =
-  process.env.NEXT_PUBLIC_PLOT_ATMOSPHERE === '1' ||
-  process.env.NEXT_PUBLIC_PLOT_ATMOSPHERE === 'true';
-
 // ── Photorealistic 3D Tiles surface (Map3DElement / <gmp-map-3d>) ───
 //
 // Admin-only renderer behind profiles.enable_3d_tiles_admin. Airplane
@@ -646,7 +638,7 @@ function Inner({
         className="h-full w-full relative"
         style={{ background: '#0a1020' }}
       >
-        <AtmosphereOverlay enabled={ATMOSPHERE_ENABLED} />
+        <AtmosphereOverlay />
       </div>
     </AtmosphereProvider>
   );

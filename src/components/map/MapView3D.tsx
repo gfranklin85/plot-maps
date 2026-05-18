@@ -9,6 +9,7 @@ import type { MapViewProps } from "./MapView";
 import type { GamepadActions } from "./GamepadFlightController";
 import { AtmosphereProvider } from "@/lib/atmosphere/AtmosphereContext";
 import AtmosphereOverlay from "./AtmosphereOverlay";
+import SkyDome from "./SkyDome";
 
 // ── Photorealistic 3D Tiles surface (Map3DElement / <gmp-map-3d>) ───
 //
@@ -642,6 +643,15 @@ function Inner({
         className="h-full w-full relative"
         style={{ background: '#0a1020' }}
       >
+        {/* SkyDome — the painted sky overhead. Mounts only when Greg's
+            crafted assets exist (see docs/asset-roadmap.md > Sky
+            Paintings). Until then, returns null and the demoted
+            AtmosphereOverlay alone carries the surface. */}
+        <SkyDome
+          mapElRef={elRef}
+          cameraRef={camRef as React.RefObject<{ lat: number; lng: number; altitude: number; heading: number } | null>}
+          maps3dReady={!!maps3d}
+        />
         <AtmosphereOverlay />
       </div>
     </AtmosphereProvider>

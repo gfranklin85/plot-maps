@@ -106,6 +106,18 @@ export interface MapViewProps {
    *  Pilot feel; 0.6 = Newcomer; 1.6 = Pro. Scales pan/yaw/tilt/zoom
    *  acceleration uniformly in both 2D and 3D paths. */
   flightSpeedMultiplier?: number;
+  /** Cinematic flight target. Set to a new object reference to trigger
+   *  an animated transition from current camera pose to the target. The
+   *  3D path implements this; the 2D path ignores. */
+  flyToTarget?: {
+    lat: number;
+    lng: number;
+    altitude: number;
+    heading: number;
+    pitch: number;
+    range: number;
+    durationMs?: number;
+  } | null;
 }
 
 const API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";

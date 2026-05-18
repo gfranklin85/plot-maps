@@ -23,6 +23,7 @@ import MapReticle from "@/components/map/MapReticle";
 import MapToolbar from "@/components/map/MapToolbar";
 import FlightTuningPanel from "@/components/map/FlightTuningPanel";
 import { useFlightTuning } from "@/lib/useFlightTuning";
+import DestinationsPanel from "@/components/map/DestinationsPanel";
 import type { GamepadActions } from "@/components/map/GamepadFlightController";
 import { useReticlePosition } from "@/lib/useReticlePosition";
 import { playShotSound, type ShotChannel } from "@/lib/shotSounds";
@@ -523,6 +524,13 @@ export default function MapPage() {
   // Lives in a toolbar-opened panel; live-previews changes while open.
   const { tuning: flightTuning, setPreset: setFlightPreset, setMultiplier: setFlightMultiplier } = useFlightTuning();
   const [flightTuningOpen, setFlightTuningOpen] = useState(false);
+  // Destinations overlay — curated cities + search + Home. Sets
+  // flyToTarget which MapView3D animates the camera toward.
+  const [destinationsOpen, setDestinationsOpen] = useState(false);
+  const [flyToTarget, setFlyToTarget] = useState<{
+    lat: number; lng: number; altitude: number; heading: number;
+    pitch: number; range: number; durationMs?: number;
+  } | null>(null);
 
   // Lookup helper for resolving a target id back to a full Lead so the
   // grab handler can store the original Lead, not just the id.
@@ -845,6 +853,13 @@ export default function MapPage() {
                 onClick: () => setFlightTuningOpen(v => !v),
                 active: flightTuningOpen,
               },
+              {
+                key: 'destinations',
+                icon: 'public',
+                label: 'Fly somewhere',
+                onClick: () => setDestinationsOpen(v => !v),
+                active: destinationsOpen,
+              },
             ]}
           />
 
@@ -857,6 +872,24 @@ export default function MapPage() {
             onPresetChange={setFlightPreset}
             onMultiplierChange={setFlightMultiplier}
             onClose={() => setFlightTuningOpen(false)}
+          />
+
+          {/* Destinations overlay — curated cities, search, Home.
+              Sets flyToTarget which MapView3D animates toward
+              with cinematic ease + arc-altitude lift. */}
+          <DestinationsPanel
+            visible={destinationsOpen}
+            home={profile.defaultMapCenter ? {
+              lat: profile.defaultMapCenter.lat,
+              lng: profile.defaultMapCenter.lng,
+              label: profile.company || profile.fullName || undefined,
+            } : null}
+            onFlyTo={(target) => {
+              // Brand-new object identity each call so MapView3D's
+              // effect fires even if user re-picks the same destination.
+              setFlyToTarget({ ...target });
+            }}
+            onClose={() => setDestinationsOpen(false)}
           />
 
           {/* Mobile search — sits inline at top of screen on small
@@ -1082,6 +1115,7 @@ export default function MapPage() {
             onGamepadParcelHoverChange={handleParcelHoverChange}
             onGamepadStatusChange={handleGamepadStatus}
             flightSpeedMultiplier={flightTuning.multiplier}
+            flyToTarget={flyToTarget}
           />
         )}
 

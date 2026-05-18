@@ -188,16 +188,33 @@ function fpToMap3D(cam: FpCam): {
   };
 }
 
+// Cinematic flight target — when the page sets a new value (new
+// object identity per trigger), MapView3D animates the camera from
+// current pose to this pose over ~2.5s. After arrival, normal
+// gamepad flight resumes from the new pose.
+export interface FlyToTarget {
+  lat: number;
+  lng: number;
+  altitude: number;
+  heading: number;
+  pitch: number;
+  range: number;
+  /** Optional override duration. Default ~2500ms. */
+  durationMs?: number;
+}
+
 function Inner({
   center,
   gamepadEnabled,
   gamepadActions,
   flightSpeedMultiplier = 1.0,
+  flyToTarget,
 }: {
   center?: { lat: number; lng: number } | null;
   gamepadEnabled: boolean;
   gamepadActions?: GamepadActions;
   flightSpeedMultiplier?: number;
+  flyToTarget?: FlyToTarget | null;
 }) {
   const maps3d = useMapsLibrary('maps3d');
   const elRef = useRef<Map3DElement | null>(null);
@@ -214,6 +231,91 @@ function Inner({
   // feel immediately while panel is open.
   const speedMultRef = useRef<number>(flightSpeedMultiplier);
   speedMultRef.current = flightSpeedMultiplier;
+  // Cinematic flight animation state. When non-null, the per-frame
+  // gamepad input is suppressed and we interpolate from `from` to
+  // `to` over `durationMs`. After arrival, returns to normal flight.
+  const flyAnimRef = useRef<{
+    from: FpCam;
+    to: { lat: number; lng: number; altitude: number; heading: number; pitch: number; range: number };
+    startMs: number;
+    durationMs: number;
+  } | null>(null);
+
+  // Trigger cinematic flight when flyToTarget changes (new object
+  // identity from the page). Snapshots current eye pose as the
+  // animation's `from`; a dedicated RAF loop interpolates from →
+  // to over durationMs with eased lat/lng/altitude/heading/pitch
+  // PLUS an arc-altitude lift so intercontinental hops swoop up
+  // and over instead of skimming flat at low altitude.
+  useEffect(() => {
+    if (!flyToTarget || !camRef.current || !elRef.current) return;
+    flyAnimRef.current = {
+      from: { ...camRef.current },
+      to: {
+        lat: flyToTarget.lat,
+        lng: flyToTarget.lng,
+        altitude: flyToTarget.altitude,
+        heading: flyToTarget.heading,
+        pitch: flyToTarget.pitch,
+        range: flyToTarget.range,
+      },
+      startMs: performance.now(),
+      durationMs: flyToTarget.durationMs ?? 2500,
+    };
+    // Zero out gamepad velocity state so input doesn't fight the
+    // animation when it lands.
+    airRef.current = { throttle: 0, strafe: 0, yaw: 0 };
+    velRef.current = { panX: 0, panY: 0, heading: 0, tilt: 0 };
+
+    // RAF loop for the animation. Self-cancels when the animation
+    // finishes. Runs independent of the gamepad loop so destinations
+    // work whether or not a controller is connected.
+    let rafId: number;
+    function tick() {
+      const anim = flyAnimRef.current;
+      const el = elRef.current;
+      const cam = camRef.current;
+      if (!anim || !el || !cam) return;
+      const now = performance.now();
+      const t = Math.min(1, (now - anim.startMs) / anim.durationMs);
+      // Cubic ease-in-out — slow start, fast middle, slow end.
+      const eased = t < 0.5
+        ? 4 * t * t * t
+        : 1 - Math.pow(-2 * t + 2, 3) / 2;
+      // Lerp the simple scalars.
+      // Heading uses shortest-path interpolation (avoid going the long
+      // way around when from=350° and to=10°).
+      const dHeading = ((anim.to.heading - anim.from.heading + 540) % 360) - 180;
+      cam.lat      = anim.from.lat      + (anim.to.lat      - anim.from.lat)      * eased;
+      cam.lng      = anim.from.lng      + (anim.to.lng      - anim.from.lng)      * eased;
+      cam.heading  = (anim.from.heading + dHeading * eased + 360) % 360;
+      cam.pitch    = anim.from.pitch    + (anim.to.pitch    - anim.from.pitch)    * eased;
+      cam.range    = anim.from.range    + (anim.to.range    - anim.from.range)    * eased;
+      // Altitude gets an arc lift on top of the base interpolation —
+      // peaks at the midpoint, scaled by hop distance so short hops
+      // barely rise and intercontinental hops climb dramatically.
+      const baseAlt = anim.from.altitude + (anim.to.altitude - anim.from.altitude) * eased;
+      const hopDistDeg = Math.hypot(anim.to.lat - anim.from.lat, anim.to.lng - anim.from.lng);
+      const arcHeight = Math.min(50_000, hopDistDeg * 400);  // meters; capped sane
+      const archParabola = 4 * t * (1 - t);                  // 0..1..0
+      cam.altitude = baseAlt + arcHeight * archParabola;
+      // Write to element via the same fpToMap3D conversion.
+      const m3d = fpToMap3D(cam);
+      el.center = m3d.center;
+      el.heading = m3d.heading;
+      el.tilt = m3d.tilt;
+      el.range = m3d.range;
+      if (t >= 1) {
+        flyAnimRef.current = null;  // done
+        return;
+      }
+      rafId = requestAnimationFrame(tick);
+    }
+    rafId = requestAnimationFrame(tick);
+    return () => {
+      cancelAnimationFrame(rafId);
+    };
+  }, [flyToTarget]);
 
   // Mount the gmp-map-3d element once the maps3d library is loaded.
   useEffect(() => {
@@ -262,6 +364,12 @@ function Inner({
       if (!el || !cam) return;
 
       elapsedMsRef.current = elapsedMs;
+
+      // Cinematic flight in progress — the destination-fly RAF loop
+      // owns the camera writes this frame. Skip gamepad input so it
+      // doesn't fight the animation. Resumes naturally on next frame
+      // after flyAnimRef clears.
+      if (flyAnimRef.current) return;
 
       // ── Edge-triggered button actions (same as 2D) ────────────────
       if (justPressed.size > 0) {
@@ -417,6 +525,7 @@ export default function MapView3D(props: MapViewProps) {
         gamepadEnabled={!!props.gamepadEnabled}
         gamepadActions={props.gamepadActions}
         flightSpeedMultiplier={props.flightSpeedMultiplier}
+        flyToTarget={props.flyToTarget}
       />
     </APIProvider>
   );

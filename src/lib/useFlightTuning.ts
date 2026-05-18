@@ -61,7 +61,10 @@ const DEFAULT_TUNING: FlightTuning = { preset: 'pilot', multiplier: 1.0, climbRa
 
 function clampMultiplier(n: number): number {
   if (!Number.isFinite(n)) return 1.0;
-  if (n < 0.3) return 0.3;
+  // Floor at 0.1× so users can crawl — Greg flagged the previous
+  // 0.3× minimum was still "pretty fast" at the new base constants
+  // because the underlying world is huge.
+  if (n < 0.1) return 0.1;
   if (n > 2.5) return 2.5;
   return n;
 }

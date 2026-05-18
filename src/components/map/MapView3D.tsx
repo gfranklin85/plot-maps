@@ -30,18 +30,24 @@ import type { GamepadActions } from "./GamepadFlightController";
 const API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
 
 // ── Physics constants (copied from the 2D airplane mode) ──────────
-const AIR_THROTTLE_ACCEL = 700;
+// Base physics constants — tuned 2026-05-17 so the 1.0× slider value
+// (Pilot preset) is a TRUE cruise pace, not "already pretty fast" as
+// before. Previously the slider's 0.5× still felt like a race; the
+// floor needed to actually crawl. Cut accel + max ~2.8× from the
+// earlier "1.0×" tuning. The slider's new top (2.5× now feels like
+// the old Pro) covers the full range of "drift slow" to "race fast."
+const AIR_THROTTLE_ACCEL = 250;
 const AIR_THROTTLE_DRAG = 0.965;
-const AIR_THROTTLE_MAX = 360;
-const AIR_STRAFE_ACCEL = 600;
+const AIR_THROTTLE_MAX = 130;
+const AIR_STRAFE_ACCEL = 220;
 const AIR_STRAFE_DRAG = 0.96;
-const AIR_STRAFE_MAX = 320;
-const AIR_YAW_ACCEL = 75;
+const AIR_STRAFE_MAX = 115;
+const AIR_YAW_ACCEL = 28;
 const AIR_YAW_DRAG = 0.94;
-const AIR_YAW_MAX = 30;
-const TILT_ACCEL_DEG_S2 = 220;
+const AIR_YAW_MAX = 11;
+const TILT_ACCEL_DEG_S2 = 80;
 const TILT_DRAG = 0.86;
-const TILT_MAX_DEG_S = 70;
+const TILT_MAX_DEG_S = 26;
 // PAN_BOOST_MULT lives in the 2D path on LB-hold; we use LB/RB for
 // zoom in 3D so the boost is intentionally removed here.
 

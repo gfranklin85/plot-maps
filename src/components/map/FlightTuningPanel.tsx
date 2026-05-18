@@ -99,7 +99,7 @@ export default function FlightTuningPanel({
         </div>
         <input
           type="range"
-          min={0.3}
+          min={0.1}
           max={2.5}
           step={0.05}
           value={tuning.multiplier}
@@ -131,7 +131,7 @@ export default function FlightTuningPanel({
         </div>
         <input
           type="range"
-          min={0.3}
+          min={0.1}
           max={2.5}
           step={0.05}
           value={tuning.turnRate}
@@ -163,7 +163,7 @@ export default function FlightTuningPanel({
         </div>
         <input
           type="range"
-          min={0.3}
+          min={0.1}
           max={2.5}
           step={0.05}
           value={tuning.climbRate}

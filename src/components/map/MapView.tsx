@@ -15,6 +15,15 @@ import ParcelOverlay, { type ParcelColorMode, type ParcelHitTester } from "./Par
 import AdvancedLeadMarkers from "./AdvancedLeadMarkers";
 import GamepadFlightController, { type GamepadActions, type FlightMode, type ReticleTarget } from "./GamepadFlightController";
 import { useCameraChoreographer, type FlyToOptions } from "@/lib/useCameraChoreographer";
+import { AtmosphereProvider } from "@/lib/atmosphere/AtmosphereContext";
+import AtmosphereOverlay from "./AtmosphereOverlay";
+
+// Atmosphere feature flag. Same flag used by MapView3D — flip
+// NEXT_PUBLIC_PLOT_ATMOSPHERE=1 in .env.local to render the time-of-day
+// grade on both surfaces.
+const ATMOSPHERE_ENABLED =
+  process.env.NEXT_PUBLIC_PLOT_ATMOSPHERE === '1' ||
+  process.env.NEXT_PUBLIC_PLOT_ATMOSPHERE === 'true';
 
 // Theme-aware pin colors
 const PIN_THEME = {
@@ -634,7 +643,16 @@ export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClic
     [leads]
   );
 
+  // Atmosphere center: prefer the explicit `center` prop (the user's
+  // hometown), fall back to MAP_CENTER. Anchored to the framing center,
+  // not the live camera position — the visual difference is sub-degree
+  // over any reasonable session travel and a fixed anchor avoids
+  // re-rendering the provider value every camera tick.
+  const atmosCenter = center ?? MAP_CENTER;
+
   return (
+    <AtmosphereProvider lat={atmosCenter.lat} lng={atmosCenter.lng}>
+    <div className="relative h-full w-full">
     <APIProvider apiKey={API_KEY} libraries={['places', 'marker']}>
       <Map
         defaultCenter={center || MAP_CENTER}
@@ -703,5 +721,8 @@ export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClic
         {prospectPins.length > 0 && <ProspectPins pins={prospectPins} onPinClick={onProspectPinClick} />}
       </Map>
     </APIProvider>
+    <AtmosphereOverlay enabled={ATMOSPHERE_ENABLED} />
+    </div>
+    </AtmosphereProvider>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import MaterialIcon from "@/components/ui/MaterialIcon";
-import type { FlightTuning } from "@/lib/useFlightTuning";
+import { AXIS_RANGES, type FlightTuning } from "@/lib/useFlightTuning";
 
 interface Props {
   visible: boolean;
@@ -60,6 +60,8 @@ export default function FlightTuningPanel({
       <Slider
         label="Flight speed"
         value={tuning.multiplier}
+        min={AXIS_RANGES.multiplier.min}
+        max={AXIS_RANGES.multiplier.max}
         leftEnd="Slow"
         rightEnd="Fast"
         onChange={onMultiplierChange}
@@ -67,6 +69,8 @@ export default function FlightTuningPanel({
       <Slider
         label="Turn rate"
         value={tuning.turnRate}
+        min={AXIS_RANGES.turnRate.min}
+        max={AXIS_RANGES.turnRate.max}
         leftEnd="Cinematic"
         rightEnd="Snappy"
         onChange={onTurnRateChange}
@@ -74,6 +78,8 @@ export default function FlightTuningPanel({
       <Slider
         label="Tilt rate"
         value={tuning.tiltRate}
+        min={AXIS_RANGES.tiltRate.min}
+        max={AXIS_RANGES.tiltRate.max}
         leftEnd="Slow"
         rightEnd="Quick"
         onChange={onTiltRateChange}
@@ -81,6 +87,8 @@ export default function FlightTuningPanel({
       <Slider
         label="Climb rate"
         value={tuning.climbRate}
+        min={AXIS_RANGES.climbRate.min}
+        max={AXIS_RANGES.climbRate.max}
         leftEnd="Cinematic"
         rightEnd="Rapid"
         onChange={onClimbRateChange}
@@ -105,12 +113,22 @@ export default function FlightTuningPanel({
 interface SliderProps {
   label: string;
   value: number;
+  min: number;
+  max: number;
   leftEnd: string;
   rightEnd: string;
   onChange: (v: number) => void;
 }
 
-function Slider({ label, value, leftEnd, rightEnd, onChange }: SliderProps) {
+function Slider({ label, value, min, max, leftEnd, rightEnd, onChange }: SliderProps) {
+  // Step scales with the range so wider sliders aren't gritty and
+  // narrow ones aren't jumpy. ~50 steps end-to-end feels right.
+  const step = Math.max(0.01, Math.round(((max - min) / 50) * 100) / 100);
+  // Only show the "1×" tick if 1.0 actually falls inside the range
+  // (climb's range is 0.05..1.2 so the tick sits near the right;
+  // turn's range is 0.5..4.0 so the tick sits near the left).
+  const oneInRange = min <= 1 && max >= 1;
+
   return (
     <div>
       <div className="flex items-center justify-between mb-1">
@@ -123,17 +141,21 @@ function Slider({ label, value, leftEnd, rightEnd, onChange }: SliderProps) {
       </div>
       <input
         type="range"
-        min={0.1}
-        max={2.5}
-        step={0.05}
+        min={min}
+        max={max}
+        step={step}
         value={value}
         onChange={(e) => onChange(parseFloat(e.target.value))}
         className="w-full accent-primary"
       />
       <div className="flex items-center justify-between mt-0.5 text-[9px] text-on-surface-variant">
         <span>{leftEnd}</span>
-        <span className="opacity-50">·</span>
-        <span className="font-semibold">1×</span>
+        {oneInRange && (
+          <>
+            <span className="opacity-50">·</span>
+            <span className="font-semibold">1×</span>
+          </>
+        )}
         <span className="opacity-50">·</span>
         <span>{rightEnd}</span>
       </div>

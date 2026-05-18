@@ -7,6 +7,16 @@ import { useGamepad } from "@/lib/useGamepad";
 import type { ButtonName } from "@/lib/gamepadActions";
 import type { MapViewProps } from "./MapView";
 import type { GamepadActions } from "./GamepadFlightController";
+import { AtmosphereProvider } from "@/lib/atmosphere/AtmosphereContext";
+import AtmosphereOverlay from "./AtmosphereOverlay";
+
+// Atmosphere feature flag. Phase 4a ships behind an env toggle so we
+// can ship the code without forcing the visual on for every user
+// before Greg's seen it on his own map. Flip to '1' (or any truthy
+// string) in .env.local to render the time-of-day grade.
+const ATMOSPHERE_ENABLED =
+  process.env.NEXT_PUBLIC_PLOT_ATMOSPHERE === '1' ||
+  process.env.NEXT_PUBLIC_PLOT_ATMOSPHERE === 'true';
 
 // ── Photorealistic 3D Tiles surface (Map3DElement / <gmp-map-3d>) ───
 //
@@ -622,12 +632,23 @@ function Inner({
     },
   });
 
+  // Atmosphere center: prefer the explicit `center` prop (the user's
+  // chosen hometown), fall back to MAP_CENTER. Sun position barely
+  // shifts over typical Plot session travel (~12 mi yields 0.15°
+  // azimuth delta), so we anchor to the framing center rather than
+  // tracking the live camera position. Cheaper, identical-looking.
+  const atmosCenter = center ?? MAP_CENTER;
+
   return (
-    <div
-      ref={containerRef}
-      className="h-full w-full"
-      style={{ background: '#0a1020' }}
-    />
+    <AtmosphereProvider lat={atmosCenter.lat} lng={atmosCenter.lng}>
+      <div
+        ref={containerRef}
+        className="h-full w-full relative"
+        style={{ background: '#0a1020' }}
+      >
+        <AtmosphereOverlay enabled={ATMOSPHERE_ENABLED} />
+      </div>
+    </AtmosphereProvider>
   );
 }
 

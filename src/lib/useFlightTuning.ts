@@ -33,10 +33,31 @@ const DEFAULT_TUNING: FlightTuning = {
   climbRate: 1.0,
 };
 
-function clampMultiplier(n: number): number {
+// Per-axis slider ranges. 1.0× is always the "designed default" feel
+// (the value the base accel constants in MapView3D are tuned to), so
+// the panel UI can still anchor a tick at 1.0. Bounds differ because
+// the right "fast/slow" envelope is different per axis:
+//
+//   pan   — 0.1..2.5 (wide; user preferences vary the most here)
+//   turn  — 0.5..4.0 (skewed UP — right-stick yaw was too slow at 1.0×)
+//   tilt  — 0.1..2.5
+//   climb — 0.05..1.2 (skewed DOWN — LT/RT was too fast at 1.0×)
+//
+// Greg dialed both 2026-05-18 after live flight: turn felt sluggish
+// even at the high end, climb felt spaceship-fast even at the low end.
+export interface AxisRange { min: number; max: number; }
+export const AXIS_RANGES: Record<keyof FlightTuning, AxisRange> = {
+  multiplier: { min: 0.5,  max: 5.0 },
+  turnRate:   { min: 0.5,  max: 4.0 },
+  tiltRate:   { min: 0.1,  max: 2.5 },
+  climbRate:  { min: 0.05, max: 1.2 },
+};
+
+function clampAxis(n: number, axis: keyof FlightTuning): number {
+  const { min, max } = AXIS_RANGES[axis];
   if (!Number.isFinite(n)) return 1.0;
-  if (n < 0.1) return 0.1;
-  if (n > 2.5) return 2.5;
+  if (n < min) return min;
+  if (n > max) return max;
   return n;
 }
 
@@ -46,18 +67,21 @@ function readFromStorage(): FlightTuning {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return DEFAULT_TUNING;
     const parsed = JSON.parse(raw) as Partial<FlightTuning>;
-    const multiplier = clampMultiplier(typeof parsed.multiplier === 'number' ? parsed.multiplier : 1.0);
+    const multiplier = clampAxis(typeof parsed.multiplier === 'number' ? parsed.multiplier : 1.0, 'multiplier');
     // Back-compat: old saved tunings without per-axis fields fall
     // back to the speed multiplier value, preserving prior feel
     // until the user touches the new sliders.
-    const turnRate = clampMultiplier(
+    const turnRate = clampAxis(
       typeof parsed.turnRate === 'number' ? parsed.turnRate : multiplier,
+      'turnRate',
     );
-    const tiltRate = clampMultiplier(
+    const tiltRate = clampAxis(
       typeof parsed.tiltRate === 'number' ? parsed.tiltRate : multiplier,
+      'tiltRate',
     );
-    const climbRate = clampMultiplier(
+    const climbRate = clampAxis(
       typeof parsed.climbRate === 'number' ? parsed.climbRate : multiplier,
+      'climbRate',
     );
     return { multiplier, turnRate, tiltRate, climbRate };
   } catch {
@@ -79,7 +103,7 @@ export function useFlightTuning() {
   }, []);
 
   const setMultiplier = useCallback((multiplier: number) => {
-    const clamped = clampMultiplier(multiplier);
+    const clamped = clampAxis(multiplier, 'multiplier');
     setTuningState(prev => {
       const next: FlightTuning = { ...prev, multiplier: clamped };
       writeToStorage(next);
@@ -88,7 +112,7 @@ export function useFlightTuning() {
   }, []);
 
   const setTurnRate = useCallback((turnRate: number) => {
-    const clamped = clampMultiplier(turnRate);
+    const clamped = clampAxis(turnRate, 'turnRate');
     setTuningState(prev => {
       const next: FlightTuning = { ...prev, turnRate: clamped };
       writeToStorage(next);
@@ -97,7 +121,7 @@ export function useFlightTuning() {
   }, []);
 
   const setTiltRate = useCallback((tiltRate: number) => {
-    const clamped = clampMultiplier(tiltRate);
+    const clamped = clampAxis(tiltRate, 'tiltRate');
     setTuningState(prev => {
       const next: FlightTuning = { ...prev, tiltRate: clamped };
       writeToStorage(next);
@@ -106,7 +130,7 @@ export function useFlightTuning() {
   }, []);
 
   const setClimbRate = useCallback((climbRate: number) => {
-    const clamped = clampMultiplier(climbRate);
+    const clamped = clampAxis(climbRate, 'climbRate');
     setTuningState(prev => {
       const next: FlightTuning = { ...prev, climbRate: clamped };
       writeToStorage(next);

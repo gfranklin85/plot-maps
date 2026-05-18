@@ -31,6 +31,7 @@
     "resend": "^6.10.0",
     "shapefile": "^0.6.6",
     "stripe": "^22.0.0",
+    "suncalc": "^1.9.0",
     "twilio": "^5.13.1"
   },
   "devDependencies": {
@@ -39,6 +40,7 @@
     "@types/proj4": "^2.5.6",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+    "@types/suncalc": "^1.9.2",
     "eslint": "^8",
     "eslint-config-next": "14.2.35",
     "postcss": "^8",

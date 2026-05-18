@@ -522,7 +522,7 @@ export default function MapPage() {
   const { position: reticlePosition, setPosition: setReticlePosition, resetPosition: resetReticlePosition } = useReticlePosition();
   // Flight feel tuning — single master multiplier + preset chips.
   // Lives in a toolbar-opened panel; live-previews changes while open.
-  const { tuning: flightTuning, setPreset: setFlightPreset, setMultiplier: setFlightMultiplier } = useFlightTuning();
+  const { tuning: flightTuning, setPreset: setFlightPreset, setMultiplier: setFlightMultiplier, setClimbRate: setFlightClimbRate } = useFlightTuning();
   const [flightTuningOpen, setFlightTuningOpen] = useState(false);
   // Destinations overlay — curated cities + search + Home. Sets
   // flyToTarget which MapView3D animates the camera toward.
@@ -871,6 +871,7 @@ export default function MapPage() {
             tuning={flightTuning}
             onPresetChange={setFlightPreset}
             onMultiplierChange={setFlightMultiplier}
+            onClimbRateChange={setFlightClimbRate}
             onClose={() => setFlightTuningOpen(false)}
           />
 
@@ -1115,6 +1116,7 @@ export default function MapPage() {
             onGamepadParcelHoverChange={handleParcelHoverChange}
             onGamepadStatusChange={handleGamepadStatus}
             flightSpeedMultiplier={flightTuning.multiplier}
+            climbRateMultiplier={flightTuning.climbRate}
             flyToTarget={flyToTarget}
           />
         )}

@@ -103,9 +103,13 @@ export interface MapViewProps {
   onGamepadFocalScreenYChange?: (fraction: number) => void;
   onGamepadStatusChange?: (connected: boolean, label: string | null) => void;
   /** Master flight-speed multiplier from useFlightTuning. 1.0 = default
-   *  Pilot feel; 0.6 = Newcomer; 1.6 = Pro. Scales pan/yaw/tilt/zoom
+   *  Pilot feel; 0.6 = Newcomer; 1.6 = Pro. Scales pan/yaw/tilt
    *  acceleration uniformly in both 2D and 3D paths. */
   flightSpeedMultiplier?: number;
+  /** Climb rate multiplier — scales LB/RB dolly speed independently
+   *  of flight speed. 3D path only (2D path uses triggers as zoom).
+   *  Default 1.0. */
+  climbRateMultiplier?: number;
   /** Cinematic flight target. Set to a new object reference to trigger
    *  an animated transition from current camera pose to the target. The
    *  3D path implements this; the 2D path ignores. */

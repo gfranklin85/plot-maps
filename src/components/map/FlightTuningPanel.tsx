@@ -12,6 +12,7 @@ interface Props {
   tuning: FlightTuning;
   onPresetChange: (preset: FlightPreset) => void;
   onMultiplierChange: (multiplier: number) => void;
+  onClimbRateChange: (climbRate: number) => void;
   onClose: () => void;
 }
 
@@ -22,29 +23,31 @@ const PRESET_META: Record<Exclude<FlightPreset, 'custom'>, { label: string; hint
 };
 
 /**
- * Flight tuning UI. Master speed multiplier slider + three preset
- * buttons. Sits as a small floating panel anchored to the map
- * toolbar; live preview — moving the slider changes flight feel
- * immediately while the panel is open.
+ * Flight tuning UI. Preset chips set both axes to the same preset.
+ * Two independent sliders:
+ *   - Flight speed — pan / yaw / tilt acceleration.
+ *   - Climb rate — LB/RB descent/ascent. NOT a camera zoom; the eye
+ *     moves through the world.
  *
- * Mouse-only for v1. Full controller-navigable settings UI is its
- * own design sprint (memory-saved).
+ * Mouse-only for v1. Live-preview — moving either slider changes
+ * flight feel immediately while flying.
  */
 export default function FlightTuningPanel({
   visible,
   tuning,
   onPresetChange,
   onMultiplierChange,
+  onClimbRateChange,
   onClose,
 }: Props) {
   if (!visible) return null;
 
   return (
-    <div className="absolute top-4 right-16 z-20 w-72 rounded-2xl bg-surface/90 backdrop-blur-md shadow-2xl border border-card-border p-4 space-y-4">
+    <div className="absolute top-4 right-16 z-20 w-80 rounded-2xl bg-surface/90 backdrop-blur-md shadow-2xl border border-card-border p-4 space-y-4">
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-sm font-bold text-on-surface">Flight feel</h3>
-          <p className="text-[10px] text-on-surface-variant mt-0.5">Tunes pan, yaw, tilt, and zoom together.</p>
+          <p className="text-[10px] text-on-surface-variant mt-0.5">Speed = move/turn. Climb = descend/ascend.</p>
         </div>
         <button
           onClick={onClose}
@@ -55,7 +58,7 @@ export default function FlightTuningPanel({
         </button>
       </div>
 
-      {/* Preset chips */}
+      {/* Preset chips — set both axes to the same preset for one-tap tuning. */}
       <div className="flex gap-1.5">
         {(Object.keys(PRESET_META) as Array<keyof typeof PRESET_META>).map((key) => {
           const meta = PRESET_META[key];
@@ -77,11 +80,11 @@ export default function FlightTuningPanel({
         })}
       </div>
 
-      {/* Master slider */}
+      {/* Flight speed slider — pan / yaw / tilt */}
       <div>
         <div className="flex items-center justify-between mb-1.5">
           <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">
-            Speed
+            Flight speed
           </label>
           <span className="text-[10px] font-mono text-on-surface tabular-nums">
             {tuning.multiplier.toFixed(2)}×
@@ -97,15 +100,47 @@ export default function FlightTuningPanel({
           className="w-full accent-primary"
         />
         <div className="flex items-center justify-between mt-1 text-[9px] text-on-surface-variant">
-          <span>0.3×</span>
-          <span className="opacity-50">|</span>
+          <span>Slow</span>
+          <span className="opacity-50">·</span>
           <span>{PRESET_MULTIPLIERS.newcomer}×</span>
-          <span className="opacity-50">|</span>
+          <span className="opacity-50">·</span>
           <span className="font-semibold">{PRESET_MULTIPLIERS.pilot}×</span>
-          <span className="opacity-50">|</span>
+          <span className="opacity-50">·</span>
           <span>{PRESET_MULTIPLIERS.pro}×</span>
-          <span className="opacity-50">|</span>
-          <span>2.5×</span>
+          <span className="opacity-50">·</span>
+          <span>Fast</span>
+        </div>
+      </div>
+
+      {/* Climb rate slider — LB/RB descent/ascent */}
+      <div>
+        <div className="flex items-center justify-between mb-1.5">
+          <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">
+            Climb rate
+          </label>
+          <span className="text-[10px] font-mono text-on-surface tabular-nums">
+            {tuning.climbRate.toFixed(2)}×
+          </span>
+        </div>
+        <input
+          type="range"
+          min={0.3}
+          max={2.5}
+          step={0.05}
+          value={tuning.climbRate}
+          onChange={(e) => onClimbRateChange(parseFloat(e.target.value))}
+          className="w-full accent-primary"
+        />
+        <div className="flex items-center justify-between mt-1 text-[9px] text-on-surface-variant">
+          <span>Cinematic</span>
+          <span className="opacity-50">·</span>
+          <span>{PRESET_MULTIPLIERS.newcomer}×</span>
+          <span className="opacity-50">·</span>
+          <span className="font-semibold">{PRESET_MULTIPLIERS.pilot}×</span>
+          <span className="opacity-50">·</span>
+          <span>{PRESET_MULTIPLIERS.pro}×</span>
+          <span className="opacity-50">·</span>
+          <span>Rapid</span>
         </div>
       </div>
 

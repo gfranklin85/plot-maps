@@ -208,12 +208,14 @@ function Inner({
   gamepadEnabled,
   gamepadActions,
   flightSpeedMultiplier = 1.0,
+  climbRateMultiplier = 1.0,
   flyToTarget,
 }: {
   center?: { lat: number; lng: number } | null;
   gamepadEnabled: boolean;
   gamepadActions?: GamepadActions;
   flightSpeedMultiplier?: number;
+  climbRateMultiplier?: number;
   flyToTarget?: FlyToTarget | null;
 }) {
   const maps3d = useMapsLibrary('maps3d');
@@ -231,6 +233,10 @@ function Inner({
   // feel immediately while panel is open.
   const speedMultRef = useRef<number>(flightSpeedMultiplier);
   speedMultRef.current = flightSpeedMultiplier;
+  // Separate ref for climb rate so dolly speed can scale independently
+  // of pan/yaw/tilt. Some users want fast pan + cinematic descent.
+  const climbMultRef = useRef<number>(climbRateMultiplier);
+  climbMultRef.current = climbRateMultiplier;
   // Cinematic flight animation state. When non-null, the per-frame
   // gamepad input is suppressed and we interpolate from `from` to
   // `to` over `durationMs`. After arrival, returns to normal flight.
@@ -397,9 +403,11 @@ function Inner({
       if (zoomSign !== 0) {
         // Move along view direction (heading + pitch). Speed scales with
         // current range so it feels equally responsive at any altitude.
-        // User's flight-speed multiplier also applies so the dolly
-        // matches the rest of the flight feel as the slider moves.
-        const moveMeters = zoomSign * cam.range * ZOOM_DOLLY_RATE_PER_SEC * speedMultRef.current * dt;
+        // User's CLIMB-RATE multiplier (separate from flight speed) is
+        // what actually scales this — descent/ascent is its own axis,
+        // not a "zoom speed." Lets users have fast pan + cinematic climb
+        // (or vice versa).
+        const moveMeters = zoomSign * cam.range * ZOOM_DOLLY_RATE_PER_SEC * climbMultRef.current * dt;
         const pitchRad = (cam.pitch * Math.PI) / 180;
         const headingRad = (cam.heading * Math.PI) / 180;
         const horizMove = moveMeters * Math.cos(pitchRad);
@@ -525,6 +533,7 @@ export default function MapView3D(props: MapViewProps) {
         gamepadEnabled={!!props.gamepadEnabled}
         gamepadActions={props.gamepadActions}
         flightSpeedMultiplier={props.flightSpeedMultiplier}
+        climbRateMultiplier={props.climbRateMultiplier}
         flyToTarget={props.flyToTarget}
       />
     </APIProvider>

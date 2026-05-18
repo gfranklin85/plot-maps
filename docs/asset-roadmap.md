@@ -175,6 +175,93 @@ Per the active prospecting backend workstream.
 
 ---
 
+## V-a. MAP UI ICONOGRAPHY — the most-touched surface in Plot
+
+Auditing the live `/map` page, ~30 generic Material icons currently serve as buttons, badges, and labels on the most-used surface in the product. Each one gets replaced with a hand-crafted artifact in the Plot visual world. Every map session starts with eyes hitting these.
+
+**The discipline:** all map UI artifacts share one visual hand — same brass tone, same patina age, same edge weight, same lighting (canonical light upper-left at ~30°, per `project_visual_rendering_language`). Build 2-3 of the universal recurring artifacts FIRST to lock the visual language; everything after inherits.
+
+### V-a.1 — Universal recurring artifacts (build these first, they appear in 3-5 places each)
+
+These ten artifacts cover ~60% of the map's icon surface because they recur. Investing here pays compound returns — designing the rotary phone once retires three different popup icons.
+
+| Artifact | Status | Appears as | Brief |
+|---|---|---|---|
+| Brass loupe | ⚪ Identified | toolbar Search, popup search inputs, Destinations panel search, future search-anywhere | Small handheld magnifier on a fine chain. Brass body, glass lens, slight patina. The recurring "find" verb. |
+| Rotary phone handset | ⚪ Identified | popup "Dial" button, popup phone-number rows, future call surfaces | Real Western-Electric-era handset seen from the side — earpiece on top, mouthpiece on bottom, cloth-wrapped cord. Brass-tinted bell hardware. The recurring "call" verb. |
+| Opened envelope + Plot wax seal | ⚪ Identified | popup "Send Invitation", future text inbox, future outbound campaigns | Aged paper envelope, flap open, deep-red Plot wax seal visible on flap or letter peeking out. The wax-seal design is its own canonical Plot artifact (see Surveyor's-mark stamp under Section V). |
+| Brass key (small) | ⚪ Identified | every panel close button, every drift-card dismiss, every modal exit | Small period brass key with engraved Plot star on bow. ONE asset that becomes the universal "close" verb across all surfaces. The single most-used artifact in the whole product. |
+| Field stake (mini) | ⚪ Identified | Destinations saved-spot rows, Prospect List "add", "pin a card", future "drop a marker" | Smaller proportional version of the Survey Stake from the Pin Family (Section II). The full-size Survey Stake lives in the world as a 3D object; this mini version lives in the UI as a flat illustration. Same craftsmanship, scaled. |
+| Worn leather field boots | ⚪ Identified | toolbar Walk Mode, popup "Walk" pill, future walking-mode entries | Pair of well-worn brown leather boots with a small brass compass tag hanging off the laces. The "boots on the ground" verb. |
+| Brass surveyor's transit | ⚪ Identified | toolbar Prospect Select, popup "Select Prospects" pill, future targeting | Seen straight-on (the round optical lens face). Brass barrel, fine scope crosshairs visible through the lens. The recurring "precision marking" verb. |
+| Plot wax seal (pressed) | ⚪ Identified | popup outcome-logged checkmark, postcard back, future commitment signatures | The CANONICAL Plot signet stamp pressed into deep-red wax. Same design as appears on the envelope flap. Use this as the recurring "this is now committed to the ledger" mark. |
+| Migratory bird (line-art) | ⚪ Identified | popup Absentee Owner badge | Single bird in flight, brass-tinted ink-line style. "The owner doesn't roost here." Conceptual match for absentee detection. |
+| Brass thumbtack with Plot star | ⚪ Identified | "pin a card" affordance, future "keep on screen" verbs | Small brass thumbtack head viewed from above, Plot star engraved on top. |
+
+### V-a.2 — Flight-mode cockpit artifacts (the cinematic signature)
+
+When this set ships, flight mode genuinely *feels* like a cockpit, not a "3D toggle." This is where the Surveyor's biplane peeks through into the work surface. Highest-impact subset after the universal artifacts.
+
+| Artifact | Status | Function | Brief |
+|---|---|---|---|
+| Biplane silhouette | ⚪ Identified | toolbar Airplane / Flight Mode toggle | Open-cockpit early-20th-century biplane (matching the Surveyor identity era — 1915-1955). Side view, slight rake. The signature of Plot's flight mode. |
+| Brass aviator's altimeter | ⚪ Identified | live altitude gauge (currently text-only) | Circular brass instrument with painted numerals, a real moving needle, glass face. ONE OF THE MOST BEAUTIFUL ARTIFACTS IN THE CATHEDRAL. The needle's motion driven by the live altitude reading at runtime. |
+| Brass aircraft trim wheel | ⚪ Identified | Flight Tuning panel button (toolbar) | Rotary brass control wheel with notched markings around its edge. Speaks aviation. |
+| Brass trim wheels × 4 (pan / turn / tilt / climb) | ⚪ Identified | inside Flight Tuning panel — replaces CSS sliders | One wheel per axis, each labeled in painted script. The panel becomes a proper instrument cluster. Real interaction: drag the wheel to rotate it, runtime reads angle → multiplier. |
+
+### V-a.3 — Toolbar anchor + map controls
+
+The 9-item map toolbar in the top-right corner.
+
+| Artifact | Status | Function | Brief |
+|---|---|---|---|
+| Brass instrument-cluster (closed-toolkit) | ⚪ Identified | toolbar anchor (closed state) | Small brass silhouette implying "open my kit" — a mixed-tools cluster (compass + dividers + chain badge composed). The gateway to all map controls. |
+| Brass clasp / latch (open-toolkit) | ⚪ Identified | toolbar anchor (open state) | A clasp opening upward. Same brass family as the closed anchor. The closed↔open transition should feel like opening and closing a real brass case. |
+| Stack of folded plat-book pages | ⚪ Identified | toolbar Layers | Stack of aged paper plat-book pages with a corner curled up. Direct speak to the cartography brand. |
+| Carved wooden topo relief | ⚪ Identified | toolbar Photoreal 3D toggle (Hybrid mode) | Small carved wooden relief map — topo-style ridges, 3D suggestion in 2D form. The "raise the world" button. |
+| Monocle (with chain) | ⚪ Identified | toolbar POI visibility — visible state | Brass-rimmed monocle dangling on a fine chain. |
+| Monocle in folded brass case | ⚪ Identified | toolbar POI visibility — hidden state | Same monocle but stowed in a closed case. Two states, one artifact family. |
+| Antique globe on stand | ⚪ Identified | toolbar Destinations / Public | Period globe on a brass meridian stand, tilted slightly. The journey-to-anywhere artifact. |
+| Brass admin pin (corner ornament) | ⚪ Identified | replaces text "ADM" badge on admin-only tools | Small brass commission pin worn at the corner of a tool. Plot lore: "you have the surveyor general's commission." |
+
+### V-a.4 — Popup outcome + state artifacts
+
+Inside PropertyPopup. These appear after a call or interaction.
+
+| Artifact | Status | Function | Brief |
+|---|---|---|---|
+| Brass survey marker (round disk) | ⚪ Identified | Parcel Details header icon | The round brass disk surveyors set in the ground to mark a benchmark. "This parcel is officially logged." |
+| Handwritten letter with quill | ⚪ Identified | outcome: Spoke with Owner | Plot voice — communication just happened. |
+| Brass phone receiver set down (off-cradle) | ⚪ Identified | outcome: No Answer | Same family as the rotary phone artifact, in a different state. |
+| Open inkwell with quill resting | ⚪ Identified | outcome: Left Voicemail | Surveyor-era voicemail equivalent — message waiting to be inked. |
+| Closed inkwell with brass cap | ⚪ Identified | outcome: DNC (Do Not Call) | Same inkwell family, sealed. |
+| Brass page-turn ornament (↑ / ↓) | ⚪ Identified | script expand/collapse chevrons | Small brass flourish pointing up or down — the "more in this scroll" affordance. Replaces generic chevrons. |
+
+### V-a.5 — Drift-cards, panels, empty states
+
+| Artifact | Status | Function | Brief |
+|---|---|---|---|
+| Magnifying glass + crossed-arrows ornament | ⚪ Identified | "expand to full" affordance on drift cards | Brass loupe combined with crossed expansion arrows beneath. Brass-tinted. |
+| Empty plat-book page with dashed circle | ⚪ Identified | Prospect List empty state | Large aged paper plat-book page with a single hand-drawn dashed-line circle on it. "You haven't marked anything yet." |
+| Brass surveyor's commission badge (chevron) | ⚪ Identified | Upgrade pill | Military-style chevron in Plot palette. "Promote to Pro." |
+| Field detective's notebook + portrait sketch | ⚪ Identified | Skip-trace button | Small pocket notebook open to a hand-drawn portrait sketch. "Find the owner." |
+| Four brass corner brackets | ⚪ Identified | Fullscreen toggle | Picture-frame brackets that fold inward when tapped. |
+| Folded paper map (corner peeled) | ⚪ Identified | Map nav anchor (top-left) — OR Plot wordmark | Brand moment top-left. Could be the Plot wordmark + a small folded paper-map glyph. |
+| Brass mailbox with Plot mark | ⚪ Identified | Destinations "Home" | A brass mailbox embossed with the Plot mark. "Home" as a Plot artifact, not a generic house. Could carry user's initials engraved on the side. |
+
+### V-a.6 — Production notes
+
+- **Format:** flat 2D illustrations (Affinity), exported as SVG when possible (crisp at any size, small file) or 256×256 PNG for the more painterly artifacts. The 3D-rendered options (altimeter, trim wheels) export from Blender as 512×512 PNG at retina-2x = 1024×1024 source.
+- **Canonical light:** every artifact obeys the canonical Plot light direction — upper-left at ~30°. A loupe with shadow falling down-right; a rotary phone with highlight on the upper-left of the brass; a brass key with the bow lit from upper-left. This is what makes everything feel like *one craftsman touched all of them*.
+- **Color discipline:** every artifact draws from the Plat Book palette (`project_brand_palette_direction`). Brass tones range from `#9c7b4a` (deep oxidized) through `#c9a36b` (mid patina) to `#e8c98a` (polished highlight). Don't drift outside this brass family.
+- **Build order recommendation:**
+  1. **Universal artifacts first** (V-a.1) — these ten retire ~18 generic icons across the product. Even shipping 2-3 of them locks the visual language for everything that follows.
+  2. **Flight-mode cockpit artifacts** (V-a.2) — the cinematic signature of flight mode.
+  3. **Everything else** (V-a.3, V-a.4, V-a.5) — fills in the remaining surface.
+- **Integration:** when an artifact ships, I (Claude) swap the relevant `<MaterialIcon icon="..." />` for `<img src="/assets/icons/..." />` (or `<Icon name="..." />` via a wrapper component we'll set up when the first artifact arrives). Same pattern as the sky dome — runtime is ready, waiting on craft.
+
+---
+
 ## VI. COLD OPEN — "The Survey" (CINEMATIC GATE)
 
 Per the cold-open memory. The 90-second cinematic intro is its own asset universe.

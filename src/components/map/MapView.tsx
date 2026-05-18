@@ -124,6 +124,14 @@ export interface MapViewProps {
    *  HUD readout. 2D path doesn't fire this (altitude isn't a
    *  meaningful concept on the tilted 2D surface). */
   onAltitudeChange?: (meters: number) => void;
+  /** Idle flag from useIdleDetection. When true, 3D path pauses its
+   *  per-frame writes (saves GPU when the user walks away). 2D path
+   *  ignores — its render is event-driven, not loop-driven. */
+  isIdle?: boolean;
+  /** Google POI labels + business icons visible? Default false for
+   *  immersive framing. 2D path: applied via MapTypeStyle. 3D path:
+   *  applied via default-labels-disabled attribute. */
+  poisVisible?: boolean;
   /** Cinematic flight target. Set to a new object reference to trigger
    *  an animated transition from current camera pose to the target. The
    *  3D path implements this; the 2D path ignores. */
@@ -141,13 +149,20 @@ export interface MapViewProps {
 const API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
 const MAP_ID = process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID || undefined;
 
-const MAP_STYLES: google.maps.MapTypeStyle[] = [
-  { featureType: "poi", elementType: "labels", stylers: [{ visibility: "off" }] },
+// Base color-grading styles for the roadmap path. POI hiding is composed
+// in below at render time based on the `poisVisible` prop so the user can
+// flip Google's business labels on/off without losing our color tweaks.
+const MAP_STYLES_BASE: google.maps.MapTypeStyle[] = [
   { featureType: "transit", stylers: [{ visibility: "off" }] },
   { featureType: "water", elementType: "geometry", stylers: [{ color: "#c9d7e8" }] },
   { featureType: "landscape", elementType: "geometry", stylers: [{ color: "#eef2f7" }] },
   { featureType: "road", elementType: "geometry", stylers: [{ color: "#ffffff" }] },
   { featureType: "road", elementType: "labels.text.fill", stylers: [{ color: "#8c9bab" }] },
+];
+
+const POI_HIDE_STYLES: google.maps.MapTypeStyle[] = [
+  { featureType: "poi", stylers: [{ visibility: "off" }] },
+  { featureType: "poi.business", stylers: [{ visibility: "off" }] },
 ];
 
 // ── Pin Icon Generators ──
@@ -594,10 +609,18 @@ function PendingSkiptracePins({ pins }: { pins: { id: string; lat: number; lng: 
   return null;
 }
 
-export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClick, center, navigateTo, zoom, mapType = "roadmap", pinMode = "dots", prospectMode = false, prospectPins = [], onProspectPinClick, showZoningOverlay = false, showParcelOverlay = false, parcelColorMode = 'land_use', onParcelClick, onParcelHoverChange, parcelHitTesterRef, view3D = false, flight = null, gamepadEnabled = false, gamepadActions, gamepadMode = 'overhead', gamepadDebugSuspendMoveCamera = false, gamepadDebugForceFallbackPath = false, gamepadDebugTickleAfterMoveCamera = false, gamepadAirplaneTargets, gamepadReticleXFraction, gamepadReticleYFraction, onGamepadReticleTargetChange, onGamepadParcelHoverChange, onGamepadFocalScreenYChange, onGamepadStatusChange, flightSpeedMultiplier = 1.0, turnRateMultiplier = 1.0, tiltRateMultiplier = 1.0 }: MapViewProps) {
+export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClick, center, navigateTo, zoom, mapType = "roadmap", pinMode = "dots", prospectMode = false, prospectPins = [], onProspectPinClick, showZoningOverlay = false, showParcelOverlay = false, parcelColorMode = 'land_use', onParcelClick, onParcelHoverChange, parcelHitTesterRef, view3D = false, flight = null, gamepadEnabled = false, gamepadActions, gamepadMode = 'overhead', gamepadDebugSuspendMoveCamera = false, gamepadDebugForceFallbackPath = false, gamepadDebugTickleAfterMoveCamera = false, gamepadAirplaneTargets, gamepadReticleXFraction, gamepadReticleYFraction, onGamepadReticleTargetChange, onGamepadParcelHoverChange, onGamepadFocalScreenYChange, onGamepadStatusChange, flightSpeedMultiplier = 1.0, turnRateMultiplier = 1.0, tiltRateMultiplier = 1.0, poisVisible = false }: MapViewProps) {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme !== 'light';
   const isSatellite = mapType === "satellite" || mapType === "hybrid";
+
+  // Compose final style array: base color grading + (optional) POI hiding.
+  // When poisVisible=true we drop the hide rules so Google's business pins
+  // and POI labels render.
+  const mapStyles = useMemo<google.maps.MapTypeStyle[]>(
+    () => poisVisible ? MAP_STYLES_BASE : [...MAP_STYLES_BASE, ...POI_HIDE_STYLES],
+    [poisVisible]
+  );
 
   const handleMarkerClick = useCallback(
     (lead: Lead) => { onLeadClick?.(lead.id, lead); },
@@ -630,7 +653,7 @@ export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClic
         headingInteractionEnabled
         rotateControl
         clickableIcons
-        styles={isSatellite || MAP_ID ? undefined : MAP_STYLES}
+        styles={isSatellite || MAP_ID ? undefined : mapStyles}
       >
         <MapTypeSync mapType={mapType} />
         <ZoomController zoom={zoom} />

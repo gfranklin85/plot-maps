@@ -227,6 +227,8 @@ function Inner({
   tiltRateMultiplier = 1.0,
   flyToTarget,
   onAltitudeChange,
+  isIdle = false,
+  poisVisible = false,
 }: {
   center?: { lat: number; lng: number } | null;
   gamepadEnabled: boolean;
@@ -237,6 +239,14 @@ function Inner({
   tiltRateMultiplier?: number;
   flyToTarget?: FlyToTarget | null;
   onAltitudeChange?: (meters: number) => void;
+  /** True when no input for >threshold. Stops camera writes + hover
+   *  wave + altitude reporting until next input. Pure GPU savings;
+   *  resumes instantly on input. */
+  isIdle?: boolean;
+  /** Google POI labels + business icons visible? Default false for
+   *  the immersive map framing. Wired to gmp-map-3d's
+   *  default-labels-disabled attribute. */
+  poisVisible?: boolean;
 }) {
   const maps3d = useMapsLibrary('maps3d');
   const elRef = useRef<Map3DElement | null>(null);
@@ -268,6 +278,10 @@ function Inner({
   // Independent so tilt always feels right regardless of pan slider.
   const tiltMultRef = useRef<number>(tiltRateMultiplier);
   tiltMultRef.current = tiltRateMultiplier;
+  // Idle flag — read each frame to skip the writes entirely when the
+  // user isn't watching.
+  const isIdleRef = useRef<boolean>(isIdle);
+  isIdleRef.current = isIdle;
   // Altitude reporting throttle — the per-frame loop pings the page's
   // AltitudeGauge via onAltitudeChange, but only ~5×/sec to avoid
   // React state churn at 60Hz.
@@ -379,7 +393,9 @@ function Inner({
     el.style.width = '100%';
     el.style.height = '100%';
     el.setAttribute('mode', 'hybrid');
-    el.setAttribute('default-labels-disabled', 'false');
+    // POI labels: default-labels-disabled inverts our prop.
+    // poisVisible=true → labels visible → attribute = 'false'.
+    el.setAttribute('default-labels-disabled', poisVisible ? 'false' : 'true');
     containerRef.current.appendChild(el);
     elRef.current = el;
     // Seed at ~80m altitude — comfortable cruise over residential
@@ -408,7 +424,20 @@ function Inner({
       elRef.current = null;
       camRef.current = null;
     };
+    // poisVisible is intentionally excluded — seeding the initial
+    // attribute on mount is the only thing it does here; the reactive
+    // effect just below handles subsequent toggles without remounting.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [maps3d, center]);
+
+  // React to POI visibility prop changes (after mount). The user
+  // toggling the POI button on the toolbar should reflect immediately
+  // — no need to remount the map.
+  useEffect(() => {
+    const el = elRef.current;
+    if (!el) return;
+    el.setAttribute('default-labels-disabled', poisVisible ? 'false' : 'true');
+  }, [poisVisible]);
 
   useGamepad({
     enabled: gamepadEnabled && !!elRef.current,
@@ -420,6 +449,14 @@ function Inner({
       if (!el || !cam) return;
 
       elapsedMsRef.current = elapsedMs;
+
+      // Idle: user walked away (no input >8s). Skip the entire per-
+      // frame work — no camera writes, no hover wave math, no
+      // altitude reports. Map3D stops re-rendering because nothing
+      // is mutating its properties. Returns instantly to normal
+      // flight on the next input (useIdleDetection flips isIdle
+      // back to false before the next frame runs).
+      if (isIdleRef.current) return;
 
       // Cinematic flight in progress — the destination-fly RAF loop
       // owns the camera writes this frame. Skip gamepad input so it
@@ -608,6 +645,8 @@ export default function MapView3D(props: MapViewProps) {
         tiltRateMultiplier={props.tiltRateMultiplier}
         flyToTarget={props.flyToTarget}
         onAltitudeChange={props.onAltitudeChange}
+        isIdle={props.isIdle}
+        poisVisible={props.poisVisible}
       />
     </APIProvider>
   );

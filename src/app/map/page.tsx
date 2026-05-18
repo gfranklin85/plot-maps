@@ -23,6 +23,8 @@ import MapReticle from "@/components/map/MapReticle";
 import MapToolbar from "@/components/map/MapToolbar";
 import FlightTuningPanel from "@/components/map/FlightTuningPanel";
 import { useFlightTuning } from "@/lib/useFlightTuning";
+import { useIdleDetection } from "@/lib/useIdleDetection";
+import { usePoiVisibility } from "@/lib/usePoiVisibility";
 import DestinationsPanel from "@/components/map/DestinationsPanel";
 import AltitudeGauge from "@/components/map/AltitudeGauge";
 import type { GamepadActions } from "@/components/map/GamepadFlightController";
@@ -536,6 +538,19 @@ export default function MapPage() {
   // AltitudeGauge HUD. Reported ~5×/sec from MapView3D.
   const [currentAltitudeM, setCurrentAltitudeM] = useState<number>(0);
 
+  // Pause per-frame GPU writes when the user walks away with a
+  // controller plugged in. 8s of no input on any surface (mouse,
+  // keyboard, wheel, touch, gamepad sticks/triggers/buttons) flips
+  // isIdle true. Any subsequent input flips it back instantly. The
+  // 3D path reads this and gates its onFrame writes.
+  const isIdle = useIdleDetection();
+
+  // Google POI labels + business icons toggle. Default hidden for
+  // immersive framing ("world is the canvas" — Google's products
+  // aren't our product). The user can flip it on from the toolbar
+  // when they need business context for prospecting.
+  const { poisVisible, togglePois } = usePoiVisibility();
+
   // Lookup helper for resolving a target id back to a full Lead so the
   // grab handler can store the original Lead, not just the id.
   const leadsById = useMemo(() => {
@@ -822,6 +837,13 @@ export default function MapPage() {
                 accentClassName: profile.enable3DTilesAdmin
                   ? 'bg-gradient-to-br from-amber-500 to-rose-500 text-white shadow-lg'
                   : undefined,
+              },
+              {
+                key: 'pois',
+                icon: poisVisible ? 'visibility' : 'visibility_off',
+                label: poisVisible ? 'Hide POI labels (Google businesses)' : 'Show POI labels (Google businesses)',
+                onClick: () => togglePois(),
+                active: poisVisible,
               },
               {
                 key: 'airplane',
@@ -1127,6 +1149,8 @@ export default function MapPage() {
             tiltRateMultiplier={flightTuning.tiltRate}
             flyToTarget={flyToTarget}
             onAltitudeChange={setCurrentAltitudeM}
+            isIdle={isIdle}
+            poisVisible={poisVisible}
           />
         )}
 

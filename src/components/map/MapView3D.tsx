@@ -47,9 +47,13 @@ const AIR_THROTTLE_MAX = 85;
 const AIR_STRAFE_ACCEL = 150;
 const AIR_STRAFE_DRAG = 0.96;
 const AIR_STRAFE_MAX = 75;
-const AIR_YAW_ACCEL = 28;
+// Yaw bumped 2026-05-18 — Greg flagged even 4× slider felt "small
+// window of slow to slower." Prior MAX=11 deg/s capped a full spin
+// at 8+ seconds; new MAX=45 deg/s puts a snappy spin at ~8s base /
+// ~2s at the top of the turn slider. Accel scaled to match.
+const AIR_YAW_ACCEL = 110;
 const AIR_YAW_DRAG = 0.94;
-const AIR_YAW_MAX = 11;
+const AIR_YAW_MAX = 45;
 const TILT_ACCEL_DEG_S2 = 80;
 const TILT_DRAG = 0.86;
 const TILT_MAX_DEG_S = 26;

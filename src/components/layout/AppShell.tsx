@@ -6,16 +6,25 @@ import { useSidebar } from '@/lib/sidebar-context';
 import Sidebar from './Sidebar';
 import TopBar from './TopBar';
 import BottomNav from './BottomNav';
+import MapNavOverlay from './MapNavOverlay';
 import CallBar from '@/components/call/CallBar';
 import type { ReactNode } from 'react';
 
 const AUTH_PAGES = ['/login', '/signup', '/auth', '/subscribe', '/landing', '/setup-number'];
+
+// Immersive pages render WITHOUT the global Sidebar/TopBar/BottomNav.
+// The map is Plot's primary product surface; wrapping it in agency-app
+// chrome competes with the "world is the canvas" framing. A compact
+// MapNavOverlay (translucent logo top-left, expandable nav drawer)
+// replaces the global chrome on these routes.
+const IMMERSIVE_PAGES = ['/map'];
 
 export default function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { user, loading } = useAuth();
   const { collapsed } = useSidebar();
   const isAuthPage = AUTH_PAGES.some((p) => pathname.startsWith(p));
+  const isImmersivePage = IMMERSIVE_PAGES.some((p) => pathname.startsWith(p));
 
   if (isAuthPage || (!loading && !user)) {
     return <>{children}</>;
@@ -26,6 +35,16 @@ export default function AppShell({ children }: { children: ReactNode }) {
       <div className="min-h-screen bg-surface flex items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
       </div>
+    );
+  }
+
+  if (isImmersivePage) {
+    return (
+      <>
+        <MapNavOverlay />
+        <main className="min-h-screen">{children}</main>
+        <CallBar />
+      </>
     );
   }
 

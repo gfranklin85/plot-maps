@@ -723,7 +723,7 @@ export default function MapPage() {
   }, [selectedLead, mapCenter, filteredLeads, walkMode, dispatchFlight, reticlePosition]);
 
   return (
-    <div className="relative h-[calc(100vh-3.5rem)] md:h-[calc(100vh-5rem)] w-full">
+    <div className="relative h-screen w-full overflow-hidden">
       {/* ═══ CONTROLS ═══ */}
       {walkMode ? (
         <button

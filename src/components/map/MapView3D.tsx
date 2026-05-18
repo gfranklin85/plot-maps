@@ -57,11 +57,14 @@ const HOVER_PAN_FREQ_Y = 0.11;
 
 // LB/RB dolly zoom — moves the eye forward (LB) or backward (RB) along
 // the current view direction. Rate is multiplied by current range so
-// it feels equally responsive at any altitude. 1.5 means a 1-second
-// hold travels ~1.5× current range — meaningful descent without
-// catapulting past where you wanted to land. Tap-and-release is ~5%
-// of current range, a precise nudge.
-const ZOOM_DOLLY_RATE_PER_SEC = 1.5;
+// it feels equally responsive at any altitude. Triggers (LT down /
+// RT up) modulate this *analog* — a light squeeze descends gently,
+// a full pull descends fast. Combined with the user's climb-rate
+// slider (which scales the max), this gives real flight-control feel
+// instead of a button's binary "moving / not moving."
+// 0.5 base means: full trigger + 1.0 climb-rate slider = ~50% of
+// current range traveled per second. Light-touch trigger = trickle.
+const ZOOM_DOLLY_RATE_PER_SEC = 0.5;
 
 
 const METERS_PER_DEG_LAT = 111_320;
@@ -362,7 +365,7 @@ function Inner({
 
   useGamepad({
     enabled: gamepadEnabled && !!elRef.current,
-    onFrame: ({ dt, elapsedMs, leftStick, rightStick, pressed, justPressed }) => {
+    onFrame: ({ dt, elapsedMs, leftStick, rightStick, triggers, justPressed }) => {
       const el = elRef.current;
       const cam = camRef.current;
       const air = airRef.current;
@@ -390,24 +393,25 @@ function Inner({
         if (justPressed.has('down') || justPressed.has('right')) actionsRef.current?.onCycleNext?.();
       }
 
-      // ── LB/RB → zoom (dolly: move eye forward / back along view) ──
-      // In first-person, "zoom in" can't just shrink cam.range — that
+      // ── LT/RT → analog descent / ascent (dolly along view ray) ──
+      // Triggers give pressure-modulated control instead of binary
+      // hold. Light squeeze = gentle drift; full pull = aggressive
+      // climb or descent. Real flight-control feel. LT = descend,
+      // RT = ascend. LB/RB are intentionally unbound for now.
+      //
+      // In first-person, "descent" can't just shrink cam.range — that
       // moves the focal point closer to a stationary eye, which is
-      // visually invisible (no perspective change). To actually feel
-      // like zooming, we translate the eye position forward/backward
-      // along the current view direction. Forward = closer to whatever
-      // you're looking at. Backward = pulling away.
-      let zoomSign = 0;
-      if (pressed.has('lb') && !pressed.has('rb')) zoomSign = -1;  // LB = forward (closer)
-      else if (pressed.has('rb') && !pressed.has('lb')) zoomSign = 1;  // RB = backward (away)
-      if (zoomSign !== 0) {
-        // Move along view direction (heading + pitch). Speed scales with
-        // current range so it feels equally responsive at any altitude.
-        // User's CLIMB-RATE multiplier (separate from flight speed) is
-        // what actually scales this — descent/ascent is its own axis,
-        // not a "zoom speed." Lets users have fast pan + cinematic climb
-        // (or vice versa).
-        const moveMeters = zoomSign * cam.range * ZOOM_DOLLY_RATE_PER_SEC * climbMultRef.current * dt;
+      // visually invisible (no perspective change). We translate the
+      // eye position along the current view direction. Magnitude is
+      // (LT - RT) so opposing trigger presses cancel naturally.
+      const dollyInput = triggers.left - triggers.right;
+      // Small dead-zone on the trigger so resting fingers don't drift.
+      const DOLLY_DEAD = 0.04;
+      const dollyEffective = Math.abs(dollyInput) < DOLLY_DEAD ? 0 : dollyInput;
+      if (dollyEffective !== 0) {
+        // Sign convention: LT positive → zoomSign -1 (descend / forward
+        // along view ray). RT positive → zoomSign +1 (ascend / back).
+        const moveMeters = -dollyEffective * cam.range * ZOOM_DOLLY_RATE_PER_SEC * climbMultRef.current * dt;
         const pitchRad = (cam.pitch * Math.PI) / 180;
         const headingRad = (cam.heading * Math.PI) / 180;
         const horizMove = moveMeters * Math.cos(pitchRad);

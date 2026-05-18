@@ -212,6 +212,7 @@ function Inner({
   gamepadActions,
   flightSpeedMultiplier = 1.0,
   climbRateMultiplier = 1.0,
+  turnRateMultiplier = 1.0,
   flyToTarget,
 }: {
   center?: { lat: number; lng: number } | null;
@@ -219,6 +220,7 @@ function Inner({
   gamepadActions?: GamepadActions;
   flightSpeedMultiplier?: number;
   climbRateMultiplier?: number;
+  turnRateMultiplier?: number;
   flyToTarget?: FlyToTarget | null;
 }) {
   const maps3d = useMapsLibrary('maps3d');
@@ -240,6 +242,11 @@ function Inner({
   // of pan/yaw/tilt. Some users want fast pan + cinematic descent.
   const climbMultRef = useRef<number>(climbRateMultiplier);
   climbMultRef.current = climbRateMultiplier;
+  // Separate ref for turn rate (yaw / right-X). Independent of pan
+  // speed so users can dial slow horizon pans + snappy throttle (or
+  // vice versa).
+  const turnMultRef = useRef<number>(turnRateMultiplier);
+  turnMultRef.current = turnRateMultiplier;
   // Cinematic flight animation state. When non-null, the per-frame
   // gamepad input is suppressed and we interpolate from `from` to
   // `to` over `durationMs`. After arrival, returns to normal flight.
@@ -428,9 +435,12 @@ function Inner({
       // No LB boost on pan since LB now means zoom. (The 2D path's
       // PAN_BOOST_MULT is preserved as a constant for future use but
       // not applied here.) The flight-speed multiplier from
-      // useFlightTuning rolls into `boost` so every accel term scales
-      // uniformly — same single-knob behavior as the 2D path.
+      // useFlightTuning rolls into `boost` for pan / tilt. Yaw uses
+      // its own `boostYaw` driven by the independent Turn Rate slider
+      // so cinematic-slow rotation + snappy pan (or vice versa) is
+      // possible without one slider doing both jobs.
       const boost = speedMultRef.current;
+      const boostYaw = turnMultRef.current;
       const dragExp = 60 * dt;
 
       const lx = shapeStick(leftStick.x);
@@ -441,7 +451,7 @@ function Inner({
       // Airplane state: throttle/strafe/yaw with accel + drag + max.
       air.throttle += -ly * AIR_THROTTLE_ACCEL * boost * dt;
       air.strafe   +=  lx * AIR_STRAFE_ACCEL   * boost * dt;
-      air.yaw      +=  rx * AIR_YAW_ACCEL      * boost * dt;
+      air.yaw      +=  rx * AIR_YAW_ACCEL      * boostYaw * dt;
       air.throttle *= Math.pow(AIR_THROTTLE_DRAG, dragExp);
       air.strafe   *= Math.pow(AIR_STRAFE_DRAG,   dragExp);
       air.yaw      *= Math.pow(AIR_YAW_DRAG,      dragExp);
@@ -538,6 +548,7 @@ export default function MapView3D(props: MapViewProps) {
         gamepadActions={props.gamepadActions}
         flightSpeedMultiplier={props.flightSpeedMultiplier}
         climbRateMultiplier={props.climbRateMultiplier}
+        turnRateMultiplier={props.turnRateMultiplier}
         flyToTarget={props.flyToTarget}
       />
     </APIProvider>

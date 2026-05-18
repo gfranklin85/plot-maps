@@ -13,6 +13,7 @@ interface Props {
   onPresetChange: (preset: FlightPreset) => void;
   onMultiplierChange: (multiplier: number) => void;
   onClimbRateChange: (climbRate: number) => void;
+  onTurnRateChange: (turnRate: number) => void;
   onClose: () => void;
 }
 
@@ -23,14 +24,19 @@ const PRESET_META: Record<Exclude<FlightPreset, 'custom'>, { label: string; hint
 };
 
 /**
- * Flight tuning UI. Preset chips set both axes to the same preset.
- * Two independent sliders:
- *   - Flight speed — pan / yaw / tilt acceleration.
- *   - Climb rate — LB/RB descent/ascent. NOT a camera zoom; the eye
- *     moves through the world.
+ * Flight tuning UI. Preset chips set all three axes to the same
+ * preset. Three independent sliders:
+ *   - Flight speed — pan (left stick) + tilt (right-Y look-up/down).
+ *   - Turn rate — yaw (right-X horizontal rotation).
+ *   - Climb rate — LT/RT descent/ascent (NOT camera zoom; eye moves
+ *     through the world).
  *
- * Mouse-only for v1. Live-preview — moving either slider changes
- * flight feel immediately while flying.
+ * Idle hover wave compensation is time-driven and intentionally NOT
+ * tunable — protects the "alive even at rest" feel from being
+ * disrupted by user settings.
+ *
+ * Mouse-only for v1. Live preview — moving any slider changes flight
+ * feel immediately while flying.
  */
 export default function FlightTuningPanel({
   visible,
@@ -38,6 +44,7 @@ export default function FlightTuningPanel({
   onPresetChange,
   onMultiplierChange,
   onClimbRateChange,
+  onTurnRateChange,
   onClose,
 }: Props) {
   if (!visible) return null;
@@ -47,7 +54,7 @@ export default function FlightTuningPanel({
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-sm font-bold text-on-surface">Flight feel</h3>
-          <p className="text-[10px] text-on-surface-variant mt-0.5">Speed = move/turn. Climb = descend/ascend.</p>
+          <p className="text-[10px] text-on-surface-variant mt-0.5">Speed = move. Turn = rotate. Climb = ascend/descend.</p>
         </div>
         <button
           onClick={onClose}
@@ -112,7 +119,39 @@ export default function FlightTuningPanel({
         </div>
       </div>
 
-      {/* Climb rate slider — LB/RB descent/ascent */}
+      {/* Turn rate slider — right-X yaw */}
+      <div>
+        <div className="flex items-center justify-between mb-1.5">
+          <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">
+            Turn rate
+          </label>
+          <span className="text-[10px] font-mono text-on-surface tabular-nums">
+            {tuning.turnRate.toFixed(2)}×
+          </span>
+        </div>
+        <input
+          type="range"
+          min={0.3}
+          max={2.5}
+          step={0.05}
+          value={tuning.turnRate}
+          onChange={(e) => onTurnRateChange(parseFloat(e.target.value))}
+          className="w-full accent-primary"
+        />
+        <div className="flex items-center justify-between mt-1 text-[9px] text-on-surface-variant">
+          <span>Cinematic</span>
+          <span className="opacity-50">·</span>
+          <span>{PRESET_MULTIPLIERS.newcomer}×</span>
+          <span className="opacity-50">·</span>
+          <span className="font-semibold">{PRESET_MULTIPLIERS.pilot}×</span>
+          <span className="opacity-50">·</span>
+          <span>{PRESET_MULTIPLIERS.pro}×</span>
+          <span className="opacity-50">·</span>
+          <span>Snappy</span>
+        </div>
+      </div>
+
+      {/* Climb rate slider — LT/RT descent/ascent */}
       <div>
         <div className="flex items-center justify-between mb-1.5">
           <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">

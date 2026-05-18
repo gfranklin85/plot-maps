@@ -106,10 +106,15 @@ export interface MapViewProps {
    *  Pilot feel; 0.6 = Newcomer; 1.6 = Pro. Scales pan/yaw/tilt
    *  acceleration uniformly in both 2D and 3D paths. */
   flightSpeedMultiplier?: number;
-  /** Climb rate multiplier — scales LB/RB dolly speed independently
+  /** Climb rate multiplier — scales LT/RT dolly speed independently
    *  of flight speed. 3D path only (2D path uses triggers as zoom).
    *  Default 1.0. */
   climbRateMultiplier?: number;
+  /** Turn rate multiplier — scales yaw (right-X) only. Independent
+   *  of flight speed so users can dial slow cinematic horizon pans
+   *  with snappy throttle (or vice versa). Applies in both 2D and
+   *  3D paths. Default 1.0. */
+  turnRateMultiplier?: number;
   /** Cinematic flight target. Set to a new object reference to trigger
    *  an animated transition from current camera pose to the target. The
    *  3D path implements this; the 2D path ignores. */
@@ -580,7 +585,7 @@ function PendingSkiptracePins({ pins }: { pins: { id: string; lat: number; lng: 
   return null;
 }
 
-export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClick, center, navigateTo, zoom, mapType = "roadmap", pinMode = "dots", prospectMode = false, prospectPins = [], onProspectPinClick, showZoningOverlay = false, showParcelOverlay = false, parcelColorMode = 'land_use', onParcelClick, onParcelHoverChange, parcelHitTesterRef, view3D = false, flight = null, gamepadEnabled = false, gamepadActions, gamepadMode = 'overhead', gamepadDebugSuspendMoveCamera = false, gamepadDebugForceFallbackPath = false, gamepadDebugTickleAfterMoveCamera = false, gamepadAirplaneTargets, gamepadReticleXFraction, gamepadReticleYFraction, onGamepadReticleTargetChange, onGamepadParcelHoverChange, onGamepadFocalScreenYChange, onGamepadStatusChange, flightSpeedMultiplier = 1.0 }: MapViewProps) {
+export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClick, center, navigateTo, zoom, mapType = "roadmap", pinMode = "dots", prospectMode = false, prospectPins = [], onProspectPinClick, showZoningOverlay = false, showParcelOverlay = false, parcelColorMode = 'land_use', onParcelClick, onParcelHoverChange, parcelHitTesterRef, view3D = false, flight = null, gamepadEnabled = false, gamepadActions, gamepadMode = 'overhead', gamepadDebugSuspendMoveCamera = false, gamepadDebugForceFallbackPath = false, gamepadDebugTickleAfterMoveCamera = false, gamepadAirplaneTargets, gamepadReticleXFraction, gamepadReticleYFraction, onGamepadReticleTargetChange, onGamepadParcelHoverChange, onGamepadFocalScreenYChange, onGamepadStatusChange, flightSpeedMultiplier = 1.0, turnRateMultiplier = 1.0 }: MapViewProps) {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme !== 'light';
   const isSatellite = mapType === "satellite" || mapType === "hybrid";
@@ -642,6 +647,7 @@ export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClic
             debugForceFallbackPath={gamepadDebugForceFallbackPath}
             debugTickleAfterMoveCamera={gamepadDebugTickleAfterMoveCamera}
             flightSpeedMultiplier={flightSpeedMultiplier}
+            turnRateMultiplier={turnRateMultiplier}
           />
         )}
         <PoiClickCatcher prospectMode={prospectMode} onMapClick={onMapClick} />

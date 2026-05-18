@@ -106,9 +106,14 @@ interface Props {
    *  giving up moveCamera's smoothness. */
   debugTickleAfterMoveCamera?: boolean;
   /** Master flight-speed multiplier from user tuning (useFlightTuning).
-   *  Scales pan/yaw/tilt/zoom acceleration uniformly. 1.0 = the
-   *  default tuned-to-cessna feel; 0.6 = newcomer; 1.6 = pro. */
+   *  Scales pan/tilt/zoom acceleration. Yaw is broken out as its own
+   *  multiplier (turnRateMultiplier). 1.0 = the default tuned-to-
+   *  cessna feel; 0.6 = newcomer; 1.6 = pro. */
   flightSpeedMultiplier?: number;
+  /** Turn-rate multiplier — scales yaw (right-X) acceleration only.
+   *  Independent of flight speed so users can dial cinematic-slow
+   *  horizon pans without slowing their pan/throttle. Default 1.0. */
+  turnRateMultiplier?: number;
 }
 
 // ── Heavy helicopter physics constants ────────────────────────────────
@@ -233,6 +238,7 @@ export default function GamepadFlightController({
   debugForceFallbackPath = false,
   debugTickleAfterMoveCamera = false,
   flightSpeedMultiplier = 1.0,
+  turnRateMultiplier = 1.0,
 }: Props) {
   const map = useMap();
 
@@ -284,6 +290,10 @@ export default function GamepadFlightController({
   // immediate feel change without re-subscribing the RAF loop.
   const flightSpeedMultiplierRef = useRef<number>(flightSpeedMultiplier);
   flightSpeedMultiplierRef.current = flightSpeedMultiplier;
+  // Turn rate is yaw-only — separate ref so the per-frame loop reads
+  // the latest slider value without re-subscribing.
+  const turnRateMultiplierRef = useRef<number>(turnRateMultiplier);
+  turnRateMultiplierRef.current = turnRateMultiplier;
   // Track last reported target id to avoid firing the callback every frame.
   const lastReportedTargetIdRef = useRef<string | null>(null);
   // Live reticle-hovering flag the LT-press handler reads each frame.
@@ -474,12 +484,15 @@ export default function GamepadFlightController({
       }
 
       // ── Physics integration ─────────────────────────────────────────
-      // `boost` combines LB-hold boost AND the user's master flight-
-      // speed multiplier (from useFlightTuning). Multiplying both into
-      // every accel term scales pan / yaw / tilt / zoom uniformly so
-      // the slider feels like a single "overall speed" knob.
+      // `boost` = LB-hold boost × user's Flight Speed multiplier (from
+      // useFlightTuning). Applied to pan / tilt / zoom accel.
+      // `boostYaw` = same LB-hold × the Turn Rate multiplier (separate
+      // user axis). Applied to yaw accel only. Lets users dial slow
+      // cinematic turns with snappy pan (or vice versa) without one
+      // slider doing both jobs.
       const lbBoost = pressed.has('lb') ? PAN_BOOST_MULT : 1;
       const boost = lbBoost * flightSpeedMultiplierRef.current;
+      const boostYaw = lbBoost * turnRateMultiplierRef.current;
       const vel = velRef.current;
       const dragExp = 60 * dt;
 
@@ -493,7 +506,7 @@ export default function GamepadFlightController({
         // Stick directions: positive X = right, positive Y = down.
         vel.panX += lx * PAN_ACCEL_PX_S2 * boost * dt;
         vel.panY += ly * PAN_ACCEL_PX_S2 * boost * dt;
-        vel.heading += rx * HEAD_ACCEL_DEG_S2 * boost * dt;
+        vel.heading += rx * HEAD_ACCEL_DEG_S2 * boostYaw * dt;
         vel.tilt -= ry * TILT_ACCEL_DEG_S2 * boost * dt; // up = look up
         vel.zoom += triggerZoomDelta * ZOOM_ACCEL_S2 * boost * dt;
 
@@ -528,7 +541,7 @@ export default function GamepadFlightController({
 
         air.throttle += -ly * AIR_THROTTLE_ACCEL * boost * dt;
         air.strafe += lx * AIR_STRAFE_ACCEL * boost * dt;
-        air.yaw += rx * AIR_YAW_ACCEL * boost * dt;
+        air.yaw += rx * AIR_YAW_ACCEL * boostYaw * dt;
 
         air.throttle *= Math.pow(AIR_THROTTLE_DRAG, dragExp);
         air.strafe *= Math.pow(AIR_STRAFE_DRAG, dragExp);

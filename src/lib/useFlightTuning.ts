@@ -33,11 +33,19 @@ export type FlightPreset = 'newcomer' | 'pilot' | 'pro' | 'custom';
 
 export interface FlightTuning {
   preset: FlightPreset;
-  /** Speed multiplier — pan + yaw + tilt accel. 0.3..2.5 useful range. */
+  /** Flight speed multiplier — pan (left stick) + tilt (right-Y look).
+   *  Yaw is broken out as turnRate. 0.3..2.5 useful range. */
   multiplier: number;
-  /** Climb rate multiplier — LB/RB dolly speed. 0.3..2.5 useful range.
-   *  Independent of speed so users can have fast pan + cinematic climb. */
+  /** Climb rate multiplier — LT/RT trigger descent/ascent. Independent
+   *  of speed so users can have fast pan + cinematic climb. */
   climbRate: number;
+  /** Turn rate multiplier — right-X yaw (horizontal rotation) speed.
+   *  Independent so users can dial cinematic-slow horizon pans OR
+   *  snappy combat-feel turns without affecting pan/tilt feel.
+   *  Idle hover wave compensation is unaffected (time-driven, not
+   *  multiplier-driven) — protected per Greg's "don't allow tuning
+   *  that disrupts designed compensation inputs." */
+  turnRate: number;
 }
 
 // Preset values. Pilot = 1.0 = the tuning that's been flying as the
@@ -49,7 +57,7 @@ export const PRESET_MULTIPLIERS: Record<Exclude<FlightPreset, 'custom'>, number>
   pro:      1.6,
 };
 
-const DEFAULT_TUNING: FlightTuning = { preset: 'pilot', multiplier: 1.0, climbRate: 1.0 };
+const DEFAULT_TUNING: FlightTuning = { preset: 'pilot', multiplier: 1.0, climbRate: 1.0, turnRate: 1.0 };
 
 function clampMultiplier(n: number): number {
   if (!Number.isFinite(n)) return 1.0;
@@ -68,12 +76,16 @@ function readFromStorage(): FlightTuning {
                                   parsed.preset === 'pro' || parsed.preset === 'custom')
       ? parsed.preset : 'pilot';
     const multiplier = clampMultiplier(typeof parsed.multiplier === 'number' ? parsed.multiplier : 1.0);
-    // Back-compat: old saved tunings without climbRate fall back to
-    // the speed multiplier value, preserving the prior single-knob feel.
+    // Back-compat: old saved tunings without these fields fall back
+    // to the speed multiplier value, preserving the prior single-knob
+    // feel until the user touches the new sliders.
     const climbRate = clampMultiplier(
       typeof parsed.climbRate === 'number' ? parsed.climbRate : multiplier,
     );
-    return { preset, multiplier, climbRate };
+    const turnRate = clampMultiplier(
+      typeof parsed.turnRate === 'number' ? parsed.turnRate : multiplier,
+    );
+    return { preset, multiplier, climbRate, turnRate };
   } catch {
     return DEFAULT_TUNING;
   }
@@ -100,16 +112,16 @@ export function useFlightTuning() {
 
   const setPreset = useCallback((preset: FlightPreset) => {
     const next: FlightTuning = preset === 'custom'
-      ? { preset, multiplier: tuning.multiplier, climbRate: tuning.climbRate }
-      : { preset, multiplier: PRESET_MULTIPLIERS[preset], climbRate: PRESET_MULTIPLIERS[preset] };
+      ? { preset, multiplier: tuning.multiplier, climbRate: tuning.climbRate, turnRate: tuning.turnRate }
+      : { preset, multiplier: PRESET_MULTIPLIERS[preset], climbRate: PRESET_MULTIPLIERS[preset], turnRate: PRESET_MULTIPLIERS[preset] };
     setTuningState(next);
     writeToStorage(next);
-  }, [tuning.multiplier, tuning.climbRate]);
+  }, [tuning.multiplier, tuning.climbRate, tuning.turnRate]);
 
   const setMultiplier = useCallback((multiplier: number) => {
     const clamped = clampMultiplier(multiplier);
     setTuningState(prev => {
-      const next: FlightTuning = { preset: 'custom', multiplier: clamped, climbRate: prev.climbRate };
+      const next: FlightTuning = { ...prev, preset: 'custom', multiplier: clamped };
       writeToStorage(next);
       return next;
     });
@@ -118,7 +130,16 @@ export function useFlightTuning() {
   const setClimbRate = useCallback((climbRate: number) => {
     const clamped = clampMultiplier(climbRate);
     setTuningState(prev => {
-      const next: FlightTuning = { preset: 'custom', multiplier: prev.multiplier, climbRate: clamped };
+      const next: FlightTuning = { ...prev, preset: 'custom', climbRate: clamped };
+      writeToStorage(next);
+      return next;
+    });
+  }, []);
+
+  const setTurnRate = useCallback((turnRate: number) => {
+    const clamped = clampMultiplier(turnRate);
+    setTuningState(prev => {
+      const next: FlightTuning = { ...prev, preset: 'custom', turnRate: clamped };
       writeToStorage(next);
       return next;
     });
@@ -129,5 +150,5 @@ export function useFlightTuning() {
     try { window.localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
   }, []);
 
-  return { tuning, setPreset, setMultiplier, setClimbRate, resetToDefault };
+  return { tuning, setPreset, setMultiplier, setClimbRate, setTurnRate, resetToDefault };
 }

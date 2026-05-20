@@ -566,26 +566,14 @@ function Inner({
       vel.tilt = clamp(vel.tilt, -tiltMaxScaled, tiltMaxScaled);
       if (Math.abs(vel.tilt) < 0.05) vel.tilt = 0;
 
-      // Pitch-return-to-level spring (Greg flagged 2026-05-19):
-      // when the user releases the right-stick, the camera should
-      // gently level out instead of staying stuck at whatever tilt
-      // they last commanded. Without this, holding sticks up + right
-      // saturates cam.pitch to the high-positive regime, and on
-      // release the camera stays tilted up — making subsequent
-      // forward throttle feel like ascent because the focal point
-      // sits in the sky. The spring runs ONLY when no tilt input
-      // is active, so deliberate framing shots aren't fought.
-      // ~1s to return from a fully-saturated pitch to level; gentle
-      // enough that you can hold any angle as long as you keep a
-      // little stick input on it.
-      const PITCH_RETURN_RATE_PER_SEC = FLIGHT_BASE.PITCH_RETURN_RATE_PER_SEC;
-      if (Math.abs(ry) < 0.05 && Math.abs(vel.tilt) < 0.05) {
-        if (cam.pitch > 0) {
-          cam.pitch = Math.max(0, cam.pitch - PITCH_RETURN_RATE_PER_SEC * Math.abs(cam.pitch) * dt);
-        } else if (cam.pitch < 0) {
-          cam.pitch = Math.min(0, cam.pitch + PITCH_RETURN_RATE_PER_SEC * Math.abs(cam.pitch) * dt);
-        }
-      }
+      // No pitch return-to-level spring and no pitch clamp. The user
+      // sets the look direction and it stays where they set it. The
+      // only ceiling is whatever Map3D enforces on its own tilt
+      // (fpToMap3D clamps the WRITE at 0-85, but cam.pitch itself is
+      // unbounded so the stick input still feels alive at the limit
+      // instead of going dead). Greg confirmed 2026-05-19: left
+      // stick = pan, right stick = look. Two separate verbs, no
+      // combined effects.
 
       // Translate airplane state into pan vel.
       vel.panX = air.strafe;

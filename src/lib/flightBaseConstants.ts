@@ -39,9 +39,6 @@ export const FLIGHT_BASE = {
   // so the displayed "effective" is "fraction of range per second
   // at full trigger" — independent of altitude.
   ZOOM_DOLLY_RATE_PER_SEC: 0.2,
-
-  // Pitch return-to-level spring (no slider, fixed feel).
-  PITCH_RETURN_RATE_PER_SEC: 1.4,
 } as const;
 
 /**

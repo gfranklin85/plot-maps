@@ -2,6 +2,7 @@
 
 import MaterialIcon from "@/components/ui/MaterialIcon";
 import { AXIS_RANGES, type FlightTuning } from "@/lib/useFlightTuning";
+import { effectiveFlightValues } from "@/lib/flightBaseConstants";
 
 interface Props {
   visible: boolean;
@@ -41,8 +42,13 @@ export default function FlightTuningPanel({
 }: Props) {
   if (!visible) return null;
 
+  // Effective numbers the engine will actually use this frame. Wired
+  // straight from flightBaseConstants so the displayed numbers and
+  // the engine's numbers can never drift apart.
+  const eff = effectiveFlightValues(tuning);
+
   return (
-    <div className="absolute top-4 right-16 z-20 w-80 rounded-2xl bg-surface/90 backdrop-blur-md shadow-2xl border border-card-border p-4 space-y-4">
+    <div className="absolute top-4 right-16 z-20 w-[22rem] rounded-2xl bg-surface/90 backdrop-blur-md shadow-2xl border border-card-border p-4 space-y-4">
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-sm font-bold text-on-surface">Flight feel</h3>
@@ -64,6 +70,7 @@ export default function FlightTuningPanel({
         max={AXIS_RANGES.multiplier.max}
         leftEnd="Slow"
         rightEnd="Fast"
+        readout={`accel ${eff.throttle.accel.toFixed(0)} · max ${eff.throttle.max.toFixed(0)} px/s (rev ${eff.throttle.reverseMax.toFixed(0)})`}
         onChange={onMultiplierChange}
       />
       <Slider
@@ -73,6 +80,7 @@ export default function FlightTuningPanel({
         max={AXIS_RANGES.turnRate.max}
         leftEnd="Cinematic"
         rightEnd="Snappy"
+        readout={`accel ${eff.yaw.accel.toFixed(0)} · max ${eff.yaw.max.toFixed(0)}°/s · 360 in ${eff.yaw.secondsPerSpin.toFixed(1)}s`}
         onChange={onTurnRateChange}
       />
       <Slider
@@ -82,6 +90,7 @@ export default function FlightTuningPanel({
         max={AXIS_RANGES.tiltRate.max}
         leftEnd="Slow"
         rightEnd="Quick"
+        readout={`accel ${eff.tilt.accel.toFixed(0)} · max ${eff.tilt.max.toFixed(1)}°/s`}
         onChange={onTiltRateChange}
       />
       <Slider
@@ -91,6 +100,7 @@ export default function FlightTuningPanel({
         max={AXIS_RANGES.climbRate.max}
         leftEnd="Cinematic"
         rightEnd="Rapid"
+        readout={`${(eff.dolly.ratePerSec * 100).toFixed(1)}% of range/sec at full trigger`}
         onChange={onClimbRateChange}
       />
 
@@ -117,10 +127,13 @@ interface SliderProps {
   max: number;
   leftEnd: string;
   rightEnd: string;
+  /** Live effective values from the engine. Shown under the slider
+   *  in monospace so Greg can dictate exact numbers back. */
+  readout: string;
   onChange: (v: number) => void;
 }
 
-function Slider({ label, value, min, max, leftEnd, rightEnd, onChange }: SliderProps) {
+function Slider({ label, value, min, max, leftEnd, rightEnd, readout, onChange }: SliderProps) {
   // Step scales with the range so wider sliders aren't gritty and
   // narrow ones aren't jumpy. ~50 steps end-to-end feels right.
   const step = Math.max(0.01, Math.round(((max - min) / 50) * 100) / 100);
@@ -158,6 +171,9 @@ function Slider({ label, value, min, max, leftEnd, rightEnd, onChange }: SliderP
         )}
         <span className="opacity-50">·</span>
         <span>{rightEnd}</span>
+      </div>
+      <div className="mt-1 text-[9.5px] font-mono text-on-surface-variant tabular-nums leading-tight">
+        {readout}
       </div>
     </div>
   );

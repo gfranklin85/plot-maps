@@ -42,22 +42,24 @@ const API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
 // throttle/strafe another ~1.5× and yaw stays where it was (turn
 // rate gets its own slider anyway). Tilt is now broken out as its
 // own slider so cutting its base doesn't fight pan tuning.
-const AIR_THROTTLE_ACCEL = 170;
-const AIR_THROTTLE_DRAG = 0.965;
-const AIR_THROTTLE_MAX = 85;
-const AIR_STRAFE_ACCEL = 150;
-const AIR_STRAFE_DRAG = 0.96;
-const AIR_STRAFE_MAX = 75;
-// Yaw bumped 2026-05-18 — Greg flagged even 4× slider felt "small
-// window of slow to slower." Prior MAX=11 deg/s capped a full spin
-// at 8+ seconds; new MAX=45 deg/s puts a snappy spin at ~8s base /
-// ~2s at the top of the turn slider. Accel scaled to match.
-const AIR_YAW_ACCEL = 110;
-const AIR_YAW_DRAG = 0.94;
-const AIR_YAW_MAX = 45;
-const TILT_ACCEL_DEG_S2 = 80;
-const TILT_DRAG = 0.86;
-const TILT_MAX_DEG_S = 26;
+// Base physics constants live in flightBaseConstants.ts as the
+// single source of truth so the FlightTuningPanel's live readouts
+// can never drift from what the engine actually applies. Pull them
+// in with the legacy names so the rest of this file reads the same.
+import { FLIGHT_BASE } from "@/lib/flightBaseConstants";
+
+const AIR_THROTTLE_ACCEL = FLIGHT_BASE.THROTTLE_ACCEL;
+const AIR_THROTTLE_DRAG  = FLIGHT_BASE.THROTTLE_DRAG;
+const AIR_THROTTLE_MAX   = FLIGHT_BASE.THROTTLE_MAX;
+const AIR_STRAFE_ACCEL = FLIGHT_BASE.STRAFE_ACCEL;
+const AIR_STRAFE_DRAG  = FLIGHT_BASE.STRAFE_DRAG;
+const AIR_STRAFE_MAX   = FLIGHT_BASE.STRAFE_MAX;
+const AIR_YAW_ACCEL = FLIGHT_BASE.YAW_ACCEL;
+const AIR_YAW_DRAG  = FLIGHT_BASE.YAW_DRAG;
+const AIR_YAW_MAX   = FLIGHT_BASE.YAW_MAX;
+const TILT_ACCEL_DEG_S2 = FLIGHT_BASE.TILT_ACCEL;
+const TILT_DRAG         = FLIGHT_BASE.TILT_DRAG;
+const TILT_MAX_DEG_S    = FLIGHT_BASE.TILT_MAX;
 // PAN_BOOST_MULT lives in the 2D path on LB-hold; we use LB/RB for
 // zoom in 3D so the boost is intentionally removed here.
 
@@ -82,7 +84,7 @@ const HOVER_PAN_FREQ_Y = 0.11;
 // slider value. At 0.2: full trigger + 1.0× climb-rate slider =
 // ~20% of current range traveled per second. Light-touch trigger
 // + low slider = barely drifting. Fine modulation, real feel.
-const ZOOM_DOLLY_RATE_PER_SEC = 0.2;
+const ZOOM_DOLLY_RATE_PER_SEC = FLIGHT_BASE.ZOOM_DOLLY_RATE_PER_SEC;
 
 
 const METERS_PER_DEG_LAT = 111_320;
@@ -540,9 +542,18 @@ function Inner({
       air.throttle *= Math.pow(AIR_THROTTLE_DRAG, dragExp);
       air.strafe   *= Math.pow(AIR_STRAFE_DRAG,   dragExp);
       air.yaw      *= Math.pow(AIR_YAW_DRAG,      dragExp);
-      air.throttle = clamp(air.throttle, -AIR_THROTTLE_MAX * 0.4, AIR_THROTTLE_MAX);
-      air.strafe   = clamp(air.strafe,   -AIR_STRAFE_MAX, AIR_STRAFE_MAX);
-      air.yaw      = clamp(air.yaw,      -AIR_YAW_MAX, AIR_YAW_MAX);
+      // MAX velocities scale with the same slider that drives accel
+      // (Greg flagged 2026-05-19): without this the slider lies past
+      // ~1.5×. The acceleration cranks higher but terminal velocity
+      // stays capped, so going from 1× to 5× just makes you hit the
+      // same wall faster. Scaling MAX makes the slider honest end-
+      // to-end. The 0.4× reverse-throttle floor is preserved.
+      const throttleMaxScaled = AIR_THROTTLE_MAX * boost;
+      const strafeMaxScaled = AIR_STRAFE_MAX * boost;
+      const yawMaxScaled = AIR_YAW_MAX * boostYaw;
+      air.throttle = clamp(air.throttle, -throttleMaxScaled * 0.4, throttleMaxScaled);
+      air.strafe   = clamp(air.strafe,   -strafeMaxScaled, strafeMaxScaled);
+      air.yaw      = clamp(air.yaw,      -yawMaxScaled, yawMaxScaled);
       if (Math.abs(air.throttle) < 0.5) air.throttle = 0;
       if (Math.abs(air.strafe)   < 0.5) air.strafe = 0;
       if (Math.abs(air.yaw)      < 0.05) air.yaw = 0;
@@ -551,8 +562,30 @@ function Inner({
       // Stick up (ry < 0) raises view; stick down (ry > 0) lowers view.
       vel.tilt -= ry * TILT_ACCEL_DEG_S2 * boostTilt * dt;
       vel.tilt *= Math.pow(TILT_DRAG, dragExp);
-      vel.tilt = clamp(vel.tilt, -TILT_MAX_DEG_S, TILT_MAX_DEG_S);
+      const tiltMaxScaled = TILT_MAX_DEG_S * boostTilt;
+      vel.tilt = clamp(vel.tilt, -tiltMaxScaled, tiltMaxScaled);
       if (Math.abs(vel.tilt) < 0.05) vel.tilt = 0;
+
+      // Pitch-return-to-level spring (Greg flagged 2026-05-19):
+      // when the user releases the right-stick, the camera should
+      // gently level out instead of staying stuck at whatever tilt
+      // they last commanded. Without this, holding sticks up + right
+      // saturates cam.pitch to the high-positive regime, and on
+      // release the camera stays tilted up — making subsequent
+      // forward throttle feel like ascent because the focal point
+      // sits in the sky. The spring runs ONLY when no tilt input
+      // is active, so deliberate framing shots aren't fought.
+      // ~1s to return from a fully-saturated pitch to level; gentle
+      // enough that you can hold any angle as long as you keep a
+      // little stick input on it.
+      const PITCH_RETURN_RATE_PER_SEC = FLIGHT_BASE.PITCH_RETURN_RATE_PER_SEC;
+      if (Math.abs(ry) < 0.05 && Math.abs(vel.tilt) < 0.05) {
+        if (cam.pitch > 0) {
+          cam.pitch = Math.max(0, cam.pitch - PITCH_RETURN_RATE_PER_SEC * Math.abs(cam.pitch) * dt);
+        } else if (cam.pitch < 0) {
+          cam.pitch = Math.min(0, cam.pitch + PITCH_RETURN_RATE_PER_SEC * Math.abs(cam.pitch) * dt);
+        }
+      }
 
       // Translate airplane state into pan vel.
       vel.panX = air.strafe;

@@ -725,3 +725,35 @@ code, .font-mono {
 .lp-cluster:hover .lp-cluster__core {
   transform: scale(1.08);
 }
+
+/* ─── Landing page (Plot's surveying field manual) ──────────────────
+   Subtle motion for the encyclopedia plate. The parchment "breathes,"
+   the entry-affordance figure has a slow coral pulse, hand-engraved
+   ink occasionally redraws. All quiet, none demanding attention.
+   ──────────────────────────────────────────────────────────────── */
+
+/* Slow coral breath on the entry brass key when at rest. */
+@keyframes plot-entry-pulse {
+  0%, 100% { opacity: 0.42; }
+  50%      { opacity: 0.78; }
+}
+
+/* Parchment-page sustained subtle warmth shift. */
+@keyframes plot-parchment-breathe {
+  0%, 100% { filter: brightness(1) sepia(0.04); }
+  50%      { filter: brightness(1.02) sepia(0.06); }
+}
+
+/* Entry sequence — parchment retreats. */
+@keyframes plot-entry-parchment-exit {
+  0%   { opacity: 1; transform: scale(1) translateY(0); }
+  60%  { opacity: 1; transform: scale(1.04) translateY(-6px); }
+  100% { opacity: 0; transform: scale(1.12) translateY(-24px); }
+}
+
+/* Entry sequence — light bloom that fills the frame before the map. */
+@keyframes plot-entry-bloom {
+  0%   { opacity: 0; }
+  60%  { opacity: 1; }
+  100% { opacity: 0.85; }
+}

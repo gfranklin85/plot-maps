@@ -535,29 +535,55 @@ export default function Parcel3DOverlay({
   }, [visible, cameraRef, fetchViewport]);
 
   // ── Hit-tester: screen pixel → parcel APN.
-  // Calls Map3D's screenToLatLng to project the pixel onto the ground,
-  // then does point-in-polygon against the cached parcel rings.
-  // Bbox prefilter makes the worst case O(visible_parcels) rather than
-  // O(all_parcels) — at 500 feature cap this is ~0.1ms per call.
+  //
+  // Map3DElement doesn't expose any screen-to-world projection method
+  // (no screenToLatLng / getProjection in the current preview API), so
+  // we project the reticle ourselves: cast a ray from the eye in the
+  // camera's view direction and intersect with the ground plane
+  // (altitude = 0). This works for the on-axis reticle pixel; truly
+  // arbitrary (x, y) pixels would need a full inverse-projection
+  // through the camera frustum, which we don't have here.
+  //
+  // Since the gamepad loop only ever calls this at the center-screen
+  // reticle, the on-axis approximation is exact for the cases that
+  // matter. Off-axis callers get the same on-axis ground point —
+  // acceptable graceful degradation (would still pick the parcel near
+  // the screen center, not at the user's actual cursor).
   useEffect(() => {
     if (!hitTesterRef) return;
-    const tester: ParcelHitTester = (x: number, y: number) => {
-      const mapEl = mapElRef.current;
-      if (!mapEl || !mapEl.screenToLatLng) return null;
-      const ll = mapEl.screenToLatLng(x, y);
-      if (!ll) return null;
-      const px: [number, number] = [ll.lng, ll.lat];
-      // Iterate cached features; bbox check first, polygon check only
-      // on bbox hits. We use .values() + array conversion so the iteration
-      // works on Plot's current tsconfig target.
+    const tester: ParcelHitTester = (_x: number, _y: number) => {
+      const cam = cameraRef.current;
+      if (!cam) return null;
+      // Pitch convention here matches MapView3D's FpCam:
+      //   pitch =  0 → looking at horizon
+      //   pitch < 0 → looking down (toward ground)
+      //   pitch > 0 → looking up (toward sky)
+      // The reticle only hits the ground when pitch is negative;
+      // looking at or above the horizon misses the ground entirely.
+      const pitchDeg = cam.pitch;
+      if (pitchDeg >= -0.5) return null; // looking at horizon or up — no ground intercept
+      const pitchRad = (Math.abs(pitchDeg) * Math.PI) / 180;
+      // Ground distance from the camera footprint to the reticle
+      // intercept: altitude / tan(downward angle).
+      const groundDistM = cam.altitude / Math.tan(pitchRad);
+      // Don't trust ridiculously far intercepts (near-horizon clips
+      // can compute kilometers away where parcels aren't fetched).
+      if (!Number.isFinite(groundDistM) || groundDistM > 50_000) return null;
+      // Convert (heading, groundDist) → lat/lng offset.
+      const headingRad = (cam.heading * Math.PI) / 180;
+      const dNorthM = groundDistM * Math.cos(headingRad);
+      const dEastM = groundDistM * Math.sin(headingRad);
+      const cosLat = Math.cos((cam.lat * Math.PI) / 180) || 1;
+      const targetLat = cam.lat + dNorthM / 111_320;
+      const targetLng = cam.lng + dEastM / (111_320 * cosLat);
+      const px: [number, number] = [targetLng, targetLat];
+      // Same point-in-polygon search as the lat/lng finder.
       const featArr = Array.from(featuresRef.current.values());
       for (let i = 0; i < featArr.length; i++) {
         const feat = featArr[i];
-        if (ll.lat < feat.bboxMinLat || ll.lat > feat.bboxMaxLat) continue;
-        if (ll.lng < feat.bboxMinLng || ll.lng > feat.bboxMaxLng) continue;
+        if (targetLat < feat.bboxMinLat || targetLat > feat.bboxMaxLat) continue;
+        if (targetLng < feat.bboxMinLng || targetLng > feat.bboxMaxLng) continue;
         if (pointInRing(px, feat.outerRing)) {
-          // Also check inner rings (holes) — if the point is inside an
-          // inner ring it's NOT inside the parcel.
           let inHole = false;
           for (let r = 0; r < feat.innerRings.length; r++) {
             if (pointInRing(px, feat.innerRings[r])) { inHole = true; break; }
@@ -572,7 +598,7 @@ export default function Parcel3DOverlay({
     return () => {
       if (hitTesterRef.current === tester) hitTesterRef.current = null;
     };
-  }, [hitTesterRef, mapElRef]);
+  }, [hitTesterRef, cameraRef]);
 
   // ── Lat/lng finder: same point-in-polygon, but starts from a
   //    geographic coordinate the caller already has (e.g. from gmp-click's

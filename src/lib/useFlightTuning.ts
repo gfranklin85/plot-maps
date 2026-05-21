@@ -23,7 +23,7 @@ const STORAGE_KEY = 'plotmaps.flightTuning';
 // stale version returns the canonical defaults instead of the
 // outdated numbers. Greg auto-migrated v3 → v4 (2026-05-21) to
 // pick up the helicopter template centering.
-const SCHEMA_VERSION = 4;
+const SCHEMA_VERSION = 5;
 
 export interface FlightTuning {
   multiplier: number;  // pan

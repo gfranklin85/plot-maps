@@ -52,7 +52,7 @@ export default function FlightTuningPanel({
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-sm font-bold text-on-surface">Flight feel</h3>
-          <p className="text-[10px] text-on-surface-variant mt-0.5">Speed = pan. Turn = yaw. Tilt = look. Climb = ascend/descend.</p>
+          <p className="text-[10px] text-on-surface-variant mt-0.5">Triggers gas. LX strafe · LY look · RX turn · RY climb.</p>
         </div>
         <button
           onClick={onClose}
@@ -84,7 +84,7 @@ export default function FlightTuningPanel({
         onChange={onTurnRateChange}
       />
       <Slider
-        label="Tilt rate"
+        label="Look rate"
         value={tuning.tiltRate}
         min={AXIS_RANGES.tiltRate.min}
         max={AXIS_RANGES.tiltRate.max}
@@ -100,7 +100,7 @@ export default function FlightTuningPanel({
         max={AXIS_RANGES.climbRate.max}
         leftEnd="Cinematic"
         rightEnd="Rapid"
-        readout={`≤300ft: ${(eff.dolly.lowAltRate * 100).toFixed(1)}% · ≥600ft: ${(eff.dolly.highAltRate * 100).toFixed(1)}% of range/sec`}
+        readout={`accel ${eff.climb.accel.toFixed(0)} · max ${eff.climb.max.toFixed(1)} m/s`}
         onChange={onClimbRateChange}
       />
 

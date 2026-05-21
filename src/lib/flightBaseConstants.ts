@@ -60,14 +60,19 @@ export const FLIGHT_BASE = {
   // Both endpoints scale by the user's climb-rate slider so dialing
   // 0.5× halves the whole curve, 1.7× maxes the whole curve. The
   // altitude SHAPE is fixed; the magnitudes are user-tunable.
-  ZOOM_DOLLY_LOW_ALT_RATE:  0.2,     // engine 1.0× anchor for low-alt zone
-  ZOOM_DOLLY_HIGH_ALT_RATE: 1.4,     // engine 1.0× anchor for high-alt zone (7× the low)
-  ZOOM_DOLLY_LOW_ALT_M:  91,         // 300 ft in meters
-  ZOOM_DOLLY_HIGH_ALT_M: 183,        // 600 ft in meters
+  ZOOM_DOLLY_LOW_ALT_RATE:  0.2,     // (retired — RY now drives direct climb)
+  ZOOM_DOLLY_HIGH_ALT_RATE: 1.4,     // (retired)
+  ZOOM_DOLLY_LOW_ALT_M:  91,
+  ZOOM_DOLLY_HIGH_ALT_M: 183,
+  ZOOM_DOLLY_RATE_PER_SEC: 0.2,      // (retired)
 
-  // Legacy single-rate field — kept for the FlightTuningPanel readout
-  // anchor. The engine reads the zone-aware values above.
-  ZOOM_DOLLY_RATE_PER_SEC: 0.2,
+  // Vertical climb (RIGHT-STICK-Y → direct ascent/descent in m/s).
+  // Engine 1.0× anchor — slider scales this. Greg flagged the prior
+  // accidental climb felt fast; pick a calm base and let the user
+  // tune up from the centered slider.
+  CLIMB_ACCEL: 60,                   // m/s² (how quickly RY reaches max)
+  CLIMB_MAX:   30,                   // m/s top vertical speed
+  CLIMB_DRAG:  0.88,                 // per-frame decay base (^60dt)
 } as const;
 
 // CANONICAL "Helicopter" template — the multipliers that, when fed
@@ -77,8 +82,8 @@ export const FLIGHT_BASE = {
 export const HELI_DEFAULT_TUNING = {
   multiplier: 1.04,    // pan — accel 177, max 88 px/s (rev 35)
   turnRate:   1.0,     // yaw — accel 110, max 45°/s (8s per 360)
-  tiltRate:   1.8,     // tilt — accel 144, max 46.8°/s
-  climbRate:  0.17,    // climb — ≤300ft: 3.4%/sec, ≥600ft: 23.8%/sec
+  tiltRate:   1.8,     // look (LY) — accel 144, max 46.8°/s
+  climbRate:  1.0,     // climb (RY) — accel 60, max 30 m/s (centered fresh)
 } as const;
 
 /**
@@ -116,37 +121,11 @@ export function effectiveFlightValues(t: {
       accel: FLIGHT_BASE.TILT_ACCEL * t.tiltRate,
       max:   FLIGHT_BASE.TILT_MAX   * t.tiltRate,
     },
-    dolly: {
-      // Both altitude-zone endpoints, scaled by the user's slider.
-      // The engine reads these via dollyRateForAltitude() below.
-      lowAltRate:  FLIGHT_BASE.ZOOM_DOLLY_LOW_ALT_RATE  * t.climbRate,
-      highAltRate: FLIGHT_BASE.ZOOM_DOLLY_HIGH_ALT_RATE * t.climbRate,
-      lowAltM:  FLIGHT_BASE.ZOOM_DOLLY_LOW_ALT_M,
-      highAltM: FLIGHT_BASE.ZOOM_DOLLY_HIGH_ALT_M,
-      // Legacy single-rate readout (for panels that show a flat number).
-      ratePerSec: FLIGHT_BASE.ZOOM_DOLLY_RATE_PER_SEC * t.climbRate,
+    climb: {
+      // Right-stick-Y → direct vertical velocity in m/s.
+      accel: FLIGHT_BASE.CLIMB_ACCEL * t.climbRate,
+      max:   FLIGHT_BASE.CLIMB_MAX   * t.climbRate,
     },
   };
 }
 
-/**
- * Altitude-aware dolly rate. Below LOW_ALT_M = slow (prospecting);
- * above HIGH_ALT_M = fast (travel); linear ramp between. Greg's
- * 2026-05-20 spec: keep fine control where curb-level work happens,
- * stop wasting the user's time climbing through travel altitudes.
- *
- * Returns the "fraction of current range per second at full trigger"
- * value the engine multiplies into its dolly translation.
- */
-export function dollyRateForAltitude(altitudeM: number, climbRateMultiplier: number): number {
-  const lowRate  = FLIGHT_BASE.ZOOM_DOLLY_LOW_ALT_RATE  * climbRateMultiplier;
-  const highRate = FLIGHT_BASE.ZOOM_DOLLY_HIGH_ALT_RATE * climbRateMultiplier;
-  const lowAlt   = FLIGHT_BASE.ZOOM_DOLLY_LOW_ALT_M;
-  const highAlt  = FLIGHT_BASE.ZOOM_DOLLY_HIGH_ALT_M;
-
-  if (altitudeM <= lowAlt) return lowRate;
-  if (altitudeM >= highAlt) return highRate;
-  // Linear ramp through the transition zone.
-  const t = (altitudeM - lowAlt) / (highAlt - lowAlt);
-  return lowRate + (highRate - lowRate) * t;
-}

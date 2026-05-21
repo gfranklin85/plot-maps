@@ -48,7 +48,7 @@ const API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
 // single source of truth so the FlightTuningPanel's live readouts
 // can never drift from what the engine actually applies. Pull them
 // in with the legacy names so the rest of this file reads the same.
-import { FLIGHT_BASE, dollyRateForAltitude } from "@/lib/flightBaseConstants";
+import { FLIGHT_BASE } from "@/lib/flightBaseConstants";
 
 const AIR_THROTTLE_ACCEL = FLIGHT_BASE.THROTTLE_ACCEL;
 const AIR_THROTTLE_DRAG  = FLIGHT_BASE.THROTTLE_DRAG;
@@ -136,7 +136,7 @@ interface FpCam {
 }
 
 interface AirState { throttle: number; strafe: number; yaw: number; }
-interface VelState { panX: number; panY: number; heading: number; tilt: number; }
+interface VelState { panX: number; panY: number; heading: number; tilt: number; climb: number; }
 
 // Convert first-person eye position + view direction → Map3D's
 // {center, range, tilt, heading}. Map3D's center is the focal point
@@ -277,7 +277,7 @@ function Inner({
   const elRef = useRef<Map3DElement | null>(null);
   const camRef = useRef<FpCam | null>(null);
   const airRef = useRef<AirState>({ throttle: 0, strafe: 0, yaw: 0 });
-  const velRef = useRef<VelState>({ panX: 0, panY: 0, heading: 0, tilt: 0 });
+  const velRef = useRef<VelState>({ panX: 0, panY: 0, heading: 0, tilt: 0, climb: 0 });
   const containerRef = useRef<HTMLDivElement | null>(null);
   const elapsedMsRef = useRef<number>(0);
 
@@ -297,6 +297,35 @@ function Inner({
   onParcelClickRef.current = onParcelClick;
   const onParcelHoverChangeRef = useRef(onParcelHoverChange);
   onParcelHoverChangeRef.current = onParcelHoverChange;
+
+  // Mouse click → parcel selection. Shares the same hit-tester the
+  // gamepad reticle uses, so mouse and controller resolve "what is
+  // under this pixel" identically. The container fires mousedown for
+  // anywhere in the 3D view; we convert to container-local coords and
+  // ask the hit-tester. Hits dispatch onParcelClick; misses are
+  // ignored (the page can wire its own mouse-empty handler later if
+  // needed for e.g. closing a popup).
+  useEffect(() => {
+    const containerEl = containerRef.current;
+    if (!containerEl) return;
+    function onMouseDown(ev: MouseEvent) {
+      // Left button only — don't hijack right-click context or middle-click.
+      if (ev.button !== 0) return;
+      const tester = effectiveHitTesterRef.current;
+      const containerEl = containerRef.current;
+      if (!tester || !containerEl) return;
+      const rect = containerEl.getBoundingClientRect();
+      const x = ev.clientX - rect.left;
+      const y = ev.clientY - rect.top;
+      const hit = tester(x, y);
+      if (!hit) return;
+      onParcelClickRef.current?.(hit.apn, { lat: hit.lat, lng: hit.lng });
+    }
+    containerEl.addEventListener('mousedown', onMouseDown);
+    return () => {
+      containerEl.removeEventListener('mousedown', onMouseDown);
+    };
+  }, [effectiveHitTesterRef]);
 
   const actionsRef = useRef<GamepadActions | undefined>(gamepadActions);
   actionsRef.current = gamepadActions;
@@ -365,7 +394,7 @@ function Inner({
     // Zero out gamepad velocity state so input doesn't fight the
     // animation when it lands.
     airRef.current = { throttle: 0, strafe: 0, yaw: 0 };
-    velRef.current = { panX: 0, panY: 0, heading: 0, tilt: 0 };
+    velRef.current = { panX: 0, panY: 0, heading: 0, tilt: 0, climb: 0 };
 
     // RAF loop for the animation. Self-cancels when the animation
     // finishes. Runs independent of the gamepad loop so destinations
@@ -451,7 +480,7 @@ function Inner({
       heading: 0, pitch: 0, range: 700,
     };
     airRef.current = { throttle: 0, strafe: 0, yaw: 0 };
-    velRef.current = { panX: 0, panY: 0, heading: 0, tilt: 0 };
+    velRef.current = { panX: 0, panY: 0, heading: 0, tilt: 0, climb: 0 };
     // Initial write to Map3D.
     const m3d = fpToMap3D(camRef.current);
     el.center = m3d.center;
@@ -559,55 +588,19 @@ function Inner({
         if (justPressed.has('down') || justPressed.has('right')) actionsRef.current?.onCycleNext?.();
       }
 
-      // ── LT/RT → analog descent / ascent (dolly along view ray) ──
-      // Triggers give pressure-modulated control instead of binary
-      // hold. Light squeeze = gentle drift; full pull = aggressive
-      // climb or descent. Real flight-control feel. LT = descend,
-      // RT = ascend. LB/RB are intentionally unbound for now.
-      //
-      // In first-person, "descent" can't just shrink cam.range — that
-      // moves the focal point closer to a stationary eye, which is
-      // visually invisible (no perspective change). We translate the
-      // eye position along the current view direction. Magnitude is
-      // (LT - RT) so opposing trigger presses cancel naturally.
-      const dollyInput = triggers.left - triggers.right;
-      // Small dead-zone on the trigger so resting fingers don't drift.
-      const DOLLY_DEAD = 0.04;
-      const dollyEffective = Math.abs(dollyInput) < DOLLY_DEAD ? 0 : dollyInput;
-      if (dollyEffective !== 0) {
-        // Sign convention: LT positive → zoomSign -1 (descend / forward
-        // along view ray). RT positive → zoomSign +1 (ascend / back).
-        //
-        // Altitude-aware rate (Greg locked 2026-05-20): below 300 ft
-        // the user is prospecting and wants fine control; above 600 ft
-        // they're traveling and want to get somewhere. The rate ramps
-        // smoothly between the two zones based on cam.altitude. The
-        // climb-rate slider scales the whole curve proportionally.
-        const dollyRate = dollyRateForAltitude(cam.altitude, climbMultRef.current);
-        const moveMeters = -dollyEffective * cam.range * dollyRate * dt;
-        const pitchRad = (cam.pitch * Math.PI) / 180;
-        const headingRad = (cam.heading * Math.PI) / 180;
-        const horizMove = moveMeters * Math.cos(pitchRad);
-        const vertMove  = moveMeters * Math.sin(pitchRad);
-        const dEast  = horizMove * Math.sin(headingRad);
-        const dNorth = horizMove * Math.cos(headingRad);
-        const cosLat = Math.cos((cam.lat * Math.PI) / 180) || 1;
-        cam.lat += dNorth / METERS_PER_DEG_LAT;
-        cam.lng += dEast  / (METERS_PER_DEG_LAT * cosLat);
-        cam.altitude += vertMove;
-      }
+      // ── Control mapping (Greg locked 2026-05-21) ─────────────────
+      //   LEFT-X   → strafe sideways
+      //   LEFT-Y   → look up/down (pitch)
+      //   RIGHT-X  → yaw (turn)
+      //   RIGHT-Y  → vertical climb / descend in m/s
+      //   RT       → accelerate forward (analog gas)
+      //   LT       → brake; once stopped, reverse
+      // Sticks = direction. Triggers = pace. Aircraft model.
 
-      // ── Physics integration — same as 2D airplane branch ──────────
-      // No LB boost on pan since LB now means zoom. (The 2D path's
-      // PAN_BOOST_MULT is preserved as a constant for future use but
-      // not applied here.) The flight-speed multiplier from
-      // useFlightTuning rolls into `boost` for pan / tilt. Yaw uses
-      // its own `boostYaw` driven by the independent Turn Rate slider
-      // so cinematic-slow rotation + snappy pan (or vice versa) is
-      // possible without one slider doing both jobs.
       const boost = speedMultRef.current;
       const boostYaw = turnMultRef.current;
       const boostTilt = tiltMultRef.current;
+      const boostClimb = climbMultRef.current;
       const dragExp = 60 * dt;
 
       const lx = shapeStick(leftStick.x);
@@ -615,10 +608,23 @@ function Inner({
       const rx = shapeStick(rightStick.x);
       const ry = shapeStick(rightStick.y);
 
-      // Airplane state: throttle/strafe/yaw with accel + drag + max.
-      air.throttle += -ly * AIR_THROTTLE_ACCEL * boost * dt;
-      air.strafe   +=  lx * AIR_STRAFE_ACCEL   * boost * dt;
-      air.yaw      +=  rx * AIR_YAW_ACCEL      * boostYaw * dt;
+      // Triggers: RT = forward gas. LT = brake when moving forward,
+      // reverse once stopped.
+      const TRIGGER_DEAD = 0.04;
+      const rt = triggers.right < TRIGGER_DEAD ? 0 : triggers.right;
+      const lt = triggers.left  < TRIGGER_DEAD ? 0 : triggers.left;
+      const BRAKE_MULT = 2.0;
+      let throttleAccel = rt * AIR_THROTTLE_ACCEL * boost;
+      if (lt > 0) {
+        if (air.throttle > 0) throttleAccel -= lt * AIR_THROTTLE_ACCEL * boost * BRAKE_MULT;
+        else throttleAccel -= lt * AIR_THROTTLE_ACCEL * boost;
+      }
+      air.throttle += throttleAccel * dt;
+
+      // Strafe (LX), Yaw (RX).
+      air.strafe += lx * AIR_STRAFE_ACCEL * boost * dt;
+      air.yaw    += rx * AIR_YAW_ACCEL    * boostYaw * dt;
+
       air.throttle *= Math.pow(AIR_THROTTLE_DRAG, dragExp);
       air.strafe   *= Math.pow(AIR_STRAFE_DRAG,   dragExp);
       air.yaw      *= Math.pow(AIR_YAW_DRAG,      dragExp);
@@ -638,22 +644,27 @@ function Inner({
       if (Math.abs(air.strafe)   < 0.5) air.strafe = 0;
       if (Math.abs(air.yaw)      < 0.05) air.yaw = 0;
 
-      // Tilt (right-Y): direct velocity-driven (same as 2D airplane).
-      // Stick up (ry < 0) raises view; stick down (ry > 0) lowers view.
-      vel.tilt -= ry * TILT_ACCEL_DEG_S2 * boostTilt * dt;
+      // ── Look pitch (LEFT-Y) ──────────────────────────────────────
+      // Stick up (ly < 0) raises view; stick down (ly > 0) lowers it.
+      vel.tilt -= ly * TILT_ACCEL_DEG_S2 * boostTilt * dt;
       vel.tilt *= Math.pow(TILT_DRAG, dragExp);
       const tiltMaxScaled = TILT_MAX_DEG_S * boostTilt;
       vel.tilt = clamp(vel.tilt, -tiltMaxScaled, tiltMaxScaled);
       if (Math.abs(vel.tilt) < 0.05) vel.tilt = 0;
 
-      // No pitch return-to-level spring and no pitch clamp. The user
-      // sets the look direction and it stays where they set it. The
-      // only ceiling is whatever Map3D enforces on its own tilt
-      // (fpToMap3D clamps the WRITE at 0-85, but cam.pitch itself is
-      // unbounded so the stick input still feels alive at the limit
-      // instead of going dead). Greg confirmed 2026-05-19: left
-      // stick = pan, right stick = look. Two separate verbs, no
-      // combined effects.
+      // ── Vertical climb (RIGHT-Y) ─────────────────────────────────
+      // Direct vertical velocity in m/s. Stick up (ry < 0) ascends;
+      // stick down (ry > 0) descends. ClimbRate slider scales accel + max.
+      vel.climb -= ry * FLIGHT_BASE.CLIMB_ACCEL * boostClimb * dt;
+      vel.climb *= Math.pow(FLIGHT_BASE.CLIMB_DRAG, dragExp);
+      const climbMaxScaled = FLIGHT_BASE.CLIMB_MAX * boostClimb;
+      vel.climb = clamp(vel.climb, -climbMaxScaled, climbMaxScaled);
+      if (Math.abs(vel.climb) < 0.02) vel.climb = 0;
+      cam.altitude = Math.max(1, cam.altitude + vel.climb * dt);
+
+      // Pitch stays where the user sets it (no spring, no clamp on
+      // the internal value — only the Map3D write is bounded inside
+      // fpToMap3D). Sticks and triggers are independent verbs.
 
       // Translate airplane state into pan vel.
       vel.panX = air.strafe;

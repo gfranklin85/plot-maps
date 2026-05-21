@@ -18,6 +18,12 @@ import { useCallback, useEffect, useState } from 'react';
 // rest" feel from user-config disruption.
 
 const STORAGE_KEY = 'plotmaps.flightTuning';
+// Bump when the canonical defaults or slider ranges change so old
+// stored values don't override the new defaults. Reading from a
+// stale version returns the canonical defaults instead of the
+// outdated numbers. Greg auto-migrated v3 → v4 (2026-05-21) to
+// pick up the helicopter template centering.
+const SCHEMA_VERSION = 4;
 
 export interface FlightTuning {
   multiplier: number;  // pan
@@ -60,7 +66,11 @@ function readFromStorage(): FlightTuning {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return DEFAULT_TUNING;
-    const parsed = JSON.parse(raw) as Partial<FlightTuning>;
+    const parsed = JSON.parse(raw) as Partial<FlightTuning> & { version?: number };
+    // Schema version gate — stale stored values from before the
+    // canonical-centering change get discarded so the user sees
+    // the new defaults instead of their old custom tuning.
+    if (parsed.version !== SCHEMA_VERSION) return DEFAULT_TUNING;
     const multiplier = clampAxis(typeof parsed.multiplier === 'number' ? parsed.multiplier : DEFAULT_TUNING.multiplier, 'multiplier');
     // Per-axis fallback: any missing axis falls back to the canonical
     // default for that axis (NOT to the multiplier — older tunings
@@ -85,7 +95,7 @@ function readFromStorage(): FlightTuning {
 
 function writeToStorage(t: FlightTuning) {
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(t));
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...t, version: SCHEMA_VERSION }));
   } catch { /* ignore */ }
 }
 

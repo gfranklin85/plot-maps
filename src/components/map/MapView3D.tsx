@@ -440,15 +440,15 @@ function Inner({
     el.setAttribute('default-labels-disabled', poisVisible ? 'false' : 'true');
     containerRef.current.appendChild(el);
     elRef.current = el;
-    // Seed at ~80m altitude — comfortable cruise over residential
-    // (well above rooftops, below low-altitude clouds), looking
-    // forward + slightly down (pitch -25). Previous 300m put the
-    // user in a "satellite-view" mindset instead of "flying around
-    // the neighborhood." Lower seed gets them straight to the
-    // useful zone.
+    // Seed at 91m (300 ft) altitude looking forward to the horizon
+    // (pitch 0). 300 ft is the top of the prospecting zone — high
+    // enough to see the neighborhood, low enough to start working
+    // immediately. Horizon framing puts the user in "flying" mind-
+    // set on frame one instead of "satellite view." Greg locked
+    // this spawn 2026-05-21.
     camRef.current = {
-      lat: seed.lat, lng: seed.lng, altitude: 80,
-      heading: 0, pitch: -25, range: 700,
+      lat: seed.lat, lng: seed.lng, altitude: 91,
+      heading: 0, pitch: 0, range: 700,
     };
     airRef.current = { throttle: 0, strafe: 0, yaw: 0 };
     velRef.current = { panX: 0, panY: 0, heading: 0, tilt: 0 };

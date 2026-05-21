@@ -194,6 +194,49 @@ export default function MapPage() {
     setGamepad(prev => ({ connected, everConnected: prev.everConnected || connected }));
   }, []);
 
+  // Page-level gamepad listener so we know about a controller BEFORE
+  // the airplane-mode GamepadFlightController is even mounted. Drives
+  // the auto-switch into airplane mode below — user shouldn't have
+  // to dig into a menu to "select controller mode."
+  const [pageGamepadConnected, setPageGamepadConnected] = useState(false);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    // Seed initial state — Chrome only exposes gamepads after the user
+    // has interacted with one, but checking up front catches the
+    // already-paired case after a page reload.
+    const seedPads = navigator.getGamepads ? navigator.getGamepads() : [];
+    for (const p of seedPads) { if (p && p.connected) { setPageGamepadConnected(true); break; } }
+    const onConnect = () => setPageGamepadConnected(true);
+    const onDisconnect = () => {
+      const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+      let any = false;
+      for (const p of pads) { if (p && p.connected) { any = true; break; } }
+      setPageGamepadConnected(any);
+    };
+    window.addEventListener('gamepadconnected', onConnect);
+    window.addEventListener('gamepaddisconnected', onDisconnect);
+    return () => {
+      window.removeEventListener('gamepadconnected', onConnect);
+      window.removeEventListener('gamepaddisconnected', onDisconnect);
+    };
+  }, []);
+
+  // Auto-switch to airplane mode + 3D when a controller is detected.
+  // No menu, no toggle to find — plug a controller in and the world
+  // becomes flyable. Disconnect drops back to overhead mode so 2D
+  // mouse + keyboard work isn't trapped in airplane mode. The
+  // toolbar airplane button stays available as a manual override.
+  useEffect(() => {
+    if (pageGamepadConnected) {
+      if (has3DSupport) {
+        setFlightMode('airplane');
+        setView3D(true);
+      }
+    } else {
+      setFlightMode('overhead');
+    }
+  }, [pageGamepadConnected, has3DSupport]);
+
   const searchParams = useSearchParams();
   const urlInitDone = useRef(false);
   const debugHoverMode = searchParams?.get('debug') === 'hover';

@@ -610,6 +610,12 @@ function Inner({
       const ly = shapeStick(leftStick.y);
       const rx = shapeStick(rightStick.x);
       const ry = shapeStick(rightStick.y);
+      // DEBUG (Greg 2026-05-21): trace LY → vel.tilt → cam.pitch to find why
+      // look-up/down is dead. Remove after diagnosis.
+      if (Math.abs(ly) > 0.1) {
+        // eslint-disable-next-line no-console
+        console.log('[FLIGHT] LY=', ly.toFixed(3), 'vel.tilt=', vel.tilt.toFixed(2), 'cam.pitch=', cam.pitch.toFixed(2), 'boostTilt=', tiltMultRef.current.toFixed(2));
+      }
 
       // Triggers: RT = forward gas. LT = brake when moving forward,
       // reverse once stopped.

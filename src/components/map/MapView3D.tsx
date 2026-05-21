@@ -166,40 +166,46 @@ function fpToMap3D(cam: FpCam): {
   // at a saturated pitch; releasing the stick lets pitch coast back.
   const map3dTilt = clamp(90 + cam.pitch, 0, 85);
 
-  // Place focal point along the view ray. Key constraint Google enforces:
-  // Map3D silently clamps focal-point altitude to >= 0 (ground level).
-  // If we write a negative focal altitude, Google ignores our entire
-  // {center, range} pair and re-derives the camera position based on
-  // its own clamped focal — meaning OUR cam.altitude is no longer the
-  // actual rendered eye altitude. That's why dolly-down hits an
-  // invisible floor at ~30m: focal goes underground long before eye
-  // does, Google clamps, camera position drifts away from what we want.
+  // ── Decouple eye altitude from look-pitch ─────────────────────────
+  // Map3D positions the camera at: eyeAlt = focalAlt + range * cos(tilt)
+  // where tilt is from-nadir (0 = straight down, 90 = horizontal).
   //
-  // Fix: dynamically shorten `range` so the focal lands AT ground level
-  // when looking down, never below. Math: focal_altitude = eye_altitude
-  // + range * sin(pitch). We want focal_altitude >= 0, so when looking
-  // down (pitch < 0), max usable range = -eye_altitude / sin(pitch).
-  // We pick the smaller of cam.range and that ground-distance, so the
-  // focal-point sits exactly on the ground (not underneath).
-  const pitchRad = (cam.pitch * Math.PI) / 180;
-  const sinPitch = Math.sin(pitchRad);
+  // Previously we placed the focal point ALONG the view ray from the
+  // eye, which meant changing pitch moved the focal up/down → Map3D
+  // moved the eye too. Result: pushing the look-up stick made the
+  // camera actually rise.
+  //
+  // Fix: invert the formula. Given the eye altitude we want
+  // (cam.altitude) and the tilt we want (map3dTilt), compute the
+  // focal altitude that produces that eye height. Look-pitch then
+  // rotates the view without affecting eye position. Climb (RY)
+  // becomes the only thing that changes altitude.
+  const tiltRad = (map3dTilt * Math.PI) / 180;
+  const cosTilt = Math.cos(tiltRad);  // 0 at horizon, 1 at nadir
+  const sinTilt = Math.sin(tiltRad);  // 1 at horizon, 0 at nadir
+
+  // Use a stable focal-projection distance: horizontal component of
+  // the user-chosen range. This keeps the focal point ahead of the
+  // camera in the direction of view, scaled by how tilted it is.
   let useRange = cam.range;
-  if (sinPitch < 0 && cam.altitude > 0) {
-    const maxRangeBeforeGround = -cam.altitude / sinPitch;
+  // We want focalAlt >= 0 (ground). focalAlt = cam.altitude - range * cosTilt.
+  // If that goes negative (when looking down with a long range), shorten
+  // range until focal sits exactly on the ground.
+  if (cosTilt > 0.0001 && cam.altitude > 0) {
+    const maxRangeBeforeGround = cam.altitude / cosTilt;
     if (maxRangeBeforeGround < useRange) useRange = maxRangeBeforeGround;
   }
-  // Floor so range can't go to zero (degenerate camera).
   if (useRange < 1) useRange = 1;
 
-  const horizDist = useRange * Math.cos(pitchRad);
-  const vertDist = useRange * sinPitch;
+  const focalAlt = Math.max(0, cam.altitude - useRange * cosTilt);
+
+  // Horizontal offset of focal from eye (in heading direction).
+  const horizDist = useRange * sinTilt;
   const headingRad = (cam.heading * Math.PI) / 180;
   const dEast = horizDist * Math.sin(headingRad);
   const dNorth = horizDist * Math.cos(headingRad);
   const cosLat = Math.cos((cam.lat * Math.PI) / 180) || 1;
-  // Floor focal altitude at 0 (terrain). The math above should keep
-  // it >= 0, but belt-and-suspenders.
-  const focalAlt = Math.max(0, cam.altitude + vertDist);
+
   return {
     center: {
       lat: cam.lat + dNorth / METERS_PER_DEG_LAT,
@@ -298,34 +304,6 @@ function Inner({
   const onParcelHoverChangeRef = useRef(onParcelHoverChange);
   onParcelHoverChangeRef.current = onParcelHoverChange;
 
-  // Mouse click → parcel selection. Shares the same hit-tester the
-  // gamepad reticle uses, so mouse and controller resolve "what is
-  // under this pixel" identically. The container fires mousedown for
-  // anywhere in the 3D view; we convert to container-local coords and
-  // ask the hit-tester. Hits dispatch onParcelClick; misses are
-  // ignored (the page can wire its own mouse-empty handler later if
-  // needed for e.g. closing a popup).
-  useEffect(() => {
-    const containerEl = containerRef.current;
-    if (!containerEl) return;
-    function onMouseDown(ev: MouseEvent) {
-      // Left button only — don't hijack right-click context or middle-click.
-      if (ev.button !== 0) return;
-      const tester = effectiveHitTesterRef.current;
-      const containerEl = containerRef.current;
-      if (!tester || !containerEl) return;
-      const rect = containerEl.getBoundingClientRect();
-      const x = ev.clientX - rect.left;
-      const y = ev.clientY - rect.top;
-      const hit = tester(x, y);
-      if (!hit) return;
-      onParcelClickRef.current?.(hit.apn, { lat: hit.lat, lng: hit.lng });
-    }
-    containerEl.addEventListener('mousedown', onMouseDown);
-    return () => {
-      containerEl.removeEventListener('mousedown', onMouseDown);
-    };
-  }, [effectiveHitTesterRef]);
 
   const actionsRef = useRef<GamepadActions | undefined>(gamepadActions);
   actionsRef.current = gamepadActions;
@@ -469,6 +447,30 @@ function Inner({
     el.setAttribute('default-labels-disabled', poisVisible ? 'false' : 'true');
     containerRef.current.appendChild(el);
     elRef.current = el;
+    // Mouse click → parcel selection. Shares the gamepad reticle's
+    // hit-tester so mouse and controller resolve "what is under this
+    // pixel" identically. We listen on the gmp-map-3d element in the
+    // CAPTURE phase because Map3DElement is a web component that
+    // consumes pointer events internally for its own camera-drag
+    // interactions — bubble-phase listeners on the parent container
+    // never fire. Capture runs BEFORE Map3D's handlers and reliably
+    // sees the click. We only stopPropagation on a parcel HIT so
+    // Map3D's normal drag-to-pan still works on empty ground.
+    function onParcelPointerDown(ev: Event) {
+      const mouseEv = ev as MouseEvent;
+      if (mouseEv.button !== 0) return;
+      const tester = effectiveHitTesterRef.current;
+      const containerEl = containerRef.current;
+      if (!tester || !containerEl) return;
+      const rect = containerEl.getBoundingClientRect();
+      const x = mouseEv.clientX - rect.left;
+      const y = mouseEv.clientY - rect.top;
+      const hit = tester(x, y);
+      if (!hit) return;
+      mouseEv.stopPropagation();
+      onParcelClickRef.current?.(hit.apn, { lat: hit.lat, lng: hit.lng });
+    }
+    el.addEventListener('pointerdown', onParcelPointerDown, { capture: true });
     // Seed at 91m (300 ft) altitude looking forward to the horizon
     // (pitch 0). 300 ft is the top of the prospecting zone — high
     // enough to see the neighborhood, low enough to start working
@@ -491,6 +493,7 @@ function Inner({
     // (don't wait for the first gamepad frame).
     onAltitudeChangeRef.current?.(camRef.current.altitude);
     return () => {
+      el.removeEventListener('pointerdown', onParcelPointerDown, { capture: true } as EventListenerOptions);
       el.remove();
       elRef.current = null;
       camRef.current = null;

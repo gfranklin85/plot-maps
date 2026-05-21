@@ -88,6 +88,18 @@ interface Props {
    *  the gamepad loop calls it each frame at the reticle pixel. Click
    *  + hover dispatch happens IN MapView3D, not here. */
   hitTesterRef?: MutableRefObject<ParcelHitTester | null>;
+  /** Lat/lng → parcel finder. Used by MapView3D's gmp-click handler:
+   *  Map3D gives us the click's geographic position directly, so we
+   *  skip the screen-projection step the reticle hit-tester does and
+   *  ray-cast directly against the cached parcel rings. */
+  latLngFinderRef?: MutableRefObject<((lat: number, lng: number) => { apn: string; lat: number; lng: number } | null) | null>;
+  /** Mouse click on a polygon → fires this. We set clickable="true" on
+   *  each <gmp-polygon-3d> and listen for gmp-click, which is the only
+   *  reliable mouse-click path on Map3D's photoreal surface (raw
+   *  pointer events get consumed inside Map3D's shadow DOM, and
+   *  gmp-click on the map element itself is not dispatched in the
+   *  current preview API — only on interactive children). */
+  onParcelClick?: (apn: string, latLng: { lat: number; lng: number }) => void;
   /** Above this eye altitude (meters), we don't fetch. The aerial
    *  view above this point sees too many parcels to render at
    *  Polygon3D's current performance ceiling. Tuned to ~1500m so
@@ -209,10 +221,16 @@ export default function Parcel3DOverlay({
   visible,
   colorMode,
   hitTesterRef,
+  latLngFinderRef,
+  onParcelClick,
   maxAltitudeMeters = MAX_ALTITUDE_DEFAULT_M,
 }: Props) {
   // Indexed feature set — APN → cached geometry + rendered polygon DOM.
   const featuresRef = useRef<Map<string, IndexedFeature>>(new Map());
+  // Live ref to onParcelClick so polygon click listeners (bound at
+  // polygon-creation time) always invoke the most-recent callback.
+  const onParcelClickRef = useRef(onParcelClick);
+  onParcelClickRef.current = onParcelClick;
   const inflightRef = useRef<AbortController | null>(null);
   const fetchTimerRef = useRef<number | null>(null);
   // Last-fetched bbox; we skip the fetch if camera hasn't moved enough.
@@ -265,6 +283,30 @@ export default function Parcel3DOverlay({
       // strokeWidth is in pixels. 1.0 is subtle; we want parcel lines
       // visible without screaming.
       poly.strokeWidth = 1.0;
+      // Enable Map3D's native click hit-testing on this polygon. The
+      // setAttribute form is what the web component reads (vs the
+      // .clickable property which isn't always reflected).
+      poly.setAttribute('clickable', 'true');
+      // Stash APN on the element so the click listener can recover
+      // which parcel was clicked from event.target without holding
+      // a closure over `feat` (which would leak across reuse).
+      poly.dataset.apn = feat.apn;
+      poly.dataset.lat = String(feat.centerLat);
+      poly.dataset.lng = String(feat.centerLng);
+      // gmp-click is dispatched by Map3D when the user clicks an
+      // interactive child. event.detail.position gives the precise
+      // click lat/lng; we fall back to the cached centroid if absent.
+      poly.addEventListener('gmp-click', (rawEv) => {
+        const ev = rawEv as CustomEvent<{ position?: { lat: number; lng: number; altitude?: number } }>;
+        const el = ev.target as HTMLElement | null;
+        const apn = el?.dataset.apn;
+        if (!apn) return;
+        const pos = ev.detail?.position;
+        const lat = pos?.lat ?? Number(el?.dataset.lat);
+        const lng = pos?.lng ?? Number(el?.dataset.lng);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+        onParcelClickRef.current?.(apn, { lat, lng });
+      });
       mapEl.appendChild(poly);
       feat.polygonEl = poly;
     }
@@ -522,6 +564,35 @@ export default function Parcel3DOverlay({
       if (hitTesterRef.current === tester) hitTesterRef.current = null;
     };
   }, [hitTesterRef, mapElRef]);
+
+  // ── Lat/lng finder: same point-in-polygon, but starts from a
+  //    geographic coordinate the caller already has (e.g. from gmp-click's
+  //    event.detail.position). No screen-projection needed.
+  useEffect(() => {
+    if (!latLngFinderRef) return;
+    const finder = (lat: number, lng: number) => {
+      const px: [number, number] = [lng, lat];
+      const featArr = Array.from(featuresRef.current.values());
+      for (let i = 0; i < featArr.length; i++) {
+        const feat = featArr[i];
+        if (lat < feat.bboxMinLat || lat > feat.bboxMaxLat) continue;
+        if (lng < feat.bboxMinLng || lng > feat.bboxMaxLng) continue;
+        if (pointInRing(px, feat.outerRing)) {
+          let inHole = false;
+          for (let r = 0; r < feat.innerRings.length; r++) {
+            if (pointInRing(px, feat.innerRings[r])) { inHole = true; break; }
+          }
+          if (inHole) continue;
+          return { apn: feat.apn, lat: feat.centerLat, lng: feat.centerLng };
+        }
+      }
+      return null;
+    };
+    latLngFinderRef.current = finder;
+    return () => {
+      if (latLngFinderRef.current === finder) latLngFinderRef.current = null;
+    };
+  }, [latLngFinderRef]);
 
   // useMemo to avoid re-creating the noop component every render.
   return useMemo(() => null, []);

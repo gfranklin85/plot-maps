@@ -46,7 +46,7 @@ const API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
 // single source of truth so the FlightTuningPanel's live readouts
 // can never drift from what the engine actually applies. Pull them
 // in with the legacy names so the rest of this file reads the same.
-import { FLIGHT_BASE } from "@/lib/flightBaseConstants";
+import { FLIGHT_BASE, dollyRateForAltitude } from "@/lib/flightBaseConstants";
 
 const AIR_THROTTLE_ACCEL = FLIGHT_BASE.THROTTLE_ACCEL;
 const AIR_THROTTLE_DRAG  = FLIGHT_BASE.THROTTLE_DRAG;
@@ -84,7 +84,6 @@ const HOVER_PAN_FREQ_Y = 0.11;
 // slider value. At 0.2: full trigger + 1.0× climb-rate slider =
 // ~20% of current range traveled per second. Light-touch trigger
 // + low slider = barely drifting. Fine modulation, real feel.
-const ZOOM_DOLLY_RATE_PER_SEC = FLIGHT_BASE.ZOOM_DOLLY_RATE_PER_SEC;
 
 
 const METERS_PER_DEG_LAT = 111_320;
@@ -504,7 +503,14 @@ function Inner({
       if (dollyEffective !== 0) {
         // Sign convention: LT positive → zoomSign -1 (descend / forward
         // along view ray). RT positive → zoomSign +1 (ascend / back).
-        const moveMeters = -dollyEffective * cam.range * ZOOM_DOLLY_RATE_PER_SEC * climbMultRef.current * dt;
+        //
+        // Altitude-aware rate (Greg locked 2026-05-20): below 300 ft
+        // the user is prospecting and wants fine control; above 600 ft
+        // they're traveling and want to get somewhere. The rate ramps
+        // smoothly between the two zones based on cam.altitude. The
+        // climb-rate slider scales the whole curve proportionally.
+        const dollyRate = dollyRateForAltitude(cam.altitude, climbMultRef.current);
+        const moveMeters = -dollyEffective * cam.range * dollyRate * dt;
         const pitchRad = (cam.pitch * Math.PI) / 180;
         const headingRad = (cam.heading * Math.PI) / 180;
         const horizMove = moveMeters * Math.cos(pitchRad);

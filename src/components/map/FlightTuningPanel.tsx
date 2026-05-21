@@ -100,7 +100,7 @@ export default function FlightTuningPanel({
         max={AXIS_RANGES.climbRate.max}
         leftEnd="Cinematic"
         rightEnd="Rapid"
-        readout={`${(eff.dolly.ratePerSec * 100).toFixed(1)}% of range/sec at full trigger`}
+        readout={`≤300ft: ${(eff.dolly.lowAltRate * 100).toFixed(1)}% · ≥600ft: ${(eff.dolly.highAltRate * 100).toFixed(1)}% of range/sec`}
         onChange={onClimbRateChange}
       />
 

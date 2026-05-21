@@ -33,24 +33,18 @@ const DEFAULT_TUNING: FlightTuning = {
   climbRate: 1.0,
 };
 
-// Per-axis slider ranges. 1.0× is always the "designed default" feel
-// (the value the base accel constants in MapView3D are tuned to), so
-// the panel UI can still anchor a tick at 1.0. Bounds differ because
-// the right "fast/slow" envelope is different per axis:
-//
-//   pan   — 0.1..2.5 (wide; user preferences vary the most here)
-//   turn  — 0.5..4.0 (skewed UP — right-stick yaw was too slow at 1.0×)
-//   tilt  — 0.1..2.5
-//   climb — 0.05..1.2 (skewed DOWN — LT/RT was too fast at 1.0×)
-//
-// Greg dialed both 2026-05-18 after live flight: turn felt sluggish
-// even at the high end, climb felt spaceship-fast even at the low end.
+// Per-axis slider ranges. Greg locked the canonical baseline 2026-05-20
+// — base FLIGHT_BASE now equals the helicopter feel he dialed, so 1.0×
+// IS the right default. Ranges symmetric around 1.0 (min + max = 2)
+// so the slider visually centers on the canonical value. Width
+// (envelope) varies per axis based on how much taste-room each one
+// needs around the default.
 export interface AxisRange { min: number; max: number; }
 export const AXIS_RANGES: Record<keyof FlightTuning, AxisRange> = {
-  multiplier: { min: 0.5,  max: 5.0 },
-  turnRate:   { min: 0.5,  max: 4.0 },
-  tiltRate:   { min: 0.1,  max: 2.5 },
-  climbRate:  { min: 0.05, max: 1.2 },
+  multiplier: { min: 0.3,  max: 1.7 },   // wide pan envelope, ±70% of base
+  turnRate:   { min: 0.3,  max: 1.7 },   // matched envelope; turn baseline already snappy
+  tiltRate:   { min: 0.3,  max: 1.7 },
+  climbRate:  { min: 0.3,  max: 1.7 },
 };
 
 function clampAxis(n: number, axis: keyof FlightTuning): number {

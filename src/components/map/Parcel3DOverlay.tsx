@@ -551,7 +551,13 @@ export default function Parcel3DOverlay({
   // the screen center, not at the user's actual cursor).
   useEffect(() => {
     if (!hitTesterRef) return;
-    const tester: ParcelHitTester = (_x: number, _y: number) => {
+    const tester: ParcelHitTester = (x: number, y: number) => {
+      // Pixel args are unused: the current Map3D preview API has no
+      // screen-to-world projection helper, so this tester always
+      // resolves the reticle (center-screen) via camera ray-to-ground
+      // intersection instead. We accept the args to keep the
+      // ParcelHitTester contract identical to the 2D path.
+      void x; void y;
       const cam = cameraRef.current;
       if (!cam) return null;
       // Pitch convention here matches MapView3D's FpCam:

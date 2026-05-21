@@ -10,40 +10,38 @@
 // no side effects. Both the engine and the panel re-read these
 // every frame so a change here ripples everywhere.
 
-// CANONICAL "Helicopter" baseline (Greg locked 2026-05-20 from live
-// flight). These ARE the 1.0×-slider numbers. Numbers were chosen
-// by flying the previous defaults, dialing each slider until the
-// feel landed, then promoting the effective values shown in
-// FlightTuningPanel to the new base. Sliders re-center so 1.0×
-// sits visually mid-slider.
+// Base physics constants — these are the ENGINE's 1.0× anchor and
+// stay stable so existing tuning math doesn't shift under our feet.
+// The "Helicopter" defaults Greg locked 2026-05-20 are not these
+// numbers — they're these numbers MULTIPLIED by the canonical
+// multipliers below (HELI_DEFAULT_TUNING). The slider ranges are
+// chosen so each axis's canonical multiplier sits at the visual
+// midpoint of its slider.
 //
-// Future aircraft templates (jet, biplane, etc.) will live as
-// alternate FLIGHT_BASE objects swapped at runtime.
+// Future aircraft templates (jet, biplane, etc.) will be additional
+// "*_DEFAULT_TUNING" multiplier objects swapped at runtime.
 export const FLIGHT_BASE = {
   // Throttle (left-stick-Y → forward/back pan along heading).
   // Reverse uses 0.4× of forward MAX (handles "back up gently"
   // without the craft snapping into full reverse).
-  THROTTLE_ACCEL: 177,      // px/s² (was 170, locked from 1.04× live)
-  THROTTLE_MAX:   88,       // px/s top forward speed (was 85)
+  THROTTLE_ACCEL: 170,      // px/s² (screen-pan accel anchor)
+  THROTTLE_MAX:   85,       // px/s top forward speed
   THROTTLE_DRAG:  0.965,    // per-frame decay base (^60dt)
   REVERSE_RATIO:  0.4,      // reverse cap = -MAX × this
 
   // Strafe (left-stick-X → sideways pan perpendicular to heading).
-  // Locked at the same 1.04× scale the throttle was reading.
-  STRAFE_ACCEL: 156,        // was 150
-  STRAFE_MAX:   78,         // was 75
+  STRAFE_ACCEL: 150,
+  STRAFE_MAX:   75,
   STRAFE_DRAG:  0.96,
 
-  // Yaw (right-stick-X → rotate heading). Greg sat at 1.00× on the
-  // live readouts so the prior 2026-05-18 values stay.
-  YAW_ACCEL: 110,
-  YAW_MAX:   45,
+  // Yaw (right-stick-X → rotate heading).
+  YAW_ACCEL: 110,           // deg/s² (bumped 2026-05-18)
+  YAW_MAX:   45,            // deg/s
   YAW_DRAG:  0.94,
 
-  // Tilt (right-stick-Y → look up/down via cam.pitch). Greg dialed
-  // 1.80× live so the new base is the effective values (144, 46.8).
-  TILT_ACCEL: 144,          // was 80
-  TILT_MAX:   46.8,         // was 26
+  // Tilt (right-stick-Y → look up/down via cam.pitch).
+  TILT_ACCEL: 80,           // deg/s²
+  TILT_MAX:   26,           // deg/s
   TILT_DRAG:  0.86,
 
   // LT/RT dolly (analog descent/ascent along view ray).
@@ -62,14 +60,25 @@ export const FLIGHT_BASE = {
   // Both endpoints scale by the user's climb-rate slider so dialing
   // 0.5× halves the whole curve, 1.7× maxes the whole curve. The
   // altitude SHAPE is fixed; the magnitudes are user-tunable.
-  ZOOM_DOLLY_LOW_ALT_RATE:  0.034,   // 3.4% range/sec at full trigger (≤ 300 ft)
-  ZOOM_DOLLY_HIGH_ALT_RATE: 0.238,   // 23.8% range/sec at full trigger (≥ 600 ft)
+  ZOOM_DOLLY_LOW_ALT_RATE:  0.2,     // engine 1.0× anchor for low-alt zone
+  ZOOM_DOLLY_HIGH_ALT_RATE: 1.4,     // engine 1.0× anchor for high-alt zone (7× the low)
   ZOOM_DOLLY_LOW_ALT_M:  91,         // 300 ft in meters
   ZOOM_DOLLY_HIGH_ALT_M: 183,        // 600 ft in meters
 
   // Legacy single-rate field — kept for the FlightTuningPanel readout
   // anchor. The engine reads the zone-aware values above.
-  ZOOM_DOLLY_RATE_PER_SEC: 0.034,
+  ZOOM_DOLLY_RATE_PER_SEC: 0.2,
+} as const;
+
+// CANONICAL "Helicopter" template — the multipliers that, when fed
+// to the engine's base constants above, produce Greg's locked feel
+// (screenshot 2026-05-20). Each slider's range is chosen so this
+// value sits at the slider's visual midpoint.
+export const HELI_DEFAULT_TUNING = {
+  multiplier: 1.04,    // pan — accel 177, max 88 px/s (rev 35)
+  turnRate:   1.0,     // yaw — accel 110, max 45°/s (8s per 360)
+  tiltRate:   1.8,     // tilt — accel 144, max 46.8°/s
+  climbRate:  0.17,    // climb — ≤300ft: 3.4%/sec, ≥600ft: 23.8%/sec
 } as const;
 
 /**

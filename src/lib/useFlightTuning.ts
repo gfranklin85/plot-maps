@@ -26,30 +26,30 @@ export interface FlightTuning {
   climbRate: number;
 }
 
-const DEFAULT_TUNING: FlightTuning = {
-  multiplier: 1.0,
-  turnRate: 1.0,
-  tiltRate: 1.0,
-  climbRate: 1.0,
-};
+// Default tuning = Greg's locked canonical "Helicopter" template
+// (2026-05-20). Lives in flightBaseConstants.ts so swapping templates
+// later (jet / biplane / etc.) is a one-import change.
+import { HELI_DEFAULT_TUNING } from './flightBaseConstants';
+const DEFAULT_TUNING: FlightTuning = { ...HELI_DEFAULT_TUNING };
 
-// Per-axis slider ranges. Greg locked the canonical baseline 2026-05-20
-// — base FLIGHT_BASE now equals the helicopter feel he dialed, so 1.0×
-// IS the right default. Ranges symmetric around 1.0 (min + max = 2)
-// so the slider visually centers on the canonical value. Width
-// (envelope) varies per axis based on how much taste-room each one
-// needs around the default.
+// Per-axis slider ranges. Each range is chosen so the canonical
+// default multiplier sits at the slider's visual midpoint — meaning
+// "drag to the middle" reproduces Greg's locked feel exactly.
+// Width gives the user ±50% taste room on either side of canonical.
+// Formula: width = canonical, so min = canonical × 0.5, max = canonical × 1.5.
+// (For climb with very small canonical, we widen the floor slightly
+// to allow finer cinematic settings.)
 export interface AxisRange { min: number; max: number; }
 export const AXIS_RANGES: Record<keyof FlightTuning, AxisRange> = {
-  multiplier: { min: 0.3,  max: 1.7 },   // wide pan envelope, ±70% of base
-  turnRate:   { min: 0.3,  max: 1.7 },   // matched envelope; turn baseline already snappy
-  tiltRate:   { min: 0.3,  max: 1.7 },
-  climbRate:  { min: 0.3,  max: 1.7 },
+  multiplier: { min: HELI_DEFAULT_TUNING.multiplier * 0.5, max: HELI_DEFAULT_TUNING.multiplier * 1.5 },  // 0.52..1.56
+  turnRate:   { min: HELI_DEFAULT_TUNING.turnRate   * 0.5, max: HELI_DEFAULT_TUNING.turnRate   * 1.5 },  // 0.50..1.50
+  tiltRate:   { min: HELI_DEFAULT_TUNING.tiltRate   * 0.5, max: HELI_DEFAULT_TUNING.tiltRate   * 1.5 },  // 0.90..2.70
+  climbRate:  { min: HELI_DEFAULT_TUNING.climbRate  * 0.3, max: HELI_DEFAULT_TUNING.climbRate  * 1.7 },  // 0.051..0.289
 };
 
 function clampAxis(n: number, axis: keyof FlightTuning): number {
   const { min, max } = AXIS_RANGES[axis];
-  if (!Number.isFinite(n)) return 1.0;
+  if (!Number.isFinite(n)) return DEFAULT_TUNING[axis];
   if (n < min) return min;
   if (n > max) return max;
   return n;
@@ -61,20 +61,20 @@ function readFromStorage(): FlightTuning {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return DEFAULT_TUNING;
     const parsed = JSON.parse(raw) as Partial<FlightTuning>;
-    const multiplier = clampAxis(typeof parsed.multiplier === 'number' ? parsed.multiplier : 1.0, 'multiplier');
-    // Back-compat: old saved tunings without per-axis fields fall
-    // back to the speed multiplier value, preserving prior feel
-    // until the user touches the new sliders.
+    const multiplier = clampAxis(typeof parsed.multiplier === 'number' ? parsed.multiplier : DEFAULT_TUNING.multiplier, 'multiplier');
+    // Per-axis fallback: any missing axis falls back to the canonical
+    // default for that axis (NOT to the multiplier — older tunings
+    // had different scaling and would now produce wrong feel).
     const turnRate = clampAxis(
-      typeof parsed.turnRate === 'number' ? parsed.turnRate : multiplier,
+      typeof parsed.turnRate === 'number' ? parsed.turnRate : DEFAULT_TUNING.turnRate,
       'turnRate',
     );
     const tiltRate = clampAxis(
-      typeof parsed.tiltRate === 'number' ? parsed.tiltRate : multiplier,
+      typeof parsed.tiltRate === 'number' ? parsed.tiltRate : DEFAULT_TUNING.tiltRate,
       'tiltRate',
     );
     const climbRate = clampAxis(
-      typeof parsed.climbRate === 'number' ? parsed.climbRate : multiplier,
+      typeof parsed.climbRate === 'number' ? parsed.climbRate : DEFAULT_TUNING.climbRate,
       'climbRate',
     );
     return { multiplier, turnRate, tiltRate, climbRate };

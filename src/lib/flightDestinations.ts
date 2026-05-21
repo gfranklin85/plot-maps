@@ -110,6 +110,14 @@ export const CURATED_DESTINATIONS: FlightDestination[] = [
     altitude: 700, heading: 270,          // looking west at the burj + skyline
     pitch: -10, range: 1500,
   },
+  {
+    id: 'acapulco',
+    name: 'Acapulco',
+    region: 'Mexico',
+    lat: 16.8400, lng: -99.9050,          // out over the bay, looking back at the amphitheater of hotels
+    altitude: 400, heading: 30,           // northeast — the curved hotel strip + headlands
+    pitch: -14, range: 1300,
+  },
 ];
 
 // Default arrival pose used for search-result destinations (no

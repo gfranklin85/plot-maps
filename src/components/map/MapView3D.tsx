@@ -297,15 +297,22 @@ function Inner({
   const fallbackParcelHitTesterRef = useRef<ParcelHitTester | null>(null);
   const effectiveHitTesterRef: React.MutableRefObject<ParcelHitTester | null> =
     parcelHitTesterRef ?? fallbackParcelHitTesterRef;
-  // Lat/lng finder — populated by Parcel3DOverlay, consumed by gmp-click
-  // handler so we can resolve geographic coordinates straight to a parcel.
+  // Lat/lng finder — written by Parcel3DOverlay; currently unused now
+  // that gmp-click + reticle both resolve via /api/parcels/at-point,
+  // but kept on the prop contract so the overlay can still expose it
+  // for future client-side fast-paths if needed.
   const latLngParcelFinderRef = useRef<((lat: number, lng: number) => { apn: string; lat: number; lng: number } | null) | null>(null);
-  const lastReticleHoverApnRef = useRef<string | null>(null);
-  // Latest callback refs — read by gamepad RAF loop without re-subscribe.
+  // Latest onParcelClick — read by both the gmp-click listener and
+  // the gamepad RAF loop without re-binding on every render.
   const onParcelClickRef = useRef(onParcelClick);
   onParcelClickRef.current = onParcelClick;
-  const onParcelHoverChangeRef = useRef(onParcelHoverChange);
-  onParcelHoverChangeRef.current = onParcelHoverChange;
+  // Hover-change is no longer driven by 3D — reticle hover state was
+  // removed when selection moved server-side. Prop still accepted so
+  // the 2D path's contract is preserved unchanged.
+  void onParcelHoverChange;
+  // Cancel-token for /api/parcels/at-point lookups so a fast second
+  // click supersedes a still-in-flight first click.
+  const lastParcelLookupAcRef = useRef<AbortController | null>(null);
 
 
   const actionsRef = useRef<GamepadActions | undefined>(gamepadActions);
@@ -450,10 +457,49 @@ function Inner({
     el.setAttribute('default-labels-disabled', poisVisible ? 'false' : 'true');
     containerRef.current.appendChild(el);
     elRef.current = el;
-    // (Mouse click is handled per-polygon inside Parcel3DOverlay via
-    //  the gmp-click event on each clickable <gmp-polygon-3d>. The
-    //  map-element-level gmp-click is not dispatched in the current
-    //  Map3D preview API — only interactive children fire it.)
+    // Map3D fires gmp-click on the map element itself with two payload
+    // types: PlaceClickEvent (user clicked a labeled POI / business
+    // icon — has placeId) and LocationClickEvent (user clicked ground
+    // / unlabeled building — has position only). We let POI clicks
+    // fall through to Google's default popover for now (Plot's
+    // custom POI popup is future work); ground clicks resolve to a
+    // parcel via /api/parcels/at-point (server-side PostGIS
+    // point-in-polygon) and fire onParcelClick on a hit. No more
+    // dependence on client-rendered polygon hit-testing.
+    function onMapClick(rawEv: Event) {
+      const ev = rawEv as CustomEvent<{
+        placeId?: string;
+        position?: { lat: number; lng: number; altitude?: number };
+      }> & { placeId?: string; position?: { lat: number; lng: number; altitude?: number } };
+      // PlaceClickEvent carries placeId either on the event itself
+      // (older API shape) or on event.detail (newer). POI clicks: let
+      // Google handle the popover until Plot ships its own POI UI.
+      const placeId = ev.placeId ?? ev.detail?.placeId;
+      if (placeId) return;
+      // LocationClickEvent — extract the click lat/lng.
+      const pos = ev.position ?? ev.detail?.position;
+      if (!pos || !Number.isFinite(pos.lat) || !Number.isFinite(pos.lng)) return;
+      const lat = pos.lat;
+      const lng = pos.lng;
+      // Server-side resolve. AbortController so rapid clicks cancel
+      // stale lookups (the last click wins, not the slowest network).
+      const ac = new AbortController();
+      lastParcelLookupAcRef.current?.abort();
+      lastParcelLookupAcRef.current = ac;
+      fetch(`/api/parcels/at-point?lat=${lat}&lng=${lng}`, { signal: ac.signal })
+        .then((r) => r.ok ? r.json() : null)
+        .then((json) => {
+          if (!json || !json.apn) return;
+          onParcelClickRef.current?.(json.apn as string, { lat, lng });
+        })
+        .catch((err) => {
+          if ((err as Error).name !== 'AbortError') {
+            // eslint-disable-next-line no-console
+            console.warn('[MapView3D] parcel-at-point lookup failed', err);
+          }
+        });
+    }
+    el.addEventListener('gmp-click', onMapClick);
     // Seed at 91m (300 ft) altitude looking forward to the horizon
     // (pitch 0). 300 ft is the top of the prospecting zone — high
     // enough to see the neighborhood, low enough to start working
@@ -476,6 +522,9 @@ function Inner({
     // (don't wait for the first gamepad frame).
     onAltitudeChangeRef.current?.(camRef.current.altitude);
     return () => {
+      el.removeEventListener('gmp-click', onMapClick);
+      lastParcelLookupAcRef.current?.abort();
+      lastParcelLookupAcRef.current = null;
       el.remove();
       elRef.current = null;
       camRef.current = null;
@@ -520,48 +569,56 @@ function Inner({
       // after flyAnimRef clears.
       if (flyAnimRef.current) return;
 
-      // ── Reticle parcel hit-test (per frame) ──────────────────────
-      // Ask Parcel3DOverlay's hit-tester what parcel is at the
-      // reticle's screen position. Fire onParcelHoverChange on
-      // transitions (apn change OR enter/leave from null). The
-      // currently hovered parcel is kept in lastReticleHoverApnRef
-      // so A-press can act on it without re-running the hit-test.
-      //
-      // Reticle is centered (50% width / 50% height) on the 3D path.
-      // If we later add a draggable reticle, swap these for the live
-      // reticle coordinates.
-      let hovered: { apn: string; lat: number; lng: number } | null = null;
-      const tester = effectiveHitTesterRef.current;
-      const containerEl = containerRef.current;
-      if (tester && containerEl) {
-        const rect = containerEl.getBoundingClientRect();
-        const reticleX = rect.width / 2;
-        const reticleY = rect.height / 2;
-        hovered = tester(reticleX, reticleY);
-      }
-      const hoveredApn = hovered?.apn ?? null;
-      if (hoveredApn !== lastReticleHoverApnRef.current) {
-        lastReticleHoverApnRef.current = hoveredApn;
-        onParcelHoverChangeRef.current?.(
-          hoveredApn,
-          hovered ? { lat: hovered.lat, lng: hovered.lng } : null,
-        );
-      }
-
       // ── Edge-triggered button actions (same as 2D) ────────────────
       if (justPressed.size > 0) {
         const fire = (name: ButtonName, fn?: () => void) => {
           if (justPressed.has(name) && fn) fn();
         };
-        // A-press: if reticle is over a parcel, that's a parcel click
-        // (opens PropertyPopup via the page's existing handler). If no
-        // parcel is hovered, fall through to onShoot (the legacy
-        // gameplay action). This way "click the thing the reticle is
-        // on" is the natural meaning and Plot's prospecting use case
-        // works without a separate confirmation button.
+        // A-press: ray-cast from the eye in the view direction to the
+        // ground plane, then resolve that lat/lng to a parcel via
+        // /api/parcels/at-point. Same backend the mouse-click path
+        // uses, so reticle and mouse always agree on what's under
+        // the crosshair. If the ray-cast misses (looking at horizon
+        // or above) or no parcel contains the point, fall through to
+        // onShoot — preserves the gameplay action when the reticle
+        // isn't actually aimed at anything selectable.
         if (justPressed.has('a')) {
-          if (hovered && onParcelClickRef.current) {
-            onParcelClickRef.current(hovered.apn, { lat: hovered.lat, lng: hovered.lng });
+          const cam = camRef.current;
+          // pitch < ~0 means we're aimed below the horizon and can
+          // intersect the ground; otherwise no parcel to select.
+          if (cam && cam.pitch < -0.5) {
+            const pitchRad = (Math.abs(cam.pitch) * Math.PI) / 180;
+            const groundDistM = cam.altitude / Math.tan(pitchRad);
+            if (Number.isFinite(groundDistM) && groundDistM > 0 && groundDistM < 50_000) {
+              const headingRad = (cam.heading * Math.PI) / 180;
+              const dNorthM = groundDistM * Math.cos(headingRad);
+              const dEastM = groundDistM * Math.sin(headingRad);
+              const cosLat = Math.cos((cam.lat * Math.PI) / 180) || 1;
+              const targetLat = cam.lat + dNorthM / 111_320;
+              const targetLng = cam.lng + dEastM / (111_320 * cosLat);
+              const ac = new AbortController();
+              lastParcelLookupAcRef.current?.abort();
+              lastParcelLookupAcRef.current = ac;
+              fetch(`/api/parcels/at-point?lat=${targetLat}&lng=${targetLng}`, { signal: ac.signal })
+                .then((r) => r.ok ? r.json() : null)
+                .then((json) => {
+                  if (json && json.apn) {
+                    onParcelClickRef.current?.(json.apn as string, { lat: targetLat, lng: targetLng });
+                  } else {
+                    // Aim was on the world but missed every parcel
+                    // (road, water, parking lot). Fall through to
+                    // onShoot so the action still does something.
+                    actionsRef.current?.onShoot?.();
+                  }
+                })
+                .catch((err) => {
+                  if ((err as Error).name !== 'AbortError') {
+                    actionsRef.current?.onShoot?.();
+                  }
+                });
+            } else if (actionsRef.current?.onShoot) {
+              actionsRef.current.onShoot();
+            }
           } else if (actionsRef.current?.onShoot) {
             actionsRef.current.onShoot();
           }

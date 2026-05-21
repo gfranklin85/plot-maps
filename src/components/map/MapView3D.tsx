@@ -297,6 +297,9 @@ function Inner({
   const fallbackParcelHitTesterRef = useRef<ParcelHitTester | null>(null);
   const effectiveHitTesterRef: React.MutableRefObject<ParcelHitTester | null> =
     parcelHitTesterRef ?? fallbackParcelHitTesterRef;
+  // Lat/lng finder — populated by Parcel3DOverlay, consumed by gmp-click
+  // handler so we can resolve geographic coordinates straight to a parcel.
+  const latLngParcelFinderRef = useRef<((lat: number, lng: number) => { apn: string; lat: number; lng: number } | null) | null>(null);
   const lastReticleHoverApnRef = useRef<string | null>(null);
   // Latest callback refs — read by gamepad RAF loop without re-subscribe.
   const onParcelClickRef = useRef(onParcelClick);
@@ -447,30 +450,10 @@ function Inner({
     el.setAttribute('default-labels-disabled', poisVisible ? 'false' : 'true');
     containerRef.current.appendChild(el);
     elRef.current = el;
-    // Mouse click → parcel selection. Shares the gamepad reticle's
-    // hit-tester so mouse and controller resolve "what is under this
-    // pixel" identically. We listen on the gmp-map-3d element in the
-    // CAPTURE phase because Map3DElement is a web component that
-    // consumes pointer events internally for its own camera-drag
-    // interactions — bubble-phase listeners on the parent container
-    // never fire. Capture runs BEFORE Map3D's handlers and reliably
-    // sees the click. We only stopPropagation on a parcel HIT so
-    // Map3D's normal drag-to-pan still works on empty ground.
-    function onParcelPointerDown(ev: Event) {
-      const mouseEv = ev as MouseEvent;
-      if (mouseEv.button !== 0) return;
-      const tester = effectiveHitTesterRef.current;
-      const containerEl = containerRef.current;
-      if (!tester || !containerEl) return;
-      const rect = containerEl.getBoundingClientRect();
-      const x = mouseEv.clientX - rect.left;
-      const y = mouseEv.clientY - rect.top;
-      const hit = tester(x, y);
-      if (!hit) return;
-      mouseEv.stopPropagation();
-      onParcelClickRef.current?.(hit.apn, { lat: hit.lat, lng: hit.lng });
-    }
-    el.addEventListener('pointerdown', onParcelPointerDown, { capture: true });
+    // (Mouse click is handled per-polygon inside Parcel3DOverlay via
+    //  the gmp-click event on each clickable <gmp-polygon-3d>. The
+    //  map-element-level gmp-click is not dispatched in the current
+    //  Map3D preview API — only interactive children fire it.)
     // Seed at 91m (300 ft) altitude looking forward to the horizon
     // (pitch 0). 300 ft is the top of the prospecting zone — high
     // enough to see the neighborhood, low enough to start working
@@ -493,7 +476,6 @@ function Inner({
     // (don't wait for the first gamepad frame).
     onAltitudeChangeRef.current?.(camRef.current.altitude);
     return () => {
-      el.removeEventListener('pointerdown', onParcelPointerDown, { capture: true } as EventListenerOptions);
       el.remove();
       elRef.current = null;
       camRef.current = null;
@@ -610,61 +592,52 @@ function Inner({
       const ly = shapeStick(leftStick.y);
       const rx = shapeStick(rightStick.x);
       const ry = shapeStick(rightStick.y);
-      // DEBUG (Greg 2026-05-21): trace LY → vel.tilt → cam.pitch to find why
-      // look-up/down is dead. Remove after diagnosis.
-      if (Math.abs(ly) > 0.1) {
-        // eslint-disable-next-line no-console
-        console.log('[FLIGHT] LY=', ly.toFixed(3), 'vel.tilt=', vel.tilt.toFixed(2), 'cam.pitch=', cam.pitch.toFixed(2), 'boostTilt=', tiltMultRef.current.toFixed(2));
-      }
+      // ── Control mapping (Greg locked 2026-05-21, restored drone feel) ──
+      //   LEFT-X   → strafe sideways
+      //   LEFT-Y   → fly forward / reverse (throttle, drone feel)
+      //   RIGHT-X  → yaw
+      //   RIGHT-Y  → look up/down (pitch)
+      //   LT       → descend (direct vertical velocity m/s)
+      //   RT       → ascend (direct vertical velocity m/s)
 
-      // Triggers: RT = forward gas. LT = brake when moving forward,
-      // reverse once stopped.
-      const TRIGGER_DEAD = 0.04;
-      const rt = triggers.right < TRIGGER_DEAD ? 0 : triggers.right;
-      const lt = triggers.left  < TRIGGER_DEAD ? 0 : triggers.left;
-      const BRAKE_MULT = 2.0;
-      let throttleAccel = rt * AIR_THROTTLE_ACCEL * boost;
-      if (lt > 0) {
-        if (air.throttle > 0) throttleAccel -= lt * AIR_THROTTLE_ACCEL * boost * BRAKE_MULT;
-        else throttleAccel -= lt * AIR_THROTTLE_ACCEL * boost;
-      }
-      air.throttle += throttleAccel * dt;
-
-      // Strafe (LX), Yaw (RX).
-      air.strafe += lx * AIR_STRAFE_ACCEL * boost * dt;
-      air.yaw    += rx * AIR_YAW_ACCEL    * boostYaw * dt;
+      // Throttle (LY) — same forward/reverse drone feel we had originally.
+      air.throttle += -ly * AIR_THROTTLE_ACCEL * boost * dt;
+      // Strafe (LX).
+      air.strafe   +=  lx * AIR_STRAFE_ACCEL   * boost * dt;
+      // Yaw (RX).
+      air.yaw      +=  rx * AIR_YAW_ACCEL      * boostYaw * dt;
 
       air.throttle *= Math.pow(AIR_THROTTLE_DRAG, dragExp);
       air.strafe   *= Math.pow(AIR_STRAFE_DRAG,   dragExp);
       air.yaw      *= Math.pow(AIR_YAW_DRAG,      dragExp);
-      // MAX velocities scale with the same slider that drives accel
-      // (Greg flagged 2026-05-19): without this the slider lies past
-      // ~1.5×. The acceleration cranks higher but terminal velocity
-      // stays capped, so going from 1× to 5× just makes you hit the
-      // same wall faster. Scaling MAX makes the slider honest end-
-      // to-end. The 0.4× reverse-throttle floor is preserved.
+
       const throttleMaxScaled = AIR_THROTTLE_MAX * boost;
-      const strafeMaxScaled = AIR_STRAFE_MAX * boost;
-      const yawMaxScaled = AIR_YAW_MAX * boostYaw;
+      const strafeMaxScaled   = AIR_STRAFE_MAX   * boost;
+      const yawMaxScaled      = AIR_YAW_MAX      * boostYaw;
       air.throttle = clamp(air.throttle, -throttleMaxScaled * 0.4, throttleMaxScaled);
       air.strafe   = clamp(air.strafe,   -strafeMaxScaled, strafeMaxScaled);
       air.yaw      = clamp(air.yaw,      -yawMaxScaled, yawMaxScaled);
-      if (Math.abs(air.throttle) < 0.5) air.throttle = 0;
-      if (Math.abs(air.strafe)   < 0.5) air.strafe = 0;
-      if (Math.abs(air.yaw)      < 0.05) air.yaw = 0;
+      if (Math.abs(air.throttle) < 0.5)  air.throttle = 0;
+      if (Math.abs(air.strafe)   < 0.5)  air.strafe   = 0;
+      if (Math.abs(air.yaw)      < 0.05) air.yaw      = 0;
 
-      // ── Look pitch (LEFT-Y) ──────────────────────────────────────
-      // Stick up (ly < 0) raises view; stick down (ly > 0) lowers it.
-      vel.tilt -= ly * TILT_ACCEL_DEG_S2 * boostTilt * dt;
+      // ── Look pitch (RIGHT-Y) ─────────────────────────────────────
+      // Stick up (ry < 0) raises view; stick down (ry > 0) lowers it.
+      vel.tilt -= ry * TILT_ACCEL_DEG_S2 * boostTilt * dt;
       vel.tilt *= Math.pow(TILT_DRAG, dragExp);
       const tiltMaxScaled = TILT_MAX_DEG_S * boostTilt;
       vel.tilt = clamp(vel.tilt, -tiltMaxScaled, tiltMaxScaled);
       if (Math.abs(vel.tilt) < 0.05) vel.tilt = 0;
 
-      // ── Vertical climb (RIGHT-Y) ─────────────────────────────────
-      // Direct vertical velocity in m/s. Stick up (ry < 0) ascends;
-      // stick down (ry > 0) descends. ClimbRate slider scales accel + max.
-      vel.climb -= ry * FLIGHT_BASE.CLIMB_ACCEL * boostClimb * dt;
+      // ── Vertical climb (LT descend / RT ascend) ──────────────────
+      // Triggers give analog pressure on a direct vertical velocity
+      // in m/s. RT held = ascend; LT held = descend. Both held cancels
+      // (input = rt - lt). ClimbRate slider scales accel + max.
+      const TRIGGER_DEAD = 0.04;
+      const rt = triggers.right < TRIGGER_DEAD ? 0 : triggers.right;
+      const lt = triggers.left  < TRIGGER_DEAD ? 0 : triggers.left;
+      const climbInput = rt - lt;
+      vel.climb += climbInput * FLIGHT_BASE.CLIMB_ACCEL * boostClimb * dt;
       vel.climb *= Math.pow(FLIGHT_BASE.CLIMB_DRAG, dragExp);
       const climbMaxScaled = FLIGHT_BASE.CLIMB_MAX * boostClimb;
       vel.climb = clamp(vel.climb, -climbMaxScaled, climbMaxScaled);
@@ -795,6 +768,8 @@ function Inner({
           visible={showParcelOverlay}
           colorMode={parcelColorMode}
           hitTesterRef={effectiveHitTesterRef}
+          latLngFinderRef={latLngParcelFinderRef}
+          onParcelClick={onParcelClick}
         />
         <AtmosphereOverlay />
       </div>

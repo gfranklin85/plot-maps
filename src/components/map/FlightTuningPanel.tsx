@@ -52,7 +52,7 @@ export default function FlightTuningPanel({
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-sm font-bold text-on-surface">Flight feel</h3>
-          <p className="text-[10px] text-on-surface-variant mt-0.5">Triggers gas. LX strafe · LY look · RX turn · RY climb.</p>
+          <p className="text-[10px] text-on-surface-variant mt-0.5">LY fly · LX strafe · RX turn · RY look · LT↓ RT↑ climb.</p>
         </div>
         <button
           onClick={onClose}
@@ -84,7 +84,7 @@ export default function FlightTuningPanel({
         onChange={onTurnRateChange}
       />
       <Slider
-        label="Look rate"
+        label="Tilt rate"
         value={tuning.tiltRate}
         min={AXIS_RANGES.tiltRate.min}
         max={AXIS_RANGES.tiltRate.max}

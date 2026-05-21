@@ -46,9 +46,16 @@ interface Map3DElement extends HTMLElement {
   screenToLatLng?: (x: number, y: number) => { lat: number; lng: number } | null;
 }
 
+// gmp-polygon-3d-interactive is the clickable variant of gmp-polygon-3d.
+// The plain (non-interactive) variant does NOT fire gmp-click events
+// even with a clickable attribute set — Map3D's API treats interactive
+// children as a separate element class (same pattern as gmp-marker-3d
+// vs gmp-marker-3d-interactive). 'path' and 'innerPaths' are the
+// current geometry properties; 'outerCoordinates'/'innerCoordinates'
+// are deprecated aliases that still work but emit console warnings.
 interface Polygon3DElement extends HTMLElement {
-  outerCoordinates: { lat: number; lng: number; altitude?: number }[];
-  innerCoordinates?: { lat: number; lng: number; altitude?: number }[][];
+  path: { lat: number; lng: number; altitude?: number }[];
+  innerPaths?: { lat: number; lng: number; altitude?: number }[][];
   fillColor: string;
   fillExtrusionColor?: string;
   strokeColor: string;
@@ -278,15 +285,14 @@ export default function Parcel3DOverlay({
     const stroke = colorMode === 'none' ? rgba('#1D3557', 0.55) : rgba(fillHex, 0.85);
 
     if (!poly) {
-      poly = document.createElement('gmp-polygon-3d') as Polygon3DElement;
+      // Interactive variant — only this one fires gmp-click events.
+      // The plain <gmp-polygon-3d> renders identically but is inert
+      // for input. See reference_map3d_element_extension_model.md.
+      poly = document.createElement('gmp-polygon-3d-interactive') as Polygon3DElement;
       poly.altitudeMode = 'RELATIVE_TO_GROUND';
       // strokeWidth is in pixels. 1.0 is subtle; we want parcel lines
       // visible without screaming.
       poly.strokeWidth = 1.0;
-      // Enable Map3D's native click hit-testing on this polygon. The
-      // setAttribute form is what the web component reads (vs the
-      // .clickable property which isn't always reflected).
-      poly.setAttribute('clickable', 'true');
       // Stash APN on the element so the click listener can recover
       // which parcel was clicked from event.target without holding
       // a closure over `feat` (which would leak across reuse).
@@ -312,14 +318,17 @@ export default function Parcel3DOverlay({
     }
 
     // Geometry — outer ring lifted to PARCEL_LIFT_M altitude. Map3D
-    // expects { lat, lng, altitude } objects.
-    poly.outerCoordinates = feat.outerRing.map(([lng, lat]) => ({
+    // expects { lat, lng, altitude } objects. Property names are
+    // 'path' / 'innerPaths' in the current API; the deprecated
+    // 'outerCoordinates' / 'innerCoordinates' still work but emit
+    // console warnings.
+    poly.path = feat.outerRing.map(([lng, lat]) => ({
       lat,
       lng,
       altitude: PARCEL_LIFT_M,
     }));
     if (feat.innerRings.length > 0) {
-      poly.innerCoordinates = feat.innerRings.map((ring) =>
+      poly.innerPaths = feat.innerRings.map((ring) =>
         ring.map(([lng, lat]) => ({ lat, lng, altitude: PARCEL_LIFT_M })),
       );
     }

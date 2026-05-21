@@ -3,12 +3,19 @@
 import { useCallback, useEffect, useMemo, useRef, type MutableRefObject } from 'react';
 import type { ParcelColorMode, ParcelHitTester } from './ParcelOverlay';
 
-// ── 3D parcel overlay ──────────────────────────────────────────────────
+// ── 3D parcel overlay (VISUAL LAYER ONLY) ─────────────────────────────
 //
-// Mounts the county assessor parcels as <gmp-polygon-3d> children of the
-// <gmp-map-3d> element. Same fetch contract as the 2D ParcelOverlay
-// (calls /api/parcels/viewport on camera changes, debounced), same
-// color modes, same click → onParcelClick(apn, latLng) flow.
+// Mounts the county assessor parcels as <gmp-polygon-3d> children of
+// the <gmp-map-3d> element to draw parcel boundaries colored by the
+// active color mode. Same fetch contract as the 2D ParcelOverlay
+// (calls /api/parcels/viewport on camera changes, debounced).
+//
+// Selection is NOT this component's job anymore. MapView3D handles
+// clicks on Map3D's native gmp-click event (PlaceClickEvent for POIs,
+// LocationClickEvent for ground) and resolves to a parcel via the
+// /api/parcels/at-point server-side PostGIS lookup. Decoupling
+// selection from polygon rendering eliminated the "polygon flickered
+// out so I can't click it" failure mode.
 //
 // Two deliberate differences from the 2D path:
 //
@@ -22,18 +29,10 @@ import type { ParcelColorMode, ParcelHitTester } from './ParcelOverlay';
 //    parcels above the terrain without breaking the "polygons sit on
 //    the ground" impression.
 //
-// The hit-tester exposed through hitTesterRef uses geometric point-in-
-// polygon math against the cached feature set, so the gamepad reticle
-// can ask "what parcel is at screen pixel (x, y)?" without depending on
-// Map3D's own event system (which is currently flaky during flight).
-//
-// Hit-testing pipeline:
-//   screen (x,y) → lat/lng via Map3DElement.screenToLatLng
-//                                     ↓
-//                          point-in-polygon test against
-//                          cached parcel rings
-//                                     ↓
-//                          returns { apn, lat, lng } or null
+// The hitTesterRef + latLngFinderRef are still populated for any
+// future client-side fast-paths (e.g. instant hover-color feedback
+// before the server lookup returns), but no selection codepath
+// depends on them today.
 
 interface Map3DElement extends HTMLElement {
   center: { lat: number; lng: number; altitude?: number };
@@ -100,13 +99,6 @@ interface Props {
    *  skip the screen-projection step the reticle hit-tester does and
    *  ray-cast directly against the cached parcel rings. */
   latLngFinderRef?: MutableRefObject<((lat: number, lng: number) => { apn: string; lat: number; lng: number } | null) | null>;
-  /** Mouse click on a polygon → fires this. We set clickable="true" on
-   *  each <gmp-polygon-3d> and listen for gmp-click, which is the only
-   *  reliable mouse-click path on Map3D's photoreal surface (raw
-   *  pointer events get consumed inside Map3D's shadow DOM, and
-   *  gmp-click on the map element itself is not dispatched in the
-   *  current preview API — only on interactive children). */
-  onParcelClick?: (apn: string, latLng: { lat: number; lng: number }) => void;
   /** Above this eye altitude (meters), we don't fetch. The aerial
    *  view above this point sees too many parcels to render at
    *  Polygon3D's current performance ceiling. Tuned to ~1500m so
@@ -229,15 +221,10 @@ export default function Parcel3DOverlay({
   colorMode,
   hitTesterRef,
   latLngFinderRef,
-  onParcelClick,
   maxAltitudeMeters = MAX_ALTITUDE_DEFAULT_M,
 }: Props) {
   // Indexed feature set — APN → cached geometry + rendered polygon DOM.
   const featuresRef = useRef<Map<string, IndexedFeature>>(new Map());
-  // Live ref to onParcelClick so polygon click listeners (bound at
-  // polygon-creation time) always invoke the most-recent callback.
-  const onParcelClickRef = useRef(onParcelClick);
-  onParcelClickRef.current = onParcelClick;
   const inflightRef = useRef<AbortController | null>(null);
   const fetchTimerRef = useRef<number | null>(null);
   // Last-fetched bbox; we skip the fetch if camera hasn't moved enough.
@@ -285,34 +272,17 @@ export default function Parcel3DOverlay({
     const stroke = colorMode === 'none' ? rgba('#1D3557', 0.55) : rgba(fillHex, 0.85);
 
     if (!poly) {
-      // Interactive variant — only this one fires gmp-click events.
-      // The plain <gmp-polygon-3d> renders identically but is inert
-      // for input. See reference_map3d_element_extension_model.md.
-      poly = document.createElement('gmp-polygon-3d-interactive') as Polygon3DElement;
+      // Plain (non-interactive) variant — Parcel3DOverlay is now a
+      // VISUAL layer only. Selection happens through Map3D's own
+      // gmp-click on the map element + /api/parcels/at-point in
+      // MapView3D. The interactive variant rendered noticeably worse
+      // at altitude / oblique angles (LOD thrash) and we no longer
+      // need its click dispatch.
+      poly = document.createElement('gmp-polygon-3d') as Polygon3DElement;
       poly.altitudeMode = 'RELATIVE_TO_GROUND';
       // strokeWidth is in pixels. 1.0 is subtle; we want parcel lines
       // visible without screaming.
       poly.strokeWidth = 1.0;
-      // Stash APN on the element so the click listener can recover
-      // which parcel was clicked from event.target without holding
-      // a closure over `feat` (which would leak across reuse).
-      poly.dataset.apn = feat.apn;
-      poly.dataset.lat = String(feat.centerLat);
-      poly.dataset.lng = String(feat.centerLng);
-      // gmp-click is dispatched by Map3D when the user clicks an
-      // interactive child. event.detail.position gives the precise
-      // click lat/lng; we fall back to the cached centroid if absent.
-      poly.addEventListener('gmp-click', (rawEv) => {
-        const ev = rawEv as CustomEvent<{ position?: { lat: number; lng: number; altitude?: number } }>;
-        const el = ev.target as HTMLElement | null;
-        const apn = el?.dataset.apn;
-        if (!apn) return;
-        const pos = ev.detail?.position;
-        const lat = pos?.lat ?? Number(el?.dataset.lat);
-        const lng = pos?.lng ?? Number(el?.dataset.lng);
-        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
-        onParcelClickRef.current?.(apn, { lat, lng });
-      });
       mapEl.appendChild(poly);
       feat.polygonEl = poly;
     }

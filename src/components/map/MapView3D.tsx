@@ -826,7 +826,6 @@ function Inner({
           colorMode={parcelColorMode}
           hitTesterRef={effectiveHitTesterRef}
           latLngFinderRef={latLngParcelFinderRef}
-          onParcelClick={onParcelClick}
         />
         <AtmosphereOverlay />
       </div>

@@ -10,6 +10,8 @@ import type { GamepadActions } from "./GamepadFlightController";
 import { AtmosphereProvider } from "@/lib/atmosphere/AtmosphereContext";
 import AtmosphereOverlay from "./AtmosphereOverlay";
 import SkyDome from "./SkyDome";
+import Parcel3DOverlay from "./Parcel3DOverlay";
+import type { ParcelColorMode, ParcelHitTester } from "./ParcelOverlay";
 
 // ── Photorealistic 3D Tiles surface (Map3DElement / <gmp-map-3d>) ───
 //
@@ -237,6 +239,11 @@ function Inner({
   onAltitudeChange,
   isIdle = false,
   poisVisible = false,
+  showParcelOverlay = false,
+  parcelColorMode = 'land_use',
+  onParcelClick,
+  onParcelHoverChange,
+  parcelHitTesterRef,
 }: {
   center?: { lat: number; lng: number } | null;
   gamepadEnabled: boolean;
@@ -255,6 +262,16 @@ function Inner({
    *  the immersive map framing. Wired to gmp-map-3d's
    *  default-labels-disabled attribute. */
   poisVisible?: boolean;
+  /** Parcel overlay: same prop contract as the 2D path. Page.tsx
+   *  passes these unchanged via MapDynamic; the 3D path now actually
+   *  consumes them. Reticle hover + A-press dispatch happens IN this
+   *  component (the gamepad loop calls the hit-tester); the page
+   *  side just renders Property­Popup on the click callback. */
+  showParcelOverlay?: boolean;
+  parcelColorMode?: ParcelColorMode;
+  onParcelClick?: (apn: string, latLng: { lat: number; lng: number }) => void;
+  onParcelHoverChange?: (apn: string | null, latLng: { lat: number; lng: number } | null) => void;
+  parcelHitTesterRef?: React.MutableRefObject<ParcelHitTester | null>;
 }) {
   const maps3d = useMapsLibrary('maps3d');
   const elRef = useRef<Map3DElement | null>(null);
@@ -263,6 +280,23 @@ function Inner({
   const velRef = useRef<VelState>({ panX: 0, panY: 0, heading: 0, tilt: 0 });
   const containerRef = useRef<HTMLDivElement | null>(null);
   const elapsedMsRef = useRef<number>(0);
+
+  // ── Parcel reticle wiring ──────────────────────────────────────────
+  // Parcel3DOverlay writes a hit-tester into the parent's ref (or our
+  // local fallback ref if the parent didn't provide one); the gamepad
+  // loop calls it each frame at the on-screen reticle pixel to discover
+  // which parcel (if any) is under the crosshair. We forward to:
+  //   - onParcelHoverChange (page renders reticle hover state)
+  //   - onParcelClick (on A-press; page opens PropertyPopup)
+  const fallbackParcelHitTesterRef = useRef<ParcelHitTester | null>(null);
+  const effectiveHitTesterRef: React.MutableRefObject<ParcelHitTester | null> =
+    parcelHitTesterRef ?? fallbackParcelHitTesterRef;
+  const lastReticleHoverApnRef = useRef<string | null>(null);
+  // Latest callback refs — read by gamepad RAF loop without re-subscribe.
+  const onParcelClickRef = useRef(onParcelClick);
+  onParcelClickRef.current = onParcelClick;
+  const onParcelHoverChangeRef = useRef(onParcelHoverChange);
+  onParcelHoverChangeRef.current = onParcelHoverChange;
 
   const actionsRef = useRef<GamepadActions | undefined>(gamepadActions);
   actionsRef.current = gamepadActions;
@@ -472,12 +506,52 @@ function Inner({
       // after flyAnimRef clears.
       if (flyAnimRef.current) return;
 
+      // ── Reticle parcel hit-test (per frame) ──────────────────────
+      // Ask Parcel3DOverlay's hit-tester what parcel is at the
+      // reticle's screen position. Fire onParcelHoverChange on
+      // transitions (apn change OR enter/leave from null). The
+      // currently hovered parcel is kept in lastReticleHoverApnRef
+      // so A-press can act on it without re-running the hit-test.
+      //
+      // Reticle is centered (50% width / 50% height) on the 3D path.
+      // If we later add a draggable reticle, swap these for the live
+      // reticle coordinates.
+      let hovered: { apn: string; lat: number; lng: number } | null = null;
+      const tester = effectiveHitTesterRef.current;
+      const containerEl = containerRef.current;
+      if (tester && containerEl) {
+        const rect = containerEl.getBoundingClientRect();
+        const reticleX = rect.width / 2;
+        const reticleY = rect.height / 2;
+        hovered = tester(reticleX, reticleY);
+      }
+      const hoveredApn = hovered?.apn ?? null;
+      if (hoveredApn !== lastReticleHoverApnRef.current) {
+        lastReticleHoverApnRef.current = hoveredApn;
+        onParcelHoverChangeRef.current?.(
+          hoveredApn,
+          hovered ? { lat: hovered.lat, lng: hovered.lng } : null,
+        );
+      }
+
       // ── Edge-triggered button actions (same as 2D) ────────────────
       if (justPressed.size > 0) {
         const fire = (name: ButtonName, fn?: () => void) => {
           if (justPressed.has(name) && fn) fn();
         };
-        fire('a', actionsRef.current?.onShoot);
+        // A-press: if reticle is over a parcel, that's a parcel click
+        // (opens PropertyPopup via the page's existing handler). If no
+        // parcel is hovered, fall through to onShoot (the legacy
+        // gameplay action). This way "click the thing the reticle is
+        // on" is the natural meaning and Plot's prospecting use case
+        // works without a separate confirmation button.
+        if (justPressed.has('a')) {
+          if (hovered && onParcelClickRef.current) {
+            onParcelClickRef.current(hovered.apn, { lat: hovered.lat, lng: hovered.lng });
+          } else if (actionsRef.current?.onShoot) {
+            actionsRef.current.onShoot();
+          }
+        }
         fire('x', actionsRef.current?.onRotateChannel);
         fire('y', actionsRef.current?.onInspect);
         fire('b', actionsRef.current?.onCancel);
@@ -679,6 +753,29 @@ function Inner({
           cameraRef={camRef as React.RefObject<{ lat: number; lng: number; altitude: number; heading: number } | null>}
           maps3dReady={!!maps3d}
         />
+        {/* Parcel overlay on the 3D path. Mounts <gmp-polygon-3d>
+            children of the Map3D element, exposes a hit-tester via
+            localParcelHitTesterRef which the gamepad loop calls each
+            frame at the reticle position. */}
+        <Parcel3DOverlay
+          mapElRef={elRef as React.MutableRefObject<HTMLElement & {
+            center: { lat: number; lng: number; altitude?: number };
+            heading: number;
+            tilt: number;
+            range: number;
+            screenToLatLng?: (x: number, y: number) => { lat: number; lng: number } | null;
+          } | null>}
+          cameraRef={camRef as React.MutableRefObject<{
+            lat: number;
+            lng: number;
+            altitude: number;
+            heading: number;
+            pitch: number;
+          } | null>}
+          visible={showParcelOverlay}
+          colorMode={parcelColorMode}
+          hitTesterRef={effectiveHitTesterRef}
+        />
         <AtmosphereOverlay />
       </div>
     </AtmosphereProvider>
@@ -701,6 +798,11 @@ export default function MapView3D(props: MapViewProps) {
         onAltitudeChange={props.onAltitudeChange}
         isIdle={props.isIdle}
         poisVisible={props.poisVisible}
+        showParcelOverlay={props.showParcelOverlay}
+        parcelColorMode={props.parcelColorMode}
+        onParcelClick={props.onParcelClick}
+        onParcelHoverChange={props.onParcelHoverChange}
+        parcelHitTesterRef={props.parcelHitTesterRef}
       />
     </APIProvider>
   );

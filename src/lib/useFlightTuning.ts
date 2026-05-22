@@ -23,7 +23,7 @@ const STORAGE_KEY = 'plotmaps.flightTuning';
 // stale version returns the canonical defaults instead of the
 // outdated numbers. Greg auto-migrated v3 → v4 (2026-05-21) to
 // pick up the helicopter template centering.
-const SCHEMA_VERSION = 5;
+const SCHEMA_VERSION = 6;
 
 export interface FlightTuning {
   multiplier: number;  // pan
@@ -47,7 +47,7 @@ const DEFAULT_TUNING: FlightTuning = { ...HELI_DEFAULT_TUNING };
 // to allow finer cinematic settings.)
 export interface AxisRange { min: number; max: number; }
 export const AXIS_RANGES: Record<keyof FlightTuning, AxisRange> = {
-  multiplier: { min: HELI_DEFAULT_TUNING.multiplier * 0.5, max: HELI_DEFAULT_TUNING.multiplier * 1.5 },  // 0.52..1.56
+  multiplier: { min: HELI_DEFAULT_TUNING.multiplier * 0.5, max: 11 },  // 0.52..11 — top end ~1000 mph ground speed (Greg 2026-05-22)
   turnRate:   { min: HELI_DEFAULT_TUNING.turnRate   * 0.5, max: HELI_DEFAULT_TUNING.turnRate   * 1.5 },  // 0.50..1.50
   tiltRate:   { min: HELI_DEFAULT_TUNING.tiltRate   * 0.5, max: HELI_DEFAULT_TUNING.tiltRate   * 1.5 },  // 0.90..2.70
   climbRate:  { min: HELI_DEFAULT_TUNING.climbRate  * 0.3, max: HELI_DEFAULT_TUNING.climbRate  * 1.7 },  // 0.051..0.289

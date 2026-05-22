@@ -2,7 +2,7 @@
 
 import MaterialIcon from "@/components/ui/MaterialIcon";
 import { AXIS_RANGES, type FlightTuning } from "@/lib/useFlightTuning";
-import { effectiveFlightValues } from "@/lib/flightBaseConstants";
+import { effectiveFlightValues, HELI_DEFAULT_TUNING } from "@/lib/flightBaseConstants";
 
 interface Props {
   visible: boolean;
@@ -68,6 +68,7 @@ export default function FlightTuningPanel({
         value={tuning.multiplier}
         min={AXIS_RANGES.multiplier.min}
         max={AXIS_RANGES.multiplier.max}
+        pivot={HELI_DEFAULT_TUNING.multiplier}
         leftEnd="Slow"
         rightEnd="Fast"
         readout={`accel ${eff.throttle.accel.toFixed(0)} · max ${eff.throttle.max.toFixed(0)} px/s (rev ${eff.throttle.reverseMax.toFixed(0)})`}
@@ -127,19 +128,41 @@ interface SliderProps {
   max: number;
   leftEnd: string;
   rightEnd: string;
+  /** Optional anchor value that sits at the slider's visual midpoint.
+   *  When provided, the slider maps the bottom half linearly from
+   *  min..pivot and the top half linearly from pivot..max — so the
+   *  user's locked default lands at the visual middle even when the
+   *  upper range is much wider than the lower (e.g. flight speed
+   *  0.5..11 anchored at 1.04 — slow side compact, fast side wide). */
+  pivot?: number;
   /** Live effective values from the engine. Shown under the slider
    *  in monospace so Greg can dictate exact numbers back. */
   readout: string;
   onChange: (v: number) => void;
 }
 
-function Slider({ label, value, min, max, leftEnd, rightEnd, readout, onChange }: SliderProps) {
-  // Step scales with the range so wider sliders aren't gritty and
-  // narrow ones aren't jumpy. ~50 steps end-to-end feels right.
-  const step = Math.max(0.01, Math.round(((max - min) / 50) * 100) / 100);
-  // Only show the "1×" tick if 1.0 actually falls inside the range
-  // (climb's range is 0.05..1.2 so the tick sits near the right;
-  // turn's range is 0.5..4.0 so the tick sits near the left).
+function Slider({ label, value, min, max, leftEnd, rightEnd, pivot, readout, onChange }: SliderProps) {
+  // When `pivot` is set, run the slider on a normalized 0..1 internal
+  // position and split the mapping at 0.5. Below midpoint the mapping
+  // is min..pivot; above midpoint it's pivot..max. Default lands at
+  // 0.5 visually.
+  const usePivot = pivot != null && pivot > min && pivot < max;
+
+  // Convert engine value → 0..1 slider position.
+  const valueToPos = (v: number): number => {
+    if (!usePivot) return (v - min) / (max - min);
+    if (v <= pivot!) return 0.5 * (v - min) / (pivot! - min);
+    return 0.5 + 0.5 * (v - pivot!) / (max - pivot!);
+  };
+  // Convert 0..1 slider position → engine value.
+  const posToValue = (p: number): number => {
+    if (!usePivot) return min + (max - min) * p;
+    if (p <= 0.5) return min + (pivot! - min) * (p / 0.5);
+    return pivot! + (max - pivot!) * ((p - 0.5) / 0.5);
+  };
+
+  const pos = valueToPos(value);
+  const step = 0.001; // fine resolution on the normalized axis
   const oneInRange = min <= 1 && max >= 1;
 
   return (
@@ -154,11 +177,11 @@ function Slider({ label, value, min, max, leftEnd, rightEnd, readout, onChange }
       </div>
       <input
         type="range"
-        min={min}
-        max={max}
+        min={0}
+        max={1}
         step={step}
-        value={value}
-        onChange={(e) => onChange(parseFloat(e.target.value))}
+        value={pos}
+        onChange={(e) => onChange(posToValue(parseFloat(e.target.value)))}
         className="w-full accent-primary"
       />
       <div className="flex items-center justify-between mt-0.5 text-[9px] text-on-surface-variant">

@@ -32,6 +32,8 @@ import { useReticlePosition } from "@/lib/useReticlePosition";
 import { playShotSound, type ShotChannel } from "@/lib/shotSounds";
 import ShotAnimation, { type Shot } from "@/components/map/ShotAnimation";
 import type { ParcelHitTester } from "@/components/map/ParcelOverlay";
+import { DESTINATIONS } from "@/lib/destinations";
+import { useInitialMapCenter } from "@/lib/useInitialMapCenter";
 
 const FILTER_TABS: { label: string; key: string; statuses: LeadStatus[] }[] = [
   { label: "All", key: "all", statuses: [] },
@@ -106,8 +108,24 @@ export default function MapPage() {
     }
   }
   const [walkMode, setWalkMode] = useState(false);
-  const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(profile.defaultMapCenter);
-  const [hasUserPanned, setHasUserPanned] = useState(false);
+  // Initial map center prefers a URL-resolved destination over the
+  // profile default. This is what prevents the "flash of Lemoore"
+  // when a visitor arrives via /map?destination=acapulco — the map
+  // mounts already framed on the destination instead of having to
+  // animate over from the default center.
+  const initialCenter = useInitialMapCenter(profile.defaultMapCenter);
+  // urlResolvedCenter is true when the initial center came from URL
+  // params (a destination slug or explicit lat/lng), not from the
+  // profile default. We treat this as "user has navigated here on
+  // purpose" so the profile-default sync effect below doesn't reset
+  // their camera away from the destination they asked for.
+  const urlResolvedCenter =
+    !!initialCenter &&
+    (!profile.defaultMapCenter ||
+      initialCenter.lat !== profile.defaultMapCenter.lat ||
+      initialCenter.lng !== profile.defaultMapCenter.lng);
+  const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(initialCenter);
+  const [hasUserPanned, setHasUserPanned] = useState(urlResolvedCenter);
   const [showGate, setShowGate] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [pinnedRef, setPinnedRef] = useState<Lead | null>(null);
@@ -250,9 +268,29 @@ export default function MapPage() {
     const zoomStr = searchParams.get('zoom');
     const prospectParam = searchParams.get('prospect');
     const leadIdParam = searchParams.get('leadId');
+    const destinationParam = searchParams.get('destination');
 
-    const lat = latStr ? parseFloat(latStr) : NaN;
-    const lng = lngStr ? parseFloat(lngStr) : NaN;
+    // Resolve ?destination=<slug> to lat/lng via the destinations
+    // catalog (shared with the landing carousel). When matched, the
+    // resolved coordinates feed the same camera path as ?lat=&lng=
+    // would have. Unmatched slugs fall through silently — the map
+    // boots at the profile default and the visitor can still navigate.
+    let lat = latStr ? parseFloat(latStr) : NaN;
+    let lng = lngStr ? parseFloat(lngStr) : NaN;
+    let resolvedDestinationZoom: number | null = null;
+    if (Number.isNaN(lat) || Number.isNaN(lng)) {
+      if (destinationParam) {
+        const match = DESTINATIONS.find(d => d.slug === destinationParam);
+        if (match) {
+          lat = match.lat;
+          lng = match.lng;
+          // Aerial framing for destination arrivals — high enough that
+          // the visitor sees the city sprawl, low enough that detail
+          // reads. The map's own controls let them descend further.
+          resolvedDestinationZoom = 17;
+        }
+      }
+    }
     const hasCoords = !Number.isNaN(lat) && !Number.isNaN(lng);
 
     if (!hasCoords && !leadIdParam) return;
@@ -262,13 +300,16 @@ export default function MapPage() {
     if (hasCoords) {
       setMapCenter({ lat, lng });
       setHasUserPanned(true);
-      const zoom = zoomStr ? parseInt(zoomStr, 10) : 19;
+      const zoomFromQuery = zoomStr ? parseInt(zoomStr, 10) : NaN;
+      const zoom = !Number.isNaN(zoomFromQuery)
+        ? zoomFromQuery
+        : (resolvedDestinationZoom ?? 19);
       // Smooth fly-in instead of an instant snap. Slightly slower than
       // search picks (1100ms) since this is the user's "I just landed
       // here from somewhere else" moment and deserves a beat of context.
       dispatchFlight({
         center: { lat, lng },
-        zoom: Number.isNaN(zoom) ? 19 : zoom,
+        zoom,
         duration: 1100,
         easing: 'easeInOutCubic',
       });

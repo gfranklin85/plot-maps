@@ -1,26 +1,27 @@
-// Plot's landing page — Plot's surveying field manual.
+// Plot's landing page.
 //
-// A single parchment plate styled as Page I of Plot's published
-// encyclopedia of surveying. Numbered figures of Plot's instruments,
-// each capable of awakening from 2D ink illustration into a full 3D
-// crafted artifact. The brass-key figure is the entry — click it and
-// the parchment yields to the photoreal 3D map.
+// Current state (2026-05-23): the page renders the PlotMaps wordmark
+// alone, centered on a parchment field, as the first iteration of the
+// logo-first treatment. The full FieldManualPlate (figure grid, brass
+// key, headline cartouche) re-integrates around this once the logo
+// presentation is locked.
 //
 // See:
-//   - memory/project_landing_page_field_manual.md (locked direction)
-//   - public/assets/landing/figures/README.md (asset drop-in spec)
-//   - src/components/landing/FieldManualPlate.tsx (composition)
-//   - src/components/landing/FigureSlot.tsx (per-figure rendering)
+//   - memory/project_landing_page_field_manual.md (overall landing direction)
+//   - memory/project_master_logomark_locked.md (locked logo spec)
+//   - src/components/landing/PlotMapsHero.tsx (current logo-first treatment)
+//   - src/components/landing/FieldManualPlate.tsx (re-integration target)
 //   - src/components/landing/EntrySequence.tsx (transition to /map)
 
-import FieldManualPlate from '@/components/landing/FieldManualPlate';
+import type { Metadata } from 'next';
+import PlotMapsHero from '@/components/landing/PlotMapsHero';
 
-export const metadata = {
-  title: 'Plotmaps — A Modern Practitioner\'s Manual',
+export const metadata: Metadata = {
+  title: "Plotmaps — A Modern Practitioner's Manual",
   description:
     'Plot is a surveying field manual rendered in real time. Open the page, turn the key, fly your hometown.',
 };
 
 export default function LandingPage() {
-  return <FieldManualPlate />;
+  return <PlotMapsHero />;
 }

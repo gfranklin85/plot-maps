@@ -306,12 +306,15 @@ export default function ArrivalSequence({
       document.cookie = `pm_arrival_oauth=1; path=/; max-age=600; samesite=lax`;
     }
     try {
+      // No ?next= query in redirectTo — Supabase's URL allowlist matching
+      // is strict about wildcards, and the callback handler now defaults
+      // to /landing?resumeArrival=1 anyway. The sessionStorage entry
+      // stashed in stashArrivalInFlight() is what tells the atlas which
+      // destination to resume on after the round-trip.
       await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(
-            `/landing?resumeArrival=1`
-          )}`,
+          redirectTo: `${window.location.origin}/auth/callback`,
         },
       });
     } catch {

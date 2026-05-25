@@ -297,6 +297,14 @@ export default function ArrivalSequence({
   const handleSignIn = useCallback(async () => {
     setOauthLoading(true);
     stashArrivalInFlight(destination.slug);
+    // Set a short-lived cookie so the /auth/callback route can detect
+    // that we came from the landing's arrival flow even if Google
+    // strips the ?next= query param during the round-trip (which it
+    // sometimes does). The callback reads + clears this cookie and
+    // routes back to /landing?resumeArrival=1 when set. 10-minute TTL.
+    if (typeof document !== 'undefined') {
+      document.cookie = `pm_arrival_oauth=1; path=/; max-age=600; samesite=lax`;
+    }
     try {
       await supabase.auth.signInWithOAuth({
         provider: 'google',
@@ -309,6 +317,9 @@ export default function ArrivalSequence({
     } catch {
       setOauthLoading(false);
       clearArrivalInFlight();
+      if (typeof document !== 'undefined') {
+        document.cookie = `pm_arrival_oauth=; path=/; max-age=0`;
+      }
     }
   }, [destination.slug]);
 

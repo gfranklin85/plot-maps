@@ -74,9 +74,9 @@ export default function LandingPage() {
       {/* Controller chip — top-right corner. */}
       <LandingControllerChip />
 
-      {/* Atlas — the main event. Fills the available viewport between
-          the top wordmark and the bottom editorial line. */}
-      <div className="relative z-10 w-full h-full pt-20">
+      {/* Atlas — the main event. Fills the full viewport edge to edge.
+          The wordmark and controller chip float above it as overlays. */}
+      <div className="relative z-10 w-full h-full">
         <DestinationAtlas />
       </div>
     </main>

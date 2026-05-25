@@ -116,21 +116,21 @@ export default function DestinationAtlas() {
 
   return (
     <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
-      {/* Atlas image stage — the world. */}
-      <div
-        className="relative"
-        style={{
-          width: 'min(94vw, calc(94vh * (16/9)))',
-          aspectRatio: '16 / 9',
-          maxHeight: '94vh',
-        }}
-      >
+      {/* Atlas image stage — fills the full viewport. The atlas image
+          itself is rendered at its native 16:9 aspect ratio; we use
+          object-cover so it fills the viewport completely on any
+          aspect ratio (16:9, 16:10, ultrawide). Light cropping of the
+          desk-surface edges is acceptable; the atlas content remains
+          centered. Pin positions are percentages of the container,
+          which match the visible atlas content because the image
+          covers the full container. */}
+      <div className="relative w-full h-full">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/assets/landing/atlas.png"
           alt=""
           aria-hidden
-          className="absolute inset-0 w-full h-full object-contain select-none"
+          className="absolute inset-0 w-full h-full object-cover select-none"
           draggable={false}
         />
 

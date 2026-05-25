@@ -111,26 +111,15 @@ export default function DestinationCarousel() {
   return (
     <section
       aria-label="Destinations"
-      className="relative w-full py-16 sm:py-24"
+      className="relative w-full h-full flex flex-col justify-center"
       style={{
-        // Cream parchment continues from the hero — the carousel lives
-        // in the same material. Slightly deeper tone so the section
-        // reads as a distinct room without breaking the page's surface.
-        backgroundColor: '#EFE3C9',
+        // Background is transparent in the one-viewport layout — the
+        // parent landing page paints the parchment field as a single
+        // material under both hero and carousel.
+        backgroundColor: 'transparent',
       }}
     >
-      {/* Subtle vignette + paper grain to keep the section grounded in
-          the same material as the wordmark hero. */}
-      <div
-        aria-hidden
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          background:
-            'radial-gradient(ellipse at center top, rgba(244, 234, 213, 0.4) 0%, rgba(155, 146, 130, 0.10) 80%), repeating-linear-gradient(45deg, rgba(155, 146, 130, 0.018) 0px, rgba(155, 146, 130, 0.018) 1px, transparent 1px, transparent 3px)',
-        }}
-      />
-
-      <div className="relative z-10 mx-auto max-w-[1800px] px-6 sm:px-10">
+      <div className="relative z-10 mx-auto max-w-[1800px] w-full px-6 sm:px-10">
         {/* Section header — restrained editorial line. */}
         <header className="mb-8 sm:mb-10 select-none">
           <div className="flex items-center gap-4 text-on-surface-variant/55">

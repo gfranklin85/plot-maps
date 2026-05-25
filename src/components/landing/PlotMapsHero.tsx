@@ -1,70 +1,40 @@
 'use client';
 
-// PlotMapsHero — the logo-first landing presentation.
+// PlotMapsHero — the upper-portion presentation of the landing.
 //
-// Strips the landing route down to a single intentional artifact: the
-// PlotMaps wordmark, centered, on a parchment field that does it justice.
+// Lives inside a single-viewport landing layout. The hero takes the
+// upper region (wordmark centered with breathing room); the carousel
+// sits beneath in the lower region. Together they fit one screen with
+// no vertical scroll.
 //
-// Entrance choreography: each letter and the reticle pieces fade + slide
-// into view in sequence (staggered via CSS animation-delay). After
-// entrance completes, the reticle pulses subtly to signal the brand is
-// alive.
+// Entrance choreography: each letter and the reticle pieces fade into
+// view in sequence (staggered via CSS animation-delay). After entrance
+// completes, the reticle pulses subtly.
 //
-// This is the first build pass — pure logo treatment, no surrounding
-// chrome. The figure grid, headline cartouche, and entry-key affordance
-// from the original FieldManualPlate will re-integrate around this once
-// the logo presentation is locked. See:
+// See:
 //   - memory/project_master_logomark_locked.md (locked logo spec)
 //   - memory/project_landing_page_field_manual.md (overall landing direction)
 //   - src/components/brand/PlotMapsLogo.tsx (the wordmark component)
-//   - src/components/landing/FieldManualPlate.tsx (re-integration target)
+//   - src/app/landing/page.tsx (one-viewport layout this composes into)
 
 import PlotMapsLogo from '@/components/brand/PlotMapsLogo';
 
 export default function PlotMapsHero() {
   return (
     <div
-      className="relative w-full overflow-hidden"
-      style={{
-        backgroundColor: '#F4EAD5', // cream parchment from Plat Book palette
-        minHeight: '100vh',
-      }}
+      className="relative w-full h-full flex items-center justify-center px-6 sm:px-10"
     >
-      {/* Atmospheric depth — subtle radial vignette + paper-grain.
-          Quiet enough that it doesn't compete with the wordmark. */}
       <div
-        aria-hidden
-        className="absolute inset-0 pointer-events-none"
+        className="plot-logo-wrapper w-full"
         style={{
-          background:
-            'radial-gradient(ellipse at center, rgba(244, 234, 213, 0) 0%, rgba(155, 146, 130, 0.10) 70%, rgba(74, 66, 54, 0.16) 100%), repeating-linear-gradient(45deg, rgba(155, 146, 130, 0.018) 0px, rgba(155, 146, 130, 0.018) 1px, transparent 1px, transparent 3px)',
+          maxWidth: 'min(64vw, 1100px)',
         }}
-      />
-
-      {/* Warm-light hint from upper-left — canonical Plot light direction. */}
-      <div
-        aria-hidden
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          background:
-            'radial-gradient(ellipse 80% 60% at 25% 20%, rgba(255, 234, 200, 0.18) 0%, rgba(255, 234, 200, 0) 60%)',
-        }}
-      />
-
-      {/* Wordmark stage — centered, sized to command the frame. */}
-      <div className="relative z-10 flex items-center justify-center w-full min-h-screen px-6 sm:px-10">
-        <div
-          className="plot-logo-wrapper w-full"
-          style={{
-            maxWidth: 'min(64vw, 1100px)',
-          }}
-        >
-          <PlotMapsLogo
-            color="#1A1F2E"
-            className="plot-logo w-full h-auto"
-            title="PlotMaps"
-          />
-        </div>
+      >
+        <PlotMapsLogo
+          color="#1A1F2E"
+          className="plot-logo w-full h-auto"
+          title="PlotMaps"
+        />
       </div>
 
       {/* Entrance + idle animations.

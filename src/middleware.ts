@@ -35,8 +35,20 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // Logged in on auth pages → redirect home
-  if (user && (pathname === '/login' || pathname === '/signup' || pathname === '/landing')) {
+  // Logged in on auth pages → redirect home.
+  // Exception: /landing?resumeArrival=1 — the OAuth round-trip from
+  // ArrivalSequence sends users back here so the destination flow can
+  // pick up where it left off. Authenticated users hitting this exact
+  // URL need to land on /landing so the carousel can re-mount the
+  // ArrivalSequence in resume mode. Without this exception, the OAuth
+  // flow bounces to '/' and the user never sees their destination land.
+  const isResumingArrival =
+    pathname === '/landing' && request.nextUrl.searchParams.get('resumeArrival') === '1';
+  if (
+    user &&
+    !isResumingArrival &&
+    (pathname === '/login' || pathname === '/signup' || pathname === '/landing')
+  ) {
     const homeUrl = request.nextUrl.clone();
     homeUrl.pathname = '/';
     return NextResponse.redirect(homeUrl);
@@ -48,6 +60,11 @@ export async function middleware(request: NextRequest) {
   // by-omission anyone who isn't an admin and hasn't been explicitly
   // flipped on. Bypass list keeps logout/waitlist reachable so a
   // gated user isn't trapped.
+  //
+  // Note: invited testers must have beta_access = true in their
+  // profile so the /landing?resumeArrival=1 OAuth callback can complete
+  // the destination flow. Otherwise they'd OAuth successfully but get
+  // bounced to /waitlist mid-arrival.
   if (user && !BETA_BYPASS_PATHS.some((p) => pathname.startsWith(p))) {
     const { data: profile } = await supabase
       .from('profiles')

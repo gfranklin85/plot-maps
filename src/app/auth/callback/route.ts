@@ -20,9 +20,26 @@ export async function GET(request: Request) {
   // there.
   const nextFromQuery = searchParams.get('next');
 
+  // Diagnostic: log everything we received so we can see why exchanges
+  // are failing in Vercel logs without dumping the code itself.
+  console.log('[auth/callback] hit', {
+    origin,
+    hasCode: !!code,
+    codeLen: code?.length ?? 0,
+    next: nextFromQuery,
+    allParams: Array.from(searchParams.keys()),
+  });
+
   if (code) {
     const supabase = await createServerSupabase();
     const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+    if (error) {
+      console.error('[auth/callback] exchangeCodeForSession failed', {
+        message: error.message,
+        status: error.status,
+        name: error.name,
+      });
+    }
     if (!error && data.session?.user) {
       // Merge anonymous analytics session with the new user
       const cookieStore = await cookies();
@@ -62,5 +79,8 @@ export async function GET(request: Request) {
     }
   }
 
+  console.log('[auth/callback] redirecting to login with auth_failed', {
+    reasonNoCode: !code,
+  });
   return NextResponse.redirect(`${origin}/login?error=auth_failed`);
 }

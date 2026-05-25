@@ -449,7 +449,7 @@ export default function ArrivalSequence({
 
               <div className="mb-10">
                 <p className="font-headline text-base italic text-surface/85 mb-4">
-                  Who's flying today?
+                  Who&apos;s flying today?
                 </p>
                 <RadioGroup
                   options={USER_TYPE_OPTIONS}

@@ -10,15 +10,11 @@
 // Resolution priority:
 //   1. Explicit ?lat=&lng= params — direct camera coordinates
 //   2. ?destination=<slug> — looked up in the shared destinations
-//      catalog and resolved to that destination's lat/lng
-//   3. profile.defaultMapCenter — the visitor's saved home (Lemoore
-//      for early users; whatever the visitor set otherwise)
-//
-// If none of the above apply, returns null and the map's downstream
-// logic handles the unset case.
+//      catalog and resolved to that destination's full camera pose
+//   3. profile.defaultMapCenter — the visitor's saved home
 
 import { useSearchParams } from 'next/navigation';
-import { DESTINATIONS } from './destinations';
+import { DESTINATIONS, type Destination } from './destinations';
 
 export function useInitialMapCenter(
   fallback: { lat: number; lng: number } | null
@@ -46,4 +42,18 @@ export function useInitialMapCenter(
 
   // Priority 3: profile fallback.
   return fallback;
+}
+
+// Resolve a full destination pose (altitude, heading, pitch, range)
+// from the URL's ?destination=<slug> param. Returns null when the
+// slug doesn't match a known destination. Called by /map/page.tsx
+// alongside useInitialMapCenter — the first sets the camera position,
+// the second sets the full first-person pose for the cinematic
+// match-cut arrival.
+export function useInitialDestinationPose(): Destination | null {
+  const searchParams = useSearchParams();
+  if (!searchParams) return null;
+  const destinationParam = searchParams.get('destination');
+  if (!destinationParam) return null;
+  return DESTINATIONS.find(d => d.slug === destinationParam) ?? null;
 }

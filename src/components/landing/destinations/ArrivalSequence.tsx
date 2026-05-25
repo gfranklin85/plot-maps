@@ -4,137 +4,238 @@
 // the moment they pick a destination and the moment they arrive on the
 // 3D map.
 //
-// Sequence beats:
+// Beats:
 //
-//   1. Darken    — page recedes to deep navy. Wordmark fades. The
-//                  visitor is in transit; the landing is gone.
-//   2. Instrument — a compass + altimeter glyph fades in centered;
-//                   destination name, latitude, and longitude appear
-//                   below in editorial type. They feel like they're
-//                   reading from a cockpit instrument panel.
-//   3. Logbook   — three surveyor's-logbook questions presented one
-//                  at a time, single-field each. Their first name, the
-//                  city they call home, and a soft self-identification
-//                  ("Working the land" / "Just exploring"). The voice
-//                  is the field surveyor's, not a SaaS form. Answers
-//                  persist to localStorage; later sessions will sync
-//                  them to Supabase and to user accounts when present.
-//   4. Approach  — instrument animates as if descending toward the
-//                  destination. "Arriving at <name>." appears. After
-//                  a brief moment, the overlay fades and the next
-//                  route mounts.
+//   darken    — page recedes to deep navy. Wordmark fades.
+//   instrument — compass glyph + destination coords appear.
+//   manifest  — OAuth gate. Visitor signs in with Google before any
+//               further data is captured. OAuth round-trip leaves the
+//               page; sessionStorage preserves arrival state so the
+//               sequence resumes after the callback.
+//   logbook   — two radio questions (user type + how heard) shown
+//               post-auth with name pre-filled from the OAuth identity.
+//   brief     — self-paced flight controls overview. Visitor releases
+//               themselves with a "Ready to fly" affordance.
+//   expansion — destination card / hero panel grows to fill viewport,
+//               controller rumbles, route changes to /map at the
+//               destination's authored camera pose.
 //
-// During the entire sequence the map is preloading via Next.js route
-// prefetch (router.prefetch). The visitor's perceived wait is filled
-// with the logbook; the actual technical wait is the next route's
-// mount + tile fetch on arrival.
+// During manifest → logbook → brief, the map route prefetches in the
+// background. When expansion fires, the map mount should be near-ready,
+// so the visitor doesn't see a flash of default state.
 //
-// All numeric durations, easing curves, and copy are chosen to be the
-// canonical version — not placeholders. Visual refinement happens in
-// dedicated polish sessions but the structure here is the structure.
+// All numeric durations are deliberate — not placeholders.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/lib/auth-context';
 import type { Destination } from '@/lib/destinations';
 
-// ── Persisted shape ─────────────────────────────────────────────────
-// Stored in localStorage so a returning visitor's prior answers can
-// inform future arrivals and so a future Supabase sync can ingest the
-// existing log. Schema is intentionally minimal — when accounts arrive
-// the merge is upsert-by-localStorage-uuid.
+// ── Persisted shape (localStorage) ──────────────────────────────────
+// Visitor's logbook answers per arrival. When Supabase account flow
+// matures, these sync server-side; for now they live client-only.
 export interface SurveyorLogEntry {
   firstName: string;
-  homeCity: string;
-  mode: 'working' | 'exploring';
+  userType: UserType;
+  source: HowHeard;
   destinationSlug: string;
-  recordedAt: string; // ISO timestamp
+  recordedAt: string;
 }
 
-const STORAGE_KEY = 'plotmaps.surveyorLog';
+type UserType =
+  | 'real_estate'
+  | 'buyer_seller'
+  | 'investor'
+  | 'exploring'
+  | 'other';
+
+type HowHeard =
+  | 'friend'
+  | 'social'
+  | 'search'
+  | 'event'
+  | 'stumbled'
+  | 'other';
+
+const LOG_STORAGE_KEY = 'plotmaps.surveyorLog';
+const ARRIVAL_STATE_KEY = 'plotmaps.arrivalInFlight';
+
+// ── Session-bridge for OAuth round-trip ────────────────────────────
+// When the visitor commits to OAuth, the browser navigates away to
+// Google's consent screen. To resume the arrival sequence on return,
+// we stash the destination slug + a marker in sessionStorage. On
+// /landing remount, if (a) there's a stashed slug and (b) the user is
+// authenticated, ArrivalSequence opens in logbook beat with the right
+// destination.
+interface ArrivalInFlight {
+  destinationSlug: string;
+  startedAt: string;
+}
+
+function stashArrivalInFlight(destinationSlug: string): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const payload: ArrivalInFlight = {
+      destinationSlug,
+      startedAt: new Date().toISOString(),
+    };
+    window.sessionStorage.setItem(ARRIVAL_STATE_KEY, JSON.stringify(payload));
+  } catch {
+    /* sessionStorage unavailable; OAuth still works, sequence just won't auto-resume */
+  }
+}
+
+export function readArrivalInFlight(): ArrivalInFlight | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.sessionStorage.getItem(ARRIVAL_STATE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as ArrivalInFlight;
+    // Stale arrival states (>10 minutes old) get discarded — visitor
+    // probably abandoned the OAuth flow.
+    const age = Date.now() - new Date(parsed.startedAt).getTime();
+    if (age > 10 * 60 * 1000) {
+      window.sessionStorage.removeItem(ARRIVAL_STATE_KEY);
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+export function clearArrivalInFlight(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.sessionStorage.removeItem(ARRIVAL_STATE_KEY);
+  } catch {
+    /* ignore */
+  }
+}
 
 function appendToLog(entry: SurveyorLogEntry): void {
   if (typeof window === 'undefined') return;
   try {
-    const existing = window.localStorage.getItem(STORAGE_KEY);
+    const existing = window.localStorage.getItem(LOG_STORAGE_KEY);
     const log: SurveyorLogEntry[] = existing ? JSON.parse(existing) : [];
     log.push(entry);
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(log));
+    window.localStorage.setItem(LOG_STORAGE_KEY, JSON.stringify(log));
   } catch {
-    // localStorage may be unavailable (private browsing, quota). The
-    // logbook still works in-session; we just don't persist.
+    /* localStorage may be unavailable; in-session only */
   }
 }
 
-// ── Beats and timings ───────────────────────────────────────────────
-// Each beat is a distinct visual state of the overlay. Timings are the
-// minimum durations; the logbook beat waits for visitor input rather
-// than auto-advancing.
-type Beat =
-  | 'darken'      // 0–600ms: background fades to navy
-  | 'instrument'  // 600–1800ms: instrument + coords appear
-  | 'logbook'     // input-paced: three questions, single field each
-  | 'approach'    // 0–1400ms: descent + "Arriving at <name>"
-  | 'release';    // overlay fades, navigation begins
-
-interface LogbookQuestion {
-  key: 'firstName' | 'homeCity' | 'mode';
-  prompt: (state: { firstName: string; destinationName: string }) => string;
-  placeholder: string;
-  kind: 'text' | 'choice';
-  choices?: { value: 'working' | 'exploring'; label: string }[];
+// ── Controller rumble ──────────────────────────────────────────────
+// On expansion completion, send a brief haptic pulse to any connected
+// gamepad. Tells the visitor in their hands that the world is live.
+function triggerControllerRumble(durationMs = 280): void {
+  if (typeof window === 'undefined' || !navigator.getGamepads) return;
+  const pads = navigator.getGamepads();
+  for (const pad of pads) {
+    if (!pad || !pad.connected) continue;
+    // Standard Web Gamepad API rumble; not all controllers support it.
+    type ActuatorPad = Gamepad & {
+      vibrationActuator?: {
+        playEffect: (
+          type: string,
+          params: {
+            duration: number;
+            strongMagnitude: number;
+            weakMagnitude: number;
+          }
+        ) => Promise<unknown>;
+      };
+    };
+    const actuator = (pad as ActuatorPad).vibrationActuator;
+    if (actuator && typeof actuator.playEffect === 'function') {
+      void actuator
+        .playEffect('dual-rumble', {
+          duration: durationMs,
+          strongMagnitude: 0.6,
+          weakMagnitude: 0.4,
+        })
+        .catch(() => {
+          /* ignore — not all browsers honor every rumble request */
+        });
+    }
+  }
 }
 
-const LOGBOOK_QUESTIONS: LogbookQuestion[] = [
-  {
-    key: 'firstName',
-    prompt: () => "What should the field log call you?",
-    placeholder: 'Your name',
-    kind: 'text',
-  },
-  {
-    key: 'homeCity',
-    prompt: ({ firstName }) =>
-      firstName
-        ? `Welcome, ${firstName}. Where do you call home?`
-        : 'Where do you call home?',
-    placeholder: 'A city, a town, somewhere',
-    kind: 'text',
-  },
-  {
-    key: 'mode',
-    prompt: () => 'Why are you flying today?',
-    placeholder: '',
-    kind: 'choice',
-    choices: [
-      { value: 'working', label: 'Working the land' },
-      { value: 'exploring', label: 'Just exploring' },
-    ],
-  },
+// ── Beat machine ───────────────────────────────────────────────────
+type Beat =
+  | 'darken'
+  | 'instrument'
+  | 'manifest'
+  | 'logbook'
+  | 'brief'
+  | 'expansion'
+  | 'release';
+
+interface RadioOption<V extends string> {
+  value: V;
+  label: string;
+}
+
+const USER_TYPE_OPTIONS: RadioOption<UserType>[] = [
+  { value: 'real_estate', label: 'I work in real estate' },
+  { value: 'investor', label: 'I invest in property' },
+  { value: 'buyer_seller', label: 'I’m looking to buy or sell' },
+  { value: 'exploring', label: 'Just exploring' },
+  { value: 'other', label: 'Something else' },
+];
+
+const HOW_HEARD_OPTIONS: RadioOption<HowHeard>[] = [
+  { value: 'friend', label: 'From someone I know' },
+  { value: 'social', label: 'Social media' },
+  { value: 'search', label: 'Found it searching' },
+  { value: 'event', label: 'An event or conference' },
+  { value: 'stumbled', label: 'Just stumbled on it' },
+  { value: 'other', label: 'Other' },
 ];
 
 interface Props {
   destination: Destination;
+  /** When true, the sequence starts in `logbook` beat with the assumption
+   *  the user is already authenticated (typical of OAuth-callback resume). */
+  resumeAfterAuth?: boolean;
   onCancel?: () => void;
 }
 
-export default function ArrivalSequence({ destination, onCancel }: Props) {
+export default function ArrivalSequence({
+  destination,
+  resumeAfterAuth = false,
+  onCancel,
+}: Props) {
   const router = useRouter();
-  const [beat, setBeat] = useState<Beat>('darken');
-  const [questionIndex, setQuestionIndex] = useState(0);
-  const [firstName, setFirstName] = useState('');
-  const [homeCity, setHomeCity] = useState('');
-  const [mode, setMode] = useState<'working' | 'exploring' | ''>('');
-  const inputRef = useRef<HTMLInputElement>(null);
+  const { user } = useAuth();
+  const [beat, setBeat] = useState<Beat>(
+    resumeAfterAuth ? 'instrument' : 'darken'
+  );
+  const [userType, setUserType] = useState<UserType | null>(null);
+  const [source, setSource] = useState<HowHeard | null>(null);
+  const [oauthLoading, setOauthLoading] = useState(false);
+  const expansionContainerRef = useRef<HTMLDivElement>(null);
 
-  // Preload the map route in the background as soon as the overlay
-  // mounts. By the time the visitor finishes the logbook, the route
-  // bundle is cached and the mount is faster.
+  // Derived: visitor's first name from the OAuth identity. Supabase
+  // exposes user_metadata.full_name for Google sign-ins; we take the
+  // first word.
+  const firstName = useMemo(() => {
+    const meta = (user?.user_metadata ?? {}) as { full_name?: string; name?: string };
+    const full = meta.full_name || meta.name || '';
+    return full.split(' ')[0] || '';
+  }, [user]);
+
+  // Preload the map route as soon as we know the visitor is committed
+  // (post-auth on the resume path; on first-arrival, after manifest).
   useEffect(() => {
-    router.prefetch(`/map?destination=${destination.slug}`);
-  }, [router, destination.slug]);
+    if (beat === 'logbook' || beat === 'brief') {
+      router.prefetch(`/map?destination=${destination.slug}`);
+    }
+  }, [beat, router, destination.slug]);
 
-  // Body scroll lock — once arrival starts, the landing beneath us is
-  // out of reach until we release.
+  // Body scroll lock — once arrival starts, the landing beneath is
+  // out of reach until release.
   useEffect(() => {
     const previous = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
@@ -143,8 +244,7 @@ export default function ArrivalSequence({ destination, onCancel }: Props) {
     };
   }, []);
 
-  // Esc cancels and returns to the landing. Accessibility move; most
-  // visitors will complete the sequence.
+  // Esc cancels and returns to the landing.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape' && onCancel) onCancel();
@@ -153,81 +253,77 @@ export default function ArrivalSequence({ destination, onCancel }: Props) {
     return () => window.removeEventListener('keydown', onKey);
   }, [onCancel]);
 
-  // Beat machine — advance darken → instrument → logbook automatically;
-  // logbook → approach when the third question resolves; approach →
-  // release after the descent animation; release navigates.
+  // Beat machine — automatic transitions for visual-only beats.
+  // Interactive beats (manifest, logbook, brief) wait for visitor input.
   useEffect(() => {
     if (beat === 'darken') {
       const t = setTimeout(() => setBeat('instrument'), 600);
       return () => clearTimeout(t);
     }
     if (beat === 'instrument') {
-      const t = setTimeout(() => setBeat('logbook'), 1200);
+      // After the instrument has its moment, advance to either manifest
+      // (if not authenticated) or logbook (if already authenticated, e.g.
+      // returning visitor or post-OAuth resume).
+      const next = user ? 'logbook' : 'manifest';
+      const t = setTimeout(() => setBeat(next), 1200);
       return () => clearTimeout(t);
     }
-    if (beat === 'approach') {
-      const t = setTimeout(() => setBeat('release'), 1400);
+    if (beat === 'expansion') {
+      // Trigger the controller rumble at the start of expansion.
+      triggerControllerRumble();
+      const t = setTimeout(() => setBeat('release'), 1100);
       return () => clearTimeout(t);
     }
     if (beat === 'release') {
-      // Final write to the surveyor's log + navigate.
-      appendToLog({
-        firstName: firstName.trim(),
-        homeCity: homeCity.trim(),
-        mode: (mode || 'exploring') as 'working' | 'exploring',
-        destinationSlug: destination.slug,
-        recordedAt: new Date().toISOString(),
-      });
+      // Persist final log entry then navigate.
+      if (userType && source) {
+        appendToLog({
+          firstName,
+          userType,
+          source,
+          destinationSlug: destination.slug,
+          recordedAt: new Date().toISOString(),
+        });
+      }
+      clearArrivalInFlight();
       const t = setTimeout(() => {
         router.push(`/map?destination=${destination.slug}`);
-      }, 350);
+      }, 200);
       return () => clearTimeout(t);
     }
-  }, [beat, destination.slug, firstName, homeCity, mode, router]);
+  }, [beat, user, userType, source, firstName, destination.slug, router]);
 
-  // Focus the input when the logbook beat or its current question arrives.
-  useEffect(() => {
-    if (beat === 'logbook' && inputRef.current) {
-      const q = LOGBOOK_QUESTIONS[questionIndex];
-      if (q && q.kind === 'text') {
-        const id = setTimeout(() => inputRef.current?.focus(), 50);
-        return () => clearTimeout(id);
-      }
+  // ── Manifest beat: OAuth ─────────────────────────────────────────
+  const handleSignIn = useCallback(async () => {
+    setOauthLoading(true);
+    stashArrivalInFlight(destination.slug);
+    try {
+      await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(
+            `/landing?resumeArrival=1`
+          )}`,
+        },
+      });
+    } catch {
+      setOauthLoading(false);
+      clearArrivalInFlight();
     }
-  }, [beat, questionIndex]);
+  }, [destination.slug]);
 
-  const currentQuestion = LOGBOOK_QUESTIONS[questionIndex];
+  // ── Logbook beat: progress to brief when both answered ───────────
+  const logbookComplete = userType !== null && source !== null;
+  const advanceFromLogbook = useCallback(() => {
+    if (logbookComplete) setBeat('brief');
+  }, [logbookComplete]);
 
-  const handleTextSubmit = useCallback(
-    (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!currentQuestion) return;
-      if (currentQuestion.kind !== 'text') return;
-      const value =
-        currentQuestion.key === 'firstName' ? firstName.trim() : homeCity.trim();
-      if (!value) return;
-      if (questionIndex + 1 >= LOGBOOK_QUESTIONS.length) {
-        setBeat('approach');
-      } else {
-        setQuestionIndex((i) => i + 1);
-      }
-    },
-    [currentQuestion, firstName, homeCity, questionIndex]
-  );
+  // ── Brief beat: progress to expansion ────────────────────────────
+  const releaseToFlight = useCallback(() => {
+    setBeat('expansion');
+  }, []);
 
-  const handleChoiceSelect = useCallback(
-    (value: 'working' | 'exploring') => {
-      setMode(value);
-      if (questionIndex + 1 >= LOGBOOK_QUESTIONS.length) {
-        setBeat('approach');
-      } else {
-        setQuestionIndex((i) => i + 1);
-      }
-    },
-    [questionIndex]
-  );
-
-  // Latitude/longitude formatted for the instrument display.
+  // Coordinates formatted for the instrument display.
   const coordsLabel = useMemo(() => {
     const latAbs = Math.abs(destination.lat).toFixed(2);
     const lngAbs = Math.abs(destination.lng).toFixed(2);
@@ -243,7 +339,7 @@ export default function ArrivalSequence({ destination, onCancel }: Props) {
       role="dialog"
       aria-label={`Arriving at ${destination.name}`}
     >
-      {/* Field — the deep navy that the world recedes into. */}
+      {/* Field of navy that the world recedes into. */}
       <div
         className="absolute inset-0"
         style={{
@@ -253,9 +349,7 @@ export default function ArrivalSequence({ destination, onCancel }: Props) {
         }}
       />
 
-      {/* Warm-light pinhole from upper-left — same canonical Plot light
-          direction as the landing. Soft enough not to compete with the
-          instrument; present enough to keep the field feeling alive. */}
+      {/* Warm-light pinhole from upper-left. */}
       <div
         aria-hidden
         className="absolute inset-0 pointer-events-none"
@@ -267,35 +361,34 @@ export default function ArrivalSequence({ destination, onCancel }: Props) {
         }}
       />
 
-      {/* Stage — centered column. Width tuned so the editorial typography
-          breathes without feeling sparse. */}
+      {/* Stage container. */}
       <div className="relative h-full w-full flex items-center justify-center px-6">
         <div
-          className="w-full max-w-[560px]"
+          ref={expansionContainerRef}
+          className="w-full max-w-[640px]"
           style={{
             opacity: beat === 'darken' ? 0 : 1,
             transform:
-              beat === 'darken' ? 'translateY(12px)' : 'translateY(0)',
+              beat === 'darken'
+                ? 'translateY(12px)'
+                : beat === 'expansion' || beat === 'release'
+                  ? 'scale(1.04)'
+                  : 'translateY(0)',
             transition:
               'opacity 800ms cubic-bezier(0.4, 0, 0.2, 1) 200ms, transform 800ms cubic-bezier(0.4, 0, 0.2, 1) 200ms',
           }}
         >
-          {/* Instrument — compass + altimeter glyph. Hand-drawn vector,
-              the same theodolite-family geometry as the wordmark reticle.
-              Stays mounted across beats; the descent animation in the
-              approach beat is applied here. */}
+          {/* Instrument — kept mounted across beats. */}
           <div className="flex justify-center mb-8">
             <Instrument beat={beat} />
           </div>
 
-          {/* Coordinates header — destination name, lat/lng. Visible
-              from instrument beat onward; in approach beat it transitions
-              to the arrival line. */}
+          {/* Coordinates header. */}
           <header className="text-center select-none mb-10">
             <div className="flex items-center justify-center gap-4 text-surface/60">
               <span className="h-px w-12 bg-current" aria-hidden />
               <span className="text-[10px] font-headline font-semibold tracking-[0.4em] uppercase">
-                {beat === 'approach' || beat === 'release'
+                {beat === 'expansion' || beat === 'release'
                   ? 'Arriving'
                   : 'In Approach'}
               </span>
@@ -309,110 +402,140 @@ export default function ArrivalSequence({ destination, onCancel }: Props) {
             </p>
           </header>
 
-          {/* Logbook — only rendered during the logbook beat. The form
-              is one question at a time; the prompt above the field
-              speaks in the surveyor's voice. */}
-          {beat === 'logbook' && currentQuestion && (
+          {/* ── Manifest beat: OAuth gate ──────────────────────── */}
+          {beat === 'manifest' && (
             <div
               className="text-center"
               style={{
                 animation:
-                  'plot-arrival-question-in 600ms cubic-bezier(0.2, 0.65, 0.3, 1) forwards',
+                  'plot-arrival-beat-in 600ms cubic-bezier(0.2, 0.65, 0.3, 1) forwards',
               }}
-              key={`q-${questionIndex}`}
             >
-              <p className="font-headline text-xl sm:text-2xl italic text-surface/90 mb-6">
-                {currentQuestion.prompt({
-                  firstName,
-                  destinationName: destination.name,
-                })}
+              <p className="font-headline text-xl sm:text-2xl italic text-surface/90 mb-2">
+                Before you fly,
               </p>
-
-              {currentQuestion.kind === 'text' && (
-                <form onSubmit={handleTextSubmit} className="mx-auto max-w-md">
-                  <div className="flex items-center gap-3 border-b border-surface/30 focus-within:border-surface/70 transition-colors">
-                    <input
-                      ref={inputRef}
-                      type="text"
-                      value={
-                        currentQuestion.key === 'firstName'
-                          ? firstName
-                          : homeCity
-                      }
-                      onChange={(e) => {
-                        if (currentQuestion.key === 'firstName') {
-                          setFirstName(e.target.value);
-                        } else {
-                          setHomeCity(e.target.value);
-                        }
-                      }}
-                      placeholder={currentQuestion.placeholder}
-                      autoComplete="off"
-                      autoCapitalize="words"
-                      className="flex-1 bg-transparent outline-none py-2 text-lg sm:text-xl text-surface placeholder:text-surface/35 font-headline"
-                      aria-label={currentQuestion.placeholder}
-                    />
-                    <button
-                      type="submit"
-                      className="px-3 py-2 font-headline text-sm tracking-wide text-surface/80 hover:text-surface transition-colors"
-                      aria-label="Continue"
-                    >
-                      →
-                    </button>
-                  </div>
-                  <p className="mt-3 text-[10px] font-headline tracking-[0.28em] uppercase text-surface/35">
-                    Press enter to continue
-                  </p>
-                </form>
-              )}
-
-              {currentQuestion.kind === 'choice' && currentQuestion.choices && (
-                <div className="flex flex-col sm:flex-row gap-3 justify-center mx-auto max-w-md">
-                  {currentQuestion.choices.map((choice) => (
-                    <button
-                      key={choice.value}
-                      type="button"
-                      onClick={() => handleChoiceSelect(choice.value)}
-                      className="flex-1 px-5 py-4 rounded-lg border border-surface/30 text-surface/85 font-headline italic text-base hover:border-surface/70 hover:text-surface hover:bg-surface/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-surface/40 transition-all"
-                    >
-                      {choice.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {/* Progress dots — one per question, current one filled. */}
-              <div className="flex items-center justify-center gap-2 mt-10">
-                {LOGBOOK_QUESTIONS.map((_, i) => (
-                  <span
-                    key={i}
-                    className={`h-1 rounded-full transition-all duration-500 ${
-                      i === questionIndex
-                        ? 'w-6 bg-surface/85'
-                        : i < questionIndex
-                        ? 'w-2 bg-surface/50'
-                        : 'w-2 bg-surface/20'
-                    }`}
-                    aria-hidden
-                  />
-                ))}
-              </div>
+              <p className="font-headline text-lg sm:text-xl italic text-surface/70 mb-8">
+                sign the manifest.
+              </p>
+              <button
+                type="button"
+                onClick={handleSignIn}
+                disabled={oauthLoading}
+                className="inline-flex items-center gap-3 px-6 py-3 rounded-lg bg-surface text-on-surface font-headline text-sm tracking-wide hover:bg-surface/90 disabled:opacity-60 transition-all"
+              >
+                <GoogleGlyph />
+                {oauthLoading ? 'Routing to Google…' : 'Continue with Google'}
+              </button>
+              <p className="mt-6 text-[10px] font-headline tracking-[0.28em] uppercase text-surface/35">
+                The manual remembers those who sign it
+              </p>
             </div>
           )}
 
-          {/* Approach line — the closing breath before the map opens. */}
-          {(beat === 'approach' || beat === 'release') && (
+          {/* ── Logbook beat: two radio questions ──────────────── */}
+          {beat === 'logbook' && (
             <div
               className="text-center"
               style={{
                 animation:
-                  'plot-arrival-question-in 600ms cubic-bezier(0.2, 0.65, 0.3, 1) forwards',
+                  'plot-arrival-beat-in 600ms cubic-bezier(0.2, 0.65, 0.3, 1) forwards',
               }}
             >
-              <p className="font-headline text-lg italic text-surface/85">
-                {firstName
-                  ? `Hold tight, ${firstName}.`
-                  : 'Hold tight.'}
+              {firstName && (
+                <p className="font-headline text-lg italic text-surface/70 mb-8">
+                  Welcome aboard, {firstName}.
+                </p>
+              )}
+
+              <div className="mb-10">
+                <p className="font-headline text-base italic text-surface/85 mb-4">
+                  Who's flying today?
+                </p>
+                <RadioGroup
+                  options={USER_TYPE_OPTIONS}
+                  value={userType}
+                  onChange={setUserType}
+                />
+              </div>
+
+              <div className="mb-10">
+                <p className="font-headline text-base italic text-surface/85 mb-4">
+                  How did you find us?
+                </p>
+                <RadioGroup
+                  options={HOW_HEARD_OPTIONS}
+                  value={source}
+                  onChange={setSource}
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={advanceFromLogbook}
+                disabled={!logbookComplete}
+                className="px-6 py-2.5 rounded border border-surface/30 text-surface/85 font-headline italic text-sm hover:border-surface/70 hover:text-surface disabled:opacity-30 disabled:hover:border-surface/30 disabled:hover:text-surface/85 transition-all"
+              >
+                Continue →
+              </button>
+            </div>
+          )}
+
+          {/* ── Brief beat: flight controls overview ───────────── */}
+          {beat === 'brief' && (
+            <div
+              className="text-center"
+              style={{
+                animation:
+                  'plot-arrival-beat-in 600ms cubic-bezier(0.2, 0.65, 0.3, 1) forwards',
+              }}
+            >
+              <p className="font-headline text-xl italic text-surface/90 mb-8">
+                A brief from the cockpit.
+              </p>
+
+              <div className="space-y-5 text-left max-w-md mx-auto mb-10">
+                <BriefRow
+                  label="Forward"
+                  detail="W / S or left stick"
+                  desc="Throttle ahead or pull back."
+                />
+                <BriefRow
+                  label="Look"
+                  detail="Mouse or right stick"
+                  desc="Tilt and turn the camera."
+                />
+                <BriefRow
+                  label="Descend"
+                  detail="LT / RT triggers"
+                  desc="Drop closer or rise above."
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={releaseToFlight}
+                className="px-7 py-3 rounded bg-surface text-on-surface font-headline text-sm tracking-wide hover:bg-surface/90 transition-all"
+              >
+                Ready to fly →
+              </button>
+
+              <p className="mt-6 text-[10px] font-headline tracking-[0.28em] uppercase text-surface/35">
+                Take your time. The field will wait.
+              </p>
+            </div>
+          )}
+
+          {/* ── Expansion / release beats ──────────────────────── */}
+          {(beat === 'expansion' || beat === 'release') && (
+            <div
+              className="text-center"
+              style={{
+                animation:
+                  'plot-arrival-beat-in 400ms cubic-bezier(0.2, 0.65, 0.3, 1) forwards',
+              }}
+            >
+              <p className="font-headline text-xl italic text-surface/85">
+                {firstName ? `Hold tight, ${firstName}.` : 'Hold tight.'}
               </p>
               <p className="font-headline text-sm italic text-surface/55 mt-1">
                 The field is opening.
@@ -421,35 +544,36 @@ export default function ArrivalSequence({ destination, onCancel }: Props) {
           )}
         </div>
 
-        {/* Cancel affordance — quiet escape in the upper-right corner.
-            Esc also works. Visible from instrument beat onward. */}
-        {onCancel && beat !== 'darken' && beat !== 'release' && (
-          <button
-            type="button"
-            onClick={onCancel}
-            className="absolute top-6 right-6 text-[10px] font-headline tracking-[0.28em] uppercase text-surface/40 hover:text-surface/80 transition-colors"
-            aria-label="Cancel arrival"
-          >
-            Return to the manual
-          </button>
-        )}
+        {/* Cancel affordance — quiet escape. Hidden during expansion/release. */}
+        {onCancel &&
+          beat !== 'darken' &&
+          beat !== 'expansion' &&
+          beat !== 'release' && (
+            <button
+              type="button"
+              onClick={onCancel}
+              className="absolute top-6 right-6 text-[10px] font-headline tracking-[0.28em] uppercase text-surface/40 hover:text-surface/80 transition-colors"
+              aria-label="Cancel arrival"
+            >
+              Return to the manual
+            </button>
+          )}
       </div>
 
-      {/* Release fade — covers the moment of route handoff so the
-          visitor doesn't see the next page's first paint. */}
+      {/* Release fade — covers the route handoff. */}
       {beat === 'release' && (
         <div
           className="absolute inset-0 pointer-events-none"
           style={{
             backgroundColor: '#0E1626',
             opacity: 0,
-            animation: 'plot-arrival-release-fade 350ms ease-in forwards',
+            animation: 'plot-arrival-release-fade 200ms ease-in forwards',
           }}
         />
       )}
 
       <style jsx global>{`
-        @keyframes plot-arrival-question-in {
+        @keyframes plot-arrival-beat-in {
           from {
             opacity: 0;
             transform: translateY(10px);
@@ -465,14 +589,6 @@ export default function ArrivalSequence({ destination, onCancel }: Props) {
           }
           to {
             opacity: 1;
-          }
-        }
-        @keyframes plot-instrument-rotate {
-          from {
-            transform: rotate(0deg);
-          }
-          to {
-            transform: rotate(360deg);
           }
         }
         @keyframes plot-instrument-breathe {
@@ -508,22 +624,99 @@ export default function ArrivalSequence({ destination, onCancel }: Props) {
   );
 }
 
-// ── Instrument ──────────────────────────────────────────────────────
-// The hand-drawn compass + altimeter glyph that sits centered above
-// the destination header. Uses the same theodolite-reticle geometry
-// family as the wordmark — a ring, a crosshair, and four cardinal
-// ticks at the compass rose. During the approach beat it animates as
-// if the camera is descending into the destination.
+// ── Subcomponents ───────────────────────────────────────────────────
+
+function RadioGroup<V extends string>({
+  options,
+  value,
+  onChange,
+}: {
+  options: RadioOption<V>[];
+  value: V | null;
+  onChange: (v: V) => void;
+}) {
+  return (
+    <div className="flex flex-wrap gap-2 justify-center max-w-lg mx-auto">
+      {options.map((opt) => {
+        const active = value === opt.value;
+        return (
+          <button
+            key={opt.value}
+            type="button"
+            onClick={() => onChange(opt.value)}
+            className={`px-4 py-2 rounded border text-sm font-headline italic transition-all ${
+              active
+                ? 'border-surface text-surface bg-surface/[0.08]'
+                : 'border-surface/25 text-surface/70 hover:border-surface/55 hover:text-surface'
+            }`}
+            aria-pressed={active}
+          >
+            {opt.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function BriefRow({
+  label,
+  detail,
+  desc,
+}: {
+  label: string;
+  detail: string;
+  desc: string;
+}) {
+  return (
+    <div className="flex items-baseline gap-4">
+      <div className="w-24 shrink-0 text-[10px] font-headline tracking-[0.28em] uppercase text-surface/55">
+        {label}
+      </div>
+      <div className="flex-1">
+        <p className="font-mono text-xs text-surface/80">{detail}</p>
+        <p className="font-headline italic text-sm text-surface/65 mt-0.5">
+          {desc}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function GoogleGlyph() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 18 18" fill="none" aria-hidden>
+      <path
+        d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"
+        fill="#4285F4"
+      />
+      <path
+        d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"
+        fill="#34A853"
+      />
+      <path
+        d="M3.964 10.706A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.706V4.962H.957A8.997 8.997 0 0 0 0 9c0 1.452.348 2.827.957 4.038l3.007-2.332z"
+        fill="#FBBC05"
+      />
+      <path
+        d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.962L3.964 7.294C4.672 5.167 6.656 3.58 9 3.58z"
+        fill="#EA4335"
+      />
+    </svg>
+  );
+}
+
 function Instrument({ beat }: { beat: Beat }) {
-  const isApproaching = beat === 'approach' || beat === 'release';
-  const isLive = beat === 'logbook'; // breathes while waiting for input
+  const isApproaching = beat === 'expansion' || beat === 'release';
+  const isWaiting =
+    beat === 'manifest' || beat === 'logbook' || beat === 'brief';
 
   return (
     <div
       aria-hidden
       style={{
         animation: isApproaching
-          ? 'plot-instrument-descend 1400ms cubic-bezier(0.4, 0, 0.2, 1) forwards'
+          ? 'plot-instrument-descend 1100ms cubic-bezier(0.4, 0, 0.2, 1) forwards'
           : undefined,
       }}
     >
@@ -533,12 +726,11 @@ function Instrument({ beat }: { beat: Beat }) {
         viewBox="0 0 96 96"
         fill="none"
         style={{
-          animation: isLive
+          animation: isWaiting
             ? 'plot-instrument-breathe 4500ms ease-in-out infinite'
             : undefined,
         }}
       >
-        {/* Outer ring — the compass body. */}
         <circle
           cx="48"
           cy="48"
@@ -547,7 +739,6 @@ function Instrument({ beat }: { beat: Beat }) {
           strokeWidth="1.25"
           fill="none"
         />
-        {/* Inner ring — the reticle aperture. */}
         <circle
           cx="48"
           cy="48"
@@ -556,43 +747,11 @@ function Instrument({ beat }: { beat: Beat }) {
           strokeWidth="1"
           fill="none"
         />
-        {/* Crosshair. */}
-        <line
-          x1="48"
-          y1="14"
-          x2="48"
-          y2="32"
-          stroke="rgba(244, 234, 213, 0.7)"
-          strokeWidth="1"
-        />
-        <line
-          x1="48"
-          y1="64"
-          x2="48"
-          y2="82"
-          stroke="rgba(244, 234, 213, 0.7)"
-          strokeWidth="1"
-        />
-        <line
-          x1="14"
-          y1="48"
-          x2="32"
-          y2="48"
-          stroke="rgba(244, 234, 213, 0.7)"
-          strokeWidth="1"
-        />
-        <line
-          x1="64"
-          y1="48"
-          x2="82"
-          y2="48"
-          stroke="rgba(244, 234, 213, 0.7)"
-          strokeWidth="1"
-        />
-        {/* Center dot — the focal point. */}
+        <line x1="48" y1="14" x2="48" y2="32" stroke="rgba(244, 234, 213, 0.7)" strokeWidth="1" />
+        <line x1="48" y1="64" x2="48" y2="82" stroke="rgba(244, 234, 213, 0.7)" strokeWidth="1" />
+        <line x1="14" y1="48" x2="32" y2="48" stroke="rgba(244, 234, 213, 0.7)" strokeWidth="1" />
+        <line x1="64" y1="48" x2="82" y2="48" stroke="rgba(244, 234, 213, 0.7)" strokeWidth="1" />
         <circle cx="48" cy="48" r="1.5" fill="rgba(244, 234, 213, 0.9)" />
-        {/* Cardinal labels — N at top. The other three stay implicit
-            because the typography is editorial, not navigational chrome. */}
         <text
           x="48"
           y="10"

@@ -23,24 +23,60 @@
 //     The cards do the visual work; the header just opens the section
 //     in the field-manual voice.
 
-import { useRef, useState, useCallback, KeyboardEvent } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRef, useState, useCallback, useEffect, KeyboardEvent } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { DESTINATIONS, type Destination } from '@/lib/destinations';
 import DestinationCard from './DestinationCard';
-import ArrivalSequence from './ArrivalSequence';
+import ArrivalSequence, {
+  readArrivalInFlight,
+  clearArrivalInFlight,
+} from './ArrivalSequence';
 
 export default function DestinationCarousel() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const scrollerRef = useRef<HTMLDivElement>(null);
   const [searchValue, setSearchValue] = useState('');
   // When set, the ArrivalSequence overlay mounts and takes over the
   // viewport. Cleared on cancel; on completion the overlay navigates
   // away from /landing entirely so we don't need to clear it.
   const [activeDestination, setActiveDestination] = useState<Destination | null>(null);
+  // When the visitor returns from the OAuth round-trip via
+  // /landing?resumeArrival=1, mount ArrivalSequence in resume mode so
+  // the sequence picks up at logbook beat instead of replaying from
+  // darken.
+  const [resumeAfterAuth, setResumeAfterAuth] = useState(false);
 
   const handleDestinationSelect = useCallback((destination: Destination) => {
     setActiveDestination(destination);
+    setResumeAfterAuth(false);
   }, []);
+
+  // OAuth-callback resume effect — runs once on mount. If the URL
+  // carries ?resumeArrival=1 and sessionStorage has a stashed in-flight
+  // arrival, re-open ArrivalSequence at the right destination in
+  // resume mode. Then strip the query param so refreshes don't
+  // re-trigger.
+  useEffect(() => {
+    if (!searchParams) return;
+    if (searchParams.get('resumeArrival') !== '1') return;
+    const stashed = readArrivalInFlight();
+    if (!stashed) {
+      // Nothing to resume — clean the URL and bail.
+      router.replace('/landing');
+      return;
+    }
+    const match = DESTINATIONS.find((d) => d.slug === stashed.destinationSlug);
+    if (!match) {
+      clearArrivalInFlight();
+      router.replace('/landing');
+      return;
+    }
+    setActiveDestination(match);
+    setResumeAfterAuth(true);
+    // Clean the query param so a refresh doesn't loop.
+    router.replace('/landing');
+  }, [searchParams, router]);
 
   const handleSearchSubmit = useCallback(
     (e: React.FormEvent) => {
@@ -209,13 +245,20 @@ export default function DestinationCarousel() {
       `}</style>
 
       {/* Arrival sequence — full-viewport overlay that takes over when
-          a destination is picked. Holds the surveyor's logbook (name,
-          home city, working/exploring) while the map route prefetches
-          in the background, then navigates to /map. */}
+          a destination is picked. Holds the OAuth gate, the post-auth
+          questionnaire, and the flight brief while the map route
+          prefetches in the background, then navigates to /map.
+          resumeAfterAuth: true when the visitor returned from the
+          Google OAuth round-trip and we're picking up where we left off. */}
       {activeDestination && (
         <ArrivalSequence
           destination={activeDestination}
-          onCancel={() => setActiveDestination(null)}
+          resumeAfterAuth={resumeAfterAuth}
+          onCancel={() => {
+            setActiveDestination(null);
+            setResumeAfterAuth(false);
+            clearArrivalInFlight();
+          }}
         />
       )}
     </section>

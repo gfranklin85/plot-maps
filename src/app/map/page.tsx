@@ -270,14 +270,17 @@ export default function MapPage() {
     const leadIdParam = searchParams.get('leadId');
     const destinationParam = searchParams.get('destination');
 
-    // Resolve ?destination=<slug> to lat/lng via the destinations
-    // catalog (shared with the landing carousel). When matched, the
-    // resolved coordinates feed the same camera path as ?lat=&lng=
-    // would have. Unmatched slugs fall through silently — the map
-    // boots at the profile default and the visitor can still navigate.
+    // Resolve ?destination=<slug> to lat/lng + full camera pose via the
+    // destinations catalog (shared with the landing carousel). When
+    // matched, the visitor's camera lands at the exact authored framing
+    // the screenshot was taken from — the match-cut zoom-through arrival.
+    // Unmatched slugs fall through silently — the map boots at the
+    // profile default and the visitor can still navigate.
     let lat = latStr ? parseFloat(latStr) : NaN;
     let lng = lngStr ? parseFloat(lngStr) : NaN;
     let resolvedDestinationZoom: number | null = null;
+    let resolvedDestinationHeading: number | null = null;
+    let resolvedDestinationTilt: number | null = null;
     if (Number.isNaN(lat) || Number.isNaN(lng)) {
       if (destinationParam) {
         const match = DESTINATIONS.find(d => d.slug === destinationParam);
@@ -288,6 +291,15 @@ export default function MapPage() {
           // the visitor sees the city sprawl, low enough that detail
           // reads. The map's own controls let them descend further.
           resolvedDestinationZoom = 17;
+          resolvedDestinationHeading = match.heading;
+          // Convert first-person pitch (0=horizon, -45=looking 45° down)
+          // to Map3D tilt (0=top-down, 85=horizon-level).
+          // pitch=0 (horizon-level) → tilt=85 (Google's max)
+          // pitch=-45 (looking down 45°) → tilt=45
+          // pitch=-90 (straight down) → tilt=0
+          // Formula: tilt = 90 + pitch, clamped to [0, 85]
+          const tilt = Math.max(0, Math.min(85, 90 + match.pitch));
+          resolvedDestinationTilt = tilt;
         }
       }
     }
@@ -310,6 +322,15 @@ export default function MapPage() {
       dispatchFlight({
         center: { lat, lng },
         zoom,
+        // When arriving from a destination card, also align the camera
+        // heading + tilt to the authored pose so the visitor lands in
+        // exactly the framing the destination screenshot promised.
+        ...(resolvedDestinationHeading !== null
+          ? { heading: resolvedDestinationHeading }
+          : {}),
+        ...(resolvedDestinationTilt !== null
+          ? { tilt: resolvedDestinationTilt }
+          : {}),
         duration: 1100,
         easing: 'easeInOutCubic',
       });

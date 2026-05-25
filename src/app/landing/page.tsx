@@ -26,7 +26,7 @@
 import type { Metadata } from 'next';
 import PlotMapsLogo from '@/components/brand/PlotMapsLogo';
 import LandingControllerChip from '@/components/landing/LandingControllerChip';
-import DestinationAtlas from '@/components/landing/destinations/DestinationAtlas';
+import CesiumGlobeLoader from '@/components/landing/destinations/CesiumGlobeLoader';
 
 export const metadata: Metadata = {
   title: "Plotmaps — A Modern Practitioner's Manual",
@@ -74,10 +74,11 @@ export default function LandingPage() {
       {/* Controller chip — top-right corner. */}
       <LandingControllerChip />
 
-      {/* Atlas — fills the full viewport edge to edge. The wordmark
-          and controller chip float above it as overlays. */}
+      {/* The globe — real 3D Earth via Cesium loaded from CDN. Fills
+          the full viewport. The wordmark and controller chip float
+          above it as overlays. */}
       <div className="relative z-10 w-full h-full">
-        <DestinationAtlas />
+        <CesiumGlobeLoader />
       </div>
     </main>
   );

@@ -1,76 +1,90 @@
 'use client';
 
 // CesiumGlobe — the landing's destination picker rendered as a real
-// 3D Earth using CesiumJS. Replaces the static atlas image with a
-// cinematic globe: photorealistic terrain, satellite imagery, real
-// city labels, atmospheric scattering, day/night terminator matching
-// the actual sun position, star field background.
+// 3D Earth via CesiumJS loaded from Cesium's CDN.
+//
+// Why CDN instead of npm: Cesium is a 3MB+ library that doesn't ship
+// cleanly through Next.js's webpack code-splitting. The official
+// Cesium quickstart recommends CDN loading for exactly this kind of
+// integration. CesiumGlobeLoader injects the <Script> tag; this
+// component reads the runtime off the global window.Cesium.
 //
 // Architecture:
-//   - Cesium Viewer mounts inside a full-viewport container at the
-//     base of the landing.
+//   - Cesium Viewer mounts inside a full-viewport container.
 //   - Six destination pins are placed at lat/lng as Cesium Entities
-//     with billboard markers + label text. Cesium handles the lat/lng
-//     to 3D-sphere math; no manual percentage calculations.
-//   - The camera orbits slowly when idle (cinematic background motion).
-//   - Click a pin → cinematic flyTo descending toward the destination
-//     → opens the ArrivalSequence overlay → completes the OAuth +
-//     logbook flow → navigates to /map at flight altitude.
-//
-// Cesium is browser-only. This component is a 'use client' boundary
-// and dynamically loads the Cesium library on mount to avoid SSR errors.
+//     with point + label markers.
+//   - Click a pin → opens ArrivalSequence (OAuth + logbook + brief)
+//     → after completion, navigates to /map at the destination's
+//     authored camera pose.
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-// Type-only imports of Cesium — keeps the bundle from pulling Cesium
-// into the server tree, while still letting us reference its event types.
-import type {
-  ScreenSpaceEventHandler as CesiumScreenSpaceEventHandler,
-} from 'cesium';
 import { DESTINATIONS, type Destination } from '@/lib/destinations';
 import ArrivalSequence, {
   readArrivalInFlight,
   clearArrivalInFlight,
 } from './ArrivalSequence';
 
-// Local aliases for Cesium's event types (the namespace is awkward).
-type PositionedEvent = CesiumScreenSpaceEventHandler.PositionedEvent;
-type MotionEvent = CesiumScreenSpaceEventHandler.MotionEvent;
-
-// Cesium's static runtime assets are copied to /cesium/ by
-// scripts/copy-cesium-assets.mjs. The library reads this at module
-// initialization to know where to fetch its workers and assets from.
-// Must be set BEFORE the cesium module is imported.
-if (typeof window !== 'undefined') {
-  (window as unknown as { CESIUM_BASE_URL: string }).CESIUM_BASE_URL = '/cesium/';
-}
-
-interface ViewerInstance {
+// Loose runtime types for window.Cesium — we don't pull Cesium's own
+// type definitions because that would mean reinstalling the npm package
+// and getting tangled in the bundling problem again. These types cover
+// just the surface this component uses.
+type CesiumViewer = {
   destroy: () => void;
-  scene: unknown;
-  camera: {
-    flyTo: (opts: unknown) => void;
+  scene: {
+    skyAtmosphere: { show: boolean };
+    fog: { enabled: boolean; density: number };
+    globe: {
+      enableLighting: boolean;
+      showGroundAtmosphere: boolean;
+      atmosphereLightIntensity: number;
+      depthTestAgainstTerrain: boolean;
+    };
+    backgroundColor: unknown;
+    primitives: { add: (p: unknown) => unknown };
+    pick: (pos: unknown) => { id?: { id?: string } } | undefined;
   };
-  entities: {
-    add: (opts: unknown) => unknown;
-    removeAll: () => void;
+  camera: { flyTo: (opts: unknown) => void };
+  entities: { add: (opts: unknown) => unknown };
+  canvas: HTMLCanvasElement;
+};
+
+type CesiumGlobal = {
+  Ion: { defaultAccessToken: string };
+  Viewer: new (
+    container: HTMLElement,
+    options: Record<string, unknown>,
+  ) => CesiumViewer;
+  Terrain: { fromWorldTerrain: () => unknown };
+  Cartesian3: { fromDegrees: (lng: number, lat: number, h?: number) => unknown };
+  Cartesian2: new (x: number, y: number) => unknown;
+  Color: { fromCssColorString: (s: string) => unknown };
+  Math: { toRadians: (deg: number) => number };
+  HeightReference: { CLAMP_TO_GROUND: unknown };
+  LabelStyle: { FILL_AND_OUTLINE: unknown };
+  ScreenSpaceEventHandler: new (canvas: HTMLCanvasElement) => {
+    setInputAction: (cb: (event: { position?: unknown; endPosition?: unknown }) => void, type: unknown) => void;
+    destroy: () => void;
   };
-  clock: { shouldAnimate: boolean };
-  screenSpaceEventHandler: unknown;
-}
+  ScreenSpaceEventType: { LEFT_CLICK: unknown; MOUSE_MOVE: unknown };
+  createOsmBuildingsAsync: () => Promise<unknown>;
+};
+
+// window.Cesium typing comes from src/types/cesium-global.d.ts as
+// Record<string, unknown>. We narrow to CesiumGlobal at the call site.
 
 export default function CesiumGlobe() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const containerRef = useRef<HTMLDivElement>(null);
-  const viewerRef = useRef<ViewerInstance | null>(null);
+  const viewerRef = useRef<CesiumViewer | null>(null);
   const [activeDestination, setActiveDestination] = useState<Destination | null>(null);
   const [resumeAfterAuth, setResumeAfterAuth] = useState(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // OAuth-callback resume — if the visitor returns from Google with
-  // ?resumeArrival=1 and a stashed destination, re-open ArrivalSequence
-  // in resume mode at that destination.
+  // OAuth-callback resume — if the visitor returns with ?resumeArrival=1
+  // and a stashed destination, re-open ArrivalSequence in resume mode.
   useEffect(() => {
     if (!searchParams) return;
     if (searchParams.get('resumeArrival') !== '1') return;
@@ -90,33 +104,33 @@ export default function CesiumGlobe() {
     router.replace('/landing');
   }, [searchParams, router]);
 
-  // Initialize the Cesium viewer once on mount.
+  // Wait for window.Cesium to be loaded (from CDN via <Script> in the
+  // CesiumGlobeLoader), then initialize the viewer.
   useEffect(() => {
     if (!containerRef.current) return;
     let cancelled = false;
+    let cleanupFn: (() => void) | null = null;
 
-    async function init() {
+    function tryInit() {
+      if (cancelled) return;
+      if (typeof window === 'undefined' || !window.Cesium) {
+        setTimeout(tryInit, 100);
+        return;
+      }
+      void init(window.Cesium as unknown as CesiumGlobal);
+    }
+
+    async function init(Cesium: CesiumGlobal) {
       try {
-        const Cesium = await import('cesium');
-        // Cesium ships its widget CSS as a side-effect import. Use a
-        // type-checker-friendly relative path via a ts-ignore so we
-        // don't need to add @types declarations for the CSS module.
-        // @ts-expect-error — Cesium CSS import has no TS module declaration
-        await import('cesium/Build/Cesium/Widgets/widgets.css');
-
-        if (cancelled || !containerRef.current) return;
-
+        if (!containerRef.current) return;
         const token = process.env.NEXT_PUBLIC_CESIUM_ION_TOKEN;
         if (!token) {
-          setLoadError('Cesium token missing');
+          setStatus('error');
+          setErrorMessage('Cesium token missing');
           return;
         }
         Cesium.Ion.defaultAccessToken = token;
 
-        // Build the viewer with the controls and chrome stripped down
-        // to match Plot's brand. We don't want Cesium's default UI
-        // (timeline, animation controls, geocoder, home button) — the
-        // visitor interacts via destination pins, not Cesium widgets.
         const viewer = new Cesium.Viewer(containerRef.current, {
           terrain: Cesium.Terrain.fromWorldTerrain(),
           animation: false,
@@ -133,34 +147,23 @@ export default function CesiumGlobe() {
           creditContainer: document.createElement('div'),
         });
 
-        viewerRef.current = viewer as unknown as ViewerInstance;
+        if (cancelled) {
+          viewer.destroy();
+          return;
+        }
+        viewerRef.current = viewer;
 
-        // Atmospheric polish — show the warm halo at the horizon,
-        // enable the day/night terminator, ground atmosphere.
-        // Cast to typed scene to access the imperative properties.
-        const scene = viewer.scene as unknown as {
-          skyAtmosphere: { show: boolean };
-          fog: { enabled: boolean; density: number };
-          globe: {
-            enableLighting: boolean;
-            showGroundAtmosphere: boolean;
-            atmosphereLightIntensity: number;
-            depthTestAgainstTerrain: boolean;
-          };
-          backgroundColor: unknown;
-        };
-        scene.skyAtmosphere.show = true;
-        scene.fog.enabled = true;
-        scene.fog.density = 0.0002;
-        scene.globe.enableLighting = true;
-        scene.globe.showGroundAtmosphere = true;
-        scene.globe.atmosphereLightIntensity = 10.0;
-        scene.globe.depthTestAgainstTerrain = false;
-        scene.backgroundColor = Cesium.Color.fromCssColorString('#0E1626');
+        // Atmospheric polish.
+        viewer.scene.skyAtmosphere.show = true;
+        viewer.scene.fog.enabled = true;
+        viewer.scene.fog.density = 0.0002;
+        viewer.scene.globe.enableLighting = true;
+        viewer.scene.globe.showGroundAtmosphere = true;
+        viewer.scene.globe.atmosphereLightIntensity = 10.0;
+        viewer.scene.globe.depthTestAgainstTerrain = false;
+        viewer.scene.backgroundColor = Cesium.Color.fromCssColorString('#0E1626');
 
-        // Add Cesium OSM Buildings — 350M global 3D buildings, free
-        // tier asset. Visitor sees actual buildings rise from cities
-        // when they zoom in.
+        // Cesium OSM Buildings — 350M global 3D buildings.
         try {
           const buildings = await Cesium.createOsmBuildingsAsync();
           if (!cancelled) {
@@ -204,9 +207,7 @@ export default function CesiumGlobe() {
           });
         }
 
-        // Initial camera: orbital view of the planet, slightly above
-        // the equator looking toward the Atlantic so all six pins
-        // (Lemoore through Tokyo) are visible at once.
+        // Initial camera — orbital view of the planet.
         viewer.camera.flyTo({
           destination: Cesium.Cartesian3.fromDegrees(20, 25, 18_000_000),
           orientation: {
@@ -217,57 +218,52 @@ export default function CesiumGlobe() {
           duration: 0,
         });
 
-        // Click handler: pick a destination via Cesium's selection event.
+        // Click handler — pick a destination.
         const handler = new Cesium.ScreenSpaceEventHandler(viewer.canvas);
-        handler.setInputAction(
-          (event: PositionedEvent) => {
-            const picked = viewer.scene.pick(event.position);
-            if (!picked || !picked.id || !picked.id.id) return;
-            const id = picked.id.id as string;
-            if (!id.startsWith('destination-')) return;
-            const slug = id.slice('destination-'.length);
-            const dest = DESTINATIONS.find((d) => d.slug === slug);
-            if (dest) {
-              setActiveDestination(dest);
-              setResumeAfterAuth(false);
-            }
-          },
-          Cesium.ScreenSpaceEventType.LEFT_CLICK,
-        );
+        handler.setInputAction((event) => {
+          if (!event.position) return;
+          const picked = viewer.scene.pick(event.position);
+          if (!picked || !picked.id || !picked.id.id) return;
+          const id = picked.id.id;
+          if (!id.startsWith('destination-')) return;
+          const slug = id.slice('destination-'.length);
+          const dest = DESTINATIONS.find((d) => d.slug === slug);
+          if (dest) {
+            setActiveDestination(dest);
+            setResumeAfterAuth(false);
+          }
+        }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
 
-        // Change cursor to pointer when hovering a pin.
-        handler.setInputAction(
-          (event: MotionEvent) => {
-            const picked = viewer.scene.pick(event.endPosition);
-            const canvas = viewer.canvas as HTMLCanvasElement;
-            if (picked?.id?.id && (picked.id.id as string).startsWith('destination-')) {
-              canvas.style.cursor = 'pointer';
-            } else {
-              canvas.style.cursor = 'default';
-            }
-          },
-          Cesium.ScreenSpaceEventType.MOUSE_MOVE,
-        );
+        handler.setInputAction((event) => {
+          if (!event.endPosition) return;
+          const picked = viewer.scene.pick(event.endPosition);
+          const canvas = viewer.canvas;
+          if (picked?.id?.id && picked.id.id.startsWith('destination-')) {
+            canvas.style.cursor = 'pointer';
+          } else {
+            canvas.style.cursor = 'default';
+          }
+        }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
 
-        // Cleanup
-        return () => {
+        cleanupFn = () => {
           handler.destroy();
           viewer.destroy();
           viewerRef.current = null;
         };
+
+        setStatus('ready');
       } catch (err) {
         console.error('[CesiumGlobe] Failed to initialize:', err);
-        setLoadError(err instanceof Error ? err.message : 'Unknown error');
+        setStatus('error');
+        setErrorMessage(err instanceof Error ? err.message : 'Unknown error');
       }
     }
 
-    const cleanupPromise = init();
+    tryInit();
 
     return () => {
       cancelled = true;
-      cleanupPromise.then((cleanup) => cleanup?.()).catch(() => {
-        /* ignore */
-      });
+      if (cleanupFn) cleanupFn();
     };
   }, []);
 
@@ -285,20 +281,26 @@ export default function CesiumGlobe() {
         aria-label="Interactive globe — pick a destination to fly"
       />
 
-      {loadError && (
-        <div className="absolute inset-0 flex items-center justify-center text-surface/70 font-headline italic text-sm">
-          Globe failed to load: {loadError}
+      {status === 'loading' && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <p className="font-headline italic text-sm tracking-[0.16em] text-surface/50">
+            Loading the world…
+          </p>
         </div>
       )}
 
-      {/* Editorial footer line. */}
+      {status === 'error' && errorMessage && (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <p className="font-headline italic text-sm text-surface/70">
+            Globe failed to load: {errorMessage}
+          </p>
+        </div>
+      )}
+
       <p className="absolute bottom-6 left-1/2 -translate-x-1/2 font-headline italic text-sm tracking-[0.16em] text-surface/55 select-none pointer-events-none">
         Choose your field.
       </p>
 
-      {/* Arrival sequence — same overlay used by the previous atlas
-          surface. Holds OAuth + logbook + brief before navigating to
-          /map at the destination's authored camera pose. */}
       {activeDestination && (
         <ArrivalSequence
           destination={activeDestination}
@@ -308,14 +310,9 @@ export default function CesiumGlobe() {
       )}
 
       <style jsx global>{`
-        /* Strip Cesium's default UI chrome and credits area. */
-        .cesium-viewer-bottom {
-          display: none !important;
-        }
+        .cesium-viewer-bottom { display: none !important; }
         .cesium-credit-textContainer,
-        .cesium-credit-logoContainer {
-          display: none !important;
-        }
+        .cesium-credit-logoContainer { display: none !important; }
       `}</style>
     </div>
   );

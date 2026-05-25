@@ -1,28 +1,28 @@
 'use client';
 
-// CesiumGlobeLoader — thin client-component wrapper that dynamically
-// imports CesiumGlobe with SSR disabled. Cesium relies on WebGL and
-// browser globals (window, document, navigator) that don't exist
-// during server-side render, so it must mount client-only.
+// CesiumGlobeLoader — wraps CesiumGlobe with the CDN Script loader.
+// Cesium's runtime is loaded via <Script /> from cesium.com's CDN
+// rather than bundled through webpack — Cesium is a 3MB+ library
+// that doesn't ship cleanly through Next.js's code-splitting.
 //
-// This file exists separate from CesiumGlobe so the landing page can
-// stay a server component (which it must be in order to export
-// `metadata`). The 'use client' boundary lives here; the landing
-// imports this loader as a regular import.
+// Once the CDN scripts load, window.Cesium becomes available and
+// CesiumGlobe initializes the viewer against it.
 
-import dynamic from 'next/dynamic';
+import Script from 'next/script';
+import CesiumGlobe from './CesiumGlobe';
 
-const CesiumGlobe = dynamic(() => import('./CesiumGlobe'), {
-  ssr: false,
-  loading: () => (
-    <div className="w-full h-full flex items-center justify-center bg-[#0E1626]">
-      <p className="font-headline italic text-sm tracking-[0.16em] text-surface/50">
-        Loading the world…
-      </p>
-    </div>
-  ),
-});
+const CESIUM_VERSION = '1.141';
+const CESIUM_BASE = `https://cesium.com/downloads/cesiumjs/releases/${CESIUM_VERSION}/Build/Cesium`;
 
 export default function CesiumGlobeLoader() {
-  return <CesiumGlobe />;
+  return (
+    <>
+      <link rel="stylesheet" href={`${CESIUM_BASE}/Widgets/widgets.css`} />
+      <Script
+        src={`${CESIUM_BASE}/Cesium.js`}
+        strategy="beforeInteractive"
+      />
+      <CesiumGlobe />
+    </>
+  );
 }

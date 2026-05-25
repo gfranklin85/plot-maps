@@ -13,32 +13,48 @@ const BETA_BYPASS_PATHS = ['/waitlist', '/auth', '/login'];
 export async function middleware(request: NextRequest) {
   const { pathname, searchParams } = request.nextUrl;
 
+  const { supabase, response } = createMiddlewareClient(request);
+
+  const { data: { user } } = await supabase.auth.getUser();
+
   // ── OAuth code catcher ──────────────────────────────────────────────
   // Supabase + Google sometimes send OAuth callback traffic to the
   // configured Site URL (https://app.plot.solutions/) instead of the
-  // explicit redirectTo (/auth/callback). When that happens, the
-  // ?code=... lands on the root, no session ever gets exchanged, and
-  // the user appears unauthenticated despite having just signed in.
+  // explicit redirectTo (/auth/callback). Handle two cases:
   //
-  // Catch the orphaned ?code=... on any non-callback path and forward
-  // to /auth/callback so the session-exchange handler can run. The
-  // callback then redirects to /landing?resumeArrival=1 (or wherever
-  // ?next= points), at which point the atlas can resume the
-  // in-flight ArrivalSequence.
+  // 1. ?code=... present AND no session yet → forward to /auth/callback
+  //    so the session-exchange handler can run.
+  // 2. ?code=... present AND session already exists → the code was
+  //    already consumed (Supabase's client-side detectSessionInUrl ran
+  //    on the dashboard load and ate it). Strip the stale code and
+  //    route the user to /landing?resumeArrival=1 so the atlas can
+  //    resume the in-flight ArrivalSequence.
   if (
     searchParams.has('code') &&
     !pathname.startsWith('/auth/callback')
   ) {
+    if (user) {
+      // Session already established — code is stale. Send the user
+      // to the arrival-resume page; if no arrival was in flight, the
+      // atlas just renders normally.
+      const cleanUrl = request.nextUrl.clone();
+      cleanUrl.pathname = '/landing';
+      cleanUrl.search = '?resumeArrival=1';
+      return NextResponse.redirect(cleanUrl);
+    }
+    // No session yet — the code is fresh, hand it to the callback.
     const callbackUrl = request.nextUrl.clone();
     callbackUrl.pathname = '/auth/callback';
-    // Preserve any ?next= the original request carried; the callback
-    // honors it as a fallback when the arrival-flag cookie is absent.
     return NextResponse.redirect(callbackUrl);
   }
 
-  const { supabase, response } = createMiddlewareClient(request);
-
-  const { data: { user } } = await supabase.auth.getUser();
+  // Strip ?error=auth_failed from the root after a stale-code race so
+  // the URL doesn't carry the failure noise forward.
+  if (pathname === '/' && searchParams.get('error') === 'auth_failed') {
+    const cleanUrl = request.nextUrl.clone();
+    cleanUrl.search = '';
+    return NextResponse.redirect(cleanUrl);
+  }
 
   const isPublicPath = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
 

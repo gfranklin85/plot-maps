@@ -13,6 +13,18 @@ const BETA_BYPASS_PATHS = ['/waitlist', '/auth', '/login'];
 export async function middleware(request: NextRequest) {
   const { pathname, searchParams } = request.nextUrl;
 
+  // ── /auth/callback bypass ──────────────────────────────────────────
+  // The auth-callback route handler is the ONLY place that should
+  // exchange an OAuth ?code= for a session. If we let the Supabase
+  // middleware client run here (supabase.auth.getUser triggers the
+  // session-from-URL handling), the code gets consumed in the middle-
+  // ware and the callback handler tries to exchange an already-spent
+  // code, producing auth_failed. Skip the middleware entirely and let
+  // the route handler do its work.
+  if (pathname.startsWith('/auth/callback')) {
+    return NextResponse.next();
+  }
+
   const { supabase, response } = createMiddlewareClient(request);
 
   const { data: { user } } = await supabase.auth.getUser();

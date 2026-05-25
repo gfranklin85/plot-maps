@@ -33,19 +33,28 @@ export async function GET(request: Request) {
         });
       }
 
-      // Resolve destination:
-      //   1. If the arrival-flag cookie is set, route to /landing so
-      //      the atlas can pick up the in-flight ArrivalSequence.
-      //   2. Else if ?next= survived the round-trip, honor it.
-      //   3. Else default to /.
+      // Always route post-OAuth traffic to /landing?resumeArrival=1.
+      // The atlas there checks sessionStorage for an in-flight arrival:
+      //   - If found → re-mount ArrivalSequence in resume mode and
+      //     complete the destination flow.
+      //   - If not found → the atlas just renders normally (user can
+      //     pick a destination from scratch).
+      //
+      // This is more reliable than carrying the routing intent through
+      // a cookie or query param, because cookies + ?next= are subject
+      // to OAuth round-trip stripping by various providers and browsers.
+      // sessionStorage is same-origin and survives reliably.
+      //
+      // The ?next= URL parameter is still honored as a fallback for
+      // OAuth flows that explicitly request a different post-auth path
+      // (e.g. /login → /dashboard direct sign-in).
       const arrivalFlag = cookieStore.get(ARRIVAL_FLAG_COOKIE)?.value;
-      let destination = nextFromQuery ?? '/';
-      if (arrivalFlag === '1') {
-        destination = '/landing?resumeArrival=1';
+      let destination = '/landing?resumeArrival=1';
+      if (nextFromQuery && !arrivalFlag) {
+        destination = nextFromQuery;
       }
 
       const response = NextResponse.redirect(`${origin}${destination}`);
-      // Clear the arrival flag cookie now that we've consumed it.
       if (arrivalFlag) {
         response.cookies.set(ARRIVAL_FLAG_COOKIE, '', { maxAge: 0, path: '/' });
       }

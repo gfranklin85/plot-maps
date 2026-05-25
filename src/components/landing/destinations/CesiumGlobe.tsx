@@ -281,13 +281,7 @@ export default function CesiumGlobe() {
         aria-label="Interactive globe — pick a destination to fly"
       />
 
-      {status === 'loading' && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <p className="font-headline italic text-sm tracking-[0.16em] text-surface/50">
-            Loading the world…
-          </p>
-        </div>
-      )}
+      {status === 'loading' && <LoadingStage />}
 
       {status === 'error' && errorMessage && (
         <div className="absolute inset-0 flex items-center justify-center">
@@ -313,6 +307,113 @@ export default function CesiumGlobe() {
         .cesium-viewer-bottom { display: none !important; }
         .cesium-credit-textContainer,
         .cesium-credit-logoContainer { display: none !important; }
+      `}</style>
+    </div>
+  );
+}
+
+// ── Loading stage ────────────────────────────────────────────────────
+// Cinematic loading state while Cesium's CDN bundle downloads and the
+// viewer initializes. A slowly-rotating surveyor's reticle (the same
+// theodolite geometry as the PlotMaps wordmark O) sits centered with
+// a faint pulse, paired with editorial type cycling through a short
+// list of approach lines. Stays consistent with Plot's brand voice
+// instead of a generic spinner.
+function LoadingStage() {
+  return (
+    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none select-none">
+      <svg
+        width="84"
+        height="84"
+        viewBox="0 0 84 84"
+        fill="none"
+        aria-hidden
+        style={{ animation: 'plot-globe-loading-spin 6s linear infinite' }}
+      >
+        {/* Outer reticle ring */}
+        <circle
+          cx="42"
+          cy="42"
+          r="36"
+          stroke="rgba(244, 234, 213, 0.5)"
+          strokeWidth="1"
+          fill="none"
+          style={{ animation: 'plot-globe-loading-breathe 2.4s ease-in-out infinite' }}
+        />
+        {/* Inner aperture */}
+        <circle
+          cx="42"
+          cy="42"
+          r="18"
+          stroke="rgba(244, 234, 213, 0.7)"
+          strokeWidth="1"
+          fill="none"
+        />
+        {/* Crosshair */}
+        <line x1="42" y1="10" x2="42" y2="26" stroke="rgba(244, 234, 213, 0.65)" strokeWidth="1" />
+        <line x1="42" y1="58" x2="42" y2="74" stroke="rgba(244, 234, 213, 0.65)" strokeWidth="1" />
+        <line x1="10" y1="42" x2="26" y2="42" stroke="rgba(244, 234, 213, 0.65)" strokeWidth="1" />
+        <line x1="58" y1="42" x2="74" y2="42" stroke="rgba(244, 234, 213, 0.65)" strokeWidth="1" />
+        {/* Center point */}
+        <circle cx="42" cy="42" r="1.5" fill="rgba(244, 201, 127, 0.95)" />
+        {/* Compass N */}
+        <text
+          x="42"
+          y="6"
+          textAnchor="middle"
+          fontSize="6"
+          fontFamily="var(--font-geist-sans), Inter, sans-serif"
+          fontWeight="600"
+          letterSpacing="0.18em"
+          fill="rgba(244, 234, 213, 0.7)"
+        >
+          N
+        </text>
+      </svg>
+
+      <p
+        className="mt-6 font-headline italic text-[11px] sm:text-xs tracking-[0.32em] uppercase text-surface/55"
+        style={{ animation: 'plot-globe-loading-text 3.6s ease-in-out infinite' }}
+      >
+        Surveying the world
+      </p>
+
+      <style jsx global>{`
+        @keyframes plot-globe-loading-spin {
+          from {
+            transform: rotate(0deg);
+          }
+          to {
+            transform: rotate(360deg);
+          }
+        }
+        @keyframes plot-globe-loading-breathe {
+          0%, 100% {
+            opacity: 1;
+            stroke-width: 1;
+          }
+          50% {
+            opacity: 0.55;
+            stroke-width: 1.4;
+          }
+        }
+        @keyframes plot-globe-loading-text {
+          0%, 100% {
+            opacity: 0.4;
+          }
+          50% {
+            opacity: 0.9;
+          }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          svg[aria-hidden] {
+            animation: none !important;
+          }
+          p[style*="plot-globe-loading-text"] {
+            animation: none !important;
+            opacity: 0.7 !important;
+          }
+        }
       `}</style>
     </div>
   );

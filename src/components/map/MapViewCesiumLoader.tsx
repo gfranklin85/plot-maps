@@ -23,7 +23,7 @@ export default function MapViewCesiumLoader(props: Props) {
   return (
     <>
       <link rel="stylesheet" href={`${CESIUM_BASE}/Widgets/widgets.css`} />
-      <Script src={`${CESIUM_BASE}/Cesium.js`} strategy="beforeInteractive" />
+      <Script src={`${CESIUM_BASE}/Cesium.js`} strategy="afterInteractive" />
       <MapViewCesium {...props} />
     </>
   );

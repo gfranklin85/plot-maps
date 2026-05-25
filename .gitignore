@@ -41,6 +41,11 @@ next-env.d.ts
 # IDE local state
 .claude/
 
+# Cesium static runtime assets — copied from node_modules at build time
+# by scripts/copy-cesium-assets.mjs. Don't commit them; the script
+# regenerates on every build (locally and on Vercel).
+/public/cesium/
+
 # Local parcel / property-data source files. These can be huge (Kings County
 # parcel .dbf is ~1.4GB). They never belong in git. Property data adapters
 # read from /data/* by convention; the path is configurable via env vars in

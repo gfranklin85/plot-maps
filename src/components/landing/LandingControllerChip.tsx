@@ -100,8 +100,10 @@ export default function LandingControllerChip() {
       }}
     >
       <div
-        className="flex items-center gap-2.5 px-3.5 py-2 rounded-full bg-on-surface/[0.05] backdrop-blur-sm border border-on-surface/15"
+        className="flex items-center gap-2.5 px-3.5 py-2 rounded-full backdrop-blur-sm border"
         style={{
+          backgroundColor: 'rgba(244, 234, 213, 0.05)',
+          borderColor: 'rgba(244, 234, 213, 0.18)',
           transition: 'all 400ms cubic-bezier(0.4, 0, 0.2, 1)',
         }}
       >
@@ -111,10 +113,10 @@ export default function LandingControllerChip() {
           style={{
             color:
               state === 'just_connected'
-                ? '#C8553D' // coral celebration color
+                ? '#F4C97F' // warm amber celebration on the dark field
                 : state === 'connected'
-                  ? 'rgba(26, 31, 46, 0.85)'
-                  : 'rgba(26, 31, 46, 0.55)',
+                  ? 'rgba(244, 234, 213, 0.95)'
+                  : 'rgba(244, 234, 213, 0.65)',
           }}
         >
           {state === 'idle' && 'Plug in to fly'}

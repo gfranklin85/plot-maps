@@ -24,8 +24,8 @@
 //   - src/components/landing/EntrySequence.tsx (transition to /map)
 
 import type { Metadata } from 'next';
-import PlotMapsHero from '@/components/landing/PlotMapsHero';
-import DestinationCarousel from '@/components/landing/destinations/DestinationCarousel';
+import PlotMapsLogo from '@/components/brand/PlotMapsLogo';
+import DestinationAtlas from '@/components/landing/destinations/DestinationAtlas';
 import LandingControllerChip from '@/components/landing/LandingControllerChip';
 
 export const metadata: Metadata = {
@@ -34,60 +34,50 @@ export const metadata: Metadata = {
     'Plot is a surveying field manual rendered in real time. Open the page, turn the key, fly your hometown.',
 };
 
-// One-viewport landing layout: no vertical scroll, ever. Wordmark hero
-// occupies the upper region; destination carousel occupies the lower
-// region; the parchment background paints the entire surface as one
-// continuous material. The destination carousel scrolls horizontally
-// inside its own region — the page itself does not.
+// One-viewport landing layout. The atlas is the protagonist; the wordmark
+// is anchored at the top as a quiet brand mark. No vertical scroll ever.
 //
 // Locked direction:
 //   - memory/feedback_landing_desktop_first_mobile_separate.md
-//   - memory/project_landing_page_field_manual.md ("single no-scroll
-//     start-screen styled as Page I of Plot's encyclopedia")
+//   - memory/project_landing_page_field_manual.md
+//   - memory/project_destination_match_cut_thesis.md
 export default function LandingPage() {
   return (
     <main
       className="relative w-full h-screen overflow-hidden"
       style={{
-        backgroundColor: '#F4EAD5', // Plat Book cream parchment
+        // Deep navy desk surface — the atlas image carries its own
+        // parchment material; the page background is the room around it.
+        backgroundColor: '#0E1626',
       }}
     >
-      {/* Atmospheric depth — single material under both hero and
-          carousel. Subtle radial vignette + paper grain texture. */}
+      {/* Faint star/dust field at the upper edge, where the warm light
+          comes from in the atlas image. Subtle continuation of the
+          atmosphere baked into the atlas. */}
       <div
         aria-hidden
-        className="absolute inset-0 pointer-events-none"
+        className="absolute inset-0 pointer-events-none opacity-60"
         style={{
           background:
-            'radial-gradient(ellipse at center, rgba(244, 234, 213, 0) 0%, rgba(155, 146, 130, 0.10) 70%, rgba(74, 66, 54, 0.16) 100%), repeating-linear-gradient(45deg, rgba(155, 146, 130, 0.018) 0px, rgba(155, 146, 130, 0.018) 1px, transparent 1px, transparent 3px)',
+            'radial-gradient(ellipse 70% 50% at 22% 12%, rgba(255, 232, 198, 0.08) 0%, rgba(255, 232, 198, 0) 65%)',
         }}
       />
 
-      {/* Warm-light pinhole from upper-left — canonical Plot light
-          direction at ~30°. */}
-      <div
-        aria-hidden
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          background:
-            'radial-gradient(ellipse 80% 60% at 25% 20%, rgba(255, 234, 200, 0.18) 0%, rgba(255, 234, 200, 0) 60%)',
-        }}
-      />
+      {/* Wordmark — anchored at the top, modest size so the atlas can
+          dominate the visual hierarchy. */}
+      <header className="absolute top-6 left-1/2 -translate-x-1/2 z-20 select-none">
+        <div className="plot-logo-header" style={{ width: '220px' }}>
+          <PlotMapsLogo color="#F4EAD5" className="w-full h-auto" />
+        </div>
+      </header>
 
-      {/* Controller affordance — top-right corner, quiet but discoverable.
-          Detects gamepad connection state, prompts pairing if absent. */}
+      {/* Controller chip — top-right corner. */}
       <LandingControllerChip />
 
-      {/* Two-row split inside the single viewport. Hero on top
-          (commands the visual hierarchy), carousel on bottom (the
-          action). Tunable proportions via flex-basis if needed later. */}
-      <div className="relative z-10 flex flex-col h-full">
-        <div className="flex-[55] min-h-0">
-          <PlotMapsHero />
-        </div>
-        <div className="flex-[45] min-h-0">
-          <DestinationCarousel />
-        </div>
+      {/* Atlas — the main event. Fills the available viewport between
+          the top wordmark and the bottom editorial line. */}
+      <div className="relative z-10 w-full h-full pt-20">
+        <DestinationAtlas />
       </div>
     </main>
   );

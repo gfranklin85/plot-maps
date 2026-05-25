@@ -11,11 +11,35 @@ const PUBLIC_PATHS = ['/login', '/signup', '/auth', '/subscribe', '/landing', '/
 const BETA_BYPASS_PATHS = ['/waitlist', '/auth', '/login'];
 
 export async function middleware(request: NextRequest) {
+  const { pathname, searchParams } = request.nextUrl;
+
+  // ── OAuth code catcher ──────────────────────────────────────────────
+  // Supabase + Google sometimes send OAuth callback traffic to the
+  // configured Site URL (https://app.plot.solutions/) instead of the
+  // explicit redirectTo (/auth/callback). When that happens, the
+  // ?code=... lands on the root, no session ever gets exchanged, and
+  // the user appears unauthenticated despite having just signed in.
+  //
+  // Catch the orphaned ?code=... on any non-callback path and forward
+  // to /auth/callback so the session-exchange handler can run. The
+  // callback then redirects to /landing?resumeArrival=1 (or wherever
+  // ?next= points), at which point the atlas can resume the
+  // in-flight ArrivalSequence.
+  if (
+    searchParams.has('code') &&
+    !pathname.startsWith('/auth/callback')
+  ) {
+    const callbackUrl = request.nextUrl.clone();
+    callbackUrl.pathname = '/auth/callback';
+    // Preserve any ?next= the original request carried; the callback
+    // honors it as a fallback when the arrival-flag cookie is absent.
+    return NextResponse.redirect(callbackUrl);
+  }
+
   const { supabase, response } = createMiddlewareClient(request);
 
   const { data: { user } } = await supabase.auth.getUser();
 
-  const { pathname } = request.nextUrl;
   const isPublicPath = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
 
   // Root path: show landing page if not logged in, dashboard if logged in

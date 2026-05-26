@@ -32,33 +32,6 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import type { Destination } from '@/lib/destinations';
 
-// ── Persisted shape (localStorage) ──────────────────────────────────
-// Visitor's logbook answers per arrival. When Supabase account flow
-// matures, these sync server-side; for now they live client-only.
-export interface SurveyorLogEntry {
-  firstName: string;
-  userType: UserType;
-  source: HowHeard;
-  destinationSlug: string;
-  recordedAt: string;
-}
-
-type UserType =
-  | 'real_estate'
-  | 'buyer_seller'
-  | 'investor'
-  | 'exploring'
-  | 'other';
-
-type HowHeard =
-  | 'friend'
-  | 'social'
-  | 'search'
-  | 'event'
-  | 'stumbled'
-  | 'other';
-
-const LOG_STORAGE_KEY = 'plotmaps.surveyorLog';
 const ARRIVAL_STATE_KEY = 'plotmaps.arrivalInFlight';
 
 // ── Session-bridge for OAuth round-trip ────────────────────────────
@@ -124,18 +97,6 @@ export function clearArrivalInFlight(): void {
   }
 }
 
-function appendToLog(entry: SurveyorLogEntry): void {
-  if (typeof window === 'undefined') return;
-  try {
-    const existing = window.localStorage.getItem(LOG_STORAGE_KEY);
-    const log: SurveyorLogEntry[] = existing ? JSON.parse(existing) : [];
-    log.push(entry);
-    window.localStorage.setItem(LOG_STORAGE_KEY, JSON.stringify(log));
-  } catch {
-    /* localStorage may be unavailable; in-session only */
-  }
-}
-
 // ── Controller rumble ──────────────────────────────────────────────
 // On expansion completion, send a brief haptic pulse to any connected
 // gamepad. Tells the visitor in their hands that the world is live.
@@ -173,36 +134,24 @@ function triggerControllerRumble(durationMs = 280): void {
 }
 
 // ── Beat machine ───────────────────────────────────────────────────
+//
+// darken      → opening fade-in
+// instrument  → reticle + coordinates settle
+// manifest    → OAuth gate (sign in with Google). Skipped if already
+//               authenticated.
+// expansion   → camera "punches in" toward the world
+// release     → navy fade covering the handoff to /map
+//
+// The questions form (logbook + brief) was cut once destination load
+// became fast enough that we no longer needed it as a holdover. If we
+// ever want first-session attribution back, do it as a one-shot prompt
+// inside /map, not on the entry critical path.
 type Beat =
   | 'darken'
   | 'instrument'
   | 'manifest'
-  | 'logbook'
-  | 'brief'
   | 'expansion'
   | 'release';
-
-interface RadioOption<V extends string> {
-  value: V;
-  label: string;
-}
-
-const USER_TYPE_OPTIONS: RadioOption<UserType>[] = [
-  { value: 'real_estate', label: 'I work in real estate' },
-  { value: 'investor', label: 'I invest in property' },
-  { value: 'buyer_seller', label: 'I’m looking to buy or sell' },
-  { value: 'exploring', label: 'Just exploring' },
-  { value: 'other', label: 'Something else' },
-];
-
-const HOW_HEARD_OPTIONS: RadioOption<HowHeard>[] = [
-  { value: 'friend', label: 'From someone I know' },
-  { value: 'social', label: 'Social media' },
-  { value: 'search', label: 'Found it searching' },
-  { value: 'event', label: 'An event or conference' },
-  { value: 'stumbled', label: 'Just stumbled on it' },
-  { value: 'other', label: 'Other' },
-];
 
 interface Props {
   destination: Destination;
@@ -220,10 +169,11 @@ export default function ArrivalSequence({
   const router = useRouter();
   const { user } = useAuth();
   const [beat, setBeat] = useState<Beat>(
-    resumeAfterAuth ? 'instrument' : 'darken'
+    // OAuth resume skips straight to expansion — the user already
+    // signed the manifest before the round-trip; we just need the
+    // visual handoff into /map.
+    resumeAfterAuth ? 'expansion' : 'darken',
   );
-  const [userType, setUserType] = useState<UserType | null>(null);
-  const [source, setSource] = useState<HowHeard | null>(null);
   const [oauthLoading, setOauthLoading] = useState(false);
   const expansionContainerRef = useRef<HTMLDivElement>(null);
 
@@ -236,10 +186,10 @@ export default function ArrivalSequence({
     return full.split(' ')[0] || '';
   }, [user]);
 
-  // Preload the map route as soon as we know the visitor is committed
-  // (post-auth on the resume path; on first-arrival, after manifest).
+  // Preload the map route as soon as we have a committed destination.
+  // Cuts the JS-chunk download off the post-handoff transition.
   useEffect(() => {
-    if (beat === 'logbook' || beat === 'brief') {
+    if (beat !== 'darken') {
       router.prefetch(`/map?destination=${destination.slug}`);
     }
   }, [beat, router, destination.slug]);
@@ -264,44 +214,33 @@ export default function ArrivalSequence({
   }, [onCancel]);
 
   // Beat machine — automatic transitions for visual-only beats.
-  // Interactive beats (manifest, logbook, brief) wait for visitor input.
+  // Manifest is the only beat that waits for visitor input (OAuth click).
   useEffect(() => {
     if (beat === 'darken') {
       const t = setTimeout(() => setBeat('instrument'), 600);
       return () => clearTimeout(t);
     }
     if (beat === 'instrument') {
-      // After the instrument has its moment, advance to either manifest
-      // (if not authenticated) or logbook (if already authenticated, e.g.
-      // returning visitor or post-OAuth resume).
-      const next = user ? 'logbook' : 'manifest';
+      // After the instrument settles, branch on auth state:
+      //   - Signed-in visitor → straight to the handoff (expansion → release).
+      //   - Anonymous visitor → manifest beat for the OAuth gate.
+      const next = user ? 'expansion' : 'manifest';
       const t = setTimeout(() => setBeat(next), 1200);
       return () => clearTimeout(t);
     }
     if (beat === 'expansion') {
-      // Trigger the controller rumble at the start of expansion.
       triggerControllerRumble();
       const t = setTimeout(() => setBeat('release'), 1100);
       return () => clearTimeout(t);
     }
     if (beat === 'release') {
-      // Persist final log entry then navigate.
-      if (userType && source) {
-        appendToLog({
-          firstName,
-          userType,
-          source,
-          destinationSlug: destination.slug,
-          recordedAt: new Date().toISOString(),
-        });
-      }
       clearArrivalInFlight();
       const t = setTimeout(() => {
         router.push(`/map?destination=${destination.slug}`);
       }, 200);
       return () => clearTimeout(t);
     }
-  }, [beat, user, userType, source, firstName, destination.slug, router]);
+  }, [beat, user, destination.slug, router]);
 
   // ── Manifest beat: OAuth ─────────────────────────────────────────
   const handleSignIn = useCallback(async () => {
@@ -358,16 +297,6 @@ export default function ArrivalSequence({
     }
   }, [destination.slug]);
 
-  // ── Logbook beat: progress to brief when both answered ───────────
-  const logbookComplete = userType !== null && source !== null;
-  const advanceFromLogbook = useCallback(() => {
-    if (logbookComplete) setBeat('brief');
-  }, [logbookComplete]);
-
-  // ── Brief beat: progress to expansion ────────────────────────────
-  const releaseToFlight = useCallback(() => {
-    setBeat('expansion');
-  }, []);
 
   // Coordinates formatted for the instrument display.
   const coordsLabel = useMemo(() => {
@@ -385,12 +314,51 @@ export default function ArrivalSequence({
       role="dialog"
       aria-label={`Arriving at ${destination.name}`}
     >
-      {/* Field of navy that the world recedes into. */}
+      {/* Destination image — blurred, the world we're flying into.
+          Renders behind everything when the destination has a hero
+          shot; the navy fallback covers the gap when it doesn't. The
+          blur + darken keep the foreground type legible. */}
+      {destination.imageSrc && (
+        <div
+          aria-hidden
+          className="absolute inset-0 overflow-hidden"
+          style={{
+            opacity: beat === 'darken' ? 0 : 1,
+            transition: 'opacity 800ms cubic-bezier(0.4, 0, 0.2, 1)',
+          }}
+        >
+          <img
+            src={destination.imageSrc}
+            alt=""
+            className="absolute inset-0 w-full h-full object-cover"
+            style={{
+              filter: 'blur(28px) saturate(1.05) brightness(0.55)',
+              transform: 'scale(1.1)', // avoid blur edge fringe
+            }}
+            draggable={false}
+          />
+          {/* Tint the blurred image toward navy so it composes with the
+              rest of Plot's brand surface rather than fighting it. */}
+          <div
+            className="absolute inset-0"
+            style={{ backgroundColor: 'rgba(14, 22, 38, 0.55)' }}
+          />
+        </div>
+      )}
+
+      {/* Field of navy — covers when no destination image, and fades
+          in on release to mask the route handoff. */}
       <div
         className="absolute inset-0"
         style={{
           backgroundColor: '#0E1626',
-          opacity: beat === 'darken' ? 0 : 1,
+          opacity: destination.imageSrc
+            ? beat === 'release'
+              ? 1
+              : 0
+            : beat === 'darken'
+              ? 0
+              : 1,
           transition: 'opacity 600ms cubic-bezier(0.4, 0, 0.2, 1)',
         }}
       />
@@ -474,99 +442,6 @@ export default function ArrivalSequence({
               </button>
               <p className="mt-6 text-[10px] font-headline tracking-[0.28em] uppercase text-surface/35">
                 The manual remembers those who sign it
-              </p>
-            </div>
-          )}
-
-          {/* ── Logbook beat: two radio questions ──────────────── */}
-          {beat === 'logbook' && (
-            <div
-              className="text-center"
-              style={{
-                animation:
-                  'plot-arrival-beat-in 600ms cubic-bezier(0.2, 0.65, 0.3, 1) forwards',
-              }}
-            >
-              {firstName && (
-                <p className="font-headline text-lg italic text-surface/70 mb-8">
-                  Welcome aboard, {firstName}.
-                </p>
-              )}
-
-              <div className="mb-10">
-                <p className="font-headline text-base italic text-surface/85 mb-4">
-                  Who&apos;s flying today?
-                </p>
-                <RadioGroup
-                  options={USER_TYPE_OPTIONS}
-                  value={userType}
-                  onChange={setUserType}
-                />
-              </div>
-
-              <div className="mb-10">
-                <p className="font-headline text-base italic text-surface/85 mb-4">
-                  How did you find us?
-                </p>
-                <RadioGroup
-                  options={HOW_HEARD_OPTIONS}
-                  value={source}
-                  onChange={setSource}
-                />
-              </div>
-
-              <button
-                type="button"
-                onClick={advanceFromLogbook}
-                disabled={!logbookComplete}
-                className="px-6 py-2.5 rounded border border-surface/30 text-surface/85 font-headline italic text-sm hover:border-surface/70 hover:text-surface disabled:opacity-30 disabled:hover:border-surface/30 disabled:hover:text-surface/85 transition-all"
-              >
-                Continue →
-              </button>
-            </div>
-          )}
-
-          {/* ── Brief beat: flight controls overview ───────────── */}
-          {beat === 'brief' && (
-            <div
-              className="text-center"
-              style={{
-                animation:
-                  'plot-arrival-beat-in 600ms cubic-bezier(0.2, 0.65, 0.3, 1) forwards',
-              }}
-            >
-              <p className="font-headline text-xl italic text-surface/90 mb-8">
-                A brief from the cockpit.
-              </p>
-
-              <div className="space-y-5 text-left max-w-md mx-auto mb-10">
-                <BriefRow
-                  label="Forward"
-                  detail="W / S or left stick"
-                  desc="Throttle ahead or pull back."
-                />
-                <BriefRow
-                  label="Look"
-                  detail="Mouse or right stick"
-                  desc="Tilt and turn the camera."
-                />
-                <BriefRow
-                  label="Descend"
-                  detail="LT / RT triggers"
-                  desc="Drop closer or rise above."
-                />
-              </div>
-
-              <button
-                type="button"
-                onClick={releaseToFlight}
-                className="px-7 py-3 rounded bg-surface text-on-surface font-headline text-sm tracking-wide hover:bg-surface/90 transition-all"
-              >
-                Ready to fly →
-              </button>
-
-              <p className="mt-6 text-[10px] font-headline tracking-[0.28em] uppercase text-surface/35">
-                Take your time. The field will wait.
               </p>
             </div>
           )}
@@ -672,63 +547,6 @@ export default function ArrivalSequence({
 
 // ── Subcomponents ───────────────────────────────────────────────────
 
-function RadioGroup<V extends string>({
-  options,
-  value,
-  onChange,
-}: {
-  options: RadioOption<V>[];
-  value: V | null;
-  onChange: (v: V) => void;
-}) {
-  return (
-    <div className="flex flex-wrap gap-2 justify-center max-w-lg mx-auto">
-      {options.map((opt) => {
-        const active = value === opt.value;
-        return (
-          <button
-            key={opt.value}
-            type="button"
-            onClick={() => onChange(opt.value)}
-            className={`px-4 py-2 rounded border text-sm font-headline italic transition-all ${
-              active
-                ? 'border-surface text-surface bg-surface/[0.08]'
-                : 'border-surface/25 text-surface/70 hover:border-surface/55 hover:text-surface'
-            }`}
-            aria-pressed={active}
-          >
-            {opt.label}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-function BriefRow({
-  label,
-  detail,
-  desc,
-}: {
-  label: string;
-  detail: string;
-  desc: string;
-}) {
-  return (
-    <div className="flex items-baseline gap-4">
-      <div className="w-24 shrink-0 text-[10px] font-headline tracking-[0.28em] uppercase text-surface/55">
-        {label}
-      </div>
-      <div className="flex-1">
-        <p className="font-mono text-xs text-surface/80">{detail}</p>
-        <p className="font-headline italic text-sm text-surface/65 mt-0.5">
-          {desc}
-        </p>
-      </div>
-    </div>
-  );
-}
-
 function GoogleGlyph() {
   return (
     <svg width="16" height="16" viewBox="0 0 18 18" fill="none" aria-hidden>
@@ -754,8 +572,7 @@ function GoogleGlyph() {
 
 function Instrument({ beat }: { beat: Beat }) {
   const isApproaching = beat === 'expansion' || beat === 'release';
-  const isWaiting =
-    beat === 'manifest' || beat === 'logbook' || beat === 'brief';
+  const isWaiting = beat === 'manifest';
 
   return (
     <div

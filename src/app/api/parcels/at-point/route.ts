@@ -48,6 +48,11 @@ export async function GET(req: Request) {
     apn: row.apn as string,
     address: (row.address as string | null) ?? null,
     city: (row.city as string | null) ?? null,
+    // Diagnostic fields (2026-05-26 — chase always-Leoni-Dr bug).
+    // area_sqm should be ~500–3000 for a residential lot. n_points
+    // should be ~5-30. Way larger = ingested geometry is wrong.
+    areaSqm: typeof row.area_sqm === 'number' ? row.area_sqm : null,
+    nPoints: typeof row.n_points === 'number' ? row.n_points : null,
     lat,
     lng,
   });

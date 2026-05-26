@@ -27,13 +27,26 @@ RETURNS TABLE (
   id uuid,
   apn text,
   address text,
-  city text
+  city text,
+  area_sqm double precision,
+  n_points integer
 )
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
 AS $$
-  SELECT p.id, p.apn, p.address, p.city
+  -- area_sqm + n_points are diagnostic (added 2026-05-26 to chase the
+  -- "all clicks resolve to 2000 Leoni Dr" bug). A real residential lot
+  -- in Kings County is ~500-3000 sqm and ~5-30 polygon vertices.
+  -- If a parcel comes back with area > 50,000 sqm or n_points > 200
+  -- its geometry was ingested wrong and overlaps neighbors.
+  SELECT
+    p.id,
+    p.apn,
+    p.address,
+    p.city,
+    ST_Area(p.geom::geography)::double precision AS area_sqm,
+    ST_NPoints(p.geom)::integer AS n_points
   FROM properties p
   WHERE p.geom IS NOT NULL
     AND p.geom && ST_SetSRID(ST_MakePoint(lng, lat), 4326)

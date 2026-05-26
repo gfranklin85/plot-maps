@@ -749,9 +749,14 @@ function Inner({
                 // DEBUG (Greg 2026-05-26): log what came back from the
                 // resolver so we can see whether the at-point endpoint
                 // is returning the wrong APN, or whether the page/popup
-                // is choking downstream.
+                // is choking downstream. area_sqm + n_points are
+                // diagnostic — a residential lot is ~500–3000 sqm with
+                // ~5-30 polygon points; way larger means the geometry
+                // was ingested wrong and overlaps neighbors.
                 // eslint-disable-next-line no-console
-                console.log(`[A-resolve] target=(${targetLat.toFixed(5)},${targetLng.toFixed(5)}) → apn=${json?.apn ?? 'NULL'} address=${json?.address ?? 'NULL'} city=${json?.city ?? 'NULL'}`);
+                console.log(
+                  `[A-resolve] target=(${targetLat.toFixed(5)},${targetLng.toFixed(5)}) → apn=${json?.apn ?? 'NULL'} address=${json?.address ?? 'NULL'} area=${json?.areaSqm != null ? Math.round(json.areaSqm) + 'sqm' : 'NULL'} npts=${json?.nPoints ?? 'NULL'}`
+                );
                 // Re-check the POI flag — gmp-click can fire later
                 // than one RAF on some browsers/Map3D versions.
                 if (lastPoiClickAtRef.current >= pressedAt) return;

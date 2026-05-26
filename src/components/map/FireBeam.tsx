@@ -106,8 +106,17 @@ interface ShotProps {
  */
 function FireBeamShotSvg({ shot, onComplete }: ShotProps) {
   // Progress: 0..1 = travel phase, 1+ = post-landing.
-  const [progress, setProgress] = useState(0);
-  const startTsRef = useRef<number | null>(null);
+  // Initial value is NOT 0 — we seed it at ~0.15 (a small head-start)
+  // so the beam is already extending on the very first frame the user
+  // sees, instead of being invisible on frame 1 + invisible on frame 2
+  // until React's effect-RAF chain finally kicks in. Removes the
+  // perceived input-to-display lag.
+  const [progress, setProgress] = useState(0.15);
+  // Seed startTs at mount time so the elapsed math accounts for the
+  // head-start. Mount time = now - (0.15 * TRAVEL_MS).
+  const startTsRef = useRef<number | null>(typeof performance !== 'undefined'
+    ? performance.now() - 0.15 * TRAVEL_MS
+    : null);
   const rafRef = useRef<number | null>(null);
   const completedRef = useRef(false);
 

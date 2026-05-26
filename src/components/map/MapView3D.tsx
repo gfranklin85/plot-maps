@@ -734,17 +734,12 @@ function Inner({
             // DEBUG (Greg 2026-05-26): trace the ray-cast inputs and
             // the lat/lng we send to the resolver. Remove after the
             // "always-Hanford" bug is diagnosed.
+            // String-formatted so the entire line is visible in the
+            // console without expanding an object.
             // eslint-disable-next-line no-console
-            console.log('[A-press ray-cast]', {
-              camLat: cam.lat.toFixed(6),
-              camLng: cam.lng.toFixed(6),
-              camAltM: cam.altitude.toFixed(1),
-              camHeading: cam.heading.toFixed(1),
-              camPitch: cam.pitch.toFixed(1),
-              groundDistM: groundDistM.toFixed(1),
-              targetLat: targetLat.toFixed(6),
-              targetLng: targetLng.toFixed(6),
-            });
+            console.log(
+              `[A-ray] cam=(${cam.lat.toFixed(5)},${cam.lng.toFixed(5)}) alt=${cam.altitude.toFixed(0)}m hdg=${cam.heading.toFixed(0)}° pitch=${cam.pitch.toFixed(1)}° groundDist=${groundDistM.toFixed(0)}m → target=(${targetLat.toFixed(5)},${targetLng.toFixed(5)})`
+            );
             const ac = new AbortController();
             lastParcelLookupAcRef.current?.abort();
             lastParcelLookupAcRef.current = ac;

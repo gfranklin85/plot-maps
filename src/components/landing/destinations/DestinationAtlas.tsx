@@ -19,7 +19,7 @@
 //   - Click triggers the same ArrivalSequence flow the carousel used.
 
 import { useCallback, useState, useMemo } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { useEffect } from 'react';
 import { DESTINATIONS, type Destination } from '@/lib/destinations';
 import ArrivalSequence, {
@@ -66,34 +66,34 @@ function latLngToPercent(lat: number, lng: number): { x: number; y: number } {
 }
 
 export default function DestinationAtlas() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [activeDestination, setActiveDestination] = useState<Destination | null>(null);
   const [hoveredSlug, setHoveredSlug] = useState<string | null>(null);
   const [resumeAfterAuth, setResumeAfterAuth] = useState(false);
 
-  // OAuth-callback resume — same shape as the carousel had. If the
-  // visitor returns with ?resumeArrival=1 and there's a stashed
-  // destination, re-open ArrivalSequence at that destination in
-  // resume mode.
+  // OAuth-callback resume — if the visitor returns with ?resumeArrival=1
+  // and there's a stashed destination, re-open ArrivalSequence at that
+  // destination in resume mode.
+  //
+  // Note: we deliberately keep ?resumeArrival=1 in the URL until the
+  // ArrivalSequence completes and navigates to /map. Stripping it here
+  // (via router.replace('/landing')) caused middleware's "authenticated
+  // user on /landing → /" rule to bounce the visitor to the dashboard
+  // mid-sequence. The param falls off naturally when ArrivalSequence
+  // hands off to /map?destination=<slug>.
   useEffect(() => {
     if (!searchParams) return;
     if (searchParams.get('resumeArrival') !== '1') return;
     const stashed = readArrivalInFlight();
-    if (!stashed) {
-      router.replace('/landing');
-      return;
-    }
+    if (!stashed) return;
     const match = DESTINATIONS.find((d) => d.slug === stashed.destinationSlug);
     if (!match) {
       clearArrivalInFlight();
-      router.replace('/landing');
       return;
     }
     setActiveDestination(match);
     setResumeAfterAuth(true);
-    router.replace('/landing');
-  }, [searchParams, router]);
+  }, [searchParams]);
 
   const handlePinClick = useCallback((destination: Destination) => {
     setActiveDestination(destination);

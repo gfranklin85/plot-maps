@@ -53,30 +53,29 @@ export default function DestinationCarousel() {
   }, []);
 
   // OAuth-callback resume effect — runs once on mount. If the URL
-  // carries ?resumeArrival=1 and sessionStorage has a stashed in-flight
+  // carries ?resumeArrival=1 and localStorage has a stashed in-flight
   // arrival, re-open ArrivalSequence at the right destination in
-  // resume mode. Then strip the query param so refreshes don't
-  // re-trigger.
+  // resume mode.
+  //
+  // Note: we deliberately keep ?resumeArrival=1 in the URL until the
+  // ArrivalSequence completes and navigates to /map. Stripping it here
+  // (via router.replace('/landing')) caused middleware's "authenticated
+  // user on /landing → /" rule to bounce the visitor to the dashboard
+  // mid-sequence. The param falls off naturally when ArrivalSequence
+  // hands off to /map?destination=<slug>.
   useEffect(() => {
     if (!searchParams) return;
     if (searchParams.get('resumeArrival') !== '1') return;
     const stashed = readArrivalInFlight();
-    if (!stashed) {
-      // Nothing to resume — clean the URL and bail.
-      router.replace('/landing');
-      return;
-    }
+    if (!stashed) return;
     const match = DESTINATIONS.find((d) => d.slug === stashed.destinationSlug);
     if (!match) {
       clearArrivalInFlight();
-      router.replace('/landing');
       return;
     }
     setActiveDestination(match);
     setResumeAfterAuth(true);
-    // Clean the query param so a refresh doesn't loop.
-    router.replace('/landing');
-  }, [searchParams, router]);
+  }, [searchParams]);
 
   const handleSearchSubmit = useCallback(
     (e: React.FormEvent) => {

@@ -645,13 +645,25 @@ function Inner({
       // is mutating its properties. Returns instantly to normal
       // flight on the next input (useIdleDetection flips isIdle
       // back to false before the next frame runs).
-      if (isIdleRef.current) return;
+      if (isIdleRef.current) {
+        if (justPressed.has('a')) {
+          // eslint-disable-next-line no-console
+          console.log('[A-press] BLOCKED: isIdle');
+        }
+        return;
+      }
 
       // Cinematic flight in progress — the destination-fly RAF loop
       // owns the camera writes this frame. Skip gamepad input so it
       // doesn't fight the animation. Resumes naturally on next frame
       // after flyAnimRef clears.
-      if (flyAnimRef.current) return;
+      if (flyAnimRef.current) {
+        if (justPressed.has('a')) {
+          // eslint-disable-next-line no-console
+          console.log('[A-press] BLOCKED: flyAnim in progress');
+        }
+        return;
+      }
 
       // ── Edge-triggered button actions (same as 2D) ────────────────
       if (justPressed.size > 0) {
@@ -671,6 +683,8 @@ function Inner({
         // follow-up parcel ray-cast suppresses itself to avoid double-
         // firing on the same press.
         if (justPressed.has('a')) {
+          // eslint-disable-next-line no-console
+          console.log('[A-press] received — cam=' + (camRef.current ? 'present' : 'NULL') + ' pitch=' + (camRef.current?.pitch.toFixed(1) ?? 'NULL'));
           // A-press: aim → fire → ask Google what's at that lat/lng.
           //
           // This is the universal selection path — works ANYWHERE

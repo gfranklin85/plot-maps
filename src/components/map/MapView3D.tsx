@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { APIProvider, useMapsLibrary } from "@vis.gl/react-google-maps";
 import { MAP_CENTER } from "@/lib/constants";
 import { useGamepad } from "@/lib/useGamepad";
@@ -12,6 +12,7 @@ import AtmosphereOverlay from "./AtmosphereOverlay";
 import SkyDome from "./SkyDome";
 import Parcel3DOverlay from "./Parcel3DOverlay";
 import type { ParcelColorMode, ParcelHitTester } from "./ParcelOverlay";
+import FireBeam, { type FireBeamShot } from "./FireBeam";
 
 // ── Photorealistic 3D Tiles surface (Map3DElement / <gmp-map-3d>) ───
 //
@@ -329,6 +330,43 @@ function Inner({
   // ray-cast suppresses itself to avoid double-firing.
   const lastPoiClickAtRef = useRef<number>(0);
 
+  // ── FireBeam shots state (Breakthrough 2 proof) ────────────────────
+  // Each A-press appends a shot. Sweep shots self-prune via
+  // onShotComplete; tether shots persist until manually cleared.
+  // Render position is reticle (start) → approximated ground-target
+  // pixel (end). The end-Y approximation is a function of camera pitch
+  // — see fireBeam() below.
+  const [fireBeamShots, setFireBeamShots] = useState<FireBeamShot[]>([]);
+  const shotIdRef = useRef<number>(0);
+  const handleShotComplete = useCallback((id: number) => {
+    setFireBeamShots((prev) => prev.filter((s) => s.id !== id));
+  }, []);
+  const fireBeam = useCallback((mode: 'sweep' | 'tether') => {
+    const el = elRef.current;
+    const cam = camRef.current;
+    if (!el || !cam) return;
+    const rect = el.getBoundingClientRect();
+    // Reticle is centered on the 3D path today.
+    const startX = rect.left + rect.width / 2;
+    const startY = rect.top + rect.height / 2;
+    // Approximate the on-screen Y of the ground target.
+    //   pitch ~ -90 (looking straight down) → target IS the reticle pixel
+    //   pitch ~  -5 (near horizon)          → target is way below reticle
+    // factor = 1 - |pitch|/90; endY = reticleY + factor * (40% of viewport height).
+    const pitchAbs = Math.min(90, Math.abs(cam.pitch));
+    const factor = 1 - pitchAbs / 90;
+    const endX = startX;
+    const endY = startY + factor * rect.height * 0.42;
+    shotIdRef.current += 1;
+    setFireBeamShots((prev) => [
+      ...prev,
+      { id: shotIdRef.current, startX, startY, endX, endY, mode },
+    ]);
+  }, []);
+  // Stable ref for the gamepad RAF loop to fire without re-binding.
+  const fireBeamRef = useRef(fireBeam);
+  fireBeamRef.current = fireBeam;
+
 
   const actionsRef = useRef<GamepadActions | undefined>(gamepadActions);
   actionsRef.current = gamepadActions;
@@ -629,6 +667,11 @@ function Inner({
         // firing on the same press.
         if (justPressed.has('a')) {
           const pressedAt = performance.now();
+          // Breakthrough 2 proof: fire the visible beam immediately so
+          // the user gets feedback regardless of what the lookup
+          // resolves to. Sweep mode for now; tap-vs-hold (sweep vs
+          // tether) lands after the proof is signed off.
+          fireBeamRef.current('sweep');
           const mapEl = elRef.current;
           if (mapEl) {
             // Dispatch synthetic click at the screen center (where the
@@ -910,6 +953,11 @@ function Inner({
           latLngFinderRef={latLngParcelFinderRef}
         />
         <AtmosphereOverlay />
+        {/* Fire-beam selection animation (Breakthrough 2 proof). Each
+            A-press appends a shot here; sweep shots auto-prune via
+            handleShotComplete. SVG is full-viewport, pointer-events
+            none, so it never blocks the map. */}
+        <FireBeam shots={fireBeamShots} onShotComplete={handleShotComplete} />
       </div>
     </AtmosphereProvider>
   );

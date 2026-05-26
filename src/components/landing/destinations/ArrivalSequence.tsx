@@ -306,33 +306,54 @@ export default function ArrivalSequence({
   // ── Manifest beat: OAuth ─────────────────────────────────────────
   const handleSignIn = useCallback(async () => {
     setOauthLoading(true);
-    // Stash in localStorage as a same-origin fallback. The primary
-    // mechanism is now the ?dest= URL param round-trip (see below),
-    // because localStorage is strictly per-origin and Google's OAuth
-    // round-trip can hop between apex (plot.solutions) and subdomain
-    // (app.plot.solutions), making the stash invisible on return.
+    // Carry the destination slug through the OAuth round-trip via a
+    // parent-domain cookie. Why a cookie and not localStorage or a URL
+    // param:
+    //   - localStorage is strictly per-origin. Google's OAuth can hop
+    //     between apex (plot.solutions) and subdomain
+    //     (app.plot.solutions), making any same-origin stash invisible
+    //     on return.
+    //   - URL params on redirectTo are stripped by Google's consent
+    //     screen for arbitrary keys (verified empirically — only ?code=
+    //     arrives back at /auth/callback).
+    //   - A cookie scoped to .plot.solutions survives both the round-
+    //     trip AND the apex↔subdomain hop. Same mechanism that already
+    //     carries the PKCE verifier cookie.
     stashArrivalInFlight(destination.slug);
     if (typeof document !== 'undefined') {
-      document.cookie = `pm_arrival_oauth=1; path=/; max-age=600; samesite=lax`;
+      // Scope to parent domain so the cookie is visible on both apex
+      // (plot.solutions) and subdomain (app.plot.solutions). Locally,
+      // host is 'localhost' which doesn't accept domain= cookies, so
+      // we omit it there.
+      const host = window.location.hostname;
+      const domainAttr =
+        host.endsWith('.plot.solutions') || host === 'plot.solutions'
+          ? '; domain=.plot.solutions'
+          : '';
+      const cookieValue = encodeURIComponent(destination.slug);
+      document.cookie = `pm_arrival_dest=${cookieValue}; path=/; max-age=600; samesite=lax; secure${domainAttr}`;
+      document.cookie = `pm_arrival_oauth=1; path=/; max-age=600; samesite=lax; secure${domainAttr}`;
     }
     try {
-      // Embed the destination slug in redirectTo as a query param.
-      // Supabase preserves any params you put on redirectTo across the
-      // OAuth round-trip — they arrive back at /auth/callback alongside
-      // ?code=... The callback then forwards the slug onto /landing as
-      // ?dest=<slug>, and the atlas reads it from the URL to know which
-      // destination to resume. URL params survive origin hops cleanly;
-      // localStorage does not.
-      const redirectTo = `${window.location.origin}/auth/callback?dest=${encodeURIComponent(destination.slug)}`;
+      // Plain callback — no query params, since Google strips them
+      // anyway. Destination comes through via the pm_arrival_dest cookie.
       await supabase.auth.signInWithOAuth({
         provider: 'google',
-        options: { redirectTo },
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
       });
     } catch {
       setOauthLoading(false);
       clearArrivalInFlight();
       if (typeof document !== 'undefined') {
-        document.cookie = `pm_arrival_oauth=; path=/; max-age=0`;
+        const host = window.location.hostname;
+        const domainAttr =
+          host.endsWith('.plot.solutions') || host === 'plot.solutions'
+            ? '; domain=.plot.solutions'
+            : '';
+        document.cookie = `pm_arrival_dest=; path=/; max-age=0${domainAttr}`;
+        document.cookie = `pm_arrival_oauth=; path=/; max-age=0${domainAttr}`;
       }
     }
   }, [destination.slug]);

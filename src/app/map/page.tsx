@@ -1222,6 +1222,28 @@ export default function MapPage() {
               } as unknown as Lead;
               setSelectedLead(stub);
             }}
+            onGooglePoiClick={(placeId, latLng) => {
+              // Google POI selection from the 3D photoreal surface
+              // (Breakthrough 1 — 2026-05-26). Construct a `gpoi:<placeId>`
+              // stub Lead; PropertyPopup detects the prefix and resolves
+              // via /api/google-poi (server-side Place Details proxy).
+              const stub: Lead = {
+                id: `gpoi:${placeId}`,
+                user_id: '',
+                name: '',
+                property_address: null,
+                owner_name: null,
+                phone: null,
+                phone_2: null,
+                phone_3: null,
+                email: null,
+                status: 'New',
+                latitude: latLng.lat,
+                longitude: latLng.lng,
+                created_at: new Date().toISOString(),
+              } as unknown as Lead;
+              setSelectedLead(stub);
+            }}
             view3D={view3D}
             flight={flight}
             navigateTo={navigateTarget}

@@ -51,6 +51,12 @@ export interface MapViewProps {
    *  lat/lng of the click. The page uses this to look up / open the
    *  PropertyPopup against the resolver. */
   onParcelClick?: (apn: string, latLng: { lat: number; lng: number }) => void;
+  /** Fires when the user picks a Google POI (address-number label or
+   *  business icon) on the 3D photoreal surface. The page wires this
+   *  to open PropertyPopup against the `gpoi:<placeId>` stub id —
+   *  same popup primitive parcels open through. POI wins over the
+   *  bare-parcel ray-cast when both could resolve. */
+  onGooglePoiClick?: (placeId: string, latLng: { lat: number; lng: number }) => void;
   /** Fires when the cursor enters or leaves a parcel polygon. The page
    *  feeds this into the airplane-mode reticle so flying over a parcel
    *  shows the grab-ready hand icon. Pin DOM hover still wins on overlap;

@@ -205,6 +205,23 @@ export default function PropertyPopup({ lead, onUpdate, walkMode = false, onWalk
   // anything to show and silently omit the rest.
   const [parcel, setParcel] = useState<import('@/lib/property-data/types').ResolvedProperty | null>(null);
 
+  // Google POI data — populated for `gpoi:<placeId>` stub leads. Normalized
+  // shape comes from /api/google-poi (server-side Place Details proxy).
+  // Lives in its own state so the parcel + POI cases don't share a slot.
+  const [googlePoi, setGooglePoi] = useState<{
+    placeId: string;
+    name: string | null;
+    address: string | null;
+    lat: number | null;
+    lng: number | null;
+    types: string[];
+    phone: string | null;
+    website: string | null;
+    rating: number | null;
+    userRatingsTotal: number | null;
+  } | null>(null);
+  const [googlePoiError, setGooglePoiError] = useState<string | null>(null);
+
   // Which expand-sections are open. Default: everything collapsed except
   // the always-visible at-a-glance row. Buyer-mode controller experience:
   // sections expand on A/select; collapsed sections show a one-line preview.
@@ -214,12 +231,35 @@ export default function PropertyPopup({ lead, onUpdate, walkMode = false, onWalk
 
   useEffect(() => {
     let cancelled = false;
+    // Stub-id resolver routing:
+    //   `parcel:<APN>`     → /api/parcel?apn=…   (Plot's PostGIS parcel resolver)
+    //   `gpoi:<placeId>`   → /api/google-poi?placeId=…  (Google Place Details proxy)
+    //   anything else      → /api/parcel?lat=…&lng=…   (lat/lng proximity guess)
+    //
+    // The branches set DIFFERENT state slots (parcel vs googlePoi) so
+    // the popup body can render the correct sections without the two
+    // shapes fighting for the same field.
+    const id = lead.id ?? '';
+    if (id.startsWith('gpoi:')) {
+      const placeId = id.slice('gpoi:'.length);
+      setGooglePoiError(null);
+      fetch(`/api/google-poi?placeId=${encodeURIComponent(placeId)}`)
+        .then(async (r) => {
+          if (!r.ok) {
+            setGooglePoiError(r.status === 404 ? 'POI not found' : 'POI lookup failed');
+            return null;
+          }
+          return r.json();
+        })
+        .then((data) => { if (!cancelled && data) setGooglePoi(data); })
+        .catch(() => { if (!cancelled) setGooglePoiError('POI lookup failed'); });
+      return () => { cancelled = true; };
+    }
     // Polygon-click stubs encode the parcel identity in the id as
     // 'parcel:<APN>'. When present, look up by APN directly — exact,
     // deterministic, and avoids the proximity guess the lat/lng path
-    // uses (which misses when the click is far from the parcel
-    // centroid). Falls back to lat/lng for normal pin clicks.
-    const apnFromStub = lead.id?.startsWith('parcel:') ? lead.id.slice('parcel:'.length) : null;
+    // uses. Falls back to lat/lng for normal pin clicks.
+    const apnFromStub = id.startsWith('parcel:') ? id.slice('parcel:'.length) : null;
     const url = apnFromStub
       ? `/api/parcel?apn=${encodeURIComponent(apnFromStub)}`
       : (lead.latitude != null && lead.longitude != null
@@ -300,9 +340,25 @@ export default function PropertyPopup({ lead, onUpdate, walkMode = false, onWalk
             {(() => {
               // Prefer the lead's address (real prospect), fall back to
               // the resolved parcel address (polygon-click case where the
-              // stub has no address yet — assessor data fills it in).
-              const addr = lead.property_address || parcel?.address || null;
-              const head = addr?.split(',')[0]?.trim() || 'No address';
+              // stub has no address yet — assessor data fills it in), then
+              // to Google POI name/address for `gpoi:<placeId>` stubs.
+              const poiName = googlePoi?.name ?? null;
+              const poiAddr = googlePoi?.address ?? null;
+              if (poiName) {
+                // POI case: name is the headline, address is the tail.
+                return (
+                  <>
+                    <h2 className="font-headline text-lg font-extrabold tracking-tight text-on-surface leading-tight">
+                      {poiName}
+                    </h2>
+                    {poiAddr && (
+                      <p className="text-xs text-on-surface-variant font-medium">{poiAddr}</p>
+                    )}
+                  </>
+                );
+              }
+              const addr = lead.property_address || parcel?.address || poiAddr || null;
+              const head = addr?.split(',')[0]?.trim() || (googlePoiError ?? 'No address');
               const tail = addr?.split(',').slice(1).join(',').trim() || '';
               return (
                 <>

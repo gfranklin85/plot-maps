@@ -250,6 +250,7 @@ function Inner({
   onParcelClick,
   onParcelHoverChange,
   parcelHitTesterRef,
+  onGooglePoiClick,
 }: {
   center?: { lat: number; lng: number } | null;
   gamepadEnabled: boolean;
@@ -278,6 +279,11 @@ function Inner({
   onParcelClick?: (apn: string, latLng: { lat: number; lng: number }) => void;
   onParcelHoverChange?: (apn: string | null, latLng: { lat: number; lng: number } | null) => void;
   parcelHitTesterRef?: React.MutableRefObject<ParcelHitTester | null>;
+  /** Google POI selection (Breakthrough 1 — 2026-05-26). Fires when a
+   *  mouse click OR a synthesized A-press click lands on one of
+   *  Google's native POI labels (address numbers, business icons).
+   *  Page wires this to open PropertyPopup with id `gpoi:<placeId>`. */
+  onGooglePoiClick?: (placeId: string, latLng: { lat: number; lng: number }) => void;
 }) {
   const maps3d = useMapsLibrary('maps3d');
   const elRef = useRef<Map3DElement | null>(null);
@@ -306,6 +312,9 @@ function Inner({
   // the gamepad RAF loop without re-binding on every render.
   const onParcelClickRef = useRef(onParcelClick);
   onParcelClickRef.current = onParcelClick;
+  // Same pattern for Google POI clicks.
+  const onGooglePoiClickRef = useRef(onGooglePoiClick);
+  onGooglePoiClickRef.current = onGooglePoiClick;
   // Hover-change is no longer driven by 3D — reticle hover state was
   // removed when selection moved server-side. Prop still accepted so
   // the 2D path's contract is preserved unchanged.
@@ -313,6 +322,12 @@ function Inner({
   // Cancel-token for /api/parcels/at-point lookups so a fast second
   // click supersedes a still-in-flight first click.
   const lastParcelLookupAcRef = useRef<AbortController | null>(null);
+  // Timestamp (performance.now ms) of the last gmp-click that resolved
+  // to a Google POI. The gamepad A-press dispatches a synthetic click
+  // first; if Google's hit-test produces a POI within ~150ms after
+  // the dispatch, this ref gets stamped and the follow-up parcel
+  // ray-cast suppresses itself to avoid double-firing.
+  const lastPoiClickAtRef = useRef<number>(0);
 
 
   const actionsRef = useRef<GamepadActions | undefined>(gamepadActions);
@@ -460,22 +475,48 @@ function Inner({
     // Map3D fires gmp-click on the map element itself with two payload
     // types: PlaceClickEvent (user clicked a labeled POI / business
     // icon — has placeId) and LocationClickEvent (user clicked ground
-    // / unlabeled building — has position only). We let POI clicks
-    // fall through to Google's default popover for now (Plot's
-    // custom POI popup is future work); ground clicks resolve to a
-    // parcel via /api/parcels/at-point (server-side PostGIS
-    // point-in-polygon) and fire onParcelClick on a hit. No more
-    // dependence on client-rendered polygon hit-testing.
+    // / unlabeled building — has position only). Selection order:
+    //   1. POI click (placeId) → route to Plot's PropertyPopup via
+    //      onGooglePoiClick. The popup opens against a `gpoi:<placeId>`
+    //      stub id which resolves through /api/google-poi. POI wins
+    //      because it's the broader coverage — every labeled house
+    //      and business worldwide becomes selectable, not just
+    //      county-limited parcel polygons.
+    //   2. Ground click (position) → resolve to a parcel via
+    //      /api/parcels/at-point (server-side PostGIS point-in-polygon).
     function onMapClick(rawEv: Event) {
       const ev = rawEv as CustomEvent<{
         placeId?: string;
         position?: { lat: number; lng: number; altitude?: number };
-      }> & { placeId?: string; position?: { lat: number; lng: number; altitude?: number } };
+      }> & {
+        placeId?: string;
+        position?: { lat: number; lng: number; altitude?: number };
+        stop?: () => void;
+        stopPropagation?: () => void;
+      };
       // PlaceClickEvent carries placeId either on the event itself
-      // (older API shape) or on event.detail (newer). POI clicks: let
-      // Google handle the popover until Plot ships its own POI UI.
+      // (older API shape) or on event.detail (newer).
       const placeId = ev.placeId ?? ev.detail?.placeId;
-      if (placeId) return;
+      if (placeId) {
+        // Suppress Google's default popover so Plot's PropertyPopup
+        // is what the user sees. Both stop() and stopPropagation
+        // exist on different Map3D versions; calling whichever is
+        // available is harmless on the other.
+        try { ev.stop?.(); } catch { /* ignore */ }
+        try { ev.stopPropagation?.(); } catch { /* ignore */ }
+        // POI click events also carry a position (Map3D includes
+        // both fields on PlaceClickEvent). Fall back to (0,0) if
+        // missing — the popup looks the place up by id, not coords.
+        const poiPos = ev.position ?? ev.detail?.position;
+        const lat = poiPos?.lat ?? 0;
+        const lng = poiPos?.lng ?? 0;
+        // Stamp the timestamp BEFORE firing the callback so a
+        // gamepad A-press synthetic-click race can suppress its
+        // follow-up parcel ray-cast. See A-press handler.
+        lastPoiClickAtRef.current = performance.now();
+        onGooglePoiClickRef.current?.(placeId, { lat, lng });
+        return;
+      }
       // LocationClickEvent — extract the click lat/lng.
       const pos = ev.position ?? ev.detail?.position;
       if (!pos || !Number.isFinite(pos.lat) || !Number.isFinite(pos.lng)) return;
@@ -574,54 +615,95 @@ function Inner({
         const fire = (name: ButtonName, fn?: () => void) => {
           if (justPressed.has(name) && fn) fn();
         };
-        // A-press: ray-cast from the eye in the view direction to the
-        // ground plane, then resolve that lat/lng to a parcel via
-        // /api/parcels/at-point. Same backend the mouse-click path
-        // uses, so reticle and mouse always agree on what's under
-        // the crosshair. If the ray-cast misses (looking at horizon
-        // or above) or no parcel contains the point, fall through to
-        // onShoot — preserves the gameplay action when the reticle
-        // isn't actually aimed at anything selectable.
+        // A-press: selection priority is
+        //   (1) Google POI under the reticle  → onGooglePoiClick
+        //   (2) Plot parcel under the reticle → onParcelClick
+        //   (3) nothing → onShoot fallback
+        //
+        // Map3D doesn't expose a public ray-cast-against-POIs API, but
+        // it DOES dispatch gmp-click events with placeId when a pointer
+        // event lands on a POI. We synthesize a click at the reticle
+        // pixel; if Google's internal hit-test produces a POI click,
+        // our gmp-click listener stamps lastPoiClickAtRef and the
+        // follow-up parcel ray-cast suppresses itself to avoid double-
+        // firing on the same press.
         if (justPressed.has('a')) {
+          const pressedAt = performance.now();
+          const mapEl = elRef.current;
+          if (mapEl) {
+            // Dispatch synthetic click at the screen center (where the
+            // reticle lives in the 3D path today). When the reticle
+            // becomes draggable here, replace with the real pixel.
+            const rect = mapEl.getBoundingClientRect();
+            const clientX = rect.left + rect.width / 2;
+            const clientY = rect.top + rect.height / 2;
+            try {
+              mapEl.dispatchEvent(new PointerEvent('pointerdown', {
+                clientX, clientY, bubbles: true, cancelable: true, button: 0, pointerType: 'mouse',
+              }));
+              mapEl.dispatchEvent(new PointerEvent('pointerup', {
+                clientX, clientY, bubbles: true, cancelable: true, button: 0, pointerType: 'mouse',
+              }));
+              mapEl.dispatchEvent(new MouseEvent('click', {
+                clientX, clientY, bubbles: true, cancelable: true, button: 0,
+              }));
+            } catch {
+              // PointerEvent not constructable in older runtimes; the
+              // parcel branch still runs in that case.
+            }
+          }
+
+          // Defer the parcel ray-cast one frame so the gmp-click event
+          // (if any) has had a chance to fire and stamp the POI ref.
           const cam = camRef.current;
-          // pitch < ~0 means we're aimed below the horizon and can
-          // intersect the ground; otherwise no parcel to select.
-          if (cam && cam.pitch < -0.5) {
+          requestAnimationFrame(() => {
+            // Did the synthetic click resolve to a POI? If yes, done —
+            // the popup is opening, don't also fire a parcel click.
+            if (lastPoiClickAtRef.current >= pressedAt) return;
+
+            // No POI hit. Run the existing parcel ray-cast.
+            if (!cam) {
+              actionsRef.current?.onShoot?.();
+              return;
+            }
+            if (cam.pitch >= -0.5) {
+              // Aimed at or above the horizon — no ground intersect.
+              actionsRef.current?.onShoot?.();
+              return;
+            }
             const pitchRad = (Math.abs(cam.pitch) * Math.PI) / 180;
             const groundDistM = cam.altitude / Math.tan(pitchRad);
-            if (Number.isFinite(groundDistM) && groundDistM > 0 && groundDistM < 50_000) {
-              const headingRad = (cam.heading * Math.PI) / 180;
-              const dNorthM = groundDistM * Math.cos(headingRad);
-              const dEastM = groundDistM * Math.sin(headingRad);
-              const cosLat = Math.cos((cam.lat * Math.PI) / 180) || 1;
-              const targetLat = cam.lat + dNorthM / 111_320;
-              const targetLng = cam.lng + dEastM / (111_320 * cosLat);
-              const ac = new AbortController();
-              lastParcelLookupAcRef.current?.abort();
-              lastParcelLookupAcRef.current = ac;
-              fetch(`/api/parcels/at-point?lat=${targetLat}&lng=${targetLng}`, { signal: ac.signal })
-                .then((r) => r.ok ? r.json() : null)
-                .then((json) => {
-                  if (json && json.apn) {
-                    onParcelClickRef.current?.(json.apn as string, { lat: targetLat, lng: targetLng });
-                  } else {
-                    // Aim was on the world but missed every parcel
-                    // (road, water, parking lot). Fall through to
-                    // onShoot so the action still does something.
-                    actionsRef.current?.onShoot?.();
-                  }
-                })
-                .catch((err) => {
-                  if ((err as Error).name !== 'AbortError') {
-                    actionsRef.current?.onShoot?.();
-                  }
-                });
-            } else if (actionsRef.current?.onShoot) {
-              actionsRef.current.onShoot();
+            if (!Number.isFinite(groundDistM) || groundDistM <= 0 || groundDistM >= 50_000) {
+              actionsRef.current?.onShoot?.();
+              return;
             }
-          } else if (actionsRef.current?.onShoot) {
-            actionsRef.current.onShoot();
-          }
+            const headingRad = (cam.heading * Math.PI) / 180;
+            const dNorthM = groundDistM * Math.cos(headingRad);
+            const dEastM = groundDistM * Math.sin(headingRad);
+            const cosLat = Math.cos((cam.lat * Math.PI) / 180) || 1;
+            const targetLat = cam.lat + dNorthM / 111_320;
+            const targetLng = cam.lng + dEastM / (111_320 * cosLat);
+            const ac = new AbortController();
+            lastParcelLookupAcRef.current?.abort();
+            lastParcelLookupAcRef.current = ac;
+            fetch(`/api/parcels/at-point?lat=${targetLat}&lng=${targetLng}`, { signal: ac.signal })
+              .then((r) => r.ok ? r.json() : null)
+              .then((json) => {
+                // Re-check the POI flag — gmp-click can fire later
+                // than one RAF on some browsers/Map3D versions.
+                if (lastPoiClickAtRef.current >= pressedAt) return;
+                if (json && json.apn) {
+                  onParcelClickRef.current?.(json.apn as string, { lat: targetLat, lng: targetLng });
+                } else {
+                  actionsRef.current?.onShoot?.();
+                }
+              })
+              .catch((err) => {
+                if ((err as Error).name !== 'AbortError') {
+                  actionsRef.current?.onShoot?.();
+                }
+              });
+          });
         }
         fire('x', actionsRef.current?.onRotateChannel);
         fire('y', actionsRef.current?.onInspect);
@@ -854,6 +936,7 @@ export default function MapView3D(props: MapViewProps) {
         onParcelClick={props.onParcelClick}
         onParcelHoverChange={props.onParcelHoverChange}
         parcelHitTesterRef={props.parcelHitTesterRef}
+        onGooglePoiClick={props.onGooglePoiClick}
       />
     </APIProvider>
   );

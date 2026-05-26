@@ -10,108 +10,99 @@
 //
 // Why this exists:
 //   - "Map is the application" — the user's relationship to the world
-//     is continuous. Routing should never break the camera. A click
-//     from the landing globe down into a city is a single Cesium
-//     camera flight, not a navigation between two pages with two
-//     separate viewers, two separate tile streams, two separate
-//     atmospheric setups.
+//     is continuous. Routing should never break the camera.
 //   - Cesium's startup cost is real (CDN load + token validation +
-//     tileset request + initial tile decode). Paying it once, on
-//     first Cesium-using page load, and never again, is what makes
-//     the cinematic match-cut arrival possible.
-//   - Tile cache stays warm. The destination flight from globe to
-//     Acapulco streams tiles in during descent; arriving at the work
-//     map afterward, those same tiles are still in memory.
+//     tileset request + initial tile decode). Paying it once, on first
+//     Cesium-using page load, and never again, is what makes the
+//     cinematic match-cut arrival possible.
 //
 // Architecture:
-//   - The provider lives near the top of the React tree (in
-//     ClientProviders / RootLayout). It manages viewer lifecycle.
-//   - The viewer's canvas lives in a fixed-position <div> that sits
-//     behind page chrome. Pointer events pass through to the canvas
-//     except where chrome wants to capture them.
-//   - Children call useCesiumViewer() to get the viewer + Cesium
-//     namespace. Hook returns null until the viewer is ready, so
-//     callers must guard.
-//   - Layer components (CesiumGlobe pin layer, work-map parcel layer,
-//     etc.) take a viewer ref and add/remove entities on mount/unmount.
-//     They don't create viewers; they read this one.
+//   - The provider lives near the top of the React tree.
+//   - The viewer's canvas lives in a fixed-position <div> rendered at
+//     the provider level. The ref to that div is stable across renders.
+//   - Children call useCesiumViewer({ activate: true }) to opt in.
+//     Activation triggers the CDN script load and viewer construction.
+//   - Layer components read viewer + Cesium namespace via useCesiumViewer()
+//     and add/remove their entities on mount/unmount. They never create
+//     viewers themselves.
 //
-// Mounting policy:
-//   - The provider lazy-loads Cesium from CDN. The first time any child
-//     calls useCesiumViewer(), the load kicks off. Until then we pay
-//     nothing — non-Cesium pages don't incur Cesium's cost.
+// Lifecycle ordering (the bug we fixed in v2):
+//   - The container div MUST exist before the script loads, so the ref
+//     is non-null when the viewer constructor needs it. Earlier we
+//     conditionally rendered the div inside an {activated && ...} block,
+//     which meant the ref was null on the first render after activation
+//     and the viewer never initialized.
+//   - The Script tag uses next/script's onReady (fires both on initial
+//     load and on remount of an already-loaded script), so re-mounting
+//     the provider doesn't break things.
 
-import { createContext, useContext, useEffect, useRef, useState } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import Script from 'next/script';
 
-// Loose typing for the surface this provider exposes. Layer components
-// import the full CesiumGlobal type from their own narrow declarations
-// when they need specific subnamespaces.
-//
-// We intentionally don't pull in @types/cesium — Cesium is loaded at
-// runtime from CDN, not from npm. Component-level narrow types are
-// the contract.
 export type CesiumViewer = unknown;
 export type CesiumGlobal = unknown;
 
 const CESIUM_VERSION = '1.141';
 const CESIUM_BASE = `https://cesium.com/downloads/cesiumjs/releases/${CESIUM_VERSION}/Build/Cesium`;
-
-// Cesium ion asset IDs.
-const PHOTOREAL_TILES_ASSET_ID = 2275207; // Google Photorealistic 3D Tiles
+const PHOTOREAL_TILES_ASSET_ID = 2275207;
 
 interface CesiumContextValue {
-  /** True once the CDN script has loaded and the viewer is constructed. */
   ready: boolean;
-  /** The viewer instance, or null until ready. */
   viewer: CesiumViewer | null;
-  /** The Cesium namespace (window.Cesium), or null until ready. */
   Cesium: CesiumGlobal | null;
-  /** Container div for the viewer's canvas — for chrome that needs to
-   *  position itself relative to the rendering surface. */
   containerRef: React.RefObject<HTMLDivElement>;
+  /** Called by useCesiumViewer({activate:true}). Idempotent. */
+  activate: () => void;
 }
 
 const CesiumContext = createContext<CesiumContextValue | null>(null);
 
 interface ProviderProps {
   children: React.ReactNode;
-  /** When true, the provider mounts the Cesium script + viewer immediately
-   *  on first render. When false (default), it waits for a child to opt
-   *  in by calling useCesiumViewer({ activate: true }). Non-Cesium pages
-   *  pay nothing. */
+  /** When true, the provider mounts the Cesium script + viewer
+   *  immediately. When false (default), it waits for a child to
+   *  call useCesiumViewer({ activate: true }). Non-Cesium pages
+   *  pay nothing until something needs the viewer. */
   eagerMount?: boolean;
 }
 
 export function CesiumViewerProvider({ children, eagerMount = false }: ProviderProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const viewerRef = useRef<CesiumViewer | null>(null);
-  const cesiumRef = useRef<CesiumGlobal | null>(null);
-  const [scriptLoaded, setScriptLoaded] = useState(false);
+  const initStartedRef = useRef(false);
   const [activated, setActivated] = useState(eagerMount);
-  const [ready, setReady] = useState(false);
+  const [viewer, setViewer] = useState<CesiumViewer | null>(null);
+  const [cesium, setCesium] = useState<CesiumGlobal | null>(null);
+  const ready = viewer !== null && cesium !== null;
 
-  // Initialize the viewer once the CDN script reports loaded AND
-  // someone has activated the viewer (eagerly or via a child opt-in).
-  useEffect(() => {
-    if (!scriptLoaded || !activated) return;
+  const activate = useCallback(() => {
+    setActivated((prev) => prev || true);
+  }, []);
+
+  // Initialize the viewer. Triggered after activation by either:
+  //   - the Script's onReady (which fires both on initial load AND on
+  //     remount if Cesium is already on window)
+  //   - the activated state flipping true (covers the case where the
+  //     script was already loaded before activation, e.g. fast nav back
+  //     to a Cesium page)
+  const tryInit = useCallback(() => {
+    if (initStartedRef.current) return;
+    if (typeof window === 'undefined') return;
+    if (!window.Cesium) return;
     if (!containerRef.current) return;
-    if (viewerRef.current) return; // already constructed
+    if (!activated) return;
+    initStartedRef.current = true;
 
-    let cancelled = false;
+    const Cesium = window.Cesium as Record<string, unknown>;
 
-    function tryInit() {
-      if (cancelled) return;
-      if (typeof window === 'undefined' || !window.Cesium) {
-        setTimeout(tryInit, 100);
-        return;
-      }
-      void init(window.Cesium as Record<string, unknown>);
-    }
-
-    async function init(Cesium: Record<string, unknown>) {
+    void (async () => {
       try {
-        if (!containerRef.current) return;
         const token = process.env.NEXT_PUBLIC_CESIUM_ION_TOKEN;
         if (!token) {
           console.error('[CesiumViewerProvider] NEXT_PUBLIC_CESIUM_ION_TOKEN missing');
@@ -125,7 +116,7 @@ export function CesiumViewerProvider({ children, eagerMount = false }: ProviderP
           options: Record<string, unknown>,
         ) => unknown;
 
-        const viewer = new ViewerCtor(containerRef.current, {
+        const viewer = new ViewerCtor(containerRef.current!, {
           animation: false,
           baseLayerPicker: false,
           fullscreenButton: false,
@@ -141,14 +132,6 @@ export function CesiumViewerProvider({ children, eagerMount = false }: ProviderP
           baseLayer: false,
         });
 
-        if (cancelled) {
-          (viewer as { destroy: () => void }).destroy();
-          return;
-        }
-
-        // Atmospheric polish — same settings the standalone work map
-        // used, applied once here so every layer renders against the
-        // same lighting.
         const v = viewer as {
           scene: {
             skyAtmosphere: { show: boolean };
@@ -163,7 +146,6 @@ export function CesiumViewerProvider({ children, eagerMount = false }: ProviderP
             primitives: { add: (p: unknown) => unknown };
           };
         };
-
         v.scene.skyAtmosphere.show = true;
         v.scene.fog.enabled = true;
         v.scene.fog.density = 0.0001;
@@ -172,121 +154,100 @@ export function CesiumViewerProvider({ children, eagerMount = false }: ProviderP
         v.scene.globe.showGroundAtmosphere = true;
         v.scene.globe.atmosphereLightIntensity = 10.0;
         v.scene.globe.depthTestAgainstTerrain = true;
-        const Color = Cesium.Color as {
-          fromCssColorString: (s: string) => unknown;
-        };
+        const Color = Cesium.Color as { fromCssColorString: (s: string) => unknown };
         v.scene.backgroundColor = Color.fromCssColorString('#0E1626');
 
-        // Google Photorealistic 3D Tiles. Streams in as the camera
-        // descends; orbital view still works without tiles loaded.
+        // Photoreal tiles. Streams in as the camera descends; the globe
+        // view still renders without them, so we don't block on this.
         try {
           const TilesetCtor = Cesium.Cesium3DTileset as {
             fromIonAssetId: (id: number) => Promise<unknown>;
           };
           const photoreal = await TilesetCtor.fromIonAssetId(PHOTOREAL_TILES_ASSET_ID);
-          if (!cancelled) {
-            v.scene.primitives.add(photoreal);
-          }
+          v.scene.primitives.add(photoreal);
         } catch (err) {
           console.error('[CesiumViewerProvider] Photoreal tiles failed:', err);
         }
 
-        if (cancelled) {
-          (viewer as { destroy: () => void }).destroy();
-          return;
-        }
-
-        viewerRef.current = viewer;
-        cesiumRef.current = Cesium;
-        setReady(true);
+        setViewer(viewer);
+        setCesium(Cesium);
       } catch (err) {
         console.error('[CesiumViewerProvider] init failed:', err);
+        initStartedRef.current = false;
       }
-    }
+    })();
+  }, [activated]);
 
+  // Retry init whenever activation flips or the script reports ready.
+  // The dependency on `activated` covers the case where Cesium was
+  // already loaded on the window (e.g. SPA nav back to a Cesium page);
+  // tryInit's internal guards prevent double-construction.
+  useEffect(() => {
     tryInit();
+  }, [tryInit, activated]);
 
-    return () => {
-      cancelled = true;
-      // We deliberately do NOT destroy the viewer here. The provider's
-      // whole point is that the viewer survives unmount/remount cycles
-      // of the children. Destruction only happens on full page tear-down,
-      // which the browser handles for us.
-    };
-  }, [scriptLoaded, activated]);
-
+  // Render order matters:
+  //   1. Container div FIRST so containerRef is bound before Script
+  //      onReady fires.
+  //   2. Script SECOND, after container is in the DOM.
+  //   3. Children LAST, so they can call useCesiumViewer freely.
   return (
     <CesiumContext.Provider
       value={{
         ready,
-        viewer: viewerRef.current,
-        Cesium: cesiumRef.current,
+        viewer,
+        Cesium: cesium,
         containerRef,
+        activate,
       }}
     >
-      {/* Only render the Cesium runtime script + container when at least
-          one child has activated the viewer. Non-Cesium pages pay no
-          download cost. */}
+      {/* The persistent container. Always rendered (so the ref is stable),
+          but display:none until activated so it doesn't take pointer
+          events or render cost on non-Cesium pages. */}
+      <div
+        ref={containerRef}
+        className="fixed inset-0 z-0"
+        aria-hidden={!ready}
+        style={{
+          background: '#0E1626',
+          display: activated ? 'block' : 'none',
+        }}
+      />
+
       {activated && (
         <>
+          {/* eslint-disable-next-line @next/next/no-css-tags */}
           <link rel="stylesheet" href={`${CESIUM_BASE}/Widgets/widgets.css`} />
           <Script
             src={`${CESIUM_BASE}/Cesium.js`}
             strategy="afterInteractive"
-            onLoad={() => setScriptLoaded(true)}
-          />
-          {/* The persistent viewer container. Sits behind chrome at z-0.
-              Pages that don't want the viewer visible (auth screens, etc)
-              cover it with their own chrome at z-10+. */}
-          <div
-            ref={containerRef}
-            className="fixed inset-0 z-0"
-            aria-hidden={!ready}
-            style={{ background: '#0E1626' }}
+            onReady={tryInit}
           />
         </>
       )}
-
-      {/* Activator: any child that calls useCesiumViewer({ activate: true })
-          will trigger setActivated(true) via the consumer below. */}
-      <ActivationBridge onActivate={() => setActivated(true)} />
 
       {children}
     </CesiumContext.Provider>
   );
 }
 
-// ── Internal: lets useCesiumViewer({activate:true}) flip the activated
-// state without making every child write to a setter directly. ──────
-const ActivationContext = createContext<(() => void) | null>(null);
-
-function ActivationBridge({ onActivate }: { onActivate: () => void }) {
-  return <ActivationContext.Provider value={onActivate}>{null}</ActivationContext.Provider>;
-}
-
-// ── Public hooks ──────────────────────────────────────────────────────
+// ── Public hook ──────────────────────────────────────────────────────
 
 interface UseCesiumOptions {
-  /** When true, activates the viewer if not already active. Pages that
-   *  need Cesium pass true; layers that are just decorating a viewer
-   *  that's already there can pass false (or omit). */
+  /** Opt this page/component into the persistent viewer. Pages that
+   *  need Cesium pass true; transient consumers can pass false to
+   *  read-only-if-already-active. */
   activate?: boolean;
 }
 
-/** Subscribe to the persistent Cesium viewer.
- *  Returns null fields until the viewer is ready. */
 export function useCesiumViewer(opts: UseCesiumOptions = {}): CesiumContextValue {
   const ctx = useContext(CesiumContext);
-  const activate = useContext(ActivationContext);
-
-  useEffect(() => {
-    if (opts.activate && activate) {
-      activate();
-    }
-  }, [opts.activate, activate]);
-
   if (!ctx) {
     throw new Error('useCesiumViewer must be used inside CesiumViewerProvider');
   }
+  const { activate } = ctx;
+  useEffect(() => {
+    if (opts.activate) activate();
+  }, [opts.activate, activate]);
   return ctx;
 }

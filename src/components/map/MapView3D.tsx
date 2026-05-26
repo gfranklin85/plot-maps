@@ -334,12 +334,17 @@ function Inner({
   // Each A-press appends a shot. Sweep shots self-prune via
   // onShotComplete; tether shots persist until manually cleared.
   // Render position is reticle (start) → approximated ground-target
-  // pixel (end). The end-Y approximation is a function of camera pitch
-  // — see fireBeam() below.
-  const [fireBeamShots, setFireBeamShots] = useState<FireBeamShot[]>([]);
+  // pixel (end). The end-Y approximation is a function of camera pitch.
+  //
+  // The shots list is mutated through a ref + forceRender bump so the
+  // beam appears in the SAME frame as the A-press, not after React's
+  // normal batched setState (which felt laggy on first iteration).
+  const fireBeamShotsRef = useRef<FireBeamShot[]>([]);
+  const [, forceFireBeamRender] = useState(0);
   const shotIdRef = useRef<number>(0);
   const handleShotComplete = useCallback((id: number) => {
-    setFireBeamShots((prev) => prev.filter((s) => s.id !== id));
+    fireBeamShotsRef.current = fireBeamShotsRef.current.filter((s) => s.id !== id);
+    forceFireBeamRender((n) => n + 1);
   }, []);
   const fireBeam = useCallback((mode: 'sweep' | 'tether') => {
     const el = elRef.current;
@@ -352,16 +357,16 @@ function Inner({
     // Approximate the on-screen Y of the ground target.
     //   pitch ~ -90 (looking straight down) → target IS the reticle pixel
     //   pitch ~  -5 (near horizon)          → target is way below reticle
-    // factor = 1 - |pitch|/90; endY = reticleY + factor * (40% of viewport height).
     const pitchAbs = Math.min(90, Math.abs(cam.pitch));
     const factor = 1 - pitchAbs / 90;
     const endX = startX;
     const endY = startY + factor * rect.height * 0.42;
     shotIdRef.current += 1;
-    setFireBeamShots((prev) => [
-      ...prev,
+    fireBeamShotsRef.current = [
+      ...fireBeamShotsRef.current,
       { id: shotIdRef.current, startX, startY, endX, endY, mode },
-    ]);
+    ];
+    forceFireBeamRender((n) => n + 1);
   }, []);
   // Stable ref for the gamepad RAF loop to fire without re-binding.
   const fireBeamRef = useRef(fireBeam);
@@ -726,6 +731,20 @@ function Inner({
             const cosLat = Math.cos((cam.lat * Math.PI) / 180) || 1;
             const targetLat = cam.lat + dNorthM / 111_320;
             const targetLng = cam.lng + dEastM / (111_320 * cosLat);
+            // DEBUG (Greg 2026-05-26): trace the ray-cast inputs and
+            // the lat/lng we send to the resolver. Remove after the
+            // "always-Hanford" bug is diagnosed.
+            // eslint-disable-next-line no-console
+            console.log('[A-press ray-cast]', {
+              camLat: cam.lat.toFixed(6),
+              camLng: cam.lng.toFixed(6),
+              camAltM: cam.altitude.toFixed(1),
+              camHeading: cam.heading.toFixed(1),
+              camPitch: cam.pitch.toFixed(1),
+              groundDistM: groundDistM.toFixed(1),
+              targetLat: targetLat.toFixed(6),
+              targetLng: targetLng.toFixed(6),
+            });
             const ac = new AbortController();
             lastParcelLookupAcRef.current?.abort();
             lastParcelLookupAcRef.current = ac;
@@ -957,7 +976,7 @@ function Inner({
             A-press appends a shot here; sweep shots auto-prune via
             handleShotComplete. SVG is full-viewport, pointer-events
             none, so it never blocks the map. */}
-        <FireBeam shots={fireBeamShots} onShotComplete={handleShotComplete} />
+        <FireBeam shots={fireBeamShotsRef.current} onShotComplete={handleShotComplete} />
       </div>
     </AtmosphereProvider>
   );

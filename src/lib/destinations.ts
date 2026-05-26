@@ -179,15 +179,16 @@ export const DESTINATIONS: Destination[] = [
     tagline: 'A grid in the desert that never sleeps.',
     surfaces: ['landing', 'panel'],
     pose: {
-      // North end of the strip, looking south down its length. Lifted
-      // to 900m so the arrival starts in the sky, not in the ground —
-      // Google's photoreal terrain around the Strip has elevation
-      // offsets at low altitudes that put a 400m camera underneath
-      // building footprints.
-      lat: 36.1100, lng: -115.1730,
-      altitude: 900, heading: 200,
-      pitch: -12, range: 1800,
+      // Greg's hand-tuned framing: looking south-southwest down the
+      // strip toward Mandalay Bay + Luxor pyramid at sunset. Captured
+      // from /map dev-readout (focal point at 36.0981, -115.1777,
+      // tilt 76.31, heading 208.06). Arrival altitude held at 900m so
+      // visitor starts in the sky over the strip.
+      lat: 36.0981, lng: -115.1777,
+      altitude: 900, heading: 208.06,
+      pitch: -14, range: 1800,
     },
+    imageSrc: '/assets/landing/destinations/las-vegas.png',
   },
   {
     slug: 'los-angeles',

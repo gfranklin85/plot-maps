@@ -43,30 +43,27 @@ export const metadata: Metadata = {
 //   - memory/project_landing_page_field_manual.md
 //   - memory/project_destination_match_cut_thesis.md
 export default function LandingPage() {
+  // No background color on the main element — the persistent Cesium
+  // viewer renders behind everything at fixed z-0 (see
+  // CesiumViewerProvider). Setting an opaque background here would
+  // hide the world. Page chrome (wordmark, controller chip, pins, the
+  // arrival sequence overlay) sits above it at z-10+.
   return (
-    <main
-      className="relative w-full h-screen overflow-hidden"
-      style={{
-        // Deep navy desk surface — the atlas image carries its own
-        // parchment material; the page background is the room around it.
-        backgroundColor: '#0E1626',
-      }}
-    >
-      {/* Faint star/dust field at the upper edge, where the warm light
-          comes from in the atlas image. Subtle continuation of the
-          atmosphere baked into the atlas. */}
+    <main className="relative w-full h-screen overflow-hidden pointer-events-none">
+      {/* Faint star/dust field overlay — sits above the Cesium canvas
+          to add Plot's warm-light brand finish on top of Cesium's
+          atmospheric scattering. */}
       <div
         aria-hidden
-        className="absolute inset-0 pointer-events-none opacity-60"
+        className="absolute inset-0 pointer-events-none opacity-40 z-[5]"
         style={{
           background:
-            'radial-gradient(ellipse 70% 50% at 22% 12%, rgba(255, 232, 198, 0.08) 0%, rgba(255, 232, 198, 0) 65%)',
+            'radial-gradient(ellipse 70% 50% at 22% 12%, rgba(255, 232, 198, 0.10) 0%, rgba(255, 232, 198, 0) 65%)',
         }}
       />
 
-      {/* Wordmark — anchored at the top, modest size so the atlas can
-          dominate the visual hierarchy. */}
-      <header className="absolute top-6 left-1/2 -translate-x-1/2 z-20 select-none">
+      {/* Wordmark — anchored at the top. */}
+      <header className="absolute top-6 left-1/2 -translate-x-1/2 z-20 select-none pointer-events-auto">
         <div className="plot-logo-header" style={{ width: '220px' }}>
           <PlotMapsLogo color="#F4EAD5" className="w-full h-auto" />
         </div>
@@ -75,10 +72,14 @@ export default function LandingPage() {
       {/* Controller chip — top-right corner. */}
       <LandingControllerChip />
 
-      {/* The globe — real 3D Earth via Cesium loaded from CDN. Fills
-          the full viewport. The wordmark and controller chip float
-          above it as overlays. */}
-      <div className="relative z-10 w-full h-full">
+      {/* The globe layer — pins + click handler over the persistent
+          Cesium viewer. Doesn't render its own canvas; CesiumGlobe just
+          adds entities + handlers to the shared viewer. pointer-events-
+          none on this wrapper so mouse events pass through to the
+          Cesium canvas underneath (where the pin click handler is
+          attached). Inner overlays (ArrivalSequence, loading state)
+          opt back into pointer events themselves. */}
+      <div className="relative z-10 w-full h-full pointer-events-none">
         <CesiumGlobeLoader />
       </div>
 

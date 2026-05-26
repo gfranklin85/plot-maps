@@ -87,12 +87,19 @@ export const DESTINATIONS: Destination[] = [
     name: 'Lemoore',
     region: 'California',
     tagline: 'Where the field manual begins.',
-    surfaces: ['landing'],
+    surfaces: ['landing', 'panel'],
     pose: {
-      lat: 36.3008, lng: -119.7829,
-      altitude: 800, heading: 0,
-      pitch: -18, range: 1200,
+      // Greg's hand-tuned framing: over Lemoore looking east-southeast
+      // toward NAS and the Valley floor + Sierra foothills. Captured
+      // from /map dev-readout (focal point at 36.3147, -119.7884,
+      // tilt 75.43, heading 101.35). Tighter range (668) keeps the
+      // composition; arrival altitude 900m so visitor starts in the
+      // sky.
+      lat: 36.3147, lng: -119.7884,
+      altitude: 900, heading: 101.35,
+      pitch: -15, range: 668,
     },
+    imageSrc: '/assets/landing/destinations/lemoore.png',
   },
   {
     slug: 'acapulco',

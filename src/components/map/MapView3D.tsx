@@ -746,6 +746,12 @@ function Inner({
             fetch(`/api/parcels/at-point?lat=${targetLat}&lng=${targetLng}`, { signal: ac.signal })
               .then((r) => r.ok ? r.json() : null)
               .then((json) => {
+                // DEBUG (Greg 2026-05-26): log what came back from the
+                // resolver so we can see whether the at-point endpoint
+                // is returning the wrong APN, or whether the page/popup
+                // is choking downstream.
+                // eslint-disable-next-line no-console
+                console.log(`[A-resolve] target=(${targetLat.toFixed(5)},${targetLng.toFixed(5)}) → apn=${json?.apn ?? 'NULL'} address=${json?.address ?? 'NULL'} city=${json?.city ?? 'NULL'}`);
                 // Re-check the POI flag — gmp-click can fire later
                 // than one RAF on some browsers/Map3D versions.
                 if (lastPoiClickAtRef.current >= pressedAt) return;

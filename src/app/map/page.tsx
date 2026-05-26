@@ -34,6 +34,7 @@ import ShotAnimation, { type Shot } from "@/components/map/ShotAnimation";
 import type { ParcelHitTester } from "@/components/map/ParcelOverlay";
 import { DESTINATIONS } from "@/lib/destinations";
 import { useInitialMapCenter } from "@/lib/useInitialMapCenter";
+import SplatHUDLayer from "@/components/splat/SplatHUDLayer";
 
 const FILTER_TABS: { label: string; key: string; statuses: LeadStatus[] }[] = [
   { label: "All", key: "all", statuses: [] },
@@ -1283,6 +1284,19 @@ export default function MapPage() {
           visible={!walkMode && profile.enable3DTilesAdmin}
           altitudeMeters={currentAltitudeM}
         />
+
+        {/* Pilot avatar — F-18 placeholder until SAM 3D Body pipeline
+            ships user selfies as splats. Only renders in airplane (game-
+            feel) mode where the cockpit framing makes sense. Translucent
+            so the user sees through to the world they're flying over. */}
+        {flightMode === 'airplane' && !walkMode && (
+          <SplatHUDLayer
+            splatUrl="/assets/splats/f18hornet.ply"
+            opacity={0.75}
+            widthFraction={0.45}
+            bottomFraction={0}
+          />
+        )}
 
         {/* Shot animation — fires at the reticle position whenever A
             successfully dispatches an outreach. Cleared after ~320ms. */}

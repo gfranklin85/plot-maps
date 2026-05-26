@@ -671,49 +671,22 @@ function Inner({
         // follow-up parcel ray-cast suppresses itself to avoid double-
         // firing on the same press.
         if (justPressed.has('a')) {
-          const pressedAt = performance.now();
-          // Breakthrough 2 proof: fire the visible beam immediately so
-          // the user gets feedback regardless of what the lookup
-          // resolves to. Sweep mode for now; tap-vs-hold (sweep vs
-          // tether) lands after the proof is signed off.
-          fireBeamRef.current('sweep');
-          const mapEl = elRef.current;
-          if (mapEl) {
-            // Dispatch synthetic click at the screen center (where the
-            // reticle lives in the 3D path today). When the reticle
-            // becomes draggable here, replace with the real pixel.
-            const rect = mapEl.getBoundingClientRect();
-            const clientX = rect.left + rect.width / 2;
-            const clientY = rect.top + rect.height / 2;
-            try {
-              mapEl.dispatchEvent(new PointerEvent('pointerdown', {
-                clientX, clientY, bubbles: true, cancelable: true, button: 0, pointerType: 'mouse',
-              }));
-              mapEl.dispatchEvent(new PointerEvent('pointerup', {
-                clientX, clientY, bubbles: true, cancelable: true, button: 0, pointerType: 'mouse',
-              }));
-              mapEl.dispatchEvent(new MouseEvent('click', {
-                clientX, clientY, bubbles: true, cancelable: true, button: 0,
-              }));
-            } catch {
-              // PointerEvent not constructable in older runtimes; the
-              // parcel branch still runs in that case.
-            }
-          }
+          // A-press: aim → fire → ask Google what's at that lat/lng.
+          //
+          // This is the universal selection path — works ANYWHERE
+          // on Earth because Google has labeled almost every house
+          // and business via Places. Parcel data (from Plot's own
+          // imports) is a separate augmentation PropertyPopup can
+          // fold in if we have it, but it's NOT the gate. Greg
+          // locked this 2026-05-26: POI surfacing is the primary
+          // tool, parcel data is the bonus.
+          (() => {
+            // Fire the visible beam immediately so the user gets
+            // feedback before the network round-trip.
+            fireBeamRef.current('sweep');
 
-          // Defer the parcel ray-cast one frame so the gmp-click event
-          // (if any) has had a chance to fire and stamp the POI ref.
-          const cam = camRef.current;
-          requestAnimationFrame(() => {
-            // Did the synthetic click resolve to a POI? If yes, done —
-            // the popup is opening, don't also fire a parcel click.
-            if (lastPoiClickAtRef.current >= pressedAt) return;
-
-            // No POI hit. Run the existing parcel ray-cast.
-            if (!cam) {
-              actionsRef.current?.onShoot?.();
-              return;
-            }
+            const cam = camRef.current;
+            if (!cam) { actionsRef.current?.onShoot?.(); return; }
             if (cam.pitch >= -0.5) {
               // Aimed at or above the horizon — no ground intersect.
               actionsRef.current?.onShoot?.();
@@ -731,37 +704,26 @@ function Inner({
             const cosLat = Math.cos((cam.lat * Math.PI) / 180) || 1;
             const targetLat = cam.lat + dNorthM / 111_320;
             const targetLng = cam.lng + dEastM / (111_320 * cosLat);
-            // DEBUG (Greg 2026-05-26): trace the ray-cast inputs and
-            // the lat/lng we send to the resolver. Remove after the
-            // "always-Hanford" bug is diagnosed.
-            // String-formatted so the entire line is visible in the
-            // console without expanding an object.
+
             // eslint-disable-next-line no-console
             console.log(
-              `[A-ray] cam=(${cam.lat.toFixed(5)},${cam.lng.toFixed(5)}) alt=${cam.altitude.toFixed(0)}m hdg=${cam.heading.toFixed(0)}° pitch=${cam.pitch.toFixed(1)}° groundDist=${groundDistM.toFixed(0)}m → target=(${targetLat.toFixed(5)},${targetLng.toFixed(5)})`
+              `[A-fire] cam=(${cam.lat.toFixed(5)},${cam.lng.toFixed(5)}) hdg=${cam.heading.toFixed(0)}° pitch=${cam.pitch.toFixed(1)}° → aim=(${targetLat.toFixed(5)},${targetLng.toFixed(5)})`
             );
+
+            // Hit Places Nearby Search. Closest POI to the aim point
+            // wins. Returns placeId if anything labeled, null otherwise.
             const ac = new AbortController();
             lastParcelLookupAcRef.current?.abort();
             lastParcelLookupAcRef.current = ac;
-            fetch(`/api/parcels/at-point?lat=${targetLat}&lng=${targetLng}`, { signal: ac.signal })
+            fetch(`/api/places-nearby?lat=${targetLat}&lng=${targetLng}`, { signal: ac.signal })
               .then((r) => r.ok ? r.json() : null)
               .then((json) => {
-                // DEBUG (Greg 2026-05-26): log what came back from the
-                // resolver so we can see whether the at-point endpoint
-                // is returning the wrong APN, or whether the page/popup
-                // is choking downstream. area_sqm + n_points are
-                // diagnostic — a residential lot is ~500–3000 sqm with
-                // ~5-30 polygon points; way larger means the geometry
-                // was ingested wrong and overlaps neighbors.
                 // eslint-disable-next-line no-console
                 console.log(
-                  `[A-resolve] target=(${targetLat.toFixed(5)},${targetLng.toFixed(5)}) → apn=${json?.apn ?? 'NULL'} address=${json?.address ?? 'NULL'} area=${json?.areaSqm != null ? Math.round(json.areaSqm) + 'sqm' : 'NULL'} npts=${json?.nPoints ?? 'NULL'}`
+                  `[A-resolve] → placeId=${json?.placeId ?? 'NULL'} name=${json?.name ?? 'NULL'} address=${json?.address ?? 'NULL'}`
                 );
-                // Re-check the POI flag — gmp-click can fire later
-                // than one RAF on some browsers/Map3D versions.
-                if (lastPoiClickAtRef.current >= pressedAt) return;
-                if (json && json.apn) {
-                  onParcelClickRef.current?.(json.apn as string, { lat: targetLat, lng: targetLng });
+                if (json && json.placeId) {
+                  onGooglePoiClickRef.current?.(json.placeId as string, { lat: targetLat, lng: targetLng });
                 } else {
                   actionsRef.current?.onShoot?.();
                 }
@@ -771,7 +733,7 @@ function Inner({
                   actionsRef.current?.onShoot?.();
                 }
               });
-          });
+          })();
         }
         fire('x', actionsRef.current?.onRotateChannel);
         fire('y', actionsRef.current?.onInspect);

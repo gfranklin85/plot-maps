@@ -64,10 +64,17 @@ const ARRIVAL_STATE_KEY = 'plotmaps.arrivalInFlight';
 // ── Session-bridge for OAuth round-trip ────────────────────────────
 // When the visitor commits to OAuth, the browser navigates away to
 // Google's consent screen. To resume the arrival sequence on return,
-// we stash the destination slug + a marker in sessionStorage. On
+// we stash the destination slug + a marker in localStorage. On
 // /landing remount, if (a) there's a stashed slug and (b) the user is
 // authenticated, ArrivalSequence opens in logbook beat with the right
 // destination.
+//
+// Why localStorage (not sessionStorage): an OAuth round-trip can cross
+// origins (apex plot.solutions ↔ subdomain app.plot.solutions) and may
+// open a fresh top-level navigation context, both of which can lose
+// sessionStorage. localStorage persists per-origin and is robust to
+// the redirect chain. The 10-minute TTL below prevents stale state
+// from leaking across sessions.
 interface ArrivalInFlight {
   destinationSlug: string;
   startedAt: string;
@@ -80,23 +87,23 @@ function stashArrivalInFlight(destinationSlug: string): void {
       destinationSlug,
       startedAt: new Date().toISOString(),
     };
-    window.sessionStorage.setItem(ARRIVAL_STATE_KEY, JSON.stringify(payload));
+    window.localStorage.setItem(ARRIVAL_STATE_KEY, JSON.stringify(payload));
   } catch {
-    /* sessionStorage unavailable; OAuth still works, sequence just won't auto-resume */
+    /* localStorage unavailable; OAuth still works, sequence just won't auto-resume */
   }
 }
 
 export function readArrivalInFlight(): ArrivalInFlight | null {
   if (typeof window === 'undefined') return null;
   try {
-    const raw = window.sessionStorage.getItem(ARRIVAL_STATE_KEY);
+    const raw = window.localStorage.getItem(ARRIVAL_STATE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as ArrivalInFlight;
     // Stale arrival states (>10 minutes old) get discarded — visitor
     // probably abandoned the OAuth flow.
     const age = Date.now() - new Date(parsed.startedAt).getTime();
     if (age > 10 * 60 * 1000) {
-      window.sessionStorage.removeItem(ARRIVAL_STATE_KEY);
+      window.localStorage.removeItem(ARRIVAL_STATE_KEY);
       return null;
     }
     return parsed;
@@ -108,6 +115,9 @@ export function readArrivalInFlight(): ArrivalInFlight | null {
 export function clearArrivalInFlight(): void {
   if (typeof window === 'undefined') return;
   try {
+    window.localStorage.removeItem(ARRIVAL_STATE_KEY);
+    // Clean up any legacy sessionStorage entries from before the
+    // localStorage migration — safe no-op if absent.
     window.sessionStorage.removeItem(ARRIVAL_STATE_KEY);
   } catch {
     /* ignore */

@@ -1,101 +1,85 @@
 'use client';
 
-// CesiumGlobe — the landing's destination picker rendered as a real
-// 3D Earth via CesiumJS loaded from Cesium's CDN.
+// CesiumGlobe — the landing's destination picker.
 //
-// Why CDN instead of npm: Cesium is a 3MB+ library that doesn't ship
-// cleanly through Next.js's webpack code-splitting. The official
-// Cesium quickstart recommends CDN loading for exactly this kind of
-// integration. CesiumGlobeLoader injects the <Script> tag; this
-// component reads the runtime off the global window.Cesium.
+// This is NOT a viewer-owning component. It's a layer over Plot's
+// persistent Cesium viewer (CesiumViewerProvider). On mount it:
+//   - Activates the viewer (downloads Cesium CDN, constructs viewer)
+//   - Frames the camera at orbital altitude looking straight down
+//   - Adds destination pin entities + a click handler
 //
-// Architecture:
-//   - Cesium Viewer mounts inside a full-viewport container.
-//   - Six destination pins are placed at lat/lng as Cesium Entities
-//     with point + label markers.
-//   - Click a pin → opens ArrivalSequence (OAuth + logbook + brief)
-//     → after completion, navigates to /map at the destination's
-//     authored camera pose.
+// On destination select, the *Cesium camera itself* starts flying
+// from orbit toward the destination's authored pose, and ArrivalSequence
+// mounts as a chrome overlay over the descending viewer. The form is
+// the cockpit; the descending world is the view through the window.
+// When the form completes, the overlay dismisses — no navigation, no
+// reload, no map remount. The user is already at the destination.
+//
+// On unmount (route change away from /landing), the pin entities and
+// click handler are cleaned up, but the viewer itself stays alive
+// across the route boundary.
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { LANDING_DESTINATIONS as DESTINATIONS, findDestinationBySlug, type Destination } from '@/lib/destinations';
+import {
+  LANDING_DESTINATIONS as DESTINATIONS,
+  findDestinationBySlug,
+  type Destination,
+} from '@/lib/destinations';
+import { useCesiumViewer } from '@/lib/cesium/CesiumViewerProvider';
 import ArrivalSequence, {
   readArrivalInFlight,
   clearArrivalInFlight,
 } from './ArrivalSequence';
 
-// Loose runtime types for window.Cesium — we don't pull Cesium's own
-// type definitions because that would mean reinstalling the npm package
-// and getting tangled in the bundling problem again. These types cover
-// just the surface this component uses.
-type CesiumViewer = {
-  destroy: () => void;
+// Narrow runtime types for just the surface this component touches on
+// the shared viewer.
+type ViewerLite = {
   scene: {
-    skyAtmosphere: { show: boolean };
-    fog: { enabled: boolean; density: number };
-    globe: {
-      enableLighting: boolean;
-      showGroundAtmosphere: boolean;
-      atmosphereLightIntensity: number;
-      depthTestAgainstTerrain: boolean;
-    };
-    backgroundColor: unknown;
-    primitives: { add: (p: unknown) => unknown };
     pick: (pos: unknown) => { id?: { id?: string } } | undefined;
   };
-  camera: { flyTo: (opts: unknown) => void };
-  entities: { add: (opts: unknown) => unknown };
+  camera: {
+    flyTo: (opts: {
+      destination: unknown;
+      orientation?: { heading: number; pitch: number; roll: number };
+      duration?: number;
+      easingFunction?: unknown;
+    }) => void;
+  };
+  entities: {
+    add: (opts: unknown) => { id: string };
+    removeById: (id: string) => unknown;
+  };
   canvas: HTMLCanvasElement;
 };
 
-type CesiumGlobal = {
-  Ion: { defaultAccessToken: string };
-  Viewer: new (
-    container: HTMLElement,
-    options: Record<string, unknown>,
-  ) => CesiumViewer;
-  Terrain: { fromWorldTerrain: () => unknown };
+type CesiumLite = {
   Cartesian3: { fromDegrees: (lng: number, lat: number, h?: number) => unknown };
   Cartesian2: new (x: number, y: number) => unknown;
   Color: { fromCssColorString: (s: string) => unknown };
   Math: { toRadians: (deg: number) => number };
   HeightReference: { CLAMP_TO_GROUND: unknown };
   LabelStyle: { FILL_AND_OUTLINE: unknown };
+  EasingFunction: { QUADRATIC_IN_OUT: unknown };
   ScreenSpaceEventHandler: new (canvas: HTMLCanvasElement) => {
-    setInputAction: (cb: (event: { position?: unknown; endPosition?: unknown }) => void, type: unknown) => void;
+    setInputAction: (
+      cb: (event: { position?: unknown; endPosition?: unknown }) => void,
+      type: unknown,
+    ) => void;
     destroy: () => void;
   };
   ScreenSpaceEventType: { LEFT_CLICK: unknown; MOUSE_MOVE: unknown };
-  createOsmBuildingsAsync: () => Promise<unknown>;
 };
-
-// window.Cesium typing comes from src/types/cesium-global.d.ts as
-// Record<string, unknown>. We narrow to CesiumGlobal at the call site.
 
 export default function CesiumGlobe() {
   const searchParams = useSearchParams();
-  const containerRef = useRef<HTMLDivElement>(null);
-  const viewerRef = useRef<CesiumViewer | null>(null);
+  const { ready, viewer, Cesium } = useCesiumViewer({ activate: true });
   const [activeDestination, setActiveDestination] = useState<Destination | null>(null);
   const [resumeAfterAuth, setResumeAfterAuth] = useState(false);
-  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // OAuth-callback resume — if the visitor returns with ?resumeArrival=1
-  // and a destination slug (either via ?dest=<slug> in the URL or via
-  // the localStorage stash as a fallback), re-open ArrivalSequence in
-  // resume mode.
-  //
-  // ?dest= is the primary signal because URL params cross origins
-  // cleanly across the apex ↔ subdomain hop Google's OAuth sometimes
-  // performs. localStorage is per-origin and disappears across that
-  // hop, which is why the previous stash-only approach silently failed.
-  //
-  // We deliberately keep ?resumeArrival=1 (and ?dest=) in the URL until
-  // ArrivalSequence completes and navigates to /map. Stripping it here
-  // would trigger middleware's "authenticated user on /landing → /"
-  // redirect mid-sequence.
+  // and we have a destination slug (URL ?dest= preferred, localStorage
+  // fallback), re-open ArrivalSequence in resume mode.
   useEffect(() => {
     if (!searchParams) return;
     if (searchParams.get('resumeArrival') !== '1') return;
@@ -112,194 +96,167 @@ export default function CesiumGlobe() {
     setResumeAfterAuth(true);
   }, [searchParams]);
 
-  // Wait for window.Cesium to be loaded (from CDN via <Script> in the
-  // CesiumGlobeLoader), then initialize the viewer.
+  // Once the viewer is ready, add pin entities, set orbital camera,
+  // attach click handler. On unmount, tear them down.
   useEffect(() => {
-    if (!containerRef.current) return;
-    let cancelled = false;
-    let cleanupFn: (() => void) | null = null;
+    if (!ready || !viewer || !Cesium) return;
 
-    function tryInit() {
-      if (cancelled) return;
-      if (typeof window === 'undefined' || !window.Cesium) {
-        setTimeout(tryInit, 100);
-        return;
-      }
-      void init(window.Cesium as unknown as CesiumGlobal);
+    const v = viewer as ViewerLite;
+    const C = Cesium as CesiumLite;
+
+    // Frame the camera at orbital altitude looking straight down.
+    // 18,000 km altitude gives a planet-from-space view; pitch -90 is
+    // top-down so the visible hemisphere is the world map.
+    v.camera.flyTo({
+      destination: C.Cartesian3.fromDegrees(20, 25, 18_000_000),
+      orientation: {
+        heading: 0,
+        pitch: C.Math.toRadians(-90),
+        roll: 0,
+      },
+      duration: 0,
+    });
+
+    // Place destination pins.
+    const addedIds: string[] = [];
+    for (const dest of DESTINATIONS) {
+      const entity = v.entities.add({
+        id: `destination-${dest.slug}`,
+        name: dest.name,
+        position: C.Cartesian3.fromDegrees(dest.pose.lng, dest.pose.lat, 0),
+        point: {
+          pixelSize: 14,
+          color: C.Color.fromCssColorString('#F4C97F'),
+          outlineColor: C.Color.fromCssColorString('#C8553D'),
+          outlineWidth: 2,
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+          heightReference: C.HeightReference.CLAMP_TO_GROUND,
+        },
+        label: {
+          text: dest.name,
+          font: '600 12px "Geist Sans", Inter, sans-serif',
+          fillColor: C.Color.fromCssColorString('#F4EAD5'),
+          outlineColor: C.Color.fromCssColorString('#0E1626'),
+          outlineWidth: 3,
+          style: C.LabelStyle.FILL_AND_OUTLINE,
+          pixelOffset: new C.Cartesian2(0, -22),
+          showBackground: false,
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+          heightReference: C.HeightReference.CLAMP_TO_GROUND,
+        },
+      });
+      addedIds.push(entity.id);
     }
 
-    async function init(Cesium: CesiumGlobal) {
-      try {
-        if (!containerRef.current) return;
-        const token = process.env.NEXT_PUBLIC_CESIUM_ION_TOKEN;
-        if (!token) {
-          setStatus('error');
-          setErrorMessage('Cesium token missing');
-          return;
-        }
-        Cesium.Ion.defaultAccessToken = token;
+    // Click handler on the shared canvas. Picks a destination pin and
+    // (a) sets activeDestination so the ArrivalSequence overlay mounts,
+    // (b) kicks off the cinematic Cesium camera flight from orbit toward
+    // the destination's authored pose. Both happen in parallel — the
+    // descent runs underneath the form.
+    const handler = new C.ScreenSpaceEventHandler(v.canvas);
+    handler.setInputAction((event) => {
+      if (!event.position) return;
+      const picked = v.scene.pick(event.position);
+      if (!picked || !picked.id || !picked.id.id) return;
+      const id = picked.id.id;
+      if (!id.startsWith('destination-')) return;
+      const slug = id.slice('destination-'.length);
+      const dest = findDestinationBySlug(slug);
+      if (!dest) return;
 
-        const viewer = new Cesium.Viewer(containerRef.current, {
-          terrain: Cesium.Terrain.fromWorldTerrain(),
-          animation: false,
-          baseLayerPicker: false,
-          fullscreenButton: false,
-          geocoder: false,
-          homeButton: false,
-          infoBox: false,
-          sceneModePicker: false,
-          selectionIndicator: false,
-          timeline: false,
-          navigationHelpButton: false,
-          navigationInstructionsInitiallyVisible: false,
-          creditContainer: document.createElement('div'),
-        });
+      setActiveDestination(dest);
+      setResumeAfterAuth(false);
 
-        if (cancelled) {
-          viewer.destroy();
-          return;
-        }
-        viewerRef.current = viewer;
+      // Begin the cinematic descent. ~8 seconds from orbit through the
+      // atmosphere into the destination's authored pose. Cesium streams
+      // photoreal tiles in as the camera descends; by the time the
+      // visitor finishes the questions form, the city is fully resolved
+      // and the camera is at the authored framing.
+      v.camera.flyTo({
+        destination: C.Cartesian3.fromDegrees(
+          dest.pose.lng,
+          dest.pose.lat,
+          dest.pose.altitude,
+        ),
+        orientation: {
+          heading: C.Math.toRadians(dest.pose.heading),
+          pitch: C.Math.toRadians(dest.pose.pitch),
+          roll: 0,
+        },
+        duration: 8.0,
+        easingFunction: C.EasingFunction.QUADRATIC_IN_OUT,
+      });
+    }, C.ScreenSpaceEventType.LEFT_CLICK);
 
-        // Atmospheric polish.
-        viewer.scene.skyAtmosphere.show = true;
-        viewer.scene.fog.enabled = true;
-        viewer.scene.fog.density = 0.0002;
-        viewer.scene.globe.enableLighting = true;
-        viewer.scene.globe.showGroundAtmosphere = true;
-        viewer.scene.globe.atmosphereLightIntensity = 10.0;
-        viewer.scene.globe.depthTestAgainstTerrain = false;
-        viewer.scene.backgroundColor = Cesium.Color.fromCssColorString('#0E1626');
-
-        // Cesium OSM Buildings — 350M global 3D buildings.
-        try {
-          const buildings = await Cesium.createOsmBuildingsAsync();
-          if (!cancelled) {
-            viewer.scene.primitives.add(buildings);
-          }
-        } catch {
-          // Non-fatal — globe still renders without buildings.
-        }
-
-        if (cancelled) {
-          viewer.destroy();
-          return;
-        }
-
-        // Place destination pins.
-        for (const dest of DESTINATIONS) {
-          viewer.entities.add({
-            id: `destination-${dest.slug}`,
-            name: dest.name,
-            position: Cesium.Cartesian3.fromDegrees(dest.pose.lng, dest.pose.lat, 0),
-            point: {
-              pixelSize: 14,
-              color: Cesium.Color.fromCssColorString('#F4C97F'),
-              outlineColor: Cesium.Color.fromCssColorString('#C8553D'),
-              outlineWidth: 2,
-              disableDepthTestDistance: Number.POSITIVE_INFINITY,
-              heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
-            },
-            label: {
-              text: dest.name,
-              font: '600 12px "Geist Sans", Inter, sans-serif',
-              fillColor: Cesium.Color.fromCssColorString('#F4EAD5'),
-              outlineColor: Cesium.Color.fromCssColorString('#0E1626'),
-              outlineWidth: 3,
-              style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-              pixelOffset: new Cesium.Cartesian2(0, -22),
-              showBackground: false,
-              disableDepthTestDistance: Number.POSITIVE_INFINITY,
-              heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
-            },
-          });
-        }
-
-        // Initial camera — orbital view of the planet.
-        viewer.camera.flyTo({
-          destination: Cesium.Cartesian3.fromDegrees(20, 25, 18_000_000),
-          orientation: {
-            heading: 0,
-            pitch: Cesium.Math.toRadians(-90),
-            roll: 0,
-          },
-          duration: 0,
-        });
-
-        // Click handler — pick a destination.
-        const handler = new Cesium.ScreenSpaceEventHandler(viewer.canvas);
-        handler.setInputAction((event) => {
-          if (!event.position) return;
-          const picked = viewer.scene.pick(event.position);
-          if (!picked || !picked.id || !picked.id.id) return;
-          const id = picked.id.id;
-          if (!id.startsWith('destination-')) return;
-          const slug = id.slice('destination-'.length);
-          const dest = findDestinationBySlug(slug);
-          if (dest) {
-            setActiveDestination(dest);
-            setResumeAfterAuth(false);
-          }
-        }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
-
-        handler.setInputAction((event) => {
-          if (!event.endPosition) return;
-          const picked = viewer.scene.pick(event.endPosition);
-          const canvas = viewer.canvas;
-          if (picked?.id?.id && picked.id.id.startsWith('destination-')) {
-            canvas.style.cursor = 'pointer';
-          } else {
-            canvas.style.cursor = 'default';
-          }
-        }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
-
-        cleanupFn = () => {
-          handler.destroy();
-          viewer.destroy();
-          viewerRef.current = null;
-        };
-
-        setStatus('ready');
-      } catch (err) {
-        console.error('[CesiumGlobe] Failed to initialize:', err);
-        setStatus('error');
-        setErrorMessage(err instanceof Error ? err.message : 'Unknown error');
+    // Cursor feedback on pin hover.
+    handler.setInputAction((event) => {
+      if (!event.endPosition) return;
+      const picked = v.scene.pick(event.endPosition);
+      const canvas = v.canvas;
+      if (picked?.id?.id && picked.id.id.startsWith('destination-')) {
+        canvas.style.cursor = 'pointer';
+      } else {
+        canvas.style.cursor = 'default';
       }
-    }
-
-    tryInit();
+    }, C.ScreenSpaceEventType.MOUSE_MOVE);
 
     return () => {
-      cancelled = true;
-      if (cleanupFn) cleanupFn();
+      handler.destroy();
+      for (const id of addedIds) {
+        v.entities.removeById(id);
+      }
     };
-  }, []);
+  }, [ready, viewer, Cesium]);
+
+  // Resume-after-auth flight — same as a fresh click, but triggered by
+  // the post-OAuth resume effect having set activeDestination.
+  useEffect(() => {
+    if (!ready || !viewer || !Cesium) return;
+    if (!activeDestination || !resumeAfterAuth) return;
+
+    const v = viewer as ViewerLite;
+    const C = Cesium as CesiumLite;
+    v.camera.flyTo({
+      destination: C.Cartesian3.fromDegrees(
+        activeDestination.pose.lng,
+        activeDestination.pose.lat,
+        activeDestination.pose.altitude,
+      ),
+      orientation: {
+        heading: C.Math.toRadians(activeDestination.pose.heading),
+        pitch: C.Math.toRadians(activeDestination.pose.pitch),
+        roll: 0,
+      },
+      duration: 8.0,
+      easingFunction: C.EasingFunction.QUADRATIC_IN_OUT,
+    });
+  }, [ready, viewer, Cesium, activeDestination, resumeAfterAuth]);
 
   const handleCancel = useCallback(() => {
     setActiveDestination(null);
     setResumeAfterAuth(false);
     clearArrivalInFlight();
-  }, []);
+    // Return the camera to orbit.
+    if (ready && viewer && Cesium) {
+      const v = viewer as ViewerLite;
+      const C = Cesium as CesiumLite;
+      v.camera.flyTo({
+        destination: C.Cartesian3.fromDegrees(20, 25, 18_000_000),
+        orientation: {
+          heading: 0,
+          pitch: C.Math.toRadians(-90),
+          roll: 0,
+        },
+        duration: 2.5,
+      });
+    }
+  }, [ready, viewer, Cesium]);
 
   return (
-    <div className="relative w-full h-full overflow-hidden bg-[#0E1626]">
-      <div
-        ref={containerRef}
-        className="absolute inset-0"
-        aria-label="Interactive globe — pick a destination to fly"
-      />
+    <>
+      {!ready && <LoadingStage />}
 
-      {status === 'loading' && <LoadingStage />}
-
-      {status === 'error' && errorMessage && (
-        <div className="absolute inset-0 flex items-center justify-center">
-          <p className="font-headline italic text-sm text-surface/70">
-            Globe failed to load: {errorMessage}
-          </p>
-        </div>
-      )}
-
-      <p className="absolute bottom-6 left-1/2 -translate-x-1/2 font-headline italic text-sm tracking-[0.16em] text-surface/55 select-none pointer-events-none">
+      <p className="absolute bottom-6 left-1/2 -translate-x-1/2 font-headline italic text-sm tracking-[0.16em] text-surface/55 select-none pointer-events-none z-10">
         Choose your field.
       </p>
 
@@ -316,20 +273,17 @@ export default function CesiumGlobe() {
         .cesium-credit-textContainer,
         .cesium-credit-logoContainer { display: none !important; }
       `}</style>
-    </div>
+    </>
   );
 }
 
 // ── Loading stage ────────────────────────────────────────────────────
-// Cinematic loading state while Cesium's CDN bundle downloads and the
-// viewer initializes. A slowly-rotating surveyor's reticle (the same
-// theodolite geometry as the PlotMaps wordmark O) sits centered with
-// a faint pulse, paired with editorial type cycling through a short
-// list of approach lines. Stays consistent with Plot's brand voice
-// instead of a generic spinner.
+// Shown while Cesium's CDN bundle downloads and the persistent viewer
+// initializes. Once the viewer is ready (which on subsequent /landing
+// visits is instant because the viewer never unmounted), this hides.
 function LoadingStage() {
   return (
-    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none select-none">
+    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none select-none z-10">
       <svg
         width="84"
         height="84"
@@ -338,7 +292,6 @@ function LoadingStage() {
         aria-hidden
         style={{ animation: 'plot-globe-loading-spin 6s linear infinite' }}
       >
-        {/* Outer reticle ring */}
         <circle
           cx="42"
           cy="42"
@@ -348,79 +301,34 @@ function LoadingStage() {
           fill="none"
           style={{ animation: 'plot-globe-loading-breathe 2.4s ease-in-out infinite' }}
         />
-        {/* Inner aperture */}
-        <circle
-          cx="42"
-          cy="42"
-          r="18"
-          stroke="rgba(244, 234, 213, 0.7)"
-          strokeWidth="1"
-          fill="none"
-        />
-        {/* Crosshair */}
+        <circle cx="42" cy="42" r="18" stroke="rgba(244, 234, 213, 0.7)" strokeWidth="1" fill="none" />
         <line x1="42" y1="10" x2="42" y2="26" stroke="rgba(244, 234, 213, 0.65)" strokeWidth="1" />
         <line x1="42" y1="58" x2="42" y2="74" stroke="rgba(244, 234, 213, 0.65)" strokeWidth="1" />
         <line x1="10" y1="42" x2="26" y2="42" stroke="rgba(244, 234, 213, 0.65)" strokeWidth="1" />
         <line x1="58" y1="42" x2="74" y2="42" stroke="rgba(244, 234, 213, 0.65)" strokeWidth="1" />
-        {/* Center point */}
         <circle cx="42" cy="42" r="1.5" fill="rgba(244, 201, 127, 0.95)" />
-        {/* Compass N */}
         <text
           x="42"
           y="6"
-          textAnchor="middle"
+          fontFamily="Geist Mono, monospace"
           fontSize="6"
-          fontFamily="var(--font-geist-sans), Inter, sans-serif"
-          fontWeight="600"
-          letterSpacing="0.18em"
-          fill="rgba(244, 234, 213, 0.7)"
+          fill="rgba(244, 234, 213, 0.5)"
+          textAnchor="middle"
         >
           N
         </text>
       </svg>
-
-      <p
-        className="mt-6 font-headline italic text-[11px] sm:text-xs tracking-[0.32em] uppercase text-surface/55"
-        style={{ animation: 'plot-globe-loading-text 3.6s ease-in-out infinite' }}
-      >
-        Surveying the world
+      <p className="mt-6 font-headline italic text-xs tracking-[0.18em] text-surface/55">
+        Loading the world…
       </p>
-
       <style jsx global>{`
         @keyframes plot-globe-loading-spin {
-          from {
-            transform: rotate(0deg);
-          }
-          to {
-            transform: rotate(360deg);
-          }
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
         }
         @keyframes plot-globe-loading-breathe {
-          0%, 100% {
-            opacity: 1;
-            stroke-width: 1;
-          }
-          50% {
-            opacity: 0.55;
-            stroke-width: 1.4;
-          }
-        }
-        @keyframes plot-globe-loading-text {
-          0%, 100% {
-            opacity: 0.4;
-          }
-          50% {
-            opacity: 0.9;
-          }
-        }
-        @media (prefers-reduced-motion: reduce) {
-          svg[aria-hidden] {
-            animation: none !important;
-          }
-          p[style*="plot-globe-loading-text"] {
-            animation: none !important;
-            opacity: 0.7 !important;
-          }
+          0%, 100% { opacity: 0.5; }
+          50% { opacity: 0.9; }
         }
       `}</style>
     </div>

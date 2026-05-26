@@ -7,6 +7,7 @@ import { AuthProvider } from '@/lib/auth-context';
 import { ProfileProvider } from '@/lib/profile-context';
 import { SidebarProvider } from '@/lib/sidebar-context';
 import { PhoneProvider } from '@/lib/phone-context';
+import { CesiumViewerProvider } from '@/lib/cesium/CesiumViewerProvider';
 import PostHogProvider from '@/components/providers/PostHogProvider';
 import AnalyticsProvider from '@/components/providers/AnalyticsProvider';
 import MetaPixelProvider from '@/components/providers/MetaPixelProvider';
@@ -27,8 +28,10 @@ export default function ClientProviders({ children }: { children: ReactNode }) {
                     <ProfileProvider>
                   <SidebarProvider>
                     <PhoneProvider>
-                      {children}
-                      <CookieBanner />
+                      <CesiumViewerProvider>
+                        {children}
+                        <CookieBanner />
+                      </CesiumViewerProvider>
                     </PhoneProvider>
                   </SidebarProvider>
                     </ProfileProvider>

@@ -1,45 +1,39 @@
 'use client';
 
-// SplatHUDLayer — renders a Gaussian-splat asset as a HUD overlay over
-// whatever's underneath (map, landing, blurred arrival background).
+// SplatHUDLayer — Gaussian-splat HUD over the viewport.
 //
-// The splat sits in screen space, not world space. It does NOT live
-// inside the map's 3D scene — it floats over it like a cockpit reticle.
-// The user's avatar (or, before SAM 3D pipeline ships, the F-18 as a
-// placeholder) is rendered as a translucent figure in the lower-center,
-// drifting with subtle idle motion so it reads as alive.
+// Architecture: we own the three.js scene + camera + renderer. The splat
+// library's DropInViewer is just a THREE.Group we add to our scene.
+// This avoids the library's auto-root-element behavior (which races with
+// React mount/unmount and creates the WebGL-context cascade we saw on
+// the first cut).
 //
-// Why splats and not glTF meshes:
-//   - SAM 3D Body's output is a .ply Gaussian-splat file. The point of
-//     this layer IS to render that output as-is, no mesh conversion.
-//   - Splats handle hair, clothing folds, transparency and partial
-//     occlusion in ways meshes cost serious modeling time to match.
-//   - At ~22k splats per asset (the F-18) we're well within real-time
-//     WebGL budget on any modern GPU.
+// Why: the bare Viewer constructor + rootElement pattern doesn't survive
+// strict-mode double-invoke. It spins up its own canvas inside our div,
+// can't tear it down cleanly when React unmounts before its async load
+// finishes, and the failed teardowns leak WebGL contexts — once we cross
+// the browser's per-tab WebGL context limit (~16 in Chrome), every new
+// context fails with "precision is null" and the splat lib retries
+// internally, hammering the .ply endpoint.
 //
-// Library: @mkkellogg/gaussian-splats-3d (MIT, ships its own three.js
-// renderer with custom shaders for the splat math).
+// With DropInViewer, we control the lifecycle: one renderer, one canvas,
+// one dispose() path. The Group just hangs off our scene root.
 
 import { useEffect, useRef } from 'react';
 
 interface Props {
-  /** URL to the .ply splat file. */
   splatUrl: string;
-  /** Opacity multiplier, 0..1. UI slider drives this live. Defaults to 0.7
-   *  (translucent — the user can see through to the world behind). */
   opacity?: number;
-  /** Width of the HUD render area as a fraction of viewport width.
-   *  Default 0.35 (roughly the lower-center area, leaves the sides clear). */
   widthFraction?: number;
-  /** Bottom offset of the HUD region as a fraction of viewport height.
-   *  Default 0.04 (small gutter from the bottom edge). */
   bottomFraction?: number;
-  /** Initial rotation of the splat in radians. The F-18 mesh from SAM
-   *  3D needs a quarter-turn so its nose faces away from the viewer.
-   *  Per-asset; future avatars will likely use different defaults. */
+  /** Rotation around the Y axis in radians, applied to the splat group. */
   initialRotationY?: number;
-  /** Idle motion: subtle bob + slow rotation so the splat reads as
-   *  alive. Defaults to true. */
+  /** Initial position relative to scene origin. The splat coordinate
+   *  space depends on what trained it; tune by eye. */
+  position?: [number, number, number];
+  /** Uniform scale. SAM 3D Body splats often come out ~1-2 units tall;
+   *  scale to fit the HUD frame. */
+  scale?: number;
   idleMotion?: boolean;
 }
 
@@ -49,137 +43,205 @@ export default function SplatHUDLayer({
   widthFraction = 0.35,
   bottomFraction = 0.04,
   initialRotationY = 0,
+  position = [0, 0, -3],
+  scale = 1,
   idleMotion = true,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
-  // Hold the live values in refs so the render loop reads current props
-  // without reattaching.
   const opacityRef = useRef(opacity);
   opacityRef.current = opacity;
   const idleMotionRef = useRef(idleMotion);
   idleMotionRef.current = idleMotion;
+  // Transforms held in refs so a parent re-render that changes the
+  // rotation slider doesn't tear the viewer down. The render loop reads
+  // current values each frame.
+  const rotationYRef = useRef(initialRotationY);
+  rotationYRef.current = initialRotationY;
+  const positionRef = useRef(position);
+  positionRef.current = position;
+  const scaleRef = useRef(scale);
+  scaleRef.current = scale;
 
   useEffect(() => {
-    let cancelled = false;
     const container = containerRef.current;
     if (!container) return;
+    let cancelled = false;
 
-    // Dynamic import so three.js + splat lib don't bloat pages that
-    // don't render a splat.
+    // We hold every disposable in closure-scope refs so the cleanup
+    // function has access to them after the async setup resolves.
+    let renderer: import('three').WebGLRenderer | null = null;
+    let rafId = 0;
+    let resizeObs: ResizeObserver | null = null;
+    let dropIn: { dispose?: () => void } | null = null;
+
     void (async () => {
-      const THREE = await import('three');
-      const { Viewer } = await import('@mkkellogg/gaussian-splats-3d');
-
+      let THREE: typeof import('three');
+      let GS: typeof import('@mkkellogg/gaussian-splats-3d');
+      try {
+        THREE = await import('three');
+        GS = await import('@mkkellogg/gaussian-splats-3d');
+      } catch (err) {
+        console.error('[SplatHUDLayer] dynamic import failed:', err);
+        return;
+      }
       if (cancelled || !container) return;
 
-      // Construct a viewer scoped to our container. selfDrivenMode = true
-      // lets the lib run its own RAF loop; useBuiltInControls = false
-      // because we don't want mouse interaction on the HUD splat.
-      type ViewerCtor = new (opts: Record<string, unknown>) => {
-        addSplatScene: (
-          url: string,
-          opts: Record<string, unknown>,
-        ) => Promise<void>;
-        getSplatScene: (i: number) => {
-          scenePosition?: { set: (x: number, y: number, z: number) => void };
-          sceneRotation?: {
-            set: (x: number, y: number, z: number, w: number) => void;
-          };
-          getSplatScene?: () => unknown;
-          opacity?: number;
-        };
-        start: () => void;
-        dispose: () => Promise<void>;
-        threeScene?: { children: { length: number } };
-        camera: { position: { set: (x: number, y: number, z: number) => void } };
-        renderer: { domElement: HTMLCanvasElement };
-        update?: () => void;
-        render?: () => void;
-      };
-      const ViewerCls = Viewer as unknown as ViewerCtor;
+      // Scene + camera + renderer that we own.
+      const scene = new THREE.Scene();
+      const w = container.clientWidth || 320;
+      const h = container.clientHeight || 320;
+      const camera = new THREE.PerspectiveCamera(45, w / h, 0.1, 1000);
+      camera.position.set(0, 0, 0);
 
-      const viewer = new ViewerCls({
-        rootElement: container,
-        selfDrivenMode: true,
-        useBuiltInControls: false,
-        ignoreDevicePixelRatio: false,
-        gpuAcceleratedSort: true,
-        sharedMemoryForWorkers: false,
-        // Transparent canvas so we composite over whatever's underneath.
-        renderMode: 1, // continuous render
+      renderer = new THREE.WebGLRenderer({
+        alpha: true,
+        antialias: true,
+        premultipliedAlpha: false,
       });
+      renderer.setPixelRatio(window.devicePixelRatio);
+      renderer.setSize(w, h, false);
+      renderer.setClearColor(0x000000, 0); // fully transparent
 
+      const canvas = renderer.domElement;
+      canvas.style.width = '100%';
+      canvas.style.height = '100%';
+      canvas.style.display = 'block';
+      canvas.style.transition = 'opacity 200ms ease-out';
+      canvas.style.willChange = 'transform, opacity';
+      container.appendChild(canvas);
+
+      // Construct DropInViewer (a THREE.Group). We pass selfDrivenMode false
+      // so it doesn't spawn its own raf loop; we drive everything ourselves.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const DropInViewerCtor = (GS as any).DropInViewer as new (
+        opts: Record<string, unknown>,
+      ) => unknown;
+      let dropInViewer: unknown;
       try {
-        await viewer.addSplatScene(splatUrl, {
+        dropInViewer = new DropInViewerCtor({
+          gpuAcceleratedSort: true,
+          sharedMemoryForWorkers: false,
+        });
+      } catch (err) {
+        console.error('[SplatHUDLayer] DropInViewer construction failed:', err);
+        return;
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const div = dropInViewer as any;
+      dropIn = div;
+
+      // Add to scene immediately so the splat appears as soon as the
+      // download finishes (the lib mutates this Group's children).
+      scene.add(div as import('three').Object3D);
+
+      // Apply initial transform from refs (so a live slider change
+      // is picked up before the first render).
+      const obj = div as import('three').Object3D;
+      obj.position.set(positionRef.current[0], positionRef.current[1], positionRef.current[2]);
+      obj.scale.setScalar(scaleRef.current);
+      obj.rotation.y = rotationYRef.current;
+
+      // Kick off the .ply load.
+      try {
+        await div.addSplatScene(splatUrl, {
           showLoadingUI: false,
-          // splatAlphaRemovalThreshold trims fully-transparent splats —
-          // keeps GPU work down without losing visible detail.
           splatAlphaRemovalThreshold: 5,
         });
       } catch (err) {
-        console.error('[SplatHUDLayer] load failed:', err);
+        console.error('[SplatHUDLayer] addSplatScene failed:', err);
         return;
       }
+      if (cancelled) return;
 
-      if (cancelled) {
-        await viewer.dispose();
-        return;
-      }
+      // Resize handling — keep the renderer + camera in sync with the
+      // container as the viewport changes (orientation, window resize).
+      resizeObs = new ResizeObserver(() => {
+        if (!container || !renderer) return;
+        const newW = container.clientWidth;
+        const newH = container.clientHeight;
+        if (newW > 0 && newH > 0) {
+          renderer.setSize(newW, newH, false);
+          camera.aspect = newW / newH;
+          camera.updateProjectionMatrix();
+        }
+      });
+      resizeObs.observe(container);
 
-      viewer.start();
-
-      // Apply initial rotation to the loaded splat scene.
-      const scene = viewer.getSplatScene(0);
-      if (scene?.sceneRotation && initialRotationY !== 0) {
-        const q = new THREE.Quaternion();
-        q.setFromEuler(new THREE.Euler(0, initialRotationY, 0));
-        scene.sceneRotation.set(q.x, q.y, q.z, q.w);
-      }
-
-      // The splat library renders to its own canvas inside the container.
-      // We layer our opacity + idle-motion as CSS on that canvas — simpler
-      // than reaching into the shader uniforms and works the same way.
-      const canvas = viewer.renderer.domElement;
-      canvas.style.opacity = String(opacityRef.current);
-      canvas.style.transition = 'opacity 200ms ease-out';
-      canvas.style.willChange = 'transform, opacity';
-
-      // Idle motion: subtle bob + slow rotation, time-driven so it's
-      // deterministic. ~6s bob period, ~24s rotation period.
-      let rafId = 0;
+      // Render loop.
       const t0 = performance.now();
-      function tick() {
-        if (cancelled) return;
+      const tick = () => {
+        if (cancelled || !renderer) return;
         const dt = (performance.now() - t0) / 1000;
-        canvas.style.opacity = String(opacityRef.current);
+
+        // Read current transform from refs so slider changes apply live.
+        const r = rotationYRef.current;
+        const p = positionRef.current;
+        const s = scaleRef.current;
+        obj.scale.setScalar(s);
         if (idleMotionRef.current) {
-          const bob = Math.sin(dt * ((Math.PI * 2) / 6)) * 4; // ±4px
-          const yaw = Math.sin(dt * ((Math.PI * 2) / 24)) * 3; // ±3°
-          canvas.style.transform = `translateY(${bob}px) rotate(${yaw}deg)`;
+          obj.rotation.y = r + Math.sin(dt * ((Math.PI * 2) / 24)) * 0.08;
+          obj.position.y = p[1] + Math.sin(dt * ((Math.PI * 2) / 6)) * 0.05;
         } else {
-          canvas.style.transform = '';
+          obj.rotation.y = r;
+          obj.position.y = p[1];
+        }
+        obj.position.x = p[0];
+        obj.position.z = p[2];
+
+        // Live-bound opacity.
+        canvas.style.opacity = String(opacityRef.current);
+
+        try {
+          renderer.render(scene, camera);
+        } catch (err) {
+          console.error('[SplatHUDLayer] render error:', err);
+          cancelled = true;
+          return;
         }
         rafId = requestAnimationFrame(tick);
-      }
-      rafId = requestAnimationFrame(tick);
-
-      // Cleanup binds onto the cancelled flag too so we don't double-free.
-      return () => {
-        cancelAnimationFrame(rafId);
       };
+      rafId = requestAnimationFrame(tick);
     })();
 
     return () => {
       cancelled = true;
-      // We don't manually destroy the viewer here — the dynamic-import
-      // closure handles its own teardown via the cancelled flag and the
-      // async dispose call inside. If we await dispose synchronously
-      // here React's effect cleanup hangs.
+      if (rafId) cancelAnimationFrame(rafId);
+      if (resizeObs) {
+        try {
+          resizeObs.disconnect();
+        } catch {
+          /* swallow */
+        }
+      }
+      // Tear down in reverse order. Wrapped in try/catches because
+      // strict-mode double-invoke can race with the async load.
+      try {
+        if (dropIn?.dispose) dropIn.dispose();
+      } catch {
+        /* swallow */
+      }
+      if (renderer) {
+        try {
+          renderer.dispose();
+          renderer.forceContextLoss();
+        } catch {
+          /* swallow */
+        }
+        if (renderer.domElement.parentNode === container && container) {
+          try {
+            container.removeChild(renderer.domElement);
+          } catch {
+            /* swallow */
+          }
+        }
+      }
     };
-  }, [splatUrl, initialRotationY]);
+    // Only the URL re-mounts the viewer. Rotation/position/scale flow
+    // through refs and update each frame inside the render loop, so
+    // sliders don't trigger a destroy+rebuild.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [splatUrl]);
 
-  // Container is fixed bottom-center over the viewport. pointer-events-
-  // none so it doesn't eat clicks meant for the world underneath.
   return (
     <div
       ref={containerRef}

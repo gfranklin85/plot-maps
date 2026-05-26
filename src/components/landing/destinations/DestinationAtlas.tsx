@@ -84,9 +84,11 @@ export default function DestinationAtlas() {
   useEffect(() => {
     if (!searchParams) return;
     if (searchParams.get('resumeArrival') !== '1') return;
-    const stashed = readArrivalInFlight();
-    if (!stashed) return;
-    const match = DESTINATIONS.find((d) => d.slug === stashed.destinationSlug);
+    const slugFromUrl = searchParams.get('dest');
+    const stashed = !slugFromUrl ? readArrivalInFlight() : null;
+    const slug = slugFromUrl ?? stashed?.destinationSlug ?? null;
+    if (!slug) return;
+    const match = DESTINATIONS.find((d) => d.slug === slug);
     if (!match) {
       clearArrivalInFlight();
       return;

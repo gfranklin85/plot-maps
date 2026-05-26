@@ -83,17 +83,27 @@ export default function CesiumGlobe() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // OAuth-callback resume — if the visitor returns with ?resumeArrival=1
-  // and a stashed destination, re-open ArrivalSequence in resume mode.
-  // Note: we deliberately keep ?resumeArrival=1 in the URL until the
+  // and a destination slug (either via ?dest=<slug> in the URL or via
+  // the localStorage stash as a fallback), re-open ArrivalSequence in
+  // resume mode.
+  //
+  // ?dest= is the primary signal because URL params cross origins
+  // cleanly across the apex ↔ subdomain hop Google's OAuth sometimes
+  // performs. localStorage is per-origin and disappears across that
+  // hop, which is why the previous stash-only approach silently failed.
+  //
+  // We deliberately keep ?resumeArrival=1 (and ?dest=) in the URL until
   // ArrivalSequence completes and navigates to /map. Stripping it here
-  // would cause middleware's "authenticated user on /landing → redirect
-  // to /" rule to bounce the visitor to the dashboard mid-sequence.
+  // would trigger middleware's "authenticated user on /landing → /"
+  // redirect mid-sequence.
   useEffect(() => {
     if (!searchParams) return;
     if (searchParams.get('resumeArrival') !== '1') return;
-    const stashed = readArrivalInFlight();
-    if (!stashed) return;
-    const match = DESTINATIONS.find((d) => d.slug === stashed.destinationSlug);
+    const slugFromUrl = searchParams.get('dest');
+    const stashed = !slugFromUrl ? readArrivalInFlight() : null;
+    const slug = slugFromUrl ?? stashed?.destinationSlug ?? null;
+    if (!slug) return;
+    const match = DESTINATIONS.find((d) => d.slug === slug);
     if (!match) {
       clearArrivalInFlight();
       return;

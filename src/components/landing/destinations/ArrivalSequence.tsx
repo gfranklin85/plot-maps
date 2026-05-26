@@ -306,26 +306,27 @@ export default function ArrivalSequence({
   // ── Manifest beat: OAuth ─────────────────────────────────────────
   const handleSignIn = useCallback(async () => {
     setOauthLoading(true);
+    // Stash in localStorage as a same-origin fallback. The primary
+    // mechanism is now the ?dest= URL param round-trip (see below),
+    // because localStorage is strictly per-origin and Google's OAuth
+    // round-trip can hop between apex (plot.solutions) and subdomain
+    // (app.plot.solutions), making the stash invisible on return.
     stashArrivalInFlight(destination.slug);
-    // Set a short-lived cookie so the /auth/callback route can detect
-    // that we came from the landing's arrival flow even if Google
-    // strips the ?next= query param during the round-trip (which it
-    // sometimes does). The callback reads + clears this cookie and
-    // routes back to /landing?resumeArrival=1 when set. 10-minute TTL.
     if (typeof document !== 'undefined') {
       document.cookie = `pm_arrival_oauth=1; path=/; max-age=600; samesite=lax`;
     }
     try {
-      // No ?next= query in redirectTo — Supabase's URL allowlist matching
-      // is strict about wildcards, and the callback handler now defaults
-      // to /landing?resumeArrival=1 anyway. The sessionStorage entry
-      // stashed in stashArrivalInFlight() is what tells the atlas which
-      // destination to resume on after the round-trip.
+      // Embed the destination slug in redirectTo as a query param.
+      // Supabase preserves any params you put on redirectTo across the
+      // OAuth round-trip — they arrive back at /auth/callback alongside
+      // ?code=... The callback then forwards the slug onto /landing as
+      // ?dest=<slug>, and the atlas reads it from the URL to know which
+      // destination to resume. URL params survive origin hops cleanly;
+      // localStorage does not.
+      const redirectTo = `${window.location.origin}/auth/callback?dest=${encodeURIComponent(destination.slug)}`;
       await supabase.auth.signInWithOAuth({
         provider: 'google',
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-        },
+        options: { redirectTo },
       });
     } catch {
       setOauthLoading(false);

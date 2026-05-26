@@ -19,18 +19,53 @@
 //   - All chrome above the carousel; carousel itself is z-0 in this page.
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import PlotMapsLogo from '@/components/brand/PlotMapsLogo';
 import LandingControllerChip from '@/components/landing/LandingControllerChip';
-import ArrivalSequence from '@/components/landing/destinations/ArrivalSequence';
+import ArrivalSequence, {
+  readArrivalInFlight,
+  clearArrivalInFlight,
+} from '@/components/landing/destinations/ArrivalSequence';
 import {
   LANDING_DESTINATIONS as DESTINATIONS,
+  findDestinationBySlug,
   type Destination,
 } from '@/lib/destinations';
 import LandingDestinationCard from './LandingDestinationCard';
 
 export default function LandingCarousel() {
+  const searchParams = useSearchParams();
   const [activeIndex, setActiveIndex] = useState(0);
   const [committed, setCommitted] = useState<Destination | null>(null);
+  const [resumeAfterAuth, setResumeAfterAuth] = useState(false);
+
+  // OAuth-callback resume. When the visitor returns with ?resumeArrival=1,
+  // we re-mount ArrivalSequence on the destination they picked before the
+  // round-trip — using the same triple-channel lookup as the rest of
+  // Plot's landing surfaces:
+  //   1. ?dest=<slug> in the URL (set by /auth/callback from the
+  //      pm_arrival_dest cookie — survives apex↔subdomain hops cleanly)
+  //   2. localStorage stash (same-origin fallback)
+  //   3. (none — we just don't auto-resume)
+  // We also snap the carousel's active index to that destination so
+  // cancelling out of the form lands the user on the right card.
+  useEffect(() => {
+    if (!searchParams) return;
+    if (searchParams.get('resumeArrival') !== '1') return;
+    const slugFromUrl = searchParams.get('dest');
+    const stashed = !slugFromUrl ? readArrivalInFlight() : null;
+    const slug = slugFromUrl ?? stashed?.destinationSlug ?? null;
+    if (!slug) return;
+    const match = findDestinationBySlug(slug);
+    if (!match) {
+      clearArrivalInFlight();
+      return;
+    }
+    const idx = DESTINATIONS.indexOf(match);
+    if (idx >= 0) setActiveIndex(idx);
+    setCommitted(match);
+    setResumeAfterAuth(true);
+  }, [searchParams]);
 
   const advance = useCallback(
     (delta: number) => {
@@ -195,12 +230,16 @@ export default function LandingCarousel() {
         className="right-6"
       />
 
-      {/* ArrivalSequence overlay — mounts when the user commits. */}
+      {/* ArrivalSequence overlay — mounts when the user commits, or
+          when the OAuth-resume effect detected an in-flight arrival. */}
       {committed && (
         <ArrivalSequence
           destination={committed}
-          resumeAfterAuth={false}
-          onCancel={() => setCommitted(null)}
+          resumeAfterAuth={resumeAfterAuth}
+          onCancel={() => {
+            setCommitted(null);
+            setResumeAfterAuth(false);
+          }}
         />
       )}
     </main>

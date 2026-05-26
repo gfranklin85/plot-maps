@@ -18,7 +18,7 @@
 //     authored camera pose.
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { DESTINATIONS, type Destination } from '@/lib/destinations';
 import ArrivalSequence, {
   readArrivalInFlight,
@@ -74,7 +74,6 @@ type CesiumGlobal = {
 // Record<string, unknown>. We narrow to CesiumGlobal at the call site.
 
 export default function CesiumGlobe() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const containerRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<CesiumViewer | null>(null);
@@ -85,24 +84,23 @@ export default function CesiumGlobe() {
 
   // OAuth-callback resume — if the visitor returns with ?resumeArrival=1
   // and a stashed destination, re-open ArrivalSequence in resume mode.
+  // Note: we deliberately keep ?resumeArrival=1 in the URL until the
+  // ArrivalSequence completes and navigates to /map. Stripping it here
+  // would cause middleware's "authenticated user on /landing → redirect
+  // to /" rule to bounce the visitor to the dashboard mid-sequence.
   useEffect(() => {
     if (!searchParams) return;
     if (searchParams.get('resumeArrival') !== '1') return;
     const stashed = readArrivalInFlight();
-    if (!stashed) {
-      router.replace('/landing');
-      return;
-    }
+    if (!stashed) return;
     const match = DESTINATIONS.find((d) => d.slug === stashed.destinationSlug);
     if (!match) {
       clearArrivalInFlight();
-      router.replace('/landing');
       return;
     }
     setActiveDestination(match);
     setResumeAfterAuth(true);
-    router.replace('/landing');
-  }, [searchParams, router]);
+  }, [searchParams]);
 
   // Wait for window.Cesium to be loaded (from CDN via <Script> in the
   // CesiumGlobeLoader), then initialize the viewer.

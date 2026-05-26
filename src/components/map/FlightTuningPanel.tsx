@@ -99,6 +99,7 @@ export default function FlightTuningPanel({
         value={tuning.climbRate}
         min={AXIS_RANGES.climbRate.min}
         max={AXIS_RANGES.climbRate.max}
+        pivot={HELI_DEFAULT_TUNING.climbRate}
         leftEnd="Cinematic"
         rightEnd="Rapid"
         readout={`accel ${eff.climb.accel.toFixed(0)} · max ${eff.climb.max.toFixed(1)} m/s`}

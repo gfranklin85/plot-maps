@@ -175,12 +175,17 @@ export const DESTINATIONS: Destination[] = [
     slug: 'las-vegas',
     name: 'Las Vegas',
     region: 'Nevada',
-    surfaces: ['panel'],
+    tagline: 'A grid in the desert that never sleeps.',
+    surfaces: ['landing', 'panel'],
     pose: {
-      // North end of the strip, looking south down the strip.
+      // North end of the strip, looking south down its length. Lifted
+      // to 900m so the arrival starts in the sky, not in the ground —
+      // Google's photoreal terrain around the Strip has elevation
+      // offsets at low altitudes that put a 400m camera underneath
+      // building footprints.
       lat: 36.1100, lng: -115.1730,
-      altitude: 400, heading: 200,
-      pitch: -16, range: 1500,
+      altitude: 900, heading: 200,
+      pitch: -12, range: 1800,
     },
   },
   {

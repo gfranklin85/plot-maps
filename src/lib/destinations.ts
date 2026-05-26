@@ -122,11 +122,18 @@ export const DESTINATIONS: Destination[] = [
     tagline: 'The grid that never sleeps.',
     surfaces: ['landing', 'panel'],
     pose: {
-      // Midtown, eye above 7th Ave, looking south-southwest down the avenues.
-      lat: 40.7549, lng: -73.9840,
-      altitude: 450, heading: 200,
-      pitch: -18, range: 1200,
+      // Greg's hand-tuned framing: camera over the Hudson north of
+      // midtown looking N-NW back at the Manhattan skyline. Captured
+      // from /map dev-readout (focal point at 40.7869, -74.0108,
+      // tilt 84.99, heading -24.15, range 6699). Tilt near 85° gives
+      // the classic near-horizontal skyline shot — much shallower
+      // pitch than the inland cities. Range 6699m frames the whole
+      // island. Arrival altitude 900m so visitor starts in the sky.
+      lat: 40.7869, lng: -74.0108,
+      altitude: 900, heading: 335.85,
+      pitch: -5, range: 6699,
     },
+    imageSrc: '/assets/landing/destinations/new-york.png',
   },
   {
     slug: 'tokyo',
@@ -135,11 +142,16 @@ export const DESTINATIONS: Destination[] = [
     tagline: 'Neon, rain, and quiet temples.',
     surfaces: ['landing', 'panel'],
     pose: {
-      // Shinjuku looking toward Shibuya / Tokyo Tower.
-      lat: 35.6720, lng: 139.7400,
-      altitude: 500, heading: 160,
-      pitch: -18, range: 1400,
+      // Greg's hand-tuned framing. Captured from /map dev-readout
+      // (focal point at 35.6661, 139.7437, tilt 78.46, heading 159.82,
+      // range 1346). South-southeast across Shinjuku toward Shibuya /
+      // the Bay. Arrival altitude lifted to 900m so visitor starts in
+      // the sky.
+      lat: 35.6661, lng: 139.7437,
+      altitude: 900, heading: 159.82,
+      pitch: -12, range: 1346,
     },
+    imageSrc: '/assets/landing/destinations/tokyo.png',
   },
   {
     slug: 'paris',

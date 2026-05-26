@@ -106,6 +106,7 @@ export const DESTINATIONS: Destination[] = [
       altitude: 400, heading: 30,
       pitch: -14, range: 1300,
     },
+    imageSrc: '/assets/landing/destinations/acapulco.png',
   },
   {
     slug: 'new-york',
@@ -217,13 +218,19 @@ export const DESTINATIONS: Destination[] = [
     slug: 'sydney',
     name: 'Sydney',
     region: 'Australia',
-    surfaces: ['panel'],
+    tagline: 'Harbour, opera, sandstone city.',
+    surfaces: ['landing', 'panel'],
     pose: {
-      // North shore looking south at the harbour.
-      lat: -33.8540, lng: 151.2200,
-      altitude: 320, heading: 195,
-      pitch: -16, range: 1100,
+      // Greg's hand-tuned framing: camera over the harbour looking
+      // southwest at the Opera House + CBD skyline. Captured from
+      // /map dev-readout (focal point at -33.8597, 151.2132, tilt 72,
+      // heading -139.29). Arrival altitude lifted from the focal-point
+      // height to 900m so visitor starts in the sky.
+      lat: -33.8597, lng: 151.2132,
+      altitude: 900, heading: 220.71,
+      pitch: -18, range: 1800,
     },
+    imageSrc: '/assets/landing/destinations/sydney.png',
   },
 ];
 

@@ -329,6 +329,16 @@ function Inner({
   // the dispatch, this ref gets stamped and the follow-up parcel
   // ray-cast suppresses itself to avoid double-firing.
   const lastPoiClickAtRef = useRef<number>(0);
+  // Pixel-accurate ground position from Map3D's own ray-cast against
+  // the photoreal mesh (terrain + buildings). When a gmp-click fires
+  // — synthesized or real — we stash the position here. The A-press
+  // handler reads it back on the next frame to drive the Places
+  // lookup, replacing our flat-plane lat/lng math which drifts at
+  // oblique angles because it doesn't know about real terrain or
+  // building heights. Pairs with lastSurfaceClickAtRef as the
+  // freshness gate.
+  const lastSurfaceClickAtRef = useRef<number>(0);
+  const lastSurfacePosRef = useRef<{ lat: number; lng: number } | null>(null);
 
   // ── FireBeam shots state (Breakthrough 2 proof) ────────────────────
   // Each A-press appends a shot. Sweep shots self-prune via
@@ -537,6 +547,15 @@ function Inner({
         stop?: () => void;
         stopPropagation?: () => void;
       };
+      // Stash the click position for the A-press handler — works for
+      // both POI and ground clicks. This is Map3D's pixel-accurate
+      // ray-cast result (knows about real terrain + photoreal mesh),
+      // which is what we want instead of our flat-plane fallback.
+      const surfacePos = ev.position ?? ev.detail?.position;
+      if (surfacePos && Number.isFinite(surfacePos.lat) && Number.isFinite(surfacePos.lng)) {
+        lastSurfacePosRef.current = { lat: surfacePos.lat, lng: surfacePos.lng };
+        lastSurfaceClickAtRef.current = performance.now();
+      }
       // PlaceClickEvent carries placeId either on the event itself
       // (older API shape) or on event.detail (newer).
       const placeId = ev.placeId ?? ev.detail?.placeId;
@@ -700,53 +719,106 @@ function Inner({
             fireBeamRef.current('sweep');
 
             const cam = camRef.current;
-            if (!cam) { actionsRef.current?.onShoot?.(); return; }
-            if (cam.pitch >= -0.5) {
-              // Aimed at or above the horizon — no ground intersect.
-              actionsRef.current?.onShoot?.();
-              return;
-            }
-            const pitchRad = (Math.abs(cam.pitch) * Math.PI) / 180;
-            const groundDistM = cam.altitude / Math.tan(pitchRad);
-            if (!Number.isFinite(groundDistM) || groundDistM <= 0 || groundDistM >= 50_000) {
-              actionsRef.current?.onShoot?.();
-              return;
-            }
-            const headingRad = (cam.heading * Math.PI) / 180;
-            const dNorthM = groundDistM * Math.cos(headingRad);
-            const dEastM = groundDistM * Math.sin(headingRad);
-            const cosLat = Math.cos((cam.lat * Math.PI) / 180) || 1;
-            const targetLat = cam.lat + dNorthM / 111_320;
-            const targetLng = cam.lng + dEastM / (111_320 * cosLat);
+            const mapEl = elRef.current;
+            if (!cam || !mapEl) { actionsRef.current?.onShoot?.(); return; }
 
-            // eslint-disable-next-line no-console
-            console.log(
-              `[A-fire] cam=(${cam.lat.toFixed(5)},${cam.lng.toFixed(5)}) hdg=${cam.heading.toFixed(0)}° pitch=${cam.pitch.toFixed(1)}° → aim=(${targetLat.toFixed(5)},${targetLng.toFixed(5)})`
-            );
+            // ── Step 1: Synthesize a click at the reticle pixel ──
+            // Map3D's own ray-cast knows about real terrain + the
+            // photoreal mesh. When we synthesize a pointer click, its
+            // gmp-click handler fires with the EXACT lat/lng of where
+            // the click ray hits the visible surface. That's pixel-
+            // accurate at any camera angle, unlike our flat-plane
+            // math which drifts at oblique angles. We dispatch here
+            // and read the result on the next frame from
+            // lastSurfacePosRef.
+            const pressedAt = performance.now();
+            const rect = mapEl.getBoundingClientRect();
+            const clientX = rect.left + rect.width / 2;
+            const clientY = rect.top + rect.height / 2;
+            try {
+              mapEl.dispatchEvent(new PointerEvent('pointerdown', {
+                clientX, clientY, bubbles: true, cancelable: true,
+                button: 0, pointerType: 'mouse',
+              }));
+              mapEl.dispatchEvent(new PointerEvent('pointerup', {
+                clientX, clientY, bubbles: true, cancelable: true,
+                button: 0, pointerType: 'mouse',
+              }));
+              mapEl.dispatchEvent(new MouseEvent('click', {
+                clientX, clientY, bubbles: true, cancelable: true,
+                button: 0,
+              }));
+            } catch { /* PointerEvent may not be constructable; we'll fall back */ }
 
-            // Hit Places Nearby Search. Closest POI to the aim point
-            // wins. Returns placeId if anything labeled, null otherwise.
-            const ac = new AbortController();
-            lastParcelLookupAcRef.current?.abort();
-            lastParcelLookupAcRef.current = ac;
-            fetch(`/api/places-nearby?lat=${targetLat}&lng=${targetLng}`, { signal: ac.signal })
-              .then((r) => r.ok ? r.json() : null)
-              .then((json) => {
-                // eslint-disable-next-line no-console
-                console.log(
-                  `[A-resolve] → placeId=${json?.placeId ?? 'NULL'} name=${json?.name ?? 'NULL'} address=${json?.address ?? 'NULL'}`
-                );
-                if (json && json.placeId) {
-                  onGooglePoiClickRef.current?.(json.placeId as string, { lat: targetLat, lng: targetLng });
-                } else {
+            // Defer one frame for Map3D's gmp-click to fire. If a
+            // surface position came back, use it (pixel-accurate).
+            // If not, fall back to flat-plane math (works fine looking
+            // straight down, drifts at oblique angles).
+            requestAnimationFrame(() => {
+              // If the synthesized click resolved to a POI directly,
+              // the gmp-click handler already opened the popup. Done.
+              if (lastPoiClickAtRef.current >= pressedAt) return;
+
+              let aimLat: number;
+              let aimLng: number;
+              let aimSource: string;
+
+              if (lastSurfaceClickAtRef.current >= pressedAt && lastSurfacePosRef.current) {
+                // Pixel-accurate: Map3D's ray-cast hit the surface.
+                aimLat = lastSurfacePosRef.current.lat;
+                aimLng = lastSurfacePosRef.current.lng;
+                aimSource = 'gmp-surface';
+              } else {
+                // Fallback: flat-plane ray-cast. Less accurate at
+                // shallow angles but works when Google's surface hit
+                // missed (looking at sky, off the photoreal mesh).
+                if (cam.pitch >= -0.5) {
                   actionsRef.current?.onShoot?.();
+                  return;
                 }
-              })
-              .catch((err) => {
-                if ((err as Error).name !== 'AbortError') {
+                const pitchRad = (Math.abs(cam.pitch) * Math.PI) / 180;
+                const groundDistM = cam.altitude / Math.tan(pitchRad);
+                if (!Number.isFinite(groundDistM) || groundDistM <= 0 || groundDistM >= 50_000) {
                   actionsRef.current?.onShoot?.();
+                  return;
                 }
-              });
+                const headingRad = (cam.heading * Math.PI) / 180;
+                const dNorthM = groundDistM * Math.cos(headingRad);
+                const dEastM = groundDistM * Math.sin(headingRad);
+                const cosLat = Math.cos((cam.lat * Math.PI) / 180) || 1;
+                aimLat = cam.lat + dNorthM / 111_320;
+                aimLng = cam.lng + dEastM / (111_320 * cosLat);
+                aimSource = 'flat-plane';
+              }
+
+              // eslint-disable-next-line no-console
+              console.log(
+                `[A-fire] src=${aimSource} cam=(${cam.lat.toFixed(5)},${cam.lng.toFixed(5)}) pitch=${cam.pitch.toFixed(1)}° → aim=(${aimLat.toFixed(5)},${aimLng.toFixed(5)})`
+              );
+
+              // Hit Places Nearby Search. Closest POI to the aim point.
+              const ac = new AbortController();
+              lastParcelLookupAcRef.current?.abort();
+              lastParcelLookupAcRef.current = ac;
+              fetch(`/api/places-nearby?lat=${aimLat}&lng=${aimLng}`, { signal: ac.signal })
+                .then((r) => r.ok ? r.json() : null)
+                .then((json) => {
+                  // eslint-disable-next-line no-console
+                  console.log(
+                    `[A-resolve] → placeId=${json?.placeId ?? 'NULL'} name=${json?.name ?? 'NULL'} address=${json?.address ?? 'NULL'}`
+                  );
+                  if (json && json.placeId) {
+                    onGooglePoiClickRef.current?.(json.placeId as string, { lat: aimLat, lng: aimLng });
+                  } else {
+                    actionsRef.current?.onShoot?.();
+                  }
+                })
+                .catch((err) => {
+                  if ((err as Error).name !== 'AbortError') {
+                    actionsRef.current?.onShoot?.();
+                  }
+                });
+            });
           })();
         }
         fire('x', actionsRef.current?.onRotateChannel);

@@ -25,7 +25,11 @@
 
 import { useRef, useState, useCallback, useEffect, KeyboardEvent } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { DESTINATIONS, type Destination } from '@/lib/destinations';
+import {
+  LANDING_DESTINATIONS as DESTINATIONS,
+  findDestinationBySlug,
+  type Destination,
+} from '@/lib/destinations';
 import DestinationCard from './DestinationCard';
 import ArrivalSequence, {
   readArrivalInFlight,
@@ -70,7 +74,7 @@ export default function DestinationCarousel() {
     const stashed = !slugFromUrl ? readArrivalInFlight() : null;
     const slug = slugFromUrl ?? stashed?.destinationSlug ?? null;
     if (!slug) return;
-    const match = DESTINATIONS.find((d) => d.slug === slug);
+    const match = findDestinationBySlug(slug);
     if (!match) {
       clearArrivalInFlight();
       return;

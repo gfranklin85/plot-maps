@@ -371,12 +371,12 @@ export default function ArrivalSequence({
 
   // Coordinates formatted for the instrument display.
   const coordsLabel = useMemo(() => {
-    const latAbs = Math.abs(destination.lat).toFixed(2);
-    const lngAbs = Math.abs(destination.lng).toFixed(2);
-    const latHem = destination.lat >= 0 ? 'N' : 'S';
-    const lngHem = destination.lng >= 0 ? 'E' : 'W';
+    const latAbs = Math.abs(destination.pose.lat).toFixed(2);
+    const lngAbs = Math.abs(destination.pose.lng).toFixed(2);
+    const latHem = destination.pose.lat >= 0 ? 'N' : 'S';
+    const lngHem = destination.pose.lng >= 0 ? 'E' : 'W';
     return `${latAbs}° ${latHem}   ${lngAbs}° ${lngHem}`;
-  }, [destination.lat, destination.lng]);
+  }, [destination.pose.lat, destination.pose.lng]);
 
   return (
     <div

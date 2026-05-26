@@ -21,7 +21,11 @@
 import { useCallback, useState, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useEffect } from 'react';
-import { DESTINATIONS, type Destination } from '@/lib/destinations';
+import {
+  LANDING_DESTINATIONS as DESTINATIONS,
+  findDestinationBySlug,
+  type Destination,
+} from '@/lib/destinations';
 import ArrivalSequence, {
   readArrivalInFlight,
   clearArrivalInFlight,
@@ -88,7 +92,7 @@ export default function DestinationAtlas() {
     const stashed = !slugFromUrl ? readArrivalInFlight() : null;
     const slug = slugFromUrl ?? stashed?.destinationSlug ?? null;
     if (!slug) return;
-    const match = DESTINATIONS.find((d) => d.slug === slug);
+    const match = findDestinationBySlug(slug);
     if (!match) {
       clearArrivalInFlight();
       return;
@@ -107,7 +111,7 @@ export default function DestinationAtlas() {
     () =>
       DESTINATIONS.map((d) => ({
         destination: d,
-        position: latLngToPercent(d.lat, d.lng),
+        position: latLngToPercent(d.pose.lat, d.pose.lng),
       })),
     [],
   );
@@ -393,10 +397,10 @@ function DestinationHoverCard({
   const top = flipVertical ? undefined : `${atlasY + cardOffsetY}%`;
   const bottom = flipVertical ? `${100 - atlasY + Math.abs(cardOffsetY)}%` : undefined;
 
-  const latAbs = Math.abs(destination.lat).toFixed(2);
-  const lngAbs = Math.abs(destination.lng).toFixed(2);
-  const latHem = destination.lat >= 0 ? 'N' : 'S';
-  const lngHem = destination.lng >= 0 ? 'E' : 'W';
+  const latAbs = Math.abs(destination.pose.lat).toFixed(2);
+  const lngAbs = Math.abs(destination.pose.lng).toFixed(2);
+  const latHem = destination.pose.lat >= 0 ? 'N' : 'S';
+  const lngHem = destination.pose.lng >= 0 ? 'E' : 'W';
 
   return (
     <div

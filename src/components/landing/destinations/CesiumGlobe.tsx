@@ -19,7 +19,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { DESTINATIONS, type Destination } from '@/lib/destinations';
+import { LANDING_DESTINATIONS as DESTINATIONS, findDestinationBySlug, type Destination } from '@/lib/destinations';
 import ArrivalSequence, {
   readArrivalInFlight,
   clearArrivalInFlight,
@@ -103,7 +103,7 @@ export default function CesiumGlobe() {
     const stashed = !slugFromUrl ? readArrivalInFlight() : null;
     const slug = slugFromUrl ?? stashed?.destinationSlug ?? null;
     if (!slug) return;
-    const match = DESTINATIONS.find((d) => d.slug === slug);
+    const match = findDestinationBySlug(slug);
     if (!match) {
       clearArrivalInFlight();
       return;
@@ -191,7 +191,7 @@ export default function CesiumGlobe() {
           viewer.entities.add({
             id: `destination-${dest.slug}`,
             name: dest.name,
-            position: Cesium.Cartesian3.fromDegrees(dest.lng, dest.lat, 0),
+            position: Cesium.Cartesian3.fromDegrees(dest.pose.lng, dest.pose.lat, 0),
             point: {
               pixelSize: 14,
               color: Cesium.Color.fromCssColorString('#F4C97F'),
@@ -235,7 +235,7 @@ export default function CesiumGlobe() {
           const id = picked.id.id;
           if (!id.startsWith('destination-')) return;
           const slug = id.slice('destination-'.length);
-          const dest = DESTINATIONS.find((d) => d.slug === slug);
+          const dest = findDestinationBySlug(slug);
           if (dest) {
             setActiveDestination(dest);
             setResumeAfterAuth(false);

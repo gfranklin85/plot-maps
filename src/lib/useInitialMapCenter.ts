@@ -14,7 +14,7 @@
 //   3. profile.defaultMapCenter — the visitor's saved home
 
 import { useSearchParams } from 'next/navigation';
-import { DESTINATIONS, type Destination } from './destinations';
+import { findDestinationBySlug, type Destination } from './destinations';
 
 export function useInitialMapCenter(
   fallback: { lat: number; lng: number } | null
@@ -34,9 +34,9 @@ export function useInitialMapCenter(
   // Priority 2: destination slug resolved against the catalog.
   const destinationParam = searchParams.get('destination');
   if (destinationParam) {
-    const match = DESTINATIONS.find(d => d.slug === destinationParam);
+    const match = findDestinationBySlug(destinationParam);
     if (match) {
-      return { lat: match.lat, lng: match.lng };
+      return { lat: match.pose.lat, lng: match.pose.lng };
     }
   }
 
@@ -55,5 +55,5 @@ export function useInitialDestinationPose(): Destination | null {
   if (!searchParams) return null;
   const destinationParam = searchParams.get('destination');
   if (!destinationParam) return null;
-  return DESTINATIONS.find(d => d.slug === destinationParam) ?? null;
+  return findDestinationBySlug(destinationParam);
 }

@@ -285,20 +285,20 @@ export default function MapPage() {
       if (destinationParam) {
         const match = DESTINATIONS.find(d => d.slug === destinationParam);
         if (match) {
-          lat = match.lat;
-          lng = match.lng;
+          lat = match.pose.lat;
+          lng = match.pose.lng;
           // Aerial framing for destination arrivals — high enough that
           // the visitor sees the city sprawl, low enough that detail
           // reads. The map's own controls let them descend further.
           resolvedDestinationZoom = 17;
-          resolvedDestinationHeading = match.heading;
+          resolvedDestinationHeading = match.pose.heading;
           // Convert first-person pitch (0=horizon, -45=looking 45° down)
           // to Map3D tilt (0=top-down, 85=horizon-level).
           // pitch=0 (horizon-level) → tilt=85 (Google's max)
           // pitch=-45 (looking down 45°) → tilt=45
           // pitch=-90 (straight down) → tilt=0
           // Formula: tilt = 90 + pitch, clamped to [0, 85]
-          const tilt = Math.max(0, Math.min(85, 90 + match.pitch));
+          const tilt = Math.max(0, Math.min(85, 90 + match.pose.pitch));
           resolvedDestinationTilt = tilt;
         }
       }

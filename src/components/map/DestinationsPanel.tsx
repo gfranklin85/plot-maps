@@ -4,10 +4,10 @@ import { useState } from "react";
 import MaterialIcon from "@/components/ui/MaterialIcon";
 import ProspectSearch from "@/components/dashboard/ProspectSearch";
 import {
-  CURATED_DESTINATIONS,
+  PANEL_DESTINATIONS,
   DEFAULT_ARRIVAL_POSE,
-  type FlightDestination,
-} from "@/lib/flightDestinations";
+  type Destination,
+} from "@/lib/destinations";
 
 interface Props {
   visible: boolean;
@@ -41,14 +41,14 @@ export default function DestinationsPanel({ visible, home, onFlyTo, onClose }: P
 
   if (!visible) return null;
 
-  function flyToDestination(d: FlightDestination) {
+  function flyToDestination(d: Destination) {
     onFlyTo({
-      lat: d.lat,
-      lng: d.lng,
-      altitude: d.altitude,
-      heading: d.heading,
-      pitch: d.pitch,
-      range: d.range,
+      lat: d.pose.lat,
+      lng: d.pose.lng,
+      altitude: d.pose.altitude,
+      heading: d.pose.heading,
+      pitch: d.pose.pitch,
+      range: d.pose.range,
     });
     onClose();
   }
@@ -103,9 +103,9 @@ export default function DestinationsPanel({ visible, home, onFlyTo, onClose }: P
         <div>
           <p className="text-[9px] font-bold text-on-surface-variant uppercase tracking-wider mb-2">Iconic destinations</p>
           <div className="grid grid-cols-2 gap-2">
-            {CURATED_DESTINATIONS.map((d) => (
+            {PANEL_DESTINATIONS.map((d) => (
               <button
-                key={d.id}
+                key={d.slug}
                 onClick={() => flyToDestination(d)}
                 className="flex flex-col items-start gap-0.5 p-3 rounded-xl bg-surface-container hover:bg-surface-container-high transition-all text-left hover:scale-[1.02]"
               >

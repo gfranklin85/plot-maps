@@ -33,7 +33,7 @@ export async function GET(req: Request) {
   // Default search radius — small enough that we don't pull in
   // POIs the user wasn't aiming at, large enough to catch the
   // labeled address numbers Google floats above houses.
-  const radius = Math.max(5, Math.min(200, parseFloat(url.searchParams.get('radius') ?? '40')));
+  const radius = Math.max(5, Math.min(500, parseFloat(url.searchParams.get('radius') ?? '100')));
 
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
     return NextResponse.json({ error: 'lat and lng required' }, { status: 400 });
@@ -82,7 +82,11 @@ export async function GET(req: Request) {
   if (!res.ok) {
     const text = await res.text().catch(() => '');
     console.error('[places-nearby] upstream non-200:', res.status, text);
-    return NextResponse.json({ error: 'upstream non-200', upstreamStatus: res.status }, { status: 502 });
+    return NextResponse.json({
+      error: 'upstream non-200',
+      upstreamStatus: res.status,
+      upstreamBody: text.slice(0, 500),
+    }, { status: 502 });
   }
 
   const json = (await res.json()) as {
@@ -97,7 +101,14 @@ export async function GET(req: Request) {
 
   const first = json.places?.[0];
   if (!first || !first.id) {
-    return NextResponse.json({ placeId: null, lat, lng });
+    // Log on the server so we can see whether Google returned an empty
+    // result set or whether our request was malformed. The browser
+    // only sees the null result; this gives us the upstream context.
+    console.log('[places-nearby] no results', {
+      lat, lng, radius,
+      placesCount: json.places?.length ?? 0,
+    });
+    return NextResponse.json({ placeId: null, lat, lng, debug: 'no_results', radius });
   }
 
   const out: NormalizedPoi = {

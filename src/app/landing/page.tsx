@@ -27,6 +27,7 @@ import type { Metadata } from 'next';
 import PlotMapsLogo from '@/components/brand/PlotMapsLogo';
 import LandingControllerChip from '@/components/landing/LandingControllerChip';
 import CesiumGlobeLoader from '@/components/landing/destinations/CesiumGlobeLoader';
+import CesiumFlightController from '@/components/map/CesiumFlightController';
 
 export const metadata: Metadata = {
   title: "Plotmaps — A Modern Practitioner's Manual",
@@ -80,6 +81,11 @@ export default function LandingPage() {
       <div className="relative z-10 w-full h-full">
         <CesiumGlobeLoader />
       </div>
+
+      {/* Gamepad-driven flight. Mounts on the persistent Cesium viewer
+          so the user can fly themselves from orbit to ground anywhere
+          on Earth. Pin clicks still work as a non-controller shortcut. */}
+      <CesiumFlightController />
     </main>
   );
 }

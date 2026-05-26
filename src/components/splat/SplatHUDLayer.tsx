@@ -43,7 +43,7 @@ export default function SplatHUDLayer({
   widthFraction = 0.35,
   bottomFraction = 0.04,
   initialRotationY = 0,
-  position = [0, 0, -3],
+  position = [0, 0, 0],
   scale = 1,
   idleMotion = true,
 }: Props) {
@@ -63,8 +63,16 @@ export default function SplatHUDLayer({
   scaleRef.current = scale;
 
   useEffect(() => {
+    console.log('[SplatHUDLayer] effect mounted', { splatUrl });
     const container = containerRef.current;
-    if (!container) return;
+    if (!container) {
+      console.warn('[SplatHUDLayer] container ref is null at effect time');
+      return;
+    }
+    console.log('[SplatHUDLayer] container ready', {
+      width: container.clientWidth,
+      height: container.clientHeight,
+    });
     let cancelled = false;
 
     // We hold every disposable in closure-scope refs so the cleanup
@@ -78,20 +86,32 @@ export default function SplatHUDLayer({
       let THREE: typeof import('three');
       let GS: typeof import('@mkkellogg/gaussian-splats-3d');
       try {
+        console.log('[SplatHUDLayer] importing three + splat lib');
         THREE = await import('three');
         GS = await import('@mkkellogg/gaussian-splats-3d');
+        console.log('[SplatHUDLayer] imports done', {
+          threeVersion: THREE.REVISION,
+          gsKeys: Object.keys(GS),
+        });
       } catch (err) {
         console.error('[SplatHUDLayer] dynamic import failed:', err);
         return;
       }
-      if (cancelled || !container) return;
+      if (cancelled || !container) {
+        console.warn('[SplatHUDLayer] cancelled or container null after import');
+        return;
+      }
 
       // Scene + camera + renderer that we own.
       const scene = new THREE.Scene();
       const w = container.clientWidth || 320;
       const h = container.clientHeight || 320;
-      const camera = new THREE.PerspectiveCamera(45, w / h, 0.1, 1000);
-      camera.position.set(0, 0, 0);
+      // Wide FOV so we don't crop a model whose coordinate space we
+      // don't yet know. Camera positioned back +5 along Z so anything
+      // near origin is in frame.
+      const camera = new THREE.PerspectiveCamera(60, w / h, 0.01, 1000);
+      camera.position.set(0, 0, 5);
+      camera.lookAt(0, 0, 0);
 
       renderer = new THREE.WebGLRenderer({
         alpha: true,
@@ -143,10 +163,12 @@ export default function SplatHUDLayer({
 
       // Kick off the .ply load.
       try {
+        console.log('[SplatHUDLayer] addSplatScene start', { splatUrl });
         await div.addSplatScene(splatUrl, {
           showLoadingUI: false,
           splatAlphaRemovalThreshold: 5,
         });
+        console.log('[SplatHUDLayer] addSplatScene success');
       } catch (err) {
         console.error('[SplatHUDLayer] addSplatScene failed:', err);
         return;

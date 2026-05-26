@@ -18,7 +18,7 @@
 //   - Survey-tick corner accents (the only vintage callback).
 //   - All chrome above the carousel; carousel itself is z-0 in this page.
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import PlotMapsLogo from '@/components/brand/PlotMapsLogo';
 import LandingControllerChip from '@/components/landing/LandingControllerChip';
@@ -31,6 +31,7 @@ import {
   findDestinationBySlug,
   type Destination,
 } from '@/lib/destinations';
+import { useGamepad } from '@/lib/useGamepad';
 import LandingDestinationCard from './LandingDestinationCard';
 
 export default function LandingCarousel() {
@@ -102,6 +103,63 @@ export default function LandingCarousel() {
     return () => window.removeEventListener('keydown', onKey);
   }, [advance, commit, committed]);
 
+  // Mouse-wheel navigation. Throttle to one card per 280ms so a single
+  // physical scroll motion (which fires many wheel events) doesn't
+  // bulldoze through the whole carousel. Delta sign maps to direction:
+  // wheeling down/right → next, up/left → previous. Both deltaX and
+  // deltaY count (lets vertical-scroll-wheel users navigate horizontally).
+  const lastWheelMsRef = useRef(0);
+  const onWheel = useCallback(
+    (e: React.WheelEvent<HTMLElement>) => {
+      if (committed) return;
+      const now = performance.now();
+      if (now - lastWheelMsRef.current < 280) return;
+      const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+      if (Math.abs(delta) < 6) return; // ignore micro-noise
+      lastWheelMsRef.current = now;
+      advance(delta > 0 ? 1 : -1);
+    },
+    [advance, committed],
+  );
+
+  // Controller navigation. D-pad left/right cycle cards (edge-triggered
+  // from justPressed so a single tap = one card). Left-stick X also
+  // navigates, but with our own edge-guard so a steady push doesn't
+  // infinite-flip. A button commits, B button cancels the open arrival.
+  //
+  // We intentionally pause the controller subscription while
+  // ArrivalSequence is mounted — the form has its own focus and we
+  // don't want sticks/buttons bleeding through.
+  const stickEdgeRef = useRef<'left' | 'right' | null>(null);
+  useGamepad({
+    enabled: !committed,
+    onFrame: ({ leftStick, justPressed }) => {
+      // D-pad — pure edge-trigger.
+      if (justPressed.has('left')) advance(-1);
+      else if (justPressed.has('right')) advance(1);
+
+      // Left stick — emulate edge-trigger. We only fire when the stick
+      // CROSSES a threshold; we don't fire again until it returns past
+      // neutral. Mirrors how D-pad feels but works on analog input.
+      const THRESHOLD = 0.55;
+      const NEUTRAL = 0.25;
+      if (stickEdgeRef.current === null) {
+        if (leftStick.x <= -THRESHOLD) {
+          stickEdgeRef.current = 'left';
+          advance(-1);
+        } else if (leftStick.x >= THRESHOLD) {
+          stickEdgeRef.current = 'right';
+          advance(1);
+        }
+      } else if (Math.abs(leftStick.x) < NEUTRAL) {
+        stickEdgeRef.current = null;
+      }
+
+      // A button commits the active card (Xbox A = south button).
+      if (justPressed.has('a')) commit();
+    },
+  });
+
   // Precomputed cards so the indexed map stays cheap.
   const cards = useMemo(
     () =>
@@ -115,7 +173,10 @@ export default function LandingCarousel() {
   const active = DESTINATIONS[activeIndex];
 
   return (
-    <main className="relative h-screen w-screen overflow-hidden bg-[#0B1020] text-[#ECEDF3] select-none">
+    <main
+      className="relative h-screen w-screen overflow-hidden bg-[#0B1020] text-[#ECEDF3] select-none"
+      onWheel={onWheel}
+    >
       {/* Subtle topo grid backdrop. Faint enough to read as texture, not
           decoration. */}
       <div

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useCallback } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { APIProvider, useMapsLibrary } from "@vis.gl/react-google-maps";
 import { MAP_CENTER } from "@/lib/constants";
 import { useGamepad } from "@/lib/useGamepad";
@@ -9,6 +9,8 @@ import type { MapViewProps } from "./MapView";
 import type { GamepadActions } from "./GamepadFlightController";
 import { AtmosphereProvider } from "@/lib/atmosphere/AtmosphereContext";
 import AtmosphereOverlay from "./AtmosphereOverlay";
+import CustomReticle from "./CustomReticle";
+import { RITUAL_TIMING } from "@/lib/ritualTiming";
 import SkyDome from "./SkyDome";
 import Parcel3DOverlay from "./Parcel3DOverlay";
 import type { ParcelColorMode, ParcelHitTester } from "./ParcelOverlay";
@@ -361,6 +363,11 @@ function Inner({
   const cursorXRef = useRef<number>(-1);
   const cursorYRef = useRef<number>(-1);
   const lastPokeAtRef = useRef<number>(0);
+  // Hover-acquisition: the reticle shifts state when over the map
+  // surface (v1 signal — simplest version that gives real feedback).
+  // v2 will upgrade to "over a Plot record specifically" via debounced
+  // ground-projection query. See docs/confirmation-ritual-design.md.
+  const [hoverActive, setHoverActive] = useState<boolean>(false);
   // Throttle the poke to ~30Hz max. 60Hz is overkill; mousemove
   // listeners across the DOM (CSS :hover, tooltips, POI hit-tests)
   // re-evaluate per event, so we ease that constant pressure.
@@ -386,9 +393,24 @@ function Inner({
   // mouse motion; the controller can't move the OS cursor but the
   // user can grab the mouse anytime, so we always know where it is.
   useEffect(() => {
+    let lastHoverCheckAt = 0;
+    let lastHoverState = false;
+    const HOVER_CHECK_INTERVAL_MS = 1000 / RITUAL_TIMING.HOVER_QUERY_RATE_HZ;
     const onMove = (e: MouseEvent) => {
       cursorXRef.current = e.clientX;
       cursorYRef.current = e.clientY;
+      // Hover-acquisition check, throttled. Topmost element at cursor
+      // pixel; reticle "acquires" iff the map element is in the stack
+      // (cursor is over the map surface, not over UI chrome).
+      const now = performance.now();
+      if (now - lastHoverCheckAt < HOVER_CHECK_INTERVAL_MS) return;
+      lastHoverCheckAt = now;
+      const stack = document.elementsFromPoint(e.clientX, e.clientY);
+      const overMap = stack.some((el) => el.tagName?.toLowerCase() === 'gmp-map-3d');
+      if (overMap !== lastHoverState) {
+        lastHoverState = overMap;
+        setHoverActive(overMap);
+      }
     };
     window.addEventListener('mousemove', onMove, { passive: true });
     return () => window.removeEventListener('mousemove', onMove);
@@ -1010,7 +1032,7 @@ function Inner({
       <div
         ref={containerRef}
         className="h-full w-full relative"
-        style={{ background: '#0a1020' }}
+        style={{ background: '#0a1020', cursor: 'none' }}
       >
         {/* SkyDome — the painted sky overhead. Mounts only when Greg's
             crafted assets exist (see docs/asset-roadmap.md > Sky
@@ -1046,6 +1068,12 @@ function Inner({
           latLngFinderRef={latLngParcelFinderRef}
         />
         <AtmosphereOverlay />
+        {/* Plot's theodolite reticle replaces the OS cursor inside the
+            map container. The OS cursor still moves (Steam Input or
+            mouse) and still fires real click events; we just replace
+            the *visual* with a custom SVG. See docs/confirmation-
+            ritual-design.md. */}
+        <CustomReticle hoverActive={hoverActive} />
       </div>
     </AtmosphereProvider>
   );

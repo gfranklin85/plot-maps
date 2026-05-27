@@ -387,6 +387,111 @@ function Inner({
     return () => window.removeEventListener('mousemove', onMove);
   }, []);
 
+  // ── Tether (RB): forgiveness-zone target acquisition ────────────────
+  // The cursor's pixel doesn't have to land on a POI. Plot queries
+  // Google Places within a radius of the cursor's ground-projected
+  // lat/lng, ranks candidates by distance, opens the popup for the
+  // closest. Subsequent RB taps cycle through the candidate list so
+  // the user can override the auto-pick. Greg locked 2026-05-26.
+  //
+  // Projection: we fire a silent synthetic click at the cursor's screen
+  // pixel and read the resulting lat/lng from gmp-click's surface
+  // ray-cast (already stashed in lastSurfacePosRef by onMapClick). This
+  // uses Google's own pixel→ground projection, so it's accurate at any
+  // camera angle, the same way mouse clicks are.
+  const tetherCandidatesRef = useRef<Array<{ placeId: string; lat: number; lng: number; name?: string }>>([]);
+  const tetherIndexRef = useRef<number>(0);
+  const tetherFiringRef = useRef<boolean>(false);
+  const TETHER_RADIUS_M = 75;
+  const fireTether = useCallback(() => {
+    if (tetherFiringRef.current) return;
+    const mapEl = elRef.current;
+    if (!mapEl) return;
+    // Cycle case: candidates already loaded — pick next, open popup.
+    if (tetherCandidatesRef.current.length > 0) {
+      tetherIndexRef.current =
+        (tetherIndexRef.current + 1) % tetherCandidatesRef.current.length;
+      const next = tetherCandidatesRef.current[tetherIndexRef.current];
+      onGooglePoiClickRef.current?.(next.placeId, { lat: next.lat, lng: next.lng });
+      return;
+    }
+    // Fresh fire: silent click at cursor → read surface lat/lng → query.
+    tetherFiringRef.current = true;
+    const cx = cursorXRef.current;
+    const cy = cursorYRef.current;
+    const x = cx >= 0 ? cx : window.innerWidth / 2;
+    const y = cy >= 0 ? cy : window.innerHeight / 2;
+    const pressedAt = performance.now();
+    try {
+      mapEl.dispatchEvent(new PointerEvent('pointerdown', {
+        clientX: x, clientY: y, bubbles: true, cancelable: true,
+        button: 0, pointerType: 'mouse',
+      }));
+      mapEl.dispatchEvent(new PointerEvent('pointerup', {
+        clientX: x, clientY: y, bubbles: true, cancelable: true,
+        button: 0, pointerType: 'mouse',
+      }));
+      mapEl.dispatchEvent(new MouseEvent('click', {
+        clientX: x, clientY: y, bubbles: true, cancelable: true,
+        button: 0,
+      }));
+    } catch { /* PointerEvent may not be constructable here */ }
+    // Defer one frame for gmp-click to surface the lat/lng.
+    requestAnimationFrame(() => {
+      tetherFiringRef.current = false;
+      // If the silent click landed directly on a POI, gmp-click already
+      // opened the popup. Done — no further work.
+      if (lastPoiClickAtRef.current >= pressedAt) return;
+      // Otherwise read the surface lat/lng and query nearby places.
+      if (!(lastSurfaceClickAtRef.current >= pressedAt) || !lastSurfacePosRef.current) {
+        return;
+      }
+      const lat = lastSurfacePosRef.current.lat;
+      const lng = lastSurfacePosRef.current.lng;
+      fetch(`/api/places-nearby?lat=${lat}&lng=${lng}&radius=${TETHER_RADIUS_M}`)
+        .then((r) => r.ok ? r.json() : null)
+        .then((json) => {
+          if (!json || !json.placeId) {
+            tetherCandidatesRef.current = [];
+            tetherIndexRef.current = 0;
+            return;
+          }
+          // /api/places-nearby returns one closest hit today. Treat it
+          // as a single-element candidate list; cycle becomes a no-op
+          // until the API is expanded to return multiple results.
+          tetherCandidatesRef.current = [{
+            placeId: json.placeId,
+            lat: json.lat ?? lat,
+            lng: json.lng ?? lng,
+            name: json.name,
+          }];
+          tetherIndexRef.current = 0;
+          onGooglePoiClickRef.current?.(json.placeId, { lat: json.lat ?? lat, lng: json.lng ?? lng });
+        })
+        .catch(() => { tetherCandidatesRef.current = []; });
+    });
+  }, []);
+  const fireTetherRef = useRef(fireTether);
+  fireTetherRef.current = fireTether;
+  // Cursor move → drop the candidate cache so the next RB tap fires a
+  // fresh query against the new aim point. Without this, RB-tap after
+  // moving the cursor would just cycle through stale candidates from
+  // the old position.
+  useEffect(() => {
+    let lastX = -1;
+    let lastY = -1;
+    const onMove = (e: MouseEvent) => {
+      if (Math.abs(e.clientX - lastX) > 8 || Math.abs(e.clientY - lastY) > 8) {
+        tetherCandidatesRef.current = [];
+        tetherIndexRef.current = 0;
+      }
+      lastX = e.clientX;
+      lastY = e.clientY;
+    };
+    window.addEventListener('mousemove', onMove, { passive: true });
+    return () => window.removeEventListener('mousemove', onMove);
+  }, []);
+
   const actionsRef = useRef<GamepadActions | undefined>(gamepadActions);
   actionsRef.current = gamepadActions;
   // Live multiplier ref so per-frame loop reads the latest value
@@ -671,10 +776,6 @@ function Inner({
       // flight on the next input (useIdleDetection flips isIdle
       // back to false before the next frame runs).
       if (isIdleRef.current) {
-        if (justPressed.has('a')) {
-          // eslint-disable-next-line no-console
-          console.log('[A-press] BLOCKED: isIdle');
-        }
         return;
       }
 
@@ -698,6 +799,14 @@ function Inner({
         // as a physical mouse click. The reticle is purely a visual
         // sight; the click itself is a real OS click on whatever the
         // cursor is hovering. Greg locked this 2026-05-26.
+        //
+        // RB-tap = tether. Forgiveness-zone target acquisition: cursor
+        // aim doesn't need pixel precision; Plot queries nearby Places
+        // and opens the closest. Subsequent RB taps cycle. Greg locked
+        // this 2026-05-26.
+        if (justPressed.has('rb')) {
+          fireTetherRef.current();
+        }
         fire('x', actionsRef.current?.onRotateChannel);
         fire('y', actionsRef.current?.onInspect);
         fire('b', actionsRef.current?.onCancel);

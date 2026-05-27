@@ -287,6 +287,22 @@ code, .font-mono {
   max-height: none !important;
 }
 
+/* ─── Suppress Google's default POI popover on the 3D photoreal
+       surface. Plot owns the property card; Google's white popover
+       must never leak through. event.stop() in gmp-click handles
+       most cases, but some click paths still race Google's renderer
+       — this is the belt-and-suspenders CSS kill switch.
+       Locked 2026-05-27. ─── */
+gmp-map-3d gmp-place-attribution,
+gmp-map-3d .gm-style-iw,
+gmp-map-3d .gm-style-iw-c,
+gmp-map-3d [class*="iw-"],
+gmp-map-3d [class*="poi-info-window"] {
+  display: none !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
+}
+
 /* ─── Skiptrace-pending pin overlay (ambient pulse over any pin
        whose lead is awaiting Tracerfy results) ─── */
 .skiptrace-pending-pin {

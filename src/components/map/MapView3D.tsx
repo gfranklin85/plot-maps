@@ -714,7 +714,18 @@ function Inner({
         position?: { lat: number; lng: number; altitude?: number };
         stop?: () => void;
         stopPropagation?: () => void;
+        preventDefault?: () => void;
+        stopImmediatePropagation?: () => void;
       };
+      // Belt-and-suspenders Google-popover suppression on EVERY click,
+      // not just POI clicks. Different Map3D versions expose different
+      // event-cancel surfaces; we call whichever ones exist. Pairs with
+      // the CSS kill switch in globals.css that hides any popover
+      // element that slips through. Locked 2026-05-27.
+      try { ev.stop?.(); } catch { /* ignore */ }
+      try { ev.stopPropagation?.(); } catch { /* ignore */ }
+      try { ev.stopImmediatePropagation?.(); } catch { /* ignore */ }
+      try { ev.preventDefault?.(); } catch { /* ignore */ }
       // Stash the click position for the A-press handler — works for
       // both POI and ground clicks. This is Map3D's pixel-accurate
       // ray-cast result (knows about real terrain + photoreal mesh),
@@ -728,15 +739,9 @@ function Inner({
       // (older API shape) or on event.detail (newer).
       const placeId = ev.placeId ?? ev.detail?.placeId;
       if (placeId) {
-        // Suppress Google's default popover so Plot's PropertyPopup
-        // is what the user sees. Both stop() and stopPropagation
-        // exist on different Map3D versions; calling whichever is
-        // available is harmless on the other.
-        try { ev.stop?.(); } catch { /* ignore */ }
-        try { ev.stopPropagation?.(); } catch { /* ignore */ }
-        // POI click events also carry a position (Map3D includes
-        // both fields on PlaceClickEvent). Fall back to (0,0) if
-        // missing — the popup looks the place up by id, not coords.
+        // (Google popover suppression already fired above for all
+        // branches.) POI click events carry a position too; fall back
+        // to (0,0) if missing — popup looks the place up by id.
         const poiPos = ev.position ?? ev.detail?.position;
         const lat = poiPos?.lat ?? 0;
         const lng = poiPos?.lng ?? 0;

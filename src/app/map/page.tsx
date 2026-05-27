@@ -128,7 +128,28 @@ export default function MapPage() {
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(initialCenter);
   const [hasUserPanned, setHasUserPanned] = useState(urlResolvedCenter);
   const [showGate, setShowGate] = useState(false);
-  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [selectedLeadRaw, setSelectedLeadRaw] = useState<Lead | null>(null);
+  // Screen-pixel anchor for the selected card. v1: snapshot the click
+  // pixel when the selection opens; card stays glued in screen space.
+  // v2: real lat/lng projection per frame. See docs/property-card-design.md.
+  const [selectedAnchorPx, setSelectedAnchorPx] = useState<{ x: number; y: number } | null>(null);
+  const selectedLead = selectedLeadRaw;
+  // Wrap setSelectedLead so EVERY selection snapshots the cursor pixel.
+  // Plot's MapView3D exposes cursor x/y on window for this purpose. If
+  // the cursor isn't tracked (initial load, programmatic open), fall
+  // back to screen center.
+  const setSelectedLead = (next: Lead | null | ((prev: Lead | null) => Lead | null)) => {
+    if (next === null) {
+      setSelectedLeadRaw(null);
+      setSelectedAnchorPx(null);
+      return;
+    }
+    const w = window as unknown as { __plotCursorX?: number; __plotCursorY?: number };
+    const x = (typeof w.__plotCursorX === 'number') ? w.__plotCursorX : window.innerWidth / 2;
+    const y = (typeof w.__plotCursorY === 'number') ? w.__plotCursorY : window.innerHeight / 2;
+    setSelectedAnchorPx({ x, y });
+    setSelectedLeadRaw(next);
+  };
   const [pinnedRef, setPinnedRef] = useState<Lead | null>(null);
   const [expandedLead, setExpandedLead] = useState<Lead | null>(null);
   // Pin-style toolbar pills were stripped 2026-05-17; default to 'dots'
@@ -1394,9 +1415,56 @@ export default function MapPage() {
         </div>
       )}
 
-      {/* ═══ ACTIVE SELECTION CARD — bottom, changes with each click ═══ */}
-      {selectedLead && !walkMode && (
-        <div className="absolute bottom-14 md:bottom-6 left-0 right-0 md:right-auto md:left-6 z-20 w-full md:w-[380px] max-h-[50vh] md:max-h-[70vh] overflow-y-auto rounded-t-2xl md:rounded-2xl bg-card border border-card-border shadow-2xl">
+      {/* ═══ ACTIVE SELECTION CARD — anchored over the property ═══
+          v1: pinned to the click pixel in screen space. Stays put as
+          camera moves. Leader points down at the snapshot location.
+          v2: lat/lng-projected per frame so it tracks the building. */}
+      {selectedLead && !walkMode && selectedAnchorPx && (() => {
+        const CARD_W = 360;
+        const CARD_H_MAX = 320;
+        const PAD = 16;
+        // Clamp so the card stays on screen even when clicks land near edges.
+        const left = Math.min(
+          Math.max(PAD, selectedAnchorPx.x - CARD_W / 2),
+          window.innerWidth - CARD_W - PAD,
+        );
+        // Default: card above the click. If too close to the top, flip below.
+        const placeAbove = selectedAnchorPx.y > CARD_H_MAX + 80;
+        const top = placeAbove
+          ? Math.max(PAD, selectedAnchorPx.y - CARD_H_MAX - 40)
+          : Math.min(window.innerHeight - CARD_H_MAX - PAD, selectedAnchorPx.y + 40);
+        // Leader anchor pixel — relative to the card's top-left.
+        const leaderX = selectedAnchorPx.x - left;
+        const leaderY = placeAbove ? CARD_H_MAX : -16;
+        return (
+        <div
+          className="absolute z-20 rounded-2xl bg-card border border-card-border shadow-2xl overflow-hidden"
+          style={{
+            left: `${left}px`,
+            top: `${top}px`,
+            width: `${CARD_W}px`,
+            maxHeight: `${CARD_H_MAX}px`,
+            overflowY: 'auto',
+            transition: 'left 120ms ease-out, top 120ms ease-out',
+          }}
+        >
+          {/* Leader — a small SVG triangle pointing at the snapshot
+              click position. Sits BELOW the card when card is above,
+              ABOVE the card when card is below. */}
+          <svg
+            width={24}
+            height={16}
+            style={{
+              position: 'absolute',
+              left: `${leaderX - 12}px`,
+              top: placeAbove ? `${leaderY}px` : `${leaderY}px`,
+              transform: placeAbove ? 'none' : 'rotate(180deg)',
+              pointerEvents: 'none',
+            }}
+            aria-hidden="true"
+          >
+            <polygon points="0,0 24,0 12,16" fill="rgb(var(--color-card))" stroke="rgb(var(--color-card-border))" strokeWidth={1} />
+          </svg>
           <div className="flex items-center justify-between px-4 pt-3 pb-1">
             <div className="flex items-center gap-2">
               {/* Pin to sidebar as reference */}
@@ -1435,7 +1503,8 @@ export default function MapPage() {
             }}
           />
         </div>
-      )}
+        );
+      })()}
 
       {/* ═══ EXPANDED FULL SIDEBAR — deep dive on selected property ═══ */}
       {expandedLead && !walkMode && (

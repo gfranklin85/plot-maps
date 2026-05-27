@@ -427,6 +427,11 @@ function Inner({
     const onMove = (e: MouseEvent) => {
       cursorXRef.current = e.clientX;
       cursorYRef.current = e.clientY;
+      // Expose the cursor pixel globally so the page can snapshot it
+      // when opening an anchored PropertyCard. Cheap, no deps; we
+      // already track this for the cursor-poke and ritual tether.
+      (window as unknown as { __plotCursorX?: number; __plotCursorY?: number }).__plotCursorX = e.clientX;
+      (window as unknown as { __plotCursorX?: number; __plotCursorY?: number }).__plotCursorY = e.clientY;
       // Hover-acquisition check, throttled. Topmost element at cursor
       // pixel; reticle "acquires" iff the map element is in the stack
       // (cursor is over the map surface, not over UI chrome).

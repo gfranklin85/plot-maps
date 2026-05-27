@@ -12,7 +12,6 @@ import AtmosphereOverlay from "./AtmosphereOverlay";
 import SkyDome from "./SkyDome";
 import Parcel3DOverlay from "./Parcel3DOverlay";
 import type { ParcelColorMode, ParcelHitTester } from "./ParcelOverlay";
-import FireBeam, { type FireBeamShot } from "./FireBeam";
 
 // ── Photorealistic 3D Tiles surface (Map3DElement / <gmp-map-3d>) ───
 //
@@ -340,48 +339,53 @@ function Inner({
   const lastSurfaceClickAtRef = useRef<number>(0);
   const lastSurfacePosRef = useRef<{ lat: number; lng: number } | null>(null);
 
-  // ── FireBeam shots state (Breakthrough 2 proof) ────────────────────
-  // Each A-press appends a shot. Sweep shots self-prune via
-  // onShotComplete; tether shots persist until manually cleared.
-  // Render position is reticle (start) → approximated ground-target
-  // pixel (end). The end-Y approximation is a function of camera pitch.
+  // ── Cursor-poke (Greg's "wake-up-hover" trick) ──────────────────────
+  // The OS cursor can sit motionless while the world moves underneath
+  // (controller flight). Google's POI hit-test is gated on mousemove
+  // events — no event means no hover glow, no clickability of the POI
+  // currently under the cursor. We dispatch a synthetic mousemove at
+  // the real cursor position whenever the camera changes, so Google
+  // re-checks what's underneath. Cursor doesn't physically move; the
+  // browser just thinks it did. ~10µs per fire, naturally rate-limited
+  // by actual camera motion (zero events when sitting still).
   //
-  // The shots list is mutated through a ref + forceRender bump so the
-  // beam appears in the SAME frame as the A-press, not after React's
-  // normal batched setState (which felt laggy on first iteration).
-  const fireBeamShotsRef = useRef<FireBeamShot[]>([]);
-  const [, forceFireBeamRender] = useState(0);
-  const shotIdRef = useRef<number>(0);
-  const handleShotComplete = useCallback((id: number) => {
-    fireBeamShotsRef.current = fireBeamShotsRef.current.filter((s) => s.id !== id);
-    forceFireBeamRender((n) => n + 1);
+  // Locked 2026-05-26 as Option A. Cathedral version of "fly the world
+  // under a parked cursor and have it react."
+  const cursorXRef = useRef<number>(-1);
+  const cursorYRef = useRef<number>(-1);
+  const lastPokeAtRef = useRef<number>(0);
+  // Throttle the poke to ~30Hz max. 60Hz is overkill; mousemove
+  // listeners across the DOM (CSS :hover, tooltips, POI hit-tests)
+  // re-evaluate per event, so we ease that constant pressure.
+  const POKE_MIN_INTERVAL_MS = 33;
+  const pokeCursor = useCallback(() => {
+    if (cursorXRef.current < 0 || cursorYRef.current < 0) return;
+    const now = performance.now();
+    if (now - lastPokeAtRef.current < POKE_MIN_INTERVAL_MS) return;
+    lastPokeAtRef.current = now;
+    const target = document.elementFromPoint(cursorXRef.current, cursorYRef.current);
+    if (!target) return;
+    target.dispatchEvent(new MouseEvent('mousemove', {
+      clientX: cursorXRef.current,
+      clientY: cursorYRef.current,
+      bubbles: true,
+      cancelable: true,
+    }));
   }, []);
-  const fireBeam = useCallback((mode: 'sweep' | 'tether') => {
-    const el = elRef.current;
-    const cam = camRef.current;
-    if (!el || !cam) return;
-    const rect = el.getBoundingClientRect();
-    // Reticle is centered on the 3D path today.
-    const startX = rect.left + rect.width / 2;
-    const startY = rect.top + rect.height / 2;
-    // Approximate the on-screen Y of the ground target.
-    //   pitch ~ -90 (looking straight down) → target IS the reticle pixel
-    //   pitch ~  -5 (near horizon)          → target is way below reticle
-    const pitchAbs = Math.min(90, Math.abs(cam.pitch));
-    const factor = 1 - pitchAbs / 90;
-    const endX = startX;
-    const endY = startY + factor * rect.height * 0.42;
-    shotIdRef.current += 1;
-    fireBeamShotsRef.current = [
-      ...fireBeamShotsRef.current,
-      { id: shotIdRef.current, startX, startY, endX, endY, mode },
-    ];
-    forceFireBeamRender((n) => n + 1);
+  const pokeCursorRef = useRef(pokeCursor);
+  pokeCursorRef.current = pokeCursor;
+  // Track real OS cursor at window level — only place where we can
+  // observe its true screen-pixel position. Updates on any real
+  // mouse motion; the controller can't move the OS cursor but the
+  // user can grab the mouse anytime, so we always know where it is.
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      cursorXRef.current = e.clientX;
+      cursorYRef.current = e.clientY;
+    };
+    window.addEventListener('mousemove', onMove, { passive: true });
+    return () => window.removeEventListener('mousemove', onMove);
   }, []);
-  // Stable ref for the gamepad RAF loop to fire without re-binding.
-  const fireBeamRef = useRef(fireBeam);
-  fireBeamRef.current = fireBeam;
-
 
   const actionsRef = useRef<GamepadActions | undefined>(gamepadActions);
   actionsRef.current = gamepadActions;
@@ -490,6 +494,8 @@ function Inner({
       el.heading = m3d.heading;
       el.tilt = m3d.tilt;
       el.range = m3d.range;
+      // Wake hover hit-test while the flyTo arc passes under the cursor.
+      pokeCursorRef.current();
       // Throttled altitude report during the cinematic flight too,
       // so the altimeter sweeps through during the arc.
       if (now - lastAltitudeReportMsRef.current > 100) {
@@ -677,10 +683,6 @@ function Inner({
       // doesn't fight the animation. Resumes naturally on next frame
       // after flyAnimRef clears.
       if (flyAnimRef.current) {
-        if (justPressed.has('a')) {
-          // eslint-disable-next-line no-console
-          console.log('[A-press] BLOCKED: flyAnim in progress');
-        }
         return;
       }
 
@@ -689,138 +691,13 @@ function Inner({
         const fire = (name: ButtonName, fn?: () => void) => {
           if (justPressed.has(name) && fn) fn();
         };
-        // A-press: selection priority is
-        //   (1) Google POI under the reticle  → onGooglePoiClick
-        //   (2) Plot parcel under the reticle → onParcelClick
-        //   (3) nothing → onShoot fallback
-        //
-        // Map3D doesn't expose a public ray-cast-against-POIs API, but
-        // it DOES dispatch gmp-click events with placeId when a pointer
-        // event lands on a POI. We synthesize a click at the reticle
-        // pixel; if Google's internal hit-test produces a POI click,
-        // our gmp-click listener stamps lastPoiClickAtRef and the
-        // follow-up parcel ray-cast suppresses itself to avoid double-
-        // firing on the same press.
-        if (justPressed.has('a')) {
-          // eslint-disable-next-line no-console
-          console.log('[A-press] received — cam=' + (camRef.current ? 'present' : 'NULL') + ' pitch=' + (camRef.current?.pitch.toFixed(1) ?? 'NULL'));
-          // A-press: aim → fire → ask Google what's at that lat/lng.
-          //
-          // This is the universal selection path — works ANYWHERE
-          // on Earth because Google has labeled almost every house
-          // and business via Places. Parcel data (from Plot's own
-          // imports) is a separate augmentation PropertyPopup can
-          // fold in if we have it, but it's NOT the gate. Greg
-          // locked this 2026-05-26: POI surfacing is the primary
-          // tool, parcel data is the bonus.
-          (() => {
-            // Fire the visible beam immediately so the user gets
-            // feedback before the network round-trip.
-            fireBeamRef.current('sweep');
-
-            const cam = camRef.current;
-            const mapEl = elRef.current;
-            if (!cam || !mapEl) { actionsRef.current?.onShoot?.(); return; }
-
-            // ── Step 1: Synthesize a click at the reticle pixel ──
-            // Map3D's own ray-cast knows about real terrain + the
-            // photoreal mesh. When we synthesize a pointer click, its
-            // gmp-click handler fires with the EXACT lat/lng of where
-            // the click ray hits the visible surface. That's pixel-
-            // accurate at any camera angle, unlike our flat-plane
-            // math which drifts at oblique angles. We dispatch here
-            // and read the result on the next frame from
-            // lastSurfacePosRef.
-            const pressedAt = performance.now();
-            const rect = mapEl.getBoundingClientRect();
-            const clientX = rect.left + rect.width / 2;
-            const clientY = rect.top + rect.height / 2;
-            try {
-              mapEl.dispatchEvent(new PointerEvent('pointerdown', {
-                clientX, clientY, bubbles: true, cancelable: true,
-                button: 0, pointerType: 'mouse',
-              }));
-              mapEl.dispatchEvent(new PointerEvent('pointerup', {
-                clientX, clientY, bubbles: true, cancelable: true,
-                button: 0, pointerType: 'mouse',
-              }));
-              mapEl.dispatchEvent(new MouseEvent('click', {
-                clientX, clientY, bubbles: true, cancelable: true,
-                button: 0,
-              }));
-            } catch { /* PointerEvent may not be constructable; we'll fall back */ }
-
-            // Defer one frame for Map3D's gmp-click to fire. If a
-            // surface position came back, use it (pixel-accurate).
-            // If not, fall back to flat-plane math (works fine looking
-            // straight down, drifts at oblique angles).
-            requestAnimationFrame(() => {
-              // If the synthesized click resolved to a POI directly,
-              // the gmp-click handler already opened the popup. Done.
-              if (lastPoiClickAtRef.current >= pressedAt) return;
-
-              let aimLat: number;
-              let aimLng: number;
-              let aimSource: string;
-
-              if (lastSurfaceClickAtRef.current >= pressedAt && lastSurfacePosRef.current) {
-                // Pixel-accurate: Map3D's ray-cast hit the surface.
-                aimLat = lastSurfacePosRef.current.lat;
-                aimLng = lastSurfacePosRef.current.lng;
-                aimSource = 'gmp-surface';
-              } else {
-                // Fallback: flat-plane ray-cast. Less accurate at
-                // shallow angles but works when Google's surface hit
-                // missed (looking at sky, off the photoreal mesh).
-                if (cam.pitch >= -0.5) {
-                  actionsRef.current?.onShoot?.();
-                  return;
-                }
-                const pitchRad = (Math.abs(cam.pitch) * Math.PI) / 180;
-                const groundDistM = cam.altitude / Math.tan(pitchRad);
-                if (!Number.isFinite(groundDistM) || groundDistM <= 0 || groundDistM >= 50_000) {
-                  actionsRef.current?.onShoot?.();
-                  return;
-                }
-                const headingRad = (cam.heading * Math.PI) / 180;
-                const dNorthM = groundDistM * Math.cos(headingRad);
-                const dEastM = groundDistM * Math.sin(headingRad);
-                const cosLat = Math.cos((cam.lat * Math.PI) / 180) || 1;
-                aimLat = cam.lat + dNorthM / 111_320;
-                aimLng = cam.lng + dEastM / (111_320 * cosLat);
-                aimSource = 'flat-plane';
-              }
-
-              // eslint-disable-next-line no-console
-              console.log(
-                `[A-fire] src=${aimSource} cam=(${cam.lat.toFixed(5)},${cam.lng.toFixed(5)}) pitch=${cam.pitch.toFixed(1)}° → aim=(${aimLat.toFixed(5)},${aimLng.toFixed(5)})`
-              );
-
-              // Hit Places Nearby Search. Closest POI to the aim point.
-              const ac = new AbortController();
-              lastParcelLookupAcRef.current?.abort();
-              lastParcelLookupAcRef.current = ac;
-              fetch(`/api/places-nearby?lat=${aimLat}&lng=${aimLng}`, { signal: ac.signal })
-                .then((r) => r.ok ? r.json() : null)
-                .then((json) => {
-                  // eslint-disable-next-line no-console
-                  console.log(
-                    `[A-resolve] → placeId=${json?.placeId ?? 'NULL'} name=${json?.name ?? 'NULL'} address=${json?.address ?? 'NULL'}`
-                  );
-                  if (json && json.placeId) {
-                    onGooglePoiClickRef.current?.(json.placeId as string, { lat: aimLat, lng: aimLng });
-                  } else {
-                    actionsRef.current?.onShoot?.();
-                  }
-                })
-                .catch((err) => {
-                  if ((err as Error).name !== 'AbortError') {
-                    actionsRef.current?.onShoot?.();
-                  }
-                });
-            });
-          })();
-        }
+        // A-press is intentionally NOT handled here. Steam Input (or
+        // equivalent OS-layer mapper) translates controller A → real
+        // OS left-click at the cursor position. Plot's existing mouse
+        // handlers (gmp-click → POI/parcel routing) do the work, same
+        // as a physical mouse click. The reticle is purely a visual
+        // sight; the click itself is a real OS click on whatever the
+        // cursor is hovering. Greg locked this 2026-05-26.
         fire('x', actionsRef.current?.onRotateChannel);
         fire('y', actionsRef.current?.onInspect);
         fire('b', actionsRef.current?.onCancel);
@@ -961,6 +838,11 @@ function Inner({
       el.tilt    = map3d.tilt;
       el.range   = map3d.range;
 
+      // World moved under the cursor — wake Google's hover hit-test so
+      // the POI now under the parked cursor lights up. See pokeCursor
+      // for the why; internally throttled to ~30Hz.
+      pokeCursorRef.current();
+
       // ── Altitude reporting (throttled ~5×/sec) ─────────────────────
       // Pings the page's AltitudeGauge with the live eye altitude.
       // Throttled to avoid React state churn at 60Hz, and gated on
@@ -1026,11 +908,6 @@ function Inner({
           latLngFinderRef={latLngParcelFinderRef}
         />
         <AtmosphereOverlay />
-        {/* Fire-beam selection animation (Breakthrough 2 proof). Each
-            A-press appends a shot here; sweep shots auto-prune via
-            handleShotComplete. SVG is full-viewport, pointer-events
-            none, so it never blocks the map. */}
-        <FireBeam shots={fireBeamShotsRef.current} onShotComplete={handleShotComplete} />
       </div>
     </AtmosphereProvider>
   );

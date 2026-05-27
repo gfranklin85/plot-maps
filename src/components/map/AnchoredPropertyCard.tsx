@@ -96,11 +96,20 @@ export default function AnchoredPropertyCard({
       m.position = { lat, lng, altitude: altitudeM };
 
       const hostDiv = document.createElement('div');
+      // Absolute positioning + explicit dimensions: the marker's
+      // internal layout treats children as 0x0 by default, so the
+      // host must opt out of normal flow and define its own size.
+      // translate(-50%, -100%) anchors the card centered above the
+      // marker's world position (card's bottom-center over the point).
       hostDiv.style.cssText = `
-        position: relative;
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 360px;
         pointer-events: auto;
         transform: translate(-50%, -100%);
         will-change: transform;
+        z-index: 100;
       `;
       m.appendChild(hostDiv);
       mapEl.appendChild(m);

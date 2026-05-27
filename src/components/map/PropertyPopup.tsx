@@ -390,8 +390,16 @@ export default function PropertyPopup({ lead, onUpdate, walkMode = false, onWalk
                   </>
                 );
               }
-              const addr = lead.property_address || parcel?.address || poiAddr || null;
-              const head = addr?.split(',')[0]?.trim() || (googlePoiError ?? 'No address');
+              // Address layer takes precedence over POI fallback because
+              // the addr:<id> resolver returns a clean fullAddress string
+              // (street + city + state + zip), already comma-formatted.
+              const addr = lead.property_address
+                || parcel?.address
+                || addressRecord?.fullAddress
+                || poiAddr
+                || null;
+              const head = addr?.split(',')[0]?.trim()
+                || (addressError ?? googlePoiError ?? 'No address');
               const tail = addr?.split(',').slice(1).join(',').trim() || '';
               return (
                 <>

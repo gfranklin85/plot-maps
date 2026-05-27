@@ -51,3 +51,11 @@ next-env.d.ts
 # read from /data/* by convention; the path is configurable via env vars in
 # production where needed.
 /data/
+
+# OpenAddresses ingest workspace. GeoJSON dumps are hundreds of MB to
+# multiple GB. Source files live on the operator's local disk (D: drive
+# in Greg's case); ingest is a one-time push to Supabase. The /scripts/
+# subfolder is git-tracked except for the bulky data files themselves.
+/scripts/openaddresses/*.geojson
+/scripts/openaddresses/*.geojson.meta
+/scripts/openaddresses/*.log

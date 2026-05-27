@@ -57,6 +57,10 @@ export interface MapViewProps {
    *  same popup primitive parcels open through. POI wins over the
    *  bare-parcel ray-cast when both could resolve. */
   onGooglePoiClick?: (placeId: string, latLng: { lat: number; lng: number }) => void;
+  /** Fires when a ground click resolves to a Plot-owned address record
+   *  via /api/addresses/at-point. Page wires this to open PropertyPopup
+   *  with the `addr:<id>` stub id. */
+  onAddressClick?: (addressId: number, latLng: { lat: number; lng: number }) => void;
   /** Fires when the cursor enters or leaves a parcel polygon. The page
    *  feeds this into the airplane-mode reticle so flying over a parcel
    *  shows the grab-ready hand icon. Pin DOM hover still wins on overlap;

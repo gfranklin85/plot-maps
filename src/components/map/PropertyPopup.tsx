@@ -222,6 +222,24 @@ export default function PropertyPopup({ lead, onUpdate, walkMode = false, onWalk
   } | null>(null);
   const [googlePoiError, setGooglePoiError] = useState<string | null>(null);
 
+  // Plot address-layer record — populated for `addr:<id>` stub leads.
+  // Source is /api/addresses/[id], backed by the `addresses` PostGIS
+  // table seeded from OpenAddresses. This is the universal layer: every
+  // address in every ingested county, no owner data attached, ammo-billed
+  // skip-trace fills in owner on demand. Greg locked 2026-05-27.
+  const [addressRecord, setAddressRecord] = useState<{
+    id: number;
+    streetNumber: string | null;
+    streetName: string | null;
+    unit: string | null;
+    city: string | null;
+    state: string | null;
+    zip: string | null;
+    county: string | null;
+    fullAddress: string;
+  } | null>(null);
+  const [addressError, setAddressError] = useState<string | null>(null);
+
   // Which expand-sections are open. Default: everything collapsed except
   // the always-visible at-a-glance row. Buyer-mode controller experience:
   // sections expand on A/select; collapsed sections show a one-line preview.
@@ -234,12 +252,27 @@ export default function PropertyPopup({ lead, onUpdate, walkMode = false, onWalk
     // Stub-id resolver routing:
     //   `parcel:<APN>`     → /api/parcel?apn=…   (Plot's PostGIS parcel resolver)
     //   `gpoi:<placeId>`   → /api/google-poi?placeId=…  (Google Place Details proxy)
+    //   `addr:<id>`        → /api/addresses/[id]  (Plot's address layer)
     //   anything else      → /api/parcel?lat=…&lng=…   (lat/lng proximity guess)
     //
-    // The branches set DIFFERENT state slots (parcel vs googlePoi) so
-    // the popup body can render the correct sections without the two
-    // shapes fighting for the same field.
+    // The branches set DIFFERENT state slots (parcel vs googlePoi vs
+    // addressRecord) so the popup body renders the right sections.
     const id = lead.id ?? '';
+    if (id.startsWith('addr:')) {
+      const addrId = id.slice('addr:'.length);
+      setAddressError(null);
+      fetch(`/api/addresses/${encodeURIComponent(addrId)}`)
+        .then(async (r) => {
+          if (!r.ok) {
+            setAddressError(r.status === 404 ? 'Address not found' : 'Address lookup failed');
+            return null;
+          }
+          return r.json();
+        })
+        .then((data) => { if (!cancelled && data) setAddressRecord(data); })
+        .catch(() => { if (!cancelled) setAddressError('Address lookup failed'); });
+      return () => { cancelled = true; };
+    }
     if (id.startsWith('gpoi:')) {
       const placeId = id.slice('gpoi:'.length);
       setGooglePoiError(null);

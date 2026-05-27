@@ -1244,6 +1244,27 @@ export default function MapPage() {
               } as unknown as Lead;
               setSelectedLead(stub);
             }}
+            onAddressClick={(addressId, latLng) => {
+              // Plot address-layer selection (2026-05-27). PostGIS hit
+              // on /api/addresses/at-point → open PropertyPopup with
+              // `addr:<id>` stub; resolver fetches /api/addresses/[id].
+              const stub: Lead = {
+                id: `addr:${addressId}`,
+                user_id: '',
+                name: '',
+                property_address: null,
+                owner_name: null,
+                phone: null,
+                phone_2: null,
+                phone_3: null,
+                email: null,
+                status: 'New',
+                latitude: latLng.lat,
+                longitude: latLng.lng,
+                created_at: new Date().toISOString(),
+              } as unknown as Lead;
+              setSelectedLead(stub);
+            }}
             view3D={view3D}
             flight={flight}
             navigateTo={navigateTarget}

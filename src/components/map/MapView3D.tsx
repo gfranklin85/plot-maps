@@ -251,6 +251,7 @@ function Inner({
   onParcelHoverChange,
   parcelHitTesterRef,
   onGooglePoiClick,
+  onAddressClick,
 }: {
   center?: { lat: number; lng: number } | null;
   gamepadEnabled: boolean;
@@ -284,6 +285,10 @@ function Inner({
    *  Google's native POI labels (address numbers, business icons).
    *  Page wires this to open PropertyPopup with id `gpoi:<placeId>`. */
   onGooglePoiClick?: (placeId: string, latLng: { lat: number; lng: number }) => void;
+  /** Plot address-layer selection. Fires when a ground click resolves
+   *  to a Plot-owned address record (OpenAddresses ingest, per-county).
+   *  Page wires this to open PropertyPopup with id `addr:<id>`. */
+  onAddressClick?: (addressId: number, latLng: { lat: number; lng: number }) => void;
 }) {
   const maps3d = useMapsLibrary('maps3d');
   const elRef = useRef<Map3DElement | null>(null);
@@ -315,6 +320,8 @@ function Inner({
   // Same pattern for Google POI clicks.
   const onGooglePoiClickRef = useRef(onGooglePoiClick);
   onGooglePoiClickRef.current = onGooglePoiClick;
+  const onAddressClickRef = useRef(onAddressClick);
+  onAddressClickRef.current = onAddressClick;
   // Hover-change is no longer driven by 3D — reticle hover state was
   // removed when selection moved server-side. Prop still accepted so
   // the 2D path's contract is preserved unchanged.
@@ -690,26 +697,48 @@ function Inner({
         onGooglePoiClickRef.current?.(placeId, { lat, lng });
         return;
       }
-      // LocationClickEvent — extract the click lat/lng.
+      // LocationClickEvent — extract the click lat/lng. Resolve order
+      // for ground clicks (Greg locked 2026-05-27):
+      //   1. Plot address layer (/api/addresses/at-point, 30m radius)
+      //      → opens addr:<id> popup. Universal across every ingested
+      //      county. National coverage. Eclipses the old parcel-at-
+      //      point path which had bad PostGIS data outside Kings.
+      //   2. Plot parcel layer (/api/parcels/at-point) as a Tier-1
+      //      enrichment fallback — only used when there's no Plot
+      //      address within radius. Today this means the user clicked
+      //      somewhere we have parcel polygon coverage (Kings) but no
+      //      address point. Rare.
+      // Pin > parcel > address ordering was the original design, but
+      // for the click resolver address WINS because it's the broader
+      // coverage. Pin handling lives upstream (the parcel/pin overlay
+      // intercepts before gmp-click reaches us).
       const pos = ev.position ?? ev.detail?.position;
       if (!pos || !Number.isFinite(pos.lat) || !Number.isFinite(pos.lng)) return;
       const lat = pos.lat;
       const lng = pos.lng;
-      // Server-side resolve. AbortController so rapid clicks cancel
-      // stale lookups (the last click wins, not the slowest network).
       const ac = new AbortController();
       lastParcelLookupAcRef.current?.abort();
       lastParcelLookupAcRef.current = ac;
-      fetch(`/api/parcels/at-point?lat=${lat}&lng=${lng}`, { signal: ac.signal })
+      // Try Plot address layer first.
+      fetch(`/api/addresses/at-point?lat=${lat}&lng=${lng}&radius=30`, { signal: ac.signal })
         .then((r) => r.ok ? r.json() : null)
         .then((json) => {
-          if (!json || !json.apn) return;
-          onParcelClickRef.current?.(json.apn as string, { lat, lng });
+          if (json && typeof json.id === 'number') {
+            onAddressClickRef.current?.(json.id, { lat, lng });
+            return;
+          }
+          // No address hit — fall through to parcel.
+          return fetch(`/api/parcels/at-point?lat=${lat}&lng=${lng}`, { signal: ac.signal })
+            .then((r2) => r2.ok ? r2.json() : null)
+            .then((parcelJson) => {
+              if (!parcelJson || !parcelJson.apn) return;
+              onParcelClickRef.current?.(parcelJson.apn as string, { lat, lng });
+            });
         })
         .catch((err) => {
           if ((err as Error).name !== 'AbortError') {
             // eslint-disable-next-line no-console
-            console.warn('[MapView3D] parcel-at-point lookup failed', err);
+            console.warn('[MapView3D] click resolver failed', err);
           }
         });
     }
@@ -1044,6 +1073,7 @@ export default function MapView3D(props: MapViewProps) {
         onParcelHoverChange={props.onParcelHoverChange}
         parcelHitTesterRef={props.parcelHitTesterRef}
         onGooglePoiClick={props.onGooglePoiClick}
+        onAddressClick={props.onAddressClick}
       />
     </APIProvider>
   );

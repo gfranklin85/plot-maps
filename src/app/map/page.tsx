@@ -14,6 +14,7 @@ import { useAuth } from "@/lib/auth-context";
 import MaterialIcon from "@/components/ui/MaterialIcon";
 import UpgradeGate from "@/components/ui/UpgradeGate";
 import PropertyPopup from "@/components/map/PropertyPopup";
+import AnchoredPropertyCard from "@/components/map/AnchoredPropertyCard";
 import ProspectListPanel from "@/components/map/ProspectListPanel";
 import OnboardingTooltips from "@/components/ui/OnboardingTooltips";
 import ProspectCoachOverlay from "@/components/map/ProspectCoachOverlay";
@@ -128,28 +129,11 @@ export default function MapPage() {
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(initialCenter);
   const [hasUserPanned, setHasUserPanned] = useState(urlResolvedCenter);
   const [showGate, setShowGate] = useState(false);
-  const [selectedLeadRaw, setSelectedLeadRaw] = useState<Lead | null>(null);
-  // Screen-pixel anchor for the selected card. v1: snapshot the click
-  // pixel when the selection opens; card stays glued in screen space.
-  // v2: real lat/lng projection per frame. See docs/property-card-design.md.
-  const [selectedAnchorPx, setSelectedAnchorPx] = useState<{ x: number; y: number } | null>(null);
-  const selectedLead = selectedLeadRaw;
-  // Wrap setSelectedLead so EVERY selection snapshots the cursor pixel.
-  // Plot's MapView3D exposes cursor x/y on window for this purpose. If
-  // the cursor isn't tracked (initial load, programmatic open), fall
-  // back to screen center.
-  const setSelectedLead = (next: Lead | null | ((prev: Lead | null) => Lead | null)) => {
-    if (next === null) {
-      setSelectedLeadRaw(null);
-      setSelectedAnchorPx(null);
-      return;
-    }
-    const w = window as unknown as { __plotCursorX?: number; __plotCursorY?: number };
-    const x = (typeof w.__plotCursorX === 'number') ? w.__plotCursorX : window.innerWidth / 2;
-    const y = (typeof w.__plotCursorY === 'number') ? w.__plotCursorY : window.innerHeight / 2;
-    setSelectedAnchorPx({ x, y });
-    setSelectedLeadRaw(next);
-  };
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  // Ref to the gmp-map-3d element, forwarded from MapView3D. Used to
+  // mount the AnchoredPropertyCard inside Google's 3D world so the
+  // card tracks the building at world coordinates, not screen pixels.
+  const map3DElRef = useRef<HTMLElement | null>(null);
   const [pinnedRef, setPinnedRef] = useState<Lead | null>(null);
   const [expandedLead, setExpandedLead] = useState<Lead | null>(null);
   // Pin-style toolbar pills were stripped 2026-05-17; default to 'dots'
@@ -1286,6 +1270,7 @@ export default function MapPage() {
               } as unknown as Lead;
               setSelectedLead(stub);
             }}
+            mapElForwardRef={map3DElRef}
             view3D={view3D}
             flight={flight}
             navigateTo={navigateTarget}
@@ -1416,95 +1401,64 @@ export default function MapPage() {
       )}
 
       {/* ═══ ACTIVE SELECTION CARD — anchored over the property ═══
-          v1: pinned to the click pixel in screen space. Stays put as
-          camera moves. Leader points down at the snapshot location.
-          v2: lat/lng-projected per frame so it tracks the building. */}
-      {selectedLead && !walkMode && selectedAnchorPx && (() => {
-        const CARD_W = 360;
-        const CARD_H_MAX = 320;
-        const PAD = 16;
-        // Clamp so the card stays on screen even when clicks land near edges.
-        const left = Math.min(
-          Math.max(PAD, selectedAnchorPx.x - CARD_W / 2),
-          window.innerWidth - CARD_W - PAD,
-        );
-        // Default: card above the click. If too close to the top, flip below.
-        const placeAbove = selectedAnchorPx.y > CARD_H_MAX + 80;
-        const top = placeAbove
-          ? Math.max(PAD, selectedAnchorPx.y - CARD_H_MAX - 40)
-          : Math.min(window.innerHeight - CARD_H_MAX - PAD, selectedAnchorPx.y + 40);
-        // Leader anchor pixel — relative to the card's top-left.
-        const leaderX = selectedAnchorPx.x - left;
-        const leaderY = placeAbove ? CARD_H_MAX : -16;
-        return (
-        <div
-          className="absolute z-20 rounded-2xl bg-card border border-card-border shadow-2xl overflow-hidden"
-          style={{
-            left: `${left}px`,
-            top: `${top}px`,
-            width: `${CARD_W}px`,
-            maxHeight: `${CARD_H_MAX}px`,
-            overflowY: 'auto',
-            transition: 'left 120ms ease-out, top 120ms ease-out',
-          }}
+          Mounted as a Marker3DInteractiveElement inside gmp-map-3d at
+          the property's lat/lng. Google's renderer handles projection,
+          depth, occlusion, and camera tracking. The card stays glued
+          to the building as the camera moves. Cathedral grade. */}
+      {selectedLead && !walkMode && selectedLead.latitude != null && selectedLead.longitude != null && (
+        <AnchoredPropertyCard
+          mapElRef={map3DElRef}
+          lat={selectedLead.latitude}
+          lng={selectedLead.longitude}
+          altitudeM={12}
         >
-          {/* Leader — a small SVG triangle pointing at the snapshot
-              click position. Sits BELOW the card when card is above,
-              ABOVE the card when card is below. */}
-          <svg
-            width={24}
-            height={16}
+          <div
+            className="rounded-2xl bg-card border border-card-border shadow-2xl overflow-hidden"
             style={{
-              position: 'absolute',
-              left: `${leaderX - 12}px`,
-              top: placeAbove ? `${leaderY}px` : `${leaderY}px`,
-              transform: placeAbove ? 'none' : 'rotate(180deg)',
-              pointerEvents: 'none',
+              width: '360px',
+              maxHeight: '320px',
+              overflowY: 'auto',
             }}
-            aria-hidden="true"
           >
-            <polygon points="0,0 24,0 12,16" fill="rgb(var(--color-card))" stroke="rgb(var(--color-card-border))" strokeWidth={1} />
-          </svg>
-          <div className="flex items-center justify-between px-4 pt-3 pb-1">
-            <div className="flex items-center gap-2">
-              {/* Pin to sidebar as reference */}
-              <button
-                onClick={() => { setPinnedRef(selectedLead); setSelectedLead(null); }}
-                className="flex items-center gap-1 text-[10px] font-bold text-primary uppercase tracking-widest hover:underline"
-                title="Pin as reference property"
-              >
-                <MaterialIcon icon="push_pin" className="text-[14px]" />
-                Pin
-              </button>
-              <button
-                onClick={() => { setExpandedLead(selectedLead); setSelectedLead(null); }}
-                className="flex items-center gap-1 text-[10px] font-bold text-primary uppercase tracking-widest hover:underline"
-              >
-                <MaterialIcon icon="open_in_full" className="text-[14px]" />
-                Expand
+            <div className="flex items-center justify-between px-4 pt-3 pb-1">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => { setPinnedRef(selectedLead); setSelectedLead(null); }}
+                  className="flex items-center gap-1 text-[10px] font-bold text-primary uppercase tracking-widest hover:underline"
+                  title="Pin as reference property"
+                >
+                  <MaterialIcon icon="push_pin" className="text-[14px]" />
+                  Pin
+                </button>
+                <button
+                  onClick={() => { setExpandedLead(selectedLead); setSelectedLead(null); }}
+                  className="flex items-center gap-1 text-[10px] font-bold text-primary uppercase tracking-widest hover:underline"
+                >
+                  <MaterialIcon icon="open_in_full" className="text-[14px]" />
+                  Expand
+                </button>
+              </div>
+              <button onClick={() => setSelectedLead(null)} className="text-secondary hover:text-on-surface transition-colors">
+                <MaterialIcon icon="close" className="text-[18px]" />
               </button>
             </div>
-            <button onClick={() => setSelectedLead(null)} className="text-secondary hover:text-on-surface transition-colors">
-              <MaterialIcon icon="close" className="text-[18px]" />
-            </button>
+            <PropertyPopup
+              lead={selectedLead}
+              onUpdate={refetchLeads}
+              onToggleProspectMode={() => handleToggleProspectMode(selectedLead)}
+              prospectMode={prospectMode}
+              onWalkHere={(lead) => {
+                if (!isSubscribed) { setShowGate(true); return; }
+                if (lead.latitude && lead.longitude) {
+                  setMapCenter({ lat: lead.latitude, lng: lead.longitude });
+                  setWalkMode(true);
+                  setSelectedLead(null);
+                }
+              }}
+            />
           </div>
-          <PropertyPopup
-            lead={selectedLead}
-            onUpdate={refetchLeads}
-            onToggleProspectMode={() => handleToggleProspectMode(selectedLead)}
-            prospectMode={prospectMode}
-            onWalkHere={(lead) => {
-              if (!isSubscribed) { setShowGate(true); return; }
-              if (lead.latitude && lead.longitude) {
-                setMapCenter({ lat: lead.latitude, lng: lead.longitude });
-                setWalkMode(true);
-                setSelectedLead(null);
-              }
-            }}
-          />
-        </div>
-        );
-      })()}
+        </AnchoredPropertyCard>
+      )}
 
       {/* ═══ EXPANDED FULL SIDEBAR — deep dive on selected property ═══ */}
       {expandedLead && !walkMode && (

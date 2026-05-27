@@ -256,6 +256,7 @@ function Inner({
   parcelHitTesterRef,
   onGooglePoiClick,
   onAddressClick,
+  mapElForwardRef,
 }: {
   center?: { lat: number; lng: number } | null;
   gamepadEnabled: boolean;
@@ -293,6 +294,10 @@ function Inner({
    *  to a Plot-owned address record (OpenAddresses ingest, per-county).
    *  Page wires this to open PropertyPopup with id `addr:<id>`. */
   onAddressClick?: (addressId: number, latLng: { lat: number; lng: number }) => void;
+  /** Forwarded ref to the underlying <gmp-map-3d> element. Used by
+   *  page.tsx to mount Marker3D children (AnchoredPropertyCard, etc.)
+   *  inside Google's world-space scene graph. */
+  mapElForwardRef?: React.MutableRefObject<HTMLElement | null>;
 }) {
   const maps3d = useMapsLibrary('maps3d');
   const elRef = useRef<Map3DElement | null>(null);
@@ -698,6 +703,7 @@ function Inner({
     el.setAttribute('default-labels-disabled', poisVisible ? 'false' : 'true');
     containerRef.current.appendChild(el);
     elRef.current = el;
+    if (mapElForwardRef) mapElForwardRef.current = el;
     // Map3D fires gmp-click on the map element itself with two payload
     // types: PlaceClickEvent (user clicked a labeled POI / business
     // icon — has placeId) and LocationClickEvent (user clicked ground
@@ -856,6 +862,7 @@ function Inner({
       lastParcelLookupAcRef.current = null;
       el.remove();
       elRef.current = null;
+      if (mapElForwardRef) mapElForwardRef.current = null;
       camRef.current = null;
     };
     // poisVisible is intentionally excluded — seeding the initial
@@ -1170,6 +1177,7 @@ export default function MapView3D(props: MapViewProps) {
         parcelHitTesterRef={props.parcelHitTesterRef}
         onGooglePoiClick={props.onGooglePoiClick}
         onAddressClick={props.onAddressClick}
+        mapElForwardRef={props.mapElForwardRef}
       />
     </APIProvider>
   );

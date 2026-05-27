@@ -61,6 +61,10 @@ export interface MapViewProps {
    *  via /api/addresses/at-point. Page wires this to open PropertyPopup
    *  with the `addr:<id>` stub id. */
   onAddressClick?: (addressId: number, latLng: { lat: number; lng: number }) => void;
+  /** Forwarded ref to the <gmp-map-3d> element. Used by the page to
+   *  mount Marker3D children (anchored PropertyCard etc.) inside
+   *  Google's 3D scene graph. */
+  mapElForwardRef?: React.MutableRefObject<HTMLElement | null>;
   /** Fires when the cursor enters or leaves a parcel polygon. The page
    *  feeds this into the airplane-mode reticle so flying over a parcel
    *  shows the grab-ready hand icon. Pin DOM hover still wins on overlap;

@@ -10,7 +10,9 @@ import type { GamepadActions } from "./GamepadFlightController";
 import { AtmosphereProvider } from "@/lib/atmosphere/AtmosphereContext";
 import AtmosphereOverlay from "./AtmosphereOverlay";
 import CustomReticle from "./CustomReticle";
+import RitualTether, { type RitualTetherHandle } from "./RitualTether";
 import { RITUAL_TIMING } from "@/lib/ritualTiming";
+import { scheduleImpact } from "@/lib/ritualAudio";
 import SkyDome from "./SkyDome";
 import Parcel3DOverlay from "./Parcel3DOverlay";
 import type { ParcelColorMode, ParcelHitTester } from "./ParcelOverlay";
@@ -368,6 +370,32 @@ function Inner({
   // v2 will upgrade to "over a Plot record specifically" via debounced
   // ground-projection query. See docs/confirmation-ritual-design.md.
   const [hoverActive, setHoverActive] = useState<boolean>(false);
+  // Tether imperative handle. Fired on every gmp-click; the reveal
+  // callback runs after impact + REVEAL_DELAY_AFTER_IMPACT_MS so the
+  // PropertyCard feels CAUSED by the connection, not coincident.
+  const tetherRef = useRef<RitualTetherHandle | null>(null);
+  // Helper: fire the full confirmation ritual at the cursor pixel and
+  // schedule the reveal callback. Pair-locked: tether visual + audio
+  // impact + reveal share the same impact frame.
+  const fireRitual = useCallback((revealCallback: () => void) => {
+    const x = cursorXRef.current >= 0 ? cursorXRef.current : window.innerWidth / 2;
+    const y = cursorYRef.current >= 0 ? cursorYRef.current : window.innerHeight / 2;
+    const tether = tetherRef.current;
+    if (!tether) {
+      // Tether unmounted (shouldn't happen, but fail open) — fall
+      // through to immediate reveal so clicks still work.
+      revealCallback();
+      return;
+    }
+    const totalMs = tether.fire(x, y, () => { /* impact frame */ });
+    // Audio scheduled to peak exactly when the tether arrives.
+    scheduleImpact(totalMs);
+    // PropertyCard reveal — small delay after impact so it feels
+    // caused by the connection.
+    window.setTimeout(revealCallback, totalMs + RITUAL_TIMING.REVEAL_DELAY_AFTER_IMPACT_MS);
+  }, []);
+  const fireRitualRef = useRef(fireRitual);
+  fireRitualRef.current = fireRitual;
   // Throttle the poke to ~30Hz max. 60Hz is overkill; mousemove
   // listeners across the DOM (CSS :hover, tooltips, POI hit-tests)
   // re-evaluate per event, so we ease that constant pressure.
@@ -716,7 +744,10 @@ function Inner({
         // gamepad A-press synthetic-click race can suppress its
         // follow-up parcel ray-cast. See A-press handler.
         lastPoiClickAtRef.current = performance.now();
-        onGooglePoiClickRef.current?.(placeId, { lat, lng });
+        // Fire the confirmation ritual; popup reveals after impact.
+        fireRitualRef.current(() => {
+          onGooglePoiClickRef.current?.(placeId, { lat, lng });
+        });
         return;
       }
       // LocationClickEvent — extract the click lat/lng. Resolve order
@@ -741,12 +772,34 @@ function Inner({
       const ac = new AbortController();
       lastParcelLookupAcRef.current?.abort();
       lastParcelLookupAcRef.current = ac;
+      // Fire the confirmation ritual IMMEDIATELY at the cursor pixel.
+      // The data query runs in parallel; whichever resolver wins
+      // (address vs parcel) is invoked from the reveal callback after
+      // impact + REVEAL_DELAY_AFTER_IMPACT_MS. If the API resolves
+      // before the reveal timer fires, we stash the result and fire
+      // exactly on time. If it resolves after, we fire whenever it
+      // lands (degraded but functional).
+      let resolved: { kind: 'address'; id: number; lat: number; lng: number }
+        | { kind: 'parcel'; apn: string; lat: number; lng: number }
+        | null = null;
+      let revealReady = false;
+      const tryReveal = () => {
+        if (!revealReady) return;
+        if (!resolved) return;
+        if (resolved.kind === 'address') {
+          onAddressClickRef.current?.(resolved.id, { lat: resolved.lat, lng: resolved.lng });
+        } else {
+          onParcelClickRef.current?.(resolved.apn, { lat: resolved.lat, lng: resolved.lng });
+        }
+      };
+      fireRitualRef.current(() => { revealReady = true; tryReveal(); });
       // Try Plot address layer first.
       fetch(`/api/addresses/at-point?lat=${lat}&lng=${lng}&radius=30`, { signal: ac.signal })
         .then((r) => r.ok ? r.json() : null)
         .then((json) => {
           if (json && typeof json.id === 'number') {
-            onAddressClickRef.current?.(json.id, { lat, lng });
+            resolved = { kind: 'address', id: json.id, lat, lng };
+            tryReveal();
             return;
           }
           // No address hit — fall through to parcel.
@@ -754,7 +807,8 @@ function Inner({
             .then((r2) => r2.ok ? r2.json() : null)
             .then((parcelJson) => {
               if (!parcelJson || !parcelJson.apn) return;
-              onParcelClickRef.current?.(parcelJson.apn as string, { lat, lng });
+              resolved = { kind: 'parcel', apn: parcelJson.apn as string, lat, lng };
+              tryReveal();
             });
         })
         .catch((err) => {
@@ -1068,11 +1122,15 @@ function Inner({
           latLngFinderRef={latLngParcelFinderRef}
         />
         <AtmosphereOverlay />
+        {/* Ritual tether — fires from viewport bottom-center to the
+            cursor pixel on every gmp-click. Pairs with scheduleImpact
+            (Web Audio) and the delayed reveal callback. See
+            docs/confirmation-ritual-design.md. */}
+        <RitualTether ref={tetherRef} />
         {/* Plot's theodolite reticle replaces the OS cursor inside the
             map container. The OS cursor still moves (Steam Input or
             mouse) and still fires real click events; we just replace
-            the *visual* with a custom SVG. See docs/confirmation-
-            ritual-design.md. */}
+            the *visual* with a custom SVG. */}
         <CustomReticle hoverActive={hoverActive} />
       </div>
     </AtmosphereProvider>

@@ -893,11 +893,26 @@ export default function MapPage() {
                     onSelect={(payload) => {
                       setMapCenter({ lat: payload.lat, lng: payload.lng });
                       setHasUserPanned(true);
+                      // 2D path: animated zoom via the choreographer.
                       dispatchFlight({
                         center: { lat: payload.lat, lng: payload.lng },
                         zoom: 19,
                         duration: 900,
                         easing: 'easeInOutCubic',
+                      });
+                      // 3D path: drop the camera at a prospecting-comfortable
+                      // altitude over the target. Without this, the 3D map
+                      // would land at zoom-19 → ground level → camera buried
+                      // inside the photoreal mesh (search-to-ground bug).
+                      // Locked 2026-05-27.
+                      setFlyToTarget({
+                        lat: payload.lat,
+                        lng: payload.lng,
+                        altitude: 280,
+                        heading: 0,
+                        pitch: -45,
+                        range: 600,
+                        durationMs: 1200,
                       });
                       if (payload.leadId && user) {
                         supabase
@@ -1047,11 +1062,22 @@ export default function MapPage() {
               onSelect={(payload) => {
                 setMapCenter({ lat: payload.lat, lng: payload.lng });
                 setHasUserPanned(true);
+                // 2D path
                 dispatchFlight({
                   center: { lat: payload.lat, lng: payload.lng },
                   zoom: 19,
                   duration: 900,
                   easing: 'easeInOutCubic',
+                });
+                // 3D path — prospecting-comfortable altitude over target.
+                setFlyToTarget({
+                  lat: payload.lat,
+                  lng: payload.lng,
+                  altitude: 280,
+                  heading: 0,
+                  pitch: -45,
+                  range: 600,
+                  durationMs: 1200,
                 });
                 if (payload.leadId && user) {
                   supabase

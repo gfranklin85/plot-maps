@@ -139,6 +139,12 @@ export default function MapPage() {
   // when the popup dismisses so the vertical rebound beam collapses
   // cleanly. Greg locked 2026-05-28: dismiss reverses the ritual.
   const ritualTetherRef = useRef<RitualTetherHandle | null>(null);
+  // Ref to the popover DOM element forwarded from AnchoredPropertyCard.
+  // The ritual tether's beam tracks this element each frame so the
+  // umbilical stays glued to the popup as the camera moves through
+  // the world. Greg locked 2026-05-28 evening: "the bounce stays
+  // with the UI, not the reticle."
+  const popoverElRef = useRef<HTMLElement | null>(null);
   // Wrap setSelectedLead so dismiss (null) also retracts the tether.
   const setSelectedLead = (next: Lead | null | ((prev: Lead | null) => Lead | null)) => {
     setSelectedLeadRaw((prev) => {
@@ -150,6 +156,28 @@ export default function MapPage() {
       return resolved;
     });
   };
+  // When the popup opens, attach the rebound beam to it so the beam
+  // tracks the popup's screen position each frame as the camera moves.
+  // The popover mounts asynchronously (polling for gmp-popover registration);
+  // we poll the ref ourselves on a few RAF ticks until it's set.
+  useEffect(() => {
+    if (!selectedLead) return;
+    let attempts = 0;
+    let rafId: number | null = null;
+    const tryAttach = () => {
+      attempts += 1;
+      const el = popoverElRef.current;
+      if (el) {
+        try { ritualTetherRef.current?.attachTo(el); } catch { /* noop */ }
+        return;
+      }
+      if (attempts < 60) {
+        rafId = requestAnimationFrame(tryAttach);
+      }
+    };
+    rafId = requestAnimationFrame(tryAttach);
+    return () => { if (rafId !== null) cancelAnimationFrame(rafId); };
+  }, [selectedLead]);
   const [pinnedRef, setPinnedRef] = useState<Lead | null>(null);
   const [expandedLead, setExpandedLead] = useState<Lead | null>(null);
   // Pin-style toolbar pills were stripped 2026-05-17; default to 'dots'
@@ -1448,6 +1476,7 @@ export default function MapPage() {
           lat={selectedLead.latitude}
           lng={selectedLead.longitude}
           altitudeM={12}
+          popoverForwardRef={popoverElRef}
         >
           <div
             className="rounded-2xl bg-card border border-card-border shadow-2xl overflow-hidden"

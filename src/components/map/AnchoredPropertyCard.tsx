@@ -30,6 +30,10 @@ interface AnchoredPropertyCardProps {
   lng: number;
   /** Altitude above ground in meters. */
   altitudeM?: number;
+  /** Forwarded ref to the popover element so other components
+   *  (e.g. RitualTether's vertical beam) can read its projected
+   *  screen position each frame and stay attached. */
+  popoverForwardRef?: React.MutableRefObject<HTMLElement | null>;
   children: ReactNode;
 }
 
@@ -51,6 +55,7 @@ export default function AnchoredPropertyCard({
   lat,
   lng,
   altitudeM = 8,
+  popoverForwardRef,
   children,
 }: AnchoredPropertyCardProps) {
   const [popover, setPopover] = useState<PopoverElement | null>(null);
@@ -107,6 +112,7 @@ export default function AnchoredPropertyCard({
       mapEl.appendChild(p);
       createdPopover = p;
       setPopover(p);
+      if (popoverForwardRef) popoverForwardRef.current = p;
       setSupported(true);
       attached = true;
     };
@@ -118,6 +124,7 @@ export default function AnchoredPropertyCard({
       if (attached && createdPopover) {
         try { createdPopover.remove(); } catch { /* already gone */ }
       }
+      if (popoverForwardRef) popoverForwardRef.current = null;
       setPopover(null);
     };
     // mapElRef is stable; lat/lng/altitude changes handled by separate

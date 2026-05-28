@@ -58,12 +58,16 @@ export const RITUAL_TIMING = {
   // edge sits at impactY - REBOUND_RISE_DISTANCE_PX.
   REBOUND_RISE_DISTANCE_PX: 140,
 
-  // Phase 6 — Reveal. PropertyCard fades in after the beam rises +
-  // stabilizes. The card must feel DEPLOYED by the beam, not
-  // coincident with it.
-  // Derived: rebound (pause + rise + stabilize) is the full lead-up
-  // to reveal. Caller computes the absolute reveal timestamp.
-  REVEAL_DELAY_AFTER_IMPACT_MS: 40 + 220 + 80, // pressure + rise + stabilize
+  // Phase 6 — Reveal. PropertyCard fades in DURING the beam rise,
+  // not after. Greg locked 2026-05-28 evening: the beam should
+  // "land into" the popup, not deliver it after the fact. Popup
+  // begins materializing partway through rise so both finish at
+  // roughly the same frame — continuous motion, not sequential.
+  //
+  // Reveal starts after: pressure pause + 60% of rise. Popup's
+  // own fade-in animation (~180ms) completes ~the moment the beam
+  // reaches its top. Feels like the beam enters the card.
+  REVEAL_DELAY_AFTER_IMPACT_MS: 40 + 220 * 0.6, // = 172ms
 
   // Phase 7 — Decay. Tether fades, parcel illumination drops to a
   // sustained "selected" glow, sustained glow persists until card is

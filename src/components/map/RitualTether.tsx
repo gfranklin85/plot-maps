@@ -31,12 +31,27 @@ export interface RitualTetherHandle {
    *
    *  Greg's design-intelligence breakthrough 2026-05-28: the beam
    *  doesn't open the popup — the beam DEPLOYS the popup. Same
-   *  energy, redirected upward into information form. */
-  fire(targetX: number, targetY: number, onImpact?: () => void): number;
+   *  energy, redirected upward into information form.
+   *
+   *  attachToEl: once the rebound beam reaches full extension, switch
+   *  from static targetX/targetY to live-tracking this element's
+   *  bounding rect. Beam stays glued to the popup as the camera
+   *  moves through the world. Greg locked 2026-05-28 evening. */
+  fire(
+    targetX: number,
+    targetY: number,
+    onImpact?: () => void,
+    attachToEl?: HTMLElement | null,
+  ): number;
   /** Retract. On card dismiss, the vertical beam collapses back into
    *  the property and fades. Caller invokes this when the popup is
    *  closed so the umbilical doesn't linger after the card is gone. */
   retract(): void;
+  /** Switch the beam from static post-impact coords to live-tracking
+   *  an element's bounding rect. Called from page.tsx once the popup
+   *  element has mounted (one render tick after selectedLead is set).
+   *  Idempotent — calling again replaces the previous follow target. */
+  attachTo(el: HTMLElement | null): void;
 }
 
 interface RitualTetherProps {
@@ -60,7 +75,12 @@ const RitualTether = forwardRef<RitualTetherHandle, RitualTetherProps>(
     const reboundNodeRef = useRef<SVGCircleElement | null>(null);
 
     useImperativeHandle(ref, () => ({
-      fire(targetX: number, targetY: number, onImpact?: () => void): number {
+      fire(
+        targetX: number,
+        targetY: number,
+        onImpact?: () => void,
+        attachToEl?: HTMLElement | null,
+      ): number {
         const svg = svgRef.current;
         const line = lineRef.current;
         const ring = impactRingRef.current;
@@ -202,6 +222,51 @@ const RitualTether = forwardRef<RitualTetherHandle, RitualTetherProps>(
                   node.setAttribute('r', String(2 + 4 * eased));
                   if (u < 1) {
                     riseRaf = requestAnimationFrame(rise);
+                  } else {
+                    // Rise complete — switch to live-follow mode if
+                    // an attach element was provided. Beam top now
+                    // tracks the popup's bottom-center each frame.
+                    if (attachToEl) {
+                      let followRaf = 0;
+                      let prevTopY = y;
+                      let prevBottomY = targetY;
+                      const follow = () => {
+                        const r = attachToEl.getBoundingClientRect();
+                        if (r.width === 0 && r.height === 0) {
+                          // Popup not laid out yet; hold last frame.
+                          followRaf = requestAnimationFrame(follow);
+                          return;
+                        }
+                        const popupCenterX = r.left + r.width / 2;
+                        // Beam terminates 6px INSIDE the popup's
+                        // bottom edge so it visually enters the card.
+                        const popupBottomY = r.bottom - 6;
+                        // Beam bottom anchor: directly under popup
+                        // center, projected toward the ground where
+                        // the impact ring popped. Match popup x so
+                        // the umbilical stays plumb.
+                        const groundY = popupBottomY + RITUAL_TIMING.REBOUND_RISE_DISTANCE_PX;
+                        // Smooth in case Google's projection jitters
+                        // a pixel per frame — exponential moving avg.
+                        const smoothTop = prevTopY * 0.55 + popupBottomY * 0.45;
+                        const smoothBottom = prevBottomY * 0.55 + groundY * 0.45;
+                        prevTopY = smoothTop;
+                        prevBottomY = smoothBottom;
+                        rebound.setAttribute('x1', String(popupCenterX));
+                        rebound.setAttribute('y1', String(smoothBottom));
+                        rebound.setAttribute('x2', String(popupCenterX));
+                        rebound.setAttribute('y2', String(smoothTop));
+                        node.setAttribute('cx', String(popupCenterX));
+                        node.setAttribute('cy', String(smoothTop));
+                        followRaf = requestAnimationFrame(follow);
+                      };
+                      followRaf = requestAnimationFrame(follow);
+                      const prevFollow = (svg as unknown as { __followCancel?: () => void }).__followCancel;
+                      if (prevFollow) prevFollow();
+                      (svg as unknown as { __followCancel?: () => void }).__followCancel = () => {
+                        cancelAnimationFrame(followRaf);
+                      };
+                    }
                   }
                 };
                 riseRaf = requestAnimationFrame(rise);
@@ -237,6 +302,58 @@ const RitualTether = forwardRef<RitualTetherHandle, RitualTetherProps>(
 
         return totalMs;
       },
+      attachTo(el: HTMLElement | null) {
+        const svg = svgRef.current;
+        const rebound = reboundBeamRef.current;
+        const node = reboundNodeRef.current;
+        if (!svg || !rebound || !node) return;
+        // Cancel any existing follow before starting a new one.
+        const prevFollow = (svg as unknown as { __followCancel?: () => void }).__followCancel;
+        if (prevFollow) prevFollow();
+        if (!el) {
+          (svg as unknown as { __followCancel?: () => void }).__followCancel = undefined;
+          return;
+        }
+        let followRaf = 0;
+        let prevTopY = Number(rebound.getAttribute('y2') ?? '0');
+        let prevBottomY = Number(rebound.getAttribute('y1') ?? '0');
+        let initialized = prevTopY > 0;
+        const follow = () => {
+          const r = el.getBoundingClientRect();
+          if (r.width === 0 && r.height === 0) {
+            followRaf = requestAnimationFrame(follow);
+            return;
+          }
+          const popupCenterX = r.left + r.width / 2;
+          const popupBottomY = r.bottom - 6;
+          const groundY = popupBottomY + RITUAL_TIMING.REBOUND_RISE_DISTANCE_PX;
+          if (!initialized) {
+            prevTopY = popupBottomY;
+            prevBottomY = groundY;
+            initialized = true;
+          }
+          const smoothTop = prevTopY * 0.55 + popupBottomY * 0.45;
+          const smoothBottom = prevBottomY * 0.55 + groundY * 0.45;
+          prevTopY = smoothTop;
+          prevBottomY = smoothBottom;
+          rebound.setAttribute('x1', String(popupCenterX));
+          rebound.setAttribute('y1', String(smoothBottom));
+          rebound.setAttribute('x2', String(popupCenterX));
+          rebound.setAttribute('y2', String(smoothTop));
+          // Ensure visible (in case attachTo is called before rise
+          // fully ran — e.g. cached selection).
+          rebound.style.opacity = '1';
+          node.style.opacity = '1';
+          node.setAttribute('r', '6');
+          node.setAttribute('cx', String(popupCenterX));
+          node.setAttribute('cy', String(smoothTop));
+          followRaf = requestAnimationFrame(follow);
+        };
+        followRaf = requestAnimationFrame(follow);
+        (svg as unknown as { __followCancel?: () => void }).__followCancel = () => {
+          cancelAnimationFrame(followRaf);
+        };
+      },
       retract() {
         // Called on popup dismiss. Collapse the vertical beam back
         // into the property and fade it out. Node retracts with it.
@@ -244,9 +361,11 @@ const RitualTether = forwardRef<RitualTetherHandle, RitualTetherProps>(
         const rebound = reboundBeamRef.current;
         const node = reboundNodeRef.current;
         if (!svg || !rebound || !node) return;
-        // Cancel any in-flight rise so we don't fight it.
+        // Cancel any in-flight animations so we don't fight them.
         const riseCancel = (svg as unknown as { __riseCancel?: () => void }).__riseCancel;
         if (riseCancel) riseCancel();
+        const followCancel = (svg as unknown as { __followCancel?: () => void }).__followCancel;
+        if (followCancel) followCancel();
         const pauseTimer = (svg as unknown as { __pauseTimer?: number }).__pauseTimer;
         if (pauseTimer) window.clearTimeout(pauseTimer);
         // Read current position to animate from.

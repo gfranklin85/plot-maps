@@ -60,13 +60,16 @@ export default function CustomReticle({ hoverActive = false, enabled = true }: C
 
   if (!enabled) return null;
 
-  // Reticle palette — parchment-cream neutral, coral on acquisition.
-  // Tuned for legibility on photoreal map tiles (mid-luminance ground,
-  // varied backgrounds). Stroke widths are 1px / 1.5px — thin linework.
-  const strokeNeutral = '#F5EBD8';
-  const strokeAcquired = '#E07856';
+  // Reticle palette — fluorescent green neutral, white on acquisition.
+  // Tuned for instant readability on photoreal map tiles (varied
+  // earth-tone backgrounds, rooftops, asphalt, grass — none are
+  // green-fluorescent so the reticle never camouflages). Stronger
+  // outer shadow for guaranteed contrast on any tile luminance.
+  // Greg locked 2026-05-27.
+  const strokeNeutral = '#00FF94';
+  const strokeAcquired = '#FFFFFF';
   const stroke = hoverActive ? strokeAcquired : strokeNeutral;
-  const shadow = 'drop-shadow(0 0 1px rgba(0,0,0,0.6))';
+  const shadow = 'drop-shadow(0 0 2px rgba(0,0,0,0.85)) drop-shadow(0 0 4px rgba(0,255,148,0.35))';
 
   return (
     <svg
@@ -134,7 +137,8 @@ export default function CustomReticle({ hoverActive = false, enabled = true }: C
           transition: `fill ${RITUAL_TIMING.HOVER_STATE_TRANSITION_MS}ms ease-out`,
         }}
       />
-      {/* Acquisition halo — only visible when hoverActive. Soft glow. */}
+      {/* Acquisition halo — only visible when hoverActive. White ring
+          around the reticle when over targetable map surface. */}
       {hoverActive && (
         <circle
           cx={24}
@@ -142,8 +146,8 @@ export default function CustomReticle({ hoverActive = false, enabled = true }: C
           r={17}
           fill="none"
           stroke={strokeAcquired}
-          strokeWidth={0.5}
-          opacity={0.5}
+          strokeWidth={0.75}
+          opacity={0.7}
         />
       )}
     </svg>

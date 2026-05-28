@@ -20,7 +20,6 @@ import OnboardingTooltips from "@/components/ui/OnboardingTooltips";
 import ProspectCoachOverlay from "@/components/map/ProspectCoachOverlay";
 import Mobile3DCoachOverlay from "@/components/map/Mobile3DCoachOverlay";
 import GamepadStatusChip from "@/components/map/GamepadStatusChip";
-import MapReticle from "@/components/map/MapReticle";
 import MapToolbar from "@/components/map/MapToolbar";
 import FlightTuningPanel from "@/components/map/FlightTuningPanel";
 import { useFlightTuning } from "@/lib/useFlightTuning";
@@ -152,7 +151,12 @@ export default function MapPage() {
   // stores the grab; Phase B2 will open menus off this state. Right-X
   // 2s hold while grabbed records an orbit direction (Phase B3 will
   // animate the orbit; B1 just stores the direction).
-  const [reticleHovering, setReticleHovering] = useState(false);
+  // reticleHovering: state was consumed by the removed MapReticle; the
+  // CustomReticle in MapView3D now manages its own hover state via
+  // hit-testing against the map element. These setReticleHovering
+  // call sites are kept (as no-ops) because they live inside the
+  // gamepad parcel-hit-test loop and removing them risks side effects.
+  const setReticleHovering = (_v: boolean) => { void _v; /* no-op; reticle hover lives in MapView3D now */ };
   // Latest hover target as a ref so onShoot (fires inside the gamepad
   // RAF loop) can read the current value without re-deriving.
   const reticleTargetRef = useRef<Lead | null>(null);
@@ -633,7 +637,7 @@ export default function MapPage() {
   // can be dragged anywhere on the map; this hook persists the position
   // and seeds the default. Both the visual MapReticle and the
   // controller's hit-test sample point read from this.
-  const { position: reticlePosition, setPosition: setReticlePosition, resetPosition: resetReticlePosition } = useReticlePosition();
+  const { position: reticlePosition } = useReticlePosition();
   // Flight feel tuning — single master multiplier + preset chips.
   // Lives in a toolbar-opened panel; live-previews changes while open.
   const { tuning: flightTuning, setMultiplier: setFlightMultiplier, setClimbRate: setFlightClimbRate, setTurnRate: setFlightTurnRate, setTiltRate: setFlightTiltRate, resetToDefault: resetFlightTuning } = useFlightTuning();
@@ -1309,21 +1313,10 @@ export default function MapPage() {
           />
         )}
 
-        {/* Center reticle — visible only in airplane mode. Position is
-            user-draggable; useReticlePosition persists the choice in
-            localStorage and double-click resets to default. The
-            `grabbed` prop is gone with the LT grab-gate; the reticle
-            now just shows "hovering or not" since shoot/inspect are
-            edge-triggered A/Y presses, not held states. */}
-        <MapReticle
-          visible={!walkMode && flightMode === 'airplane'}
-          hovering={reticleHovering}
-          grabbed={false}
-          xFraction={reticlePosition.xFraction}
-          yFraction={reticlePosition.yFraction}
-          onPositionChange={setReticlePosition}
-          onResetPosition={resetReticlePosition}
-        />
+        {/* Legacy MapReticle removed 2026-05-27. The theodolite
+            CustomReticle inside MapView3D is now the only reticle —
+            it tracks the OS cursor (gamepad + mouse) and renders
+            world-aware hover state. No competing white-dot needed. */}
 
         {/* Altitude gauge — live readout of the eye altitude over
             ground. Only meaningful on the 3D Tiles photoreal path

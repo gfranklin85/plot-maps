@@ -38,6 +38,10 @@ interface PopoverElement extends HTMLElement {
   altitudeMode: string;
   open: boolean;
   lightDismissDisabled?: boolean;
+  // Mar 2026 GA release added this — disables the camera auto-pan
+  // that fires when the popover opens. Plot owns its own camera
+  // model; we never want Google jerking the camera toward the popup.
+  disablePanWhileOpen?: boolean;
 }
 
 const POPOVER_TAG = 'gmp-popover';
@@ -88,10 +92,17 @@ export default function AnchoredPropertyCard({
       const p = document.createElement(POPOVER_TAG) as PopoverElement;
       p.altitudeMode = 'RELATIVE_TO_GROUND';
       p.positionAnchor = { lat, lng, altitude: altitudeM };
-      p.open = true;
+      // Disable the camera auto-pan that Google's default fires when
+      // the popover opens. Plot owns its own camera (flight model);
+      // we never want Google jerking the camera. Set BEFORE open.
+      try { p.disablePanWhileOpen = true; } catch { /* property may not be settable */ }
       // Don't auto-close when the user clicks the map; Plot owns the
       // dismiss path via the card's own close button.
       try { p.lightDismissDisabled = true; } catch { /* property may not be settable */ }
+      // Also try the alternate attribute form for older preview API
+      // versions that haven't switched to property-style yet.
+      try { p.setAttribute('disable-pan-while-open', ''); } catch { /* ignore */ }
+      p.open = true;
 
       mapEl.appendChild(p);
       createdPopover = p;

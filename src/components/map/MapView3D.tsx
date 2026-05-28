@@ -257,6 +257,7 @@ function Inner({
   onGooglePoiClick,
   onAddressClick,
   mapElForwardRef,
+  ritualTetherForwardRef,
 }: {
   center?: { lat: number; lng: number } | null;
   gamepadEnabled: boolean;
@@ -298,6 +299,10 @@ function Inner({
    *  page.tsx to mount Marker3D children (AnchoredPropertyCard, etc.)
    *  inside Google's world-space scene graph. */
   mapElForwardRef?: React.MutableRefObject<HTMLElement | null>;
+  /** Forwarded ref to the RitualTether's imperative handle. Used by
+   *  page.tsx to call retract() when the popup dismisses, so the
+   *  vertical rebound beam collapses back into the property. */
+  ritualTetherForwardRef?: React.MutableRefObject<RitualTetherHandle | null>;
 }) {
   const maps3d = useMapsLibrary('maps3d');
   const elRef = useRef<Map3DElement | null>(null);
@@ -1143,7 +1148,12 @@ function Inner({
             cursor pixel on every gmp-click. Pairs with scheduleImpact
             (Web Audio) and the delayed reveal callback. See
             docs/confirmation-ritual-design.md. */}
-        <RitualTether ref={tetherRef} />
+        <RitualTether
+          ref={(h: RitualTetherHandle | null) => {
+            tetherRef.current = h;
+            if (ritualTetherForwardRef) ritualTetherForwardRef.current = h;
+          }}
+        />
         {/* Plot's theodolite reticle replaces the OS cursor inside the
             map container. The OS cursor still moves (Steam Input or
             mouse) and still fires real click events; we just replace
@@ -1178,6 +1188,7 @@ export default function MapView3D(props: MapViewProps) {
         onGooglePoiClick={props.onGooglePoiClick}
         onAddressClick={props.onAddressClick}
         mapElForwardRef={props.mapElForwardRef}
+        ritualTetherForwardRef={props.ritualTetherForwardRef}
       />
     </APIProvider>
   );

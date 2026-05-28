@@ -23,9 +23,20 @@ import { RITUAL_TIMING } from "@/lib/ritualTiming";
 
 export interface RitualTetherHandle {
   /** Engage. Launches a tether from origin to (targetX, targetY).
-   *  Returns the total ritual duration in ms (launch + travel) so
-   *  the caller can schedule the reveal phase. */
+   *  After impact, an information beam REDIRECTS vertically — rises
+   *  from the impact point to where the popup will land. Returns the
+   *  total ritual duration in ms (launch + travel + pressure pause +
+   *  rise + stabilize) so the caller can schedule the popup reveal
+   *  to land exactly when the beam finishes deploying.
+   *
+   *  Greg's design-intelligence breakthrough 2026-05-28: the beam
+   *  doesn't open the popup — the beam DEPLOYS the popup. Same
+   *  energy, redirected upward into information form. */
   fire(targetX: number, targetY: number, onImpact?: () => void): number;
+  /** Retract. On card dismiss, the vertical beam collapses back into
+   *  the property and fades. Caller invokes this when the popup is
+   *  closed so the umbilical doesn't linger after the card is gone. */
+  retract(): void;
 }
 
 interface RitualTetherProps {
@@ -39,6 +50,14 @@ const RitualTether = forwardRef<RitualTetherHandle, RitualTetherProps>(
     const svgRef = useRef<SVGSVGElement | null>(null);
     const lineRef = useRef<SVGLineElement | null>(null);
     const impactRingRef = useRef<SVGCircleElement | null>(null);
+    // Vertical rebound beam — the "information beam" that rises from
+    // the property after impact. Stays visible as an umbilical
+    // connecting popup to property until retract() is called.
+    const reboundBeamRef = useRef<SVGLineElement | null>(null);
+    // Node sphere at the rebound's top — the visual anchor where the
+    // popup will materialize. Subtle glow; the popup masks it on
+    // arrival. v1 placeholder; v2 becomes a real Blender asset.
+    const reboundNodeRef = useRef<SVGCircleElement | null>(null);
 
     useImperativeHandle(ref, () => ({
       fire(targetX: number, targetY: number, onImpact?: () => void): number {
@@ -66,7 +85,15 @@ const RitualTether = forwardRef<RitualTetherHandle, RitualTetherProps>(
           RITUAL_TIMING.TRAVEL_DURATION_MIN_MS,
           RITUAL_TIMING.TRAVEL_DURATION_MAX_MS,
         );
-        const totalMs = RITUAL_TIMING.LAUNCH_DURATION_MS + travelMs;
+        // Total ritual duration: launch + travel + pressure pause +
+        // rise + stabilize. Caller schedules popup reveal at this
+        // exact moment so the popup arrives JUST as the beam finishes
+        // stabilizing at the top — the popup is the beam's payload.
+        const totalMs = RITUAL_TIMING.LAUNCH_DURATION_MS
+          + travelMs
+          + RITUAL_TIMING.REBOUND_PRESSURE_PAUSE_MS
+          + RITUAL_TIMING.REBOUND_RISE_DURATION_MS
+          + RITUAL_TIMING.REBOUND_STABILIZE_MS;
 
         // Reset line to origin → origin (zero length), make visible.
         line.setAttribute('x1', String(originX));
@@ -127,7 +154,7 @@ const RitualTether = forwardRef<RitualTetherHandle, RitualTetherProps>(
                 fill: 'forwards',
               },
             );
-            // Tether fades out after impact.
+            // Incoming tether fades out after impact.
             line.animate(
               [{ opacity: 1 }, { opacity: 0 }],
               {
@@ -136,6 +163,60 @@ const RitualTether = forwardRef<RitualTetherHandle, RitualTetherProps>(
                 fill: 'forwards',
               },
             );
+
+            // ── Vertical REBOUND beam — Greg locked 2026-05-28 ──
+            // The energy redirects upward from the impact point.
+            // This is what deploys the popup, not "the popup opens."
+            const rebound = reboundBeamRef.current;
+            const node = reboundNodeRef.current;
+            if (rebound && node) {
+              const topY = targetY - RITUAL_TIMING.REBOUND_RISE_DISTANCE_PX;
+              // Reset rebound to zero-length at the impact point,
+              // hidden, ready to extend.
+              rebound.setAttribute('x1', String(targetX));
+              rebound.setAttribute('y1', String(targetY));
+              rebound.setAttribute('x2', String(targetX));
+              rebound.setAttribute('y2', String(targetY));
+              rebound.style.opacity = '0';
+              node.setAttribute('cx', String(targetX));
+              node.setAttribute('cy', String(targetY));
+              node.setAttribute('r', '2');
+              node.style.opacity = '0';
+              // Pressure-pause beat, then extend the beam upward.
+              const pauseTimer = window.setTimeout(() => {
+                rebound.style.opacity = '1';
+                node.style.opacity = '1';
+                const riseStart = performance.now();
+                const riseEnd = riseStart + RITUAL_TIMING.REBOUND_RISE_DURATION_MS;
+                let riseRaf = 0;
+                const rise = () => {
+                  const n = performance.now();
+                  const u = clamp((n - riseStart) / (riseEnd - riseStart), 0, 1);
+                  // ease-out-cubic — snaps up then settles.
+                  const eased = 1 - Math.pow(1 - u, 3);
+                  const y = targetY + (topY - targetY) * eased;
+                  rebound.setAttribute('y2', String(y));
+                  node.setAttribute('cy', String(y));
+                  // Node swells slightly as it reaches the top —
+                  // sells the "deployment" beat.
+                  node.setAttribute('r', String(2 + 4 * eased));
+                  if (u < 1) {
+                    riseRaf = requestAnimationFrame(rise);
+                  }
+                };
+                riseRaf = requestAnimationFrame(rise);
+                // Stash on the svg so retract() / new fire() can cancel.
+                const prevRise = (svg as unknown as { __riseCancel?: () => void }).__riseCancel;
+                if (prevRise) prevRise();
+                (svg as unknown as { __riseCancel?: () => void }).__riseCancel = () => {
+                  cancelAnimationFrame(riseRaf);
+                };
+              }, RITUAL_TIMING.REBOUND_PRESSURE_PAUSE_MS);
+              // Stash so cleanup cancels the deferred rise.
+              const prevPause = (svg as unknown as { __pauseTimer?: number }).__pauseTimer;
+              if (prevPause) window.clearTimeout(prevPause);
+              (svg as unknown as { __pauseTimer?: number }).__pauseTimer = pauseTimer;
+            }
             return;
           }
           rafId = requestAnimationFrame(tick);
@@ -155,6 +236,45 @@ const RitualTether = forwardRef<RitualTetherHandle, RitualTetherProps>(
         };
 
         return totalMs;
+      },
+      retract() {
+        // Called on popup dismiss. Collapse the vertical beam back
+        // into the property and fade it out. Node retracts with it.
+        const svg = svgRef.current;
+        const rebound = reboundBeamRef.current;
+        const node = reboundNodeRef.current;
+        if (!svg || !rebound || !node) return;
+        // Cancel any in-flight rise so we don't fight it.
+        const riseCancel = (svg as unknown as { __riseCancel?: () => void }).__riseCancel;
+        if (riseCancel) riseCancel();
+        const pauseTimer = (svg as unknown as { __pauseTimer?: number }).__pauseTimer;
+        if (pauseTimer) window.clearTimeout(pauseTimer);
+        // Read current position to animate from.
+        const y1 = Number(rebound.getAttribute('y1') ?? '0');
+        const y2 = Number(rebound.getAttribute('y2') ?? '0');
+        const startY = y2;
+        const endY = y1; // collapse back to anchor point
+        const startTime = performance.now();
+        const dur = RITUAL_TIMING.REBOUND_BEAM_RETRACT_MS;
+        let retractRaf = 0;
+        const step = () => {
+          const t = clamp((performance.now() - startTime) / dur, 0, 1);
+          const eased = 1 - Math.pow(1 - t, 2);
+          const y = startY + (endY - startY) * eased;
+          rebound.setAttribute('y2', String(y));
+          node.setAttribute('cy', String(y));
+          // Fade as it retracts.
+          rebound.style.opacity = String(1 - eased);
+          node.style.opacity = String(1 - eased);
+          if (t < 1) {
+            retractRaf = requestAnimationFrame(step);
+          } else {
+            rebound.style.opacity = '0';
+            node.style.opacity = '0';
+          }
+        };
+        retractRaf = requestAnimationFrame(step);
+        (svg as unknown as { __retractRaf?: number }).__retractRaf = retractRaf;
       },
     }), [originXRef, originYRef]);
 
@@ -216,6 +336,38 @@ const RitualTether = forwardRef<RitualTetherHandle, RitualTetherProps>(
           opacity={0}
           style={{
             filter: 'drop-shadow(0 0 8px rgba(224,120,86,0.6))',
+          }}
+        />
+        {/* Vertical rebound beam — rises from impact point after the
+            tether arrives. Sits beneath the popup as the umbilical.
+            Greg locked 2026-05-28: design-intelligence breakthrough. */}
+        <line
+          ref={reboundBeamRef}
+          x1={0}
+          y1={0}
+          x2={0}
+          y2={0}
+          stroke="#00FF94"
+          strokeWidth={1.5}
+          strokeLinecap="round"
+          opacity={0}
+          style={{
+            filter: 'drop-shadow(0 0 6px rgba(0,255,148,0.55))',
+          }}
+        />
+        {/* Information node — sits at the top of the rebound beam.
+            Subtle glow; the popup masks it on arrival. v1 placeholder;
+            v2 becomes a real Blender/SAM-3D asset per design-intelligence
+            thesis (the spatial anchor; popup is the information surface). */}
+        <circle
+          ref={reboundNodeRef}
+          cx={0}
+          cy={0}
+          r={2}
+          fill="#00FF94"
+          opacity={0}
+          style={{
+            filter: 'drop-shadow(0 0 10px rgba(0,255,148,0.7))',
           }}
         />
       </svg>

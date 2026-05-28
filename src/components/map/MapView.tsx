@@ -65,6 +65,10 @@ export interface MapViewProps {
    *  mount Marker3D children (anchored PropertyCard etc.) inside
    *  Google's 3D scene graph. */
   mapElForwardRef?: React.MutableRefObject<HTMLElement | null>;
+  /** Forwarded ref to the RitualTether's imperative handle. Used by
+   *  the page to call retract() when the popup dismisses so the
+   *  vertical rebound beam collapses cleanly. */
+  ritualTetherForwardRef?: React.MutableRefObject<import('./RitualTether').RitualTetherHandle | null>;
   /** Fires when the cursor enters or leaves a parcel polygon. The page
    *  feeds this into the airplane-mode reticle so flying over a parcel
    *  shows the grab-ready hand icon. Pin DOM hover still wins on overlap;

@@ -35,14 +35,42 @@ export const RITUAL_TIMING = {
     return this.LAUNCH_DURATION_MS + this.TRAVEL_DURATION_MS;
   },
 
-  // Phase 6 — Reveal. PropertyCard fades in this many ms AFTER impact.
-  // Critical: the card must feel CAUSED by the impact, not coincident.
-  // 100ms is the locked starting value; tune during the timing sprint.
-  REVEAL_DELAY_AFTER_IMPACT_MS: 100,
+  // Phase 5.5 — Vertical rebound (the "node bounces up" beat).
+  // Greg locked 2026-05-28: the design-intelligence breakthrough.
+  // On impact, the energy REDIRECTS vertically — a beam shoots up
+  // from the property to where the card will land. This is what
+  // separates "popup opens" from "information is deployed."
+  //
+  // Pressure pause: brief beat between impact and rise. Sells
+  // the redirection mentally — the impact compresses, then releases
+  // upward. Without it, the rise reads as a continuation of the
+  // incoming tether instead of a NEW direction.
+  REBOUND_PRESSURE_PAUSE_MS: 40,
+  // Rise duration: how long the vertical beam takes to extend from
+  // impact point to popup altitude. Fast enough to feel snappy,
+  // slow enough to read as movement (not a flash).
+  REBOUND_RISE_DURATION_MS: 220,
+  // Stabilization hold: the beam holds at full extension before the
+  // popup fades in. The "stand still and present yourself" beat.
+  REBOUND_STABILIZE_MS: 80,
+  // Vertical pixel distance the beam extends (in screen space for v1;
+  // v2 with world-space 3D this becomes meters). The popup's bottom
+  // edge sits at impactY - REBOUND_RISE_DISTANCE_PX.
+  REBOUND_RISE_DISTANCE_PX: 140,
+
+  // Phase 6 — Reveal. PropertyCard fades in after the beam rises +
+  // stabilizes. The card must feel DEPLOYED by the beam, not
+  // coincident with it.
+  // Derived: rebound (pause + rise + stabilize) is the full lead-up
+  // to reveal. Caller computes the absolute reveal timestamp.
+  REVEAL_DELAY_AFTER_IMPACT_MS: 40 + 220 + 80, // pressure + rise + stabilize
 
   // Phase 7 — Decay. Tether fades, parcel illumination drops to a
   // sustained "selected" glow, sustained glow persists until card is
   // dismissed.
+  // Vertical beam stays VISIBLE under the popup as the umbilical
+  // connecting card to property (does not fade until dismiss).
+  REBOUND_BEAM_RETRACT_MS: 200,
   TETHER_FADE_MS: 200,
   ILLUMINATION_PEAK_HOLD_MS: 50,
   ILLUMINATION_DECAY_TO_SUSTAINED_MS: 150,

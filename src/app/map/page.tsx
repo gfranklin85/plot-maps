@@ -15,6 +15,7 @@ import MaterialIcon from "@/components/ui/MaterialIcon";
 import UpgradeGate from "@/components/ui/UpgradeGate";
 import PropertyPopup from "@/components/map/PropertyPopup";
 import AnchoredPropertyCard from "@/components/map/AnchoredPropertyCard";
+import type { RitualTetherHandle } from "@/components/map/RitualTether";
 import ProspectListPanel from "@/components/map/ProspectListPanel";
 import OnboardingTooltips from "@/components/ui/OnboardingTooltips";
 import ProspectCoachOverlay from "@/components/map/ProspectCoachOverlay";
@@ -128,11 +129,27 @@ export default function MapPage() {
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(initialCenter);
   const [hasUserPanned, setHasUserPanned] = useState(urlResolvedCenter);
   const [showGate, setShowGate] = useState(false);
-  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [selectedLeadRaw, setSelectedLeadRaw] = useState<Lead | null>(null);
+  const selectedLead = selectedLeadRaw;
   // Ref to the gmp-map-3d element, forwarded from MapView3D. Used to
   // mount the AnchoredPropertyCard inside Google's 3D world so the
   // card tracks the building at world coordinates, not screen pixels.
   const map3DElRef = useRef<HTMLElement | null>(null);
+  // Ref to the RitualTether's imperative handle. We call retract()
+  // when the popup dismisses so the vertical rebound beam collapses
+  // cleanly. Greg locked 2026-05-28: dismiss reverses the ritual.
+  const ritualTetherRef = useRef<RitualTetherHandle | null>(null);
+  // Wrap setSelectedLead so dismiss (null) also retracts the tether.
+  const setSelectedLead = (next: Lead | null | ((prev: Lead | null) => Lead | null)) => {
+    setSelectedLeadRaw((prev) => {
+      const resolved = typeof next === 'function' ? next(prev) : next;
+      if (resolved === null && prev !== null) {
+        // Card is closing — collapse the rebound beam.
+        try { ritualTetherRef.current?.retract(); } catch { /* noop */ }
+      }
+      return resolved;
+    });
+  };
   const [pinnedRef, setPinnedRef] = useState<Lead | null>(null);
   const [expandedLead, setExpandedLead] = useState<Lead | null>(null);
   // Pin-style toolbar pills were stripped 2026-05-17; default to 'dots'
@@ -1301,6 +1318,7 @@ export default function MapPage() {
               setSelectedLead(stub);
             }}
             mapElForwardRef={map3DElRef}
+            ritualTetherForwardRef={ritualTetherRef}
             view3D={view3D}
             flight={flight}
             navigateTo={navigateTarget}

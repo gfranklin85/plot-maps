@@ -3,40 +3,44 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
-// AnchoredPropertyCard — Plot's PropertyCard rendered IN the 3D world
-// at a parcel's lat/lng, using Google's gmp-marker-3d-interactive as
-// the anchor. Google's renderer handles projection, depth, occlusion,
-// and camera tracking; we just provide the HTML content.
+// AnchoredPropertyCard — Plot's PropertyCard rendered IN the 3D world,
+// anchored at a parcel's lat/lng via Google's PopoverElement
+// (<gmp-popover>). This is Map3D's native primitive for HTML content
+// anchored to a world position; Google handles projection, depth,
+// occlusion, and camera tracking internally.
 //
 // Architecture:
-//   - Mounts a <gmp-marker-3d-interactive> inside the <gmp-map-3d>
-//     element passed in via mapElRef
-//   - Portals React children into a host div child of the marker so
-//     React owns the inner content while Google owns positioning
-//   - When map element isn't ready at first mount (common — Map3D
-//     mounts async), we poll for it and retry; once mounted, we
-//     trigger a state update so the portal renders into the live host
-//   - Updates marker position on lat/lng change without rebuilding
+//   - Creates a <gmp-popover> with positionAnchor = {lat, lng, altitude}
+//   - Portals React children into the popover's default slot, where
+//     they render with real DOM layout (real bounding boxes, real
+//     event handling — unlike children of gmp-marker-3d-interactive
+//     which are detached from layout flow)
+//   - Polls for the popover element type to register (Map3D's preview
+//     library mounts asynchronously); retries up to 5 seconds
+//   - On lat/lng change, updates positionAnchor without rebuild
+//   - Graceful fallback: if PopoverElement isn't registered, renders
+//     the card as a centered fixed overlay so the user still gets UI
 //
-// Greg locked 2026-05-27: cathedral grade. No screen-space hack.
+// Locked 2026-05-27 after research confirmed gmp-popover is the
+// canonical Map3D HTML-anchor primitive (GA Oct 2025).
 
 interface AnchoredPropertyCardProps {
-  /** The <gmp-map-3d> element we attach the marker to. */
   mapElRef: React.MutableRefObject<HTMLElement | null>;
-  /** World position to anchor the card at. */
   lat: number;
   lng: number;
   /** Altitude above ground in meters. */
   altitudeM?: number;
-  /** Content to render inside the marker. */
   children: ReactNode;
 }
 
-// Minimal interface for the Map3D marker primitive.
-interface Marker3DInteractiveElement extends HTMLElement {
-  position: { lat: number; lng: number; altitude?: number };
-  altitudeMode: string; // 'CLAMP_TO_GROUND' | 'RELATIVE_TO_GROUND' | 'ABSOLUTE'
+interface PopoverElement extends HTMLElement {
+  positionAnchor: { lat: number; lng: number; altitude?: number };
+  altitudeMode: string;
+  open: boolean;
+  lightDismissDisabled?: boolean;
 }
+
+const POPOVER_TAG = 'gmp-popover';
 
 export default function AnchoredPropertyCard({
   mapElRef,
@@ -45,24 +49,15 @@ export default function AnchoredPropertyCard({
   altitudeM = 8,
   children,
 }: AnchoredPropertyCardProps) {
-  // Host node we portal React children into. State (not ref) so a
-  // re-render fires once the host exists and the portal renders.
-  const [host, setHost] = useState<HTMLDivElement | null>(null);
-  const [marker, setMarker] = useState<Marker3DInteractiveElement | null>(null);
-  // Track whether the marker element type is even supported by the
-  // current Maps library load. If not, we'll skip mounting and the
-  // page can fall back gracefully.
+  const [popover, setPopover] = useState<PopoverElement | null>(null);
   const [supported, setSupported] = useState<boolean | null>(null);
 
-  // Mount loop — polls for the map element until it's ready, then
-  // creates the marker + host once. Tolerates the common case where
-  // React mounts this component before Map3D has finished its async
-  // attribute/element registration.
   useEffect(() => {
     let attached = false;
     let retryId: number | null = null;
-    const MAX_ATTEMPTS = 50; // 50 × 100ms = 5s budget
+    const MAX_ATTEMPTS = 50; // 5s budget at 100ms intervals
     let attempt = 0;
+    let createdPopover: PopoverElement | null = null;
 
     const tryMount = () => {
       attempt += 1;
@@ -75,47 +70,32 @@ export default function AnchoredPropertyCard({
         }
         return;
       }
-
-      // Verify the custom element type is defined. customElements.get
-      // returns the constructor if registered; if Maps3D didn't load
-      // the marker module, this returns undefined.
-      const definedCtor = window.customElements?.get?.('gmp-marker-3d-interactive');
-      if (!definedCtor) {
+      // PopoverElement is registered as the custom element gmp-popover.
+      // If the Maps3D library load doesn't include it (older preview
+      // versions, restricted API key), the constructor is undefined.
+      const def = window.customElements?.get?.(POPOVER_TAG);
+      if (!def) {
         if (attempt < MAX_ATTEMPTS) {
           retryId = window.setTimeout(tryMount, 100);
         } else {
           // eslint-disable-next-line no-console
-          console.warn('[AnchoredPropertyCard] gmp-marker-3d-interactive not registered after retries; card will not render in world.');
+          console.warn('[AnchoredPropertyCard] gmp-popover not registered after retries; falling back to centered overlay.');
           setSupported(false);
         }
         return;
       }
 
-      const m = document.createElement('gmp-marker-3d-interactive') as Marker3DInteractiveElement;
-      m.altitudeMode = 'RELATIVE_TO_GROUND';
-      m.position = { lat, lng, altitude: altitudeM };
+      const p = document.createElement(POPOVER_TAG) as PopoverElement;
+      p.altitudeMode = 'RELATIVE_TO_GROUND';
+      p.positionAnchor = { lat, lng, altitude: altitudeM };
+      p.open = true;
+      // Don't auto-close when the user clicks the map; Plot owns the
+      // dismiss path via the card's own close button.
+      try { p.lightDismissDisabled = true; } catch { /* property may not be settable */ }
 
-      const hostDiv = document.createElement('div');
-      // Absolute positioning + explicit dimensions: the marker's
-      // internal layout treats children as 0x0 by default, so the
-      // host must opt out of normal flow and define its own size.
-      // translate(-50%, -100%) anchors the card centered above the
-      // marker's world position (card's bottom-center over the point).
-      hostDiv.style.cssText = `
-        position: absolute;
-        left: 0;
-        top: 0;
-        width: 360px;
-        pointer-events: auto;
-        transform: translate(-50%, -100%);
-        will-change: transform;
-        z-index: 100;
-      `;
-      m.appendChild(hostDiv);
-      mapEl.appendChild(m);
-
-      setMarker(m);
-      setHost(hostDiv);
+      mapEl.appendChild(p);
+      createdPopover = p;
+      setPopover(p);
       setSupported(true);
       attached = true;
     };
@@ -124,27 +104,23 @@ export default function AnchoredPropertyCard({
 
     return () => {
       if (retryId !== null) window.clearTimeout(retryId);
-      if (attached) {
-        try { marker?.remove(); } catch { /* already gone */ }
+      if (attached && createdPopover) {
+        try { createdPopover.remove(); } catch { /* already gone */ }
       }
-      setMarker(null);
-      setHost(null);
+      setPopover(null);
     };
-    // mapElRef is a stable ref; lat/lng/altitude changes are handled
-    // by the position-update effect below so we don't rebuild on every
-    // selection.
+    // mapElRef is stable; lat/lng/altitude changes handled by separate
+    // effect to avoid rebuilding the popover on every selection.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Update marker position when lat/lng changes (different parcel selected).
+  // Update anchor when lat/lng changes (different property selected).
   useEffect(() => {
-    if (!marker) return;
-    marker.position = { lat, lng, altitude: altitudeM };
-  }, [marker, lat, lng, altitudeM]);
+    if (!popover) return;
+    popover.positionAnchor = { lat, lng, altitude: altitudeM };
+  }, [popover, lat, lng, altitudeM]);
 
-  // If the marker element isn't supported, fall back: render the card
-  // as a fixed-position centered overlay so the user STILL gets a card,
-  // just not world-anchored. Better than nothing while we investigate.
+  // Fallback: PopoverElement not available; render as centered overlay.
   if (supported === false) {
     return (
       <div
@@ -162,6 +138,6 @@ export default function AnchoredPropertyCard({
     );
   }
 
-  if (!host) return null;
-  return createPortal(children, host);
+  if (!popover) return null;
+  return createPortal(children, popover);
 }

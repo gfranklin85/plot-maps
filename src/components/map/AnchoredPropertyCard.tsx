@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import CardBeamTail from "./CardBeamTail";
 
 // AnchoredPropertyCard — Plot's PropertyCard rendered IN the 3D world,
 // anchored at a parcel's lat/lng via Google's PopoverElement
@@ -157,5 +158,15 @@ export default function AnchoredPropertyCard({
   }
 
   if (!popover) return null;
-  return createPortal(children, popover);
+  // Wrap children + CardBeamTail in a relative container so the beam
+  // can absolute-position below the card and ride along with the
+  // popover's own screen-space transforms. Greg locked 2026-05-28:
+  // beam stays with UI, not the screen.
+  return createPortal(
+    <div style={{ position: 'relative', display: 'inline-block' }}>
+      {children}
+      <CardBeamTail />
+    </div>,
+    popover,
+  );
 }

@@ -65,14 +65,9 @@ const RitualTether = forwardRef<RitualTetherHandle, RitualTetherProps>(
     const svgRef = useRef<SVGSVGElement | null>(null);
     const lineRef = useRef<SVGLineElement | null>(null);
     const impactRingRef = useRef<SVGCircleElement | null>(null);
-    // Vertical rebound beam — the "information beam" that rises from
-    // the property after impact. Stays visible as an umbilical
-    // connecting popup to property until retract() is called.
-    const reboundBeamRef = useRef<SVGLineElement | null>(null);
-    // Node sphere at the rebound's top — the visual anchor where the
-    // popup will materialize. Subtle glow; the popup masks it on
-    // arrival. v1 placeholder; v2 becomes a real Blender asset.
-    const reboundNodeRef = useRef<SVGCircleElement | null>(null);
+    // Vertical rebound beam + node moved into CardBeamTail (a child of
+    // the popup). They ride with the UI natively. Kept refs as no-ops
+    // for backward compatibility with attachTo()/retract() callers.
 
     useImperativeHandle(ref, () => ({
       fire(
@@ -183,105 +178,11 @@ const RitualTether = forwardRef<RitualTetherHandle, RitualTetherProps>(
                 fill: 'forwards',
               },
             );
-
-            // ── Vertical REBOUND beam — Greg locked 2026-05-28 ──
-            // The energy redirects upward from the impact point.
-            // This is what deploys the popup, not "the popup opens."
-            const rebound = reboundBeamRef.current;
-            const node = reboundNodeRef.current;
-            if (rebound && node) {
-              const topY = targetY - RITUAL_TIMING.REBOUND_RISE_DISTANCE_PX;
-              // Reset rebound to zero-length at the impact point,
-              // hidden, ready to extend.
-              rebound.setAttribute('x1', String(targetX));
-              rebound.setAttribute('y1', String(targetY));
-              rebound.setAttribute('x2', String(targetX));
-              rebound.setAttribute('y2', String(targetY));
-              rebound.style.opacity = '0';
-              node.setAttribute('cx', String(targetX));
-              node.setAttribute('cy', String(targetY));
-              node.setAttribute('r', '2');
-              node.style.opacity = '0';
-              // Pressure-pause beat, then extend the beam upward.
-              const pauseTimer = window.setTimeout(() => {
-                rebound.style.opacity = '1';
-                node.style.opacity = '1';
-                const riseStart = performance.now();
-                const riseEnd = riseStart + RITUAL_TIMING.REBOUND_RISE_DURATION_MS;
-                let riseRaf = 0;
-                const rise = () => {
-                  const n = performance.now();
-                  const u = clamp((n - riseStart) / (riseEnd - riseStart), 0, 1);
-                  // ease-out-cubic — snaps up then settles.
-                  const eased = 1 - Math.pow(1 - u, 3);
-                  const y = targetY + (topY - targetY) * eased;
-                  rebound.setAttribute('y2', String(y));
-                  node.setAttribute('cy', String(y));
-                  // Node swells slightly as it reaches the top —
-                  // sells the "deployment" beat.
-                  node.setAttribute('r', String(2 + 4 * eased));
-                  if (u < 1) {
-                    riseRaf = requestAnimationFrame(rise);
-                  } else {
-                    // Rise complete — switch to live-follow mode if
-                    // an attach element was provided. Beam top now
-                    // tracks the popup's bottom-center each frame.
-                    if (attachToEl) {
-                      let followRaf = 0;
-                      let prevTopY = y;
-                      let prevBottomY = targetY;
-                      const follow = () => {
-                        const r = attachToEl.getBoundingClientRect();
-                        if (r.width === 0 && r.height === 0) {
-                          // Popup not laid out yet; hold last frame.
-                          followRaf = requestAnimationFrame(follow);
-                          return;
-                        }
-                        const popupCenterX = r.left + r.width / 2;
-                        // Beam terminates 6px INSIDE the popup's
-                        // bottom edge so it visually enters the card.
-                        const popupBottomY = r.bottom - 6;
-                        // Beam bottom anchor: directly under popup
-                        // center, projected toward the ground where
-                        // the impact ring popped. Match popup x so
-                        // the umbilical stays plumb.
-                        const groundY = popupBottomY + RITUAL_TIMING.REBOUND_RISE_DISTANCE_PX;
-                        // Smooth in case Google's projection jitters
-                        // a pixel per frame — exponential moving avg.
-                        const smoothTop = prevTopY * 0.55 + popupBottomY * 0.45;
-                        const smoothBottom = prevBottomY * 0.55 + groundY * 0.45;
-                        prevTopY = smoothTop;
-                        prevBottomY = smoothBottom;
-                        rebound.setAttribute('x1', String(popupCenterX));
-                        rebound.setAttribute('y1', String(smoothBottom));
-                        rebound.setAttribute('x2', String(popupCenterX));
-                        rebound.setAttribute('y2', String(smoothTop));
-                        node.setAttribute('cx', String(popupCenterX));
-                        node.setAttribute('cy', String(smoothTop));
-                        followRaf = requestAnimationFrame(follow);
-                      };
-                      followRaf = requestAnimationFrame(follow);
-                      const prevFollow = (svg as unknown as { __followCancel?: () => void }).__followCancel;
-                      if (prevFollow) prevFollow();
-                      (svg as unknown as { __followCancel?: () => void }).__followCancel = () => {
-                        cancelAnimationFrame(followRaf);
-                      };
-                    }
-                  }
-                };
-                riseRaf = requestAnimationFrame(rise);
-                // Stash on the svg so retract() / new fire() can cancel.
-                const prevRise = (svg as unknown as { __riseCancel?: () => void }).__riseCancel;
-                if (prevRise) prevRise();
-                (svg as unknown as { __riseCancel?: () => void }).__riseCancel = () => {
-                  cancelAnimationFrame(riseRaf);
-                };
-              }, RITUAL_TIMING.REBOUND_PRESSURE_PAUSE_MS);
-              // Stash so cleanup cancels the deferred rise.
-              const prevPause = (svg as unknown as { __pauseTimer?: number }).__pauseTimer;
-              if (prevPause) window.clearTimeout(prevPause);
-              (svg as unknown as { __pauseTimer?: number }).__pauseTimer = pauseTimer;
-            }
+            // Vertical rebound + node animation are NOW rendered as
+            // children of the popup itself (see CardBeamTail). Beam
+            // stays glued to the UI natively, no follow loop needed.
+            // attachToEl is accepted for API compatibility but unused.
+            void attachToEl;
             return;
           }
           rafId = requestAnimationFrame(tick);
@@ -303,97 +204,15 @@ const RitualTether = forwardRef<RitualTetherHandle, RitualTetherProps>(
         return totalMs;
       },
       attachTo(el: HTMLElement | null) {
-        const svg = svgRef.current;
-        const rebound = reboundBeamRef.current;
-        const node = reboundNodeRef.current;
-        if (!svg || !rebound || !node) return;
-        // Cancel any existing follow before starting a new one.
-        const prevFollow = (svg as unknown as { __followCancel?: () => void }).__followCancel;
-        if (prevFollow) prevFollow();
-        if (!el) {
-          (svg as unknown as { __followCancel?: () => void }).__followCancel = undefined;
-          return;
-        }
-        let followRaf = 0;
-        let prevTopY = Number(rebound.getAttribute('y2') ?? '0');
-        let prevBottomY = Number(rebound.getAttribute('y1') ?? '0');
-        let initialized = prevTopY > 0;
-        const follow = () => {
-          const r = el.getBoundingClientRect();
-          if (r.width === 0 && r.height === 0) {
-            followRaf = requestAnimationFrame(follow);
-            return;
-          }
-          const popupCenterX = r.left + r.width / 2;
-          const popupBottomY = r.bottom - 6;
-          const groundY = popupBottomY + RITUAL_TIMING.REBOUND_RISE_DISTANCE_PX;
-          if (!initialized) {
-            prevTopY = popupBottomY;
-            prevBottomY = groundY;
-            initialized = true;
-          }
-          const smoothTop = prevTopY * 0.55 + popupBottomY * 0.45;
-          const smoothBottom = prevBottomY * 0.55 + groundY * 0.45;
-          prevTopY = smoothTop;
-          prevBottomY = smoothBottom;
-          rebound.setAttribute('x1', String(popupCenterX));
-          rebound.setAttribute('y1', String(smoothBottom));
-          rebound.setAttribute('x2', String(popupCenterX));
-          rebound.setAttribute('y2', String(smoothTop));
-          // Ensure visible (in case attachTo is called before rise
-          // fully ran — e.g. cached selection).
-          rebound.style.opacity = '1';
-          node.style.opacity = '1';
-          node.setAttribute('r', '6');
-          node.setAttribute('cx', String(popupCenterX));
-          node.setAttribute('cy', String(smoothTop));
-          followRaf = requestAnimationFrame(follow);
-        };
-        followRaf = requestAnimationFrame(follow);
-        (svg as unknown as { __followCancel?: () => void }).__followCancel = () => {
-          cancelAnimationFrame(followRaf);
-        };
+        // No-op: vertical beam now lives in CardBeamTail (a child of
+        // the popup itself). It rides with the UI natively. Kept for
+        // API backward compatibility.
+        void el;
       },
       retract() {
-        // Called on popup dismiss. Collapse the vertical beam back
-        // into the property and fade it out. Node retracts with it.
-        const svg = svgRef.current;
-        const rebound = reboundBeamRef.current;
-        const node = reboundNodeRef.current;
-        if (!svg || !rebound || !node) return;
-        // Cancel any in-flight animations so we don't fight them.
-        const riseCancel = (svg as unknown as { __riseCancel?: () => void }).__riseCancel;
-        if (riseCancel) riseCancel();
-        const followCancel = (svg as unknown as { __followCancel?: () => void }).__followCancel;
-        if (followCancel) followCancel();
-        const pauseTimer = (svg as unknown as { __pauseTimer?: number }).__pauseTimer;
-        if (pauseTimer) window.clearTimeout(pauseTimer);
-        // Read current position to animate from.
-        const y1 = Number(rebound.getAttribute('y1') ?? '0');
-        const y2 = Number(rebound.getAttribute('y2') ?? '0');
-        const startY = y2;
-        const endY = y1; // collapse back to anchor point
-        const startTime = performance.now();
-        const dur = RITUAL_TIMING.REBOUND_BEAM_RETRACT_MS;
-        let retractRaf = 0;
-        const step = () => {
-          const t = clamp((performance.now() - startTime) / dur, 0, 1);
-          const eased = 1 - Math.pow(1 - t, 2);
-          const y = startY + (endY - startY) * eased;
-          rebound.setAttribute('y2', String(y));
-          node.setAttribute('cy', String(y));
-          // Fade as it retracts.
-          rebound.style.opacity = String(1 - eased);
-          node.style.opacity = String(1 - eased);
-          if (t < 1) {
-            retractRaf = requestAnimationFrame(step);
-          } else {
-            rebound.style.opacity = '0';
-            node.style.opacity = '0';
-          }
-        };
-        retractRaf = requestAnimationFrame(step);
-        (svg as unknown as { __retractRaf?: number }).__retractRaf = retractRaf;
+        // No-op: beam tail unmounts with the popup automatically when
+        // the card closes. The popup's own close transition handles
+        // the disappearance.
       },
     }), [originXRef, originYRef]);
 
@@ -457,38 +276,10 @@ const RitualTether = forwardRef<RitualTetherHandle, RitualTetherProps>(
             filter: 'drop-shadow(0 0 8px rgba(224,120,86,0.6))',
           }}
         />
-        {/* Vertical rebound beam — rises from impact point after the
-            tether arrives. Sits beneath the popup as the umbilical.
-            Greg locked 2026-05-28: design-intelligence breakthrough. */}
-        <line
-          ref={reboundBeamRef}
-          x1={0}
-          y1={0}
-          x2={0}
-          y2={0}
-          stroke="#00FF94"
-          strokeWidth={1.5}
-          strokeLinecap="round"
-          opacity={0}
-          style={{
-            filter: 'drop-shadow(0 0 6px rgba(0,255,148,0.55))',
-          }}
-        />
-        {/* Information node — sits at the top of the rebound beam.
-            Subtle glow; the popup masks it on arrival. v1 placeholder;
-            v2 becomes a real Blender/SAM-3D asset per design-intelligence
-            thesis (the spatial anchor; popup is the information surface). */}
-        <circle
-          ref={reboundNodeRef}
-          cx={0}
-          cy={0}
-          r={2}
-          fill="#00FF94"
-          opacity={0}
-          style={{
-            filter: 'drop-shadow(0 0 10px rgba(0,255,148,0.7))',
-          }}
-        />
+        {/* Vertical rebound beam + node moved to CardBeamTail (a
+            child of the popup itself), so they ride with the UI
+            natively rather than via screen-space follow loop. Greg
+            locked 2026-05-28 evening. */}
       </svg>
     );
   },

@@ -15,6 +15,7 @@ import MaterialIcon from "@/components/ui/MaterialIcon";
 import UpgradeGate from "@/components/ui/UpgradeGate";
 import PropertyPopup from "@/components/map/PropertyPopup";
 import AnchoredPropertyCard from "@/components/map/AnchoredPropertyCard";
+import GroundGlow from "@/components/map/GroundGlow";
 import type { RitualTetherHandle } from "@/components/map/RitualTether";
 import ProspectListPanel from "@/components/map/ProspectListPanel";
 import OnboardingTooltips from "@/components/ui/OnboardingTooltips";
@@ -1471,6 +1472,12 @@ export default function MapPage() {
           depth, occlusion, and camera tracking. The card stays glued
           to the building as the camera moves. Cathedral grade. */}
       {selectedLead && !walkMode && selectedLead.latitude != null && selectedLead.longitude != null && (
+        <>
+        <GroundGlow
+          mapElRef={map3DElRef}
+          lat={selectedLead.latitude}
+          lng={selectedLead.longitude}
+        />
         <AnchoredPropertyCard
           mapElRef={map3DElRef}
           lat={selectedLead.latitude}
@@ -1524,6 +1531,7 @@ export default function MapPage() {
             />
           </div>
         </AnchoredPropertyCard>
+        </>
       )}
 
       {/* ═══ EXPANDED FULL SIDEBAR — deep dive on selected property ═══ */}

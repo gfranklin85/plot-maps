@@ -15,6 +15,7 @@
 // Tone: quiet, present, not flashy. The footer is legitimacy, not pitch.
 
 import Link from 'next/link';
+import PositionWordmark from '@/components/brand/PositionWordmark';
 
 export default function PositionFooter() {
   const year = new Date().getFullYear();
@@ -31,9 +32,16 @@ export default function PositionFooter() {
           </p>
         </div>
 
-        {/* Brokerage block */}
-        <div className="space-y-2">
-          <div className="text-zinc-100 font-semibold tracking-tight">Position Realty</div>
+        {/* Brokerage block — the Position wordmark replaces the typeset
+            "Position Realty" header so the locked logomark gets its own
+            quiet placement on every public page footer. */}
+        <div className="space-y-3">
+          <Link href="/position" aria-label="Position Realty" className="inline-block">
+            <PositionWordmark
+              color="#F5EDD8"
+              className="h-5 w-auto opacity-90 hover:opacity-100 transition-opacity"
+            />
+          </Link>
           <p>
             <Link href="/position" className="hover:text-zinc-100 underline-offset-2 hover:underline">
               About Position

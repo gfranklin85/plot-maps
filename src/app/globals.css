@@ -323,6 +323,18 @@ gmp-popover[plot-ground-glow] {
   background: transparent !important;
 }
 
+/* ─── Plot landing destination strip — hide native scrollbar across
+       all engines while keeping the element scrollable. Pairs with
+       scrollbarWidth:'none' (Firefox) + msOverflowStyle (legacy Edge)
+       set inline on the strip container. Locked 2026-05-29 after the
+       launch surface QA caught a stray native scrollbar leaking under
+       the destination cards. ─── */
+.plot-strip::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
 /* ─── Skiptrace-pending pin overlay (ambient pulse over any pin
        whose lead is awaiting Tracerfy results) ─── */
 .skiptrace-pending-pin {

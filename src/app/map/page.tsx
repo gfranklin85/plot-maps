@@ -285,21 +285,79 @@ export default function MapPage() {
   const [pageGamepadConnected, setPageGamepadConnected] = useState(false);
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    // Seed initial state — Chrome only exposes gamepads after the user
-    // has interacted with one, but checking up front catches the
-    // already-paired case after a page reload.
-    const seedPads = navigator.getGamepads ? navigator.getGamepads() : [];
-    for (const p of seedPads) { if (p && p.connected) { setPageGamepadConnected(true); break; } }
-    const onConnect = () => setPageGamepadConnected(true);
-    const onDisconnect = () => {
-      const pads = navigator.getGamepads ? navigator.getGamepads() : [];
-      let any = false;
-      for (const p of pads) { if (p && p.connected) { any = true; break; } }
-      setPageGamepadConnected(any);
+
+    // ── Why this is more elaborate than a plain gamepadconnected listener ──
+    // Per docs/controller-setup.md, Steam Input is configured to consume
+    // A/B/X/Y, D-pad, and right-stick (under LB) at the OS layer — they
+    // never reach the browser's Gamepad API. Chrome only "wakes" gamepad
+    // detection after the page receives a raw button/axis event from a
+    // gamepad. With Steam swallowing the buttons users typically press
+    // first, the `gamepadconnected` event may never fire, leaving
+    // pageGamepadConnected false, flightMode stuck in 'overhead', and
+    // the useGamepad RAF loop in MapView3D disabled.
+    //
+    // The fix: poll navigator.getGamepads() for activity on inputs that
+    // Steam leaves raw (left stick, triggers, bumpers). Any non-zero
+    // axis or button.value flips pageGamepadConnected to true. We also
+    // keep the seed scan + native events for the cases where they DO
+    // work (no Steam, or browser already woken from a prior session).
+
+    let cancelled = false;
+    let lastConnectedState = false;
+    const setConnected = (v: boolean) => {
+      if (cancelled || v === lastConnectedState) return;
+      lastConnectedState = v;
+      setPageGamepadConnected(v);
     };
+
+    const scanForActivity = (): boolean => {
+      const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+      for (const p of pads) {
+        if (!p || !p.connected) continue;
+        // Any axis past the dead zone counts as "live"
+        for (const a of p.axes) {
+          if (Math.abs(a) > 0.15) return true;
+        }
+        // Any button pressed (including triggers, where .value > 0)
+        for (const b of p.buttons) {
+          if (b && (b.pressed || (typeof b.value === 'number' && b.value > 0.1))) return true;
+        }
+      }
+      return false;
+    };
+
+    const scanForConnected = (): boolean => {
+      const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+      for (const p of pads) {
+        if (p && p.connected) return true;
+      }
+      return false;
+    };
+
+    // Seed: if the browser already knows about a connected pad (page
+    // reload with controller already paired), accept it immediately.
+    if (scanForConnected()) setConnected(true);
+
+    // Activity poll — once per ~250ms. Runs as long as the page is
+    // mounted; cheap, doesn't allocate. The instant we observe stick
+    // or trigger motion, we mark the gamepad live. We keep polling
+    // even after detection so a disconnect (controller dies / unplugged)
+    // can flip us back to overhead mode.
+    const pollId = window.setInterval(() => {
+      const active = scanForActivity() || scanForConnected();
+      setConnected(active);
+    }, 250);
+
+    // Native events still help when Steam doesn't swallow the first
+    // button press. They fire instantly; the poll is the backstop.
+    const onConnect = () => setConnected(true);
+    const onDisconnect = () => setConnected(scanForConnected());
     window.addEventListener('gamepadconnected', onConnect);
     window.addEventListener('gamepaddisconnected', onDisconnect);
+
     return () => {
+      cancelled = true;
+      window.clearInterval(pollId);
       window.removeEventListener('gamepadconnected', onConnect);
       window.removeEventListener('gamepaddisconnected', onDisconnect);
     };

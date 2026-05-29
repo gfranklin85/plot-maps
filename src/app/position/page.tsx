@@ -19,6 +19,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import PlotMapsLogo from '@/components/brand/PlotMapsLogo';
+import PositionWordmark from '@/components/brand/PositionWordmark';
 import PositionFooter from '@/components/public/PositionFooter';
 
 export const metadata: Metadata = {
@@ -52,10 +53,17 @@ export default function PositionPage() {
           <div className="text-xs uppercase tracking-[0.32em] text-amber-300/80">
             Operated by · CA DRE #02090737
           </div>
-          <h1 className="mt-4 font-headline text-4xl md:text-6xl font-light tracking-tight text-zinc-50 leading-[1.05]">
-            Position Realty
+          {/* Position wordmark replaces the typeset h1 so the locked
+              logomark IS the page's headline. Accessible name on the
+              SVG covers what an h1 would have given screen readers. */}
+          <h1 className="mt-5 leading-none">
+            <span className="sr-only">Position Realty</span>
+            <PositionWordmark
+              color="#F5EDD8"
+              className="h-12 md:h-16 w-auto"
+            />
           </h1>
-          <p className="mt-6 text-lg md:text-xl text-zinc-300 leading-relaxed max-w-2xl">
+          <p className="mt-7 text-lg md:text-xl text-zinc-300 leading-relaxed max-w-2xl">
             A California brokerage built around better tools, clearer
             data, and direct operator-level service. We help buyers,
             sellers, landowners, and investors navigate real estate

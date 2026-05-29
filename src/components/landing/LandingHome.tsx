@@ -189,14 +189,9 @@ export default function LandingHome() {
     <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col">
 
       {/* ── Top bar ──────────────────────────────────────────── */}
-      {/* Wordmark sized to actually read (h-10 ~ 40px). "Enter Map" was
-          duplicate of the search bar's primary action so it's gone;
-          the nav now just lists the two destinations that aren't
-          reachable through the hero (Position + Contact). */}
-      <header className="absolute top-0 left-0 right-0 z-30 px-6 md:px-10 pt-6 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-3" aria-label="Plot Maps home">
-          <PlotMapsLogo color="#F5EDD8" className="h-10 w-auto" />
-        </Link>
+      {/* PlotMaps wordmark moved INTO the hero (below); the header is
+          now nav-only so the corner can't shrink the brand mark. */}
+      <header className="absolute top-0 left-0 right-0 z-30 px-6 md:px-10 pt-6 flex items-center justify-end">
         <nav className="hidden md:flex items-center gap-7 text-sm text-zinc-300">
           <Link href="/position" className="hover:text-white transition-colors">Position Realty</Link>
           <Link href="/contact" className="hover:text-white transition-colors">Contact</Link>
@@ -215,6 +210,18 @@ export default function LandingHome() {
         </div>
 
         <div className="w-full max-w-3xl text-center space-y-6">
+          {/* Hero wordmark — Plot's master logomark front-and-center.
+              This is the FIRST piece of brand the visitor reads, not
+              a corner mark fighting for attention with the nav. */}
+          <div className="flex justify-center mb-2">
+            <Link href="/" aria-label="Plot Maps home" className="inline-block">
+              <PlotMapsLogo
+                color="#F5EDD8"
+                className="h-12 md:h-16 w-auto opacity-95 hover:opacity-100 transition-opacity"
+              />
+            </Link>
+          </div>
+
           {/* Three-word action verb headline. Direct, declarative,
               tells the user what the product does in the same breath
               as inviting them to do it. No question mark, no asking. */}
@@ -345,10 +352,26 @@ export default function LandingHome() {
             </div>
           </div>
 
+          {/* Strip — no visible scrollbar, native trackpad/touch
+              inertia, vertical-wheel translates to horizontal scroll
+              (so a normal mouse wheel scrolls the strip too). */}
           <div
             ref={stripRef}
-            className="flex gap-5 overflow-x-auto snap-x snap-mandatory pb-4 px-6 md:px-2 scroll-smooth scrollbar-thin"
-            style={{ scrollbarWidth: 'thin', WebkitOverflowScrolling: 'touch' }}
+            onWheel={(e) => {
+              // If the user is scrolling vertically with a wheel, redirect
+              // it to horizontal so they can flip through the cards
+              // without a trackpad. Plain horizontal scrolls (trackpads)
+              // pass through untouched.
+              if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+                e.currentTarget.scrollLeft += e.deltaY;
+              }
+            }}
+            className="plot-strip flex gap-5 overflow-x-auto snap-x snap-mandatory pb-2 px-6 md:px-2 scroll-smooth"
+            style={{
+              scrollbarWidth: 'none',                  // Firefox
+              msOverflowStyle: 'none' as unknown as undefined, // IE/old Edge
+              WebkitOverflowScrolling: 'touch',         // iOS inertia
+            }}
           >
             {LANDING_DESTINATIONS.map((d) => (
               <DestinationCard key={d.slug} destination={d} />

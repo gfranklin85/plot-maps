@@ -31,6 +31,119 @@ html, body {
   --app-height: 100dvh;
 }
 
+/* ─── Plot Maps canonical palette (locked 2026-05-30) ────────────
+   The brand color system for every PUBLIC-FACING surface — landing,
+   /position, /contact, /join-position, PropertyPopup, footers, the
+   map's HUD chrome. Existing dashboard / legacy --color-* tokens
+   below are unchanged; they drive operator-tier surfaces (leads,
+   campaigns, settings) that pre-date this palette.
+
+   Token vocabulary:
+     --plot-base        the grounded UI surface (popup body, sidebar,
+                        footer, header chrome)
+     --plot-base-soft   a softer variant of base for subtle stratification
+     --plot-edge        the hologram boundary color (brass)
+     --plot-edge-bloom  the warmer outer glow of the edge
+     --plot-signal      the active-signal accent (cyan) — beams, scans,
+                        hover states, "this is live right now"
+     --plot-action      coral / coral-orange — primary buttons, selected
+                        states, the brightest call to attention
+     --plot-text        primary text on base
+     --plot-text-muted  secondary text
+     --plot-text-faint  tertiary text + footers
+     --plot-divider     hairline dividers on base
+     --plot-status-active   listing status green
+     --plot-status-pending  listing status amber
+     --plot-status-sold     listing status red
+     --plot-status-off      listing status grey
+
+   Light and dark theme inverses share the same hue vocabulary, just
+   flipped. A user toggling themes sees palette consistency, not
+   whiplash. data-theme="light" override block below.
+   ─────────────────────────────────────────────────────────────── */
+
+:root,
+:root[data-theme="dark"] {
+  /* Dark theme — the default. Deep navy base, warm brass edge,
+     electric cyan signal, ivory text. */
+  --plot-base:           #0E1B2A;     /* deep navy */
+  --plot-base-soft:      #15263A;     /* one tier lighter for stratification */
+  --plot-base-deep:      #0A1422;     /* one tier darker, used behind glows */
+  --plot-edge:           #C9A35A;     /* warm brass */
+  --plot-edge-bloom:     #E2C285;     /* brighter brass for glow */
+  --plot-edge-hot:       #F2D89D;     /* hot peak of the lumen seam */
+  --plot-signal:         #53D8FF;     /* electric cyan */
+  --plot-signal-soft:    #AEEBFF;     /* pale ice blue for soft hovers */
+  --plot-action:         #E87857;     /* coral — primary action only */
+  --plot-action-hover:   #FF9077;     /* coral lighter for hover */
+  --plot-text:           #F5F1E8;     /* warm ivory */
+  --plot-text-muted:     rgba(245,241,232,0.62);
+  --plot-text-faint:     rgba(245,241,232,0.38);
+  --plot-divider:        rgba(201,163,90,0.25);  /* brass at low alpha */
+  --plot-divider-strong: rgba(201,163,90,0.55);
+
+  /* Status colors — same across themes (the only tokens that don't
+     invert; status semantics are theme-independent). */
+  --plot-status-active:  #35D07F;
+  --plot-status-pending: #F2B84B;
+  --plot-status-sold:    #E15A5A;
+  --plot-status-off:     #8A97A6;
+}
+
+:root[data-theme="light"] {
+  /* Light theme — the inverse. Warm ivory base, deeper brass edge,
+     deep cyan signal (darker for legibility), navy text. */
+  --plot-base:           #F5F1E8;     /* warm ivory */
+  --plot-base-soft:      #ECE5D4;     /* slightly toned for stratification */
+  --plot-base-deep:      #FFFAEE;     /* lighter for elevated surfaces */
+  --plot-edge:           #A8842F;     /* deeper brass for light-bg legibility */
+  --plot-edge-bloom:     #C9A35A;     /* warmer brass for glow */
+  --plot-edge-hot:       #E2C285;     /* peak of the lumen seam */
+  --plot-signal:         #0E7FB8;     /* deep cyan */
+  --plot-signal-soft:    #B6E0F2;     /* pale ice */
+  --plot-action:         #C5563A;     /* deeper coral for light-bg legibility */
+  --plot-action-hover:   #B14730;
+  --plot-text:           #0E1B2A;     /* deep navy */
+  --plot-text-muted:     rgba(14,27,42,0.62);
+  --plot-text-faint:     rgba(14,27,42,0.40);
+  --plot-divider:        rgba(168,132,47,0.28);
+  --plot-divider-strong: rgba(168,132,47,0.55);
+
+  --plot-status-active:  #2BAE6C;
+  --plot-status-pending: #D9991F;
+  --plot-status-sold:    #C24545;
+  --plot-status-off:     #6B7A8A;
+}
+
+/* Prevent flash-of-wrong-theme during SSR/hydration: ThemeProvider
+   sets data-theme on <html> client-side, but the first paint can use
+   the prefers-color-scheme media query as a sensible fallback. Default
+   :root above is dark, so this only fires when the system is light AND
+   the visitor hasn't set a stored preference yet. */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    --plot-base:           #F5F1E8;
+    --plot-base-soft:      #ECE5D4;
+    --plot-base-deep:      #FFFAEE;
+    --plot-edge:           #A8842F;
+    --plot-edge-bloom:     #C9A35A;
+    --plot-edge-hot:       #E2C285;
+    --plot-signal:         #0E7FB8;
+    --plot-signal-soft:    #B6E0F2;
+    --plot-action:         #C5563A;
+    --plot-action-hover:   #B14730;
+    --plot-text:           #0E1B2A;
+    --plot-text-muted:     rgba(14,27,42,0.62);
+    --plot-text-faint:     rgba(14,27,42,0.40);
+    --plot-divider:        rgba(168,132,47,0.28);
+    --plot-divider-strong: rgba(168,132,47,0.55);
+    --plot-status-active:  #2BAE6C;
+    --plot-status-pending: #D9991F;
+    --plot-status-sold:    #C24545;
+    --plot-status-off:     #6B7A8A;
+  }
+}
+
 /* ─── Light Theme — "Plat Book" ─────────────────────────────────
    Plot's canonical brand palette. Cream parchment canvas, oxide-coral
    primary action, blueprint navy ink, safety-orange stake accent
@@ -323,6 +436,33 @@ gmp-popover[plot-ground-glow] {
   background: transparent !important;
 }
 
+/* ─── PropertyPopup popover chrome suppression. Mirrors the
+       GroundGlow rules, scoped to the OTHER gmp-popover Plot uses —
+       the one hosting AnchoredPropertyCard. Without this, Google's
+       default popover container adds:
+         - a white pill background under our hologram
+         - a tail/pointer that pokes out
+         - a max-height + overflow:auto wrapper that paints scrollbars
+       Greg flagged the scrollbar bleed 2026-05-30. Plot's PropertyPopup
+       owns its own visual chrome (gold edge, glow, footer); we want
+       Google's host to be invisible.
+       The wrapper div Plot portals into carries [data-plot-popup="1"]
+       so we can target by attribute selector. */
+gmp-popover:has([data-plot-popup="1"])::part(container),
+gmp-popover:has([data-plot-popup="1"])::part(content),
+gmp-popover:has([data-plot-popup="1"])::part(tail) {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  max-height: none !important;
+  overflow: visible !important;
+}
+gmp-popover:has([data-plot-popup="1"]) {
+  --gmp-popover-background: transparent;
+  background: transparent !important;
+}
+
 /* ─── Plot landing destination strip — hide native scrollbar across
        all engines while keeping the element scrollable. Pairs with
        scrollbarWidth:'none' (Firefox) + msOverflowStyle (legacy Edge)
@@ -333,6 +473,80 @@ gmp-popover[plot-ground-glow] {
   display: none;
   width: 0;
   height: 0;
+}
+
+/* ─── Plot public-page theming bridge ────────────────────────────
+   The public surfaces (landing, /position, /contact, /join-position)
+   ship with dark-themed Tailwind classes (bg-zinc-950, text-zinc-100,
+   etc.). Wrapping the root <div> with .plot-page lets us:
+     1. Drive root background + text from the canonical --plot-* tokens
+        so the theme toggle works
+     2. Override the most-visible dark Tailwind classes when light theme
+        is active, without rewriting every utility class
+
+   The override list below covers what's actually rendered on those
+   pages (verified via grep). Surgical, not blanket — Tailwind classes
+   we don't list pass through unchanged.
+   Locked 2026-05-30.
+   ─────────────────────────────────────────────────────────────── */
+.plot-page {
+  background: var(--plot-base);
+  color: var(--plot-text);
+  transition: background-color 240ms ease, color 240ms ease;
+}
+
+/* Light-theme overrides — only fire when data-theme="light" is set on
+   <html>. Each override targets a specific Tailwind class used inside
+   .plot-page. Order matters: more specific selectors win. */
+:root[data-theme="light"] .plot-page .bg-zinc-950,
+:root[data-theme="light"] .plot-page.bg-zinc-950 {
+  background-color: var(--plot-base) !important;
+}
+:root[data-theme="light"] .plot-page .bg-zinc-900,
+:root[data-theme="light"] .plot-page .bg-zinc-900\/60,
+:root[data-theme="light"] .plot-page .bg-zinc-900\/40,
+:root[data-theme="light"] .plot-page .bg-zinc-900\/85,
+:root[data-theme="light"] .plot-page .bg-zinc-925\/30 {
+  background-color: var(--plot-base-soft) !important;
+}
+:root[data-theme="light"] .plot-page .text-zinc-100,
+:root[data-theme="light"] .plot-page .text-zinc-50,
+:root[data-theme="light"] .plot-page .text-white {
+  color: var(--plot-text) !important;
+}
+:root[data-theme="light"] .plot-page .text-zinc-300,
+:root[data-theme="light"] .plot-page .text-zinc-400 {
+  color: var(--plot-text-muted) !important;
+}
+:root[data-theme="light"] .plot-page .text-zinc-500,
+:root[data-theme="light"] .plot-page .text-zinc-600 {
+  color: var(--plot-text-faint) !important;
+}
+:root[data-theme="light"] .plot-page .border-zinc-800,
+:root[data-theme="light"] .plot-page .border-zinc-800\/60,
+:root[data-theme="light"] .plot-page .border-zinc-900,
+:root[data-theme="light"] .plot-page .border-zinc-700 {
+  border-color: var(--plot-divider) !important;
+}
+:root[data-theme="light"] .plot-page .text-amber-200,
+:root[data-theme="light"] .plot-page .text-amber-300,
+:root[data-theme="light"] .plot-page .text-amber-300\/70,
+:root[data-theme="light"] .plot-page .text-amber-300\/80 {
+  color: var(--plot-edge) !important;
+}
+:root[data-theme="light"] .plot-page .bg-amber-300 {
+  background-color: var(--plot-edge) !important;
+  color: var(--plot-base) !important;
+}
+:root[data-theme="light"] .plot-page .hover\:bg-amber-200:hover {
+  background-color: var(--plot-edge-bloom) !important;
+}
+:root[data-theme="light"] .plot-page .border-amber-300\/30,
+:root[data-theme="light"] .plot-page .border-amber-300\/35,
+:root[data-theme="light"] .plot-page .border-amber-300\/40,
+:root[data-theme="light"] .plot-page .border-amber-300\/45,
+:root[data-theme="light"] .plot-page .border-amber-300\/50 {
+  border-color: var(--plot-edge) !important;
 }
 
 /* ─── Skiptrace-pending pin overlay (ambient pulse over any pin

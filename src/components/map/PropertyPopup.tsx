@@ -172,10 +172,33 @@ export default function PropertyPopup({ lead, onUpdate, onClose, onPin }: Props)
     }
   };
 
-  // ── Hero image source ──────────────────────────────────────────
-  // Pulled from lead.listing_photo_url when present (MLS feed will
-  // populate this June 18+). Demo data can set it on the mock JSON.
-  const heroUrl = lead.listing_photo_url || null;
+  // ── Photo carousel source ──────────────────────────────────────
+  // Prefers listing_photo_urls[] (full MLS media set) and falls back
+  // to listing_photo_url (single thumbnail). Mock data and the live
+  // RESO feed both flow through this path.
+  const photos: string[] = (() => {
+    if (Array.isArray(lead.listing_photo_urls) && lead.listing_photo_urls.length > 0) {
+      // Filter empties + de-dupe in case the feed has both fields
+      const seen = new Set<string>();
+      const out: string[] = [];
+      for (const u of lead.listing_photo_urls) {
+        if (typeof u === 'string' && u && !seen.has(u)) {
+          seen.add(u);
+          out.push(u);
+        }
+      }
+      if (out.length > 0) return out;
+    }
+    if (lead.listing_photo_url) return [lead.listing_photo_url];
+    return [];
+  })();
+  const hasPhotos = photos.length > 0;
+  const [photoIdx, setPhotoIdx] = useState(0);
+  // Reset index when the lead changes so the carousel doesn't carry
+  // a stale index from the prior property
+  useEffect(() => { setPhotoIdx(0); }, [lead.id]);
+  const goPrev = () => setPhotoIdx((i) => (i - 1 + photos.length) % photos.length);
+  const goNext = () => setPhotoIdx((i) => (i + 1) % photos.length);
 
   return (
     <div className="plot-popup">
@@ -206,13 +229,46 @@ export default function PropertyPopup({ lead, onUpdate, onClose, onPin }: Props)
         </div>
       )}
 
-      {/* ── HERO (when image available) ────────────────────────── */}
-      {heroUrl && (
+      {/* ── HERO PHOTO CAROUSEL ────────────────────────────────
+          Renders when listing photos are present. Single photo →
+          static image with overlaid status pill. Multiple photos →
+          scrollable carousel with prev/next arrows and a count
+          indicator. Pattern mirrors Zillow's listing card model. */}
+      {hasPhotos && (
         <div className="hero">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={heroUrl} alt="" />
+          <img
+            src={photos[photoIdx]}
+            alt=""
+            onError={(e) => { (e.currentTarget as HTMLImageElement).style.visibility = 'hidden'; }}
+          />
           {status && (
             <div className={`pill pill-${status.toLowerCase()}`}>{status.toUpperCase()}</div>
+          )}
+          {photos.length > 1 && (
+            <>
+              <button
+                type="button"
+                className="carousel-btn carousel-prev"
+                onClick={(e) => { e.stopPropagation(); goPrev(); }}
+                aria-label="Previous photo"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                  <polyline points="15 18 9 12 15 6" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                className="carousel-btn carousel-next"
+                onClick={(e) => { e.stopPropagation(); goNext(); }}
+                aria-label="Next photo"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                  <polyline points="9 18 15 12 9 6" />
+                </svg>
+              </button>
+              <div className="carousel-count">{photoIdx + 1} / {photos.length}</div>
+            </>
           )}
         </div>
       )}
@@ -226,7 +282,7 @@ export default function PropertyPopup({ lead, onUpdate, onClose, onPin }: Props)
             {coords && <div className="coords">{coords}</div>}
           </div>
           {/* pill renders here when there's no hero image */}
-          {!heroUrl && status && (
+          {!hasPhotos && status && (
             <div className={`pill pill-${status.toLowerCase()} pill-inline`}>{status.toUpperCase()}</div>
           )}
         </div>
@@ -299,52 +355,42 @@ export default function PropertyPopup({ lead, onUpdate, onClose, onPin }: Props)
         <div className="mark">PLOT <span className="pl">PL</span></div>
       </div>
 
-      {/* All component styles scoped under .plot-popup. */}
+      {/* All component styles scoped under .plot-popup.
+          Consumes the canonical --plot-* token palette so the popup
+          inverts with the active theme (light/dark) without code
+          changes — see src/lib/theme-context.tsx + globals.css. */}
       <style jsx>{`
         .plot-popup{
-          --gold:        #F2C063;
-          --gold-bloom:  #FFD66B;
-          --gold-hot:    #FFE9A8;
-          --gold-inner:  #FFF4D6;
-          --gold-30:     rgba(242,192,99,0.30);
-          --gold-40:     rgba(242,192,99,0.40);
-          --gold-60:     rgba(242,192,99,0.60);
-          --fill:        rgba(22,16,6,0.94);
-          --cream:       #F5EDD8;
-          --cream-price: #FFE9A8;
-          --cream-muted: rgba(245,237,216,0.58);
-          --cream-faint: rgba(245,237,216,0.35);
-
           position:relative;
           width:380px;
           border-radius:14px;
           padding:18px 18px 20px;
-          color:var(--cream);
+          color:var(--plot-text);
           font-family:'Inter', system-ui, -apple-system, sans-serif;
           font-feature-settings:'ss01','cv11';
           isolation:isolate;
-          /* Atmospheric pooling — warm gold pools on warm near-black */
+          /* Atmospheric pooling — soft warm pools on the base color.
+             Both themes get the same recipe; the base shifts the mood. */
           background:
-            radial-gradient(circle at 88% 12%, rgba(255,214,107,0.18) 0px, transparent 45%),
-            radial-gradient(circle at 8% 88%,  rgba(255,180,80,0.16) 0px, transparent 50%),
-            radial-gradient(circle at 50% 50%, rgba(80,55,20,0.40) 0px, transparent 70%),
-            radial-gradient(circle at 0% 0%,   rgba(60,40,15,0.30) 0px, transparent 45%),
-            var(--fill);
+            radial-gradient(circle at 88% 12%, color-mix(in srgb, var(--plot-edge) 14%, transparent) 0px, transparent 45%),
+            radial-gradient(circle at 8% 88%,  color-mix(in srgb, var(--plot-edge) 10%, transparent) 0px, transparent 50%),
+            radial-gradient(circle at 50% 50%, var(--plot-base-deep) 0px, transparent 70%),
+            var(--plot-base);
           /* glow stack: hard rim, tight, far halo, inside edge, inner highlight */
           box-shadow:
-            0 0 1px 0 rgba(242,192,99,1),
-            0 0 14px 0 rgba(242,192,99,0.95),
-            0 0 36px -2px rgba(255,214,107,0.55),
-            inset 0 0 0 1.5px var(--gold),
-            inset 0 0 10px 0 rgba(255,244,214,0.45);
+            0 0 1px 0 var(--plot-edge),
+            0 0 14px 0 color-mix(in srgb, var(--plot-edge) 80%, transparent),
+            0 0 36px -2px color-mix(in srgb, var(--plot-edge-bloom) 45%, transparent),
+            inset 0 0 0 1.5px var(--plot-edge),
+            inset 0 0 10px 0 color-mix(in srgb, var(--plot-edge-hot) 35%, transparent);
         }
         .plot-popup::before{
           /* breathing outer bloom — ambient ~5s loop */
           content:""; position:absolute; inset:0;
           border-radius:14px; z-index:-1; pointer-events:none;
           box-shadow:
-            0 0 28px 1px rgba(255,214,107,0.85),
-            0 0 64px 8px rgba(255,214,107,0.25);
+            0 0 28px 1px color-mix(in srgb, var(--plot-edge-bloom) 75%, transparent),
+            0 0 64px 8px color-mix(in srgb, var(--plot-edge-bloom) 20%, transparent);
           animation: plot-popup-breathe 5s ease-in-out infinite;
           will-change:opacity, transform;
         }
@@ -355,13 +401,13 @@ export default function PropertyPopup({ lead, onUpdate, onClose, onPin }: Props)
 
         /* registration corners — surveyor's tell */
         .reg{ position:absolute; width:14px; height:14px; pointer-events:none; z-index:2; }
-        .reg.tl{ top:-6px;    left:-6px;   border-top:1.5px solid var(--gold); border-left:1.5px solid var(--gold); }
-        .reg.tr{ top:-6px;    right:-6px;  border-top:1.5px solid var(--gold); border-right:1.5px solid var(--gold); }
-        .reg.bl{ bottom:-6px; left:-6px;   border-bottom:1.5px solid var(--gold); border-left:1.5px solid var(--gold); }
-        .reg.br{ bottom:-6px; right:-6px;  border-bottom:1.5px solid var(--gold); border-right:1.5px solid var(--gold); }
+        .reg.tl{ top:-6px;    left:-6px;   border-top:1.5px solid var(--plot-edge); border-left:1.5px solid var(--plot-edge); }
+        .reg.tr{ top:-6px;    right:-6px;  border-top:1.5px solid var(--plot-edge); border-right:1.5px solid var(--plot-edge); }
+        .reg.bl{ bottom:-6px; left:-6px;   border-bottom:1.5px solid var(--plot-edge); border-left:1.5px solid var(--plot-edge); }
+        .reg.br{ bottom:-6px; right:-6px;  border-bottom:1.5px solid var(--plot-edge); border-right:1.5px solid var(--plot-edge); }
 
         /* midpoint tick marks */
-        .tick{ position:absolute; background:var(--gold); pointer-events:none; opacity:0.85; z-index:2; }
+        .tick{ position:absolute; background:var(--plot-edge); pointer-events:none; opacity:0.85; z-index:2; }
         .tick.t{ top:-3.5px;   left:50%; transform:translateX(-50%); width:1.5px; height:6px; }
         .tick.b{ bottom:-3.5px;left:50%; transform:translateX(-50%); width:1.5px; height:6px; }
         .tick.l{ left:-3.5px;  top:50%;  transform:translateY(-50%); width:6px; height:1.5px; }
@@ -378,10 +424,10 @@ export default function PropertyPopup({ lead, onUpdate, onClose, onPin }: Props)
         .chrome-btn{
           width:24px; height:24px;
           display:flex; align-items:center; justify-content:center;
-          background:rgba(12,9,4,0.55);
-          border:1px solid rgba(242,192,99,0.45);
+          background:color-mix(in srgb, var(--plot-base-deep) 70%, transparent);
+          border:1px solid var(--plot-divider-strong);
           border-radius:4px;
-          color:var(--gold);
+          color:var(--plot-edge);
           cursor:pointer;
           padding:0;
           backdrop-filter:blur(3px);
@@ -389,12 +435,12 @@ export default function PropertyPopup({ lead, onUpdate, onClose, onPin }: Props)
           transition:background 120ms ease, color 120ms ease, border-color 120ms ease;
         }
         .chrome-btn:hover{
-          background:rgba(242,192,99,0.20);
-          border-color:var(--gold-bloom);
-          color:var(--gold-hot);
+          background:color-mix(in srgb, var(--plot-edge) 22%, transparent);
+          border-color:var(--plot-edge-bloom);
+          color:var(--plot-edge-hot);
         }
 
-        /* ── hero photo ──────────────────────────────────── */
+        /* ── hero photo (and carousel) ────────────────────── */
         .hero{
           position:relative;
           width:100%;
@@ -402,11 +448,53 @@ export default function PropertyPopup({ lead, onUpdate, onClose, onPin }: Props)
           border-radius:8px;
           overflow:hidden;
           margin-bottom:14px;
-          box-shadow: inset 0 -42px 50px -32px rgba(18,13,5,0.55);
+          background:var(--plot-base-deep);
+          box-shadow: inset 0 -42px 50px -32px color-mix(in srgb, var(--plot-base-deep) 80%, black);
         }
         .hero img{
           width:100%; height:100%; display:block;
           object-fit:cover;
+        }
+
+        /* carousel arrows + count indicator */
+        .carousel-btn{
+          position:absolute;
+          top:50%;
+          transform:translateY(-50%);
+          width:28px; height:28px;
+          display:flex; align-items:center; justify-content:center;
+          background:color-mix(in srgb, var(--plot-base-deep) 80%, transparent);
+          border:1px solid var(--plot-divider-strong);
+          border-radius:9999px;
+          color:var(--plot-text);
+          cursor:pointer;
+          padding:0;
+          z-index:3;
+          backdrop-filter:blur(4px);
+          -webkit-backdrop-filter:blur(4px);
+          opacity:0.85;
+          transition: opacity 120ms ease, background 120ms ease, color 120ms ease;
+        }
+        .carousel-btn:hover{
+          opacity:1;
+          background:color-mix(in srgb, var(--plot-signal) 22%, var(--plot-base-deep));
+          color:var(--plot-signal);
+        }
+        .carousel-prev{ left:8px; }
+        .carousel-next{ right:8px; }
+        .carousel-count{
+          position:absolute;
+          bottom:8px; right:10px;
+          z-index:3;
+          font-family:'JetBrains Mono', ui-monospace, monospace;
+          font-size:10px;
+          letter-spacing:0.14em;
+          color:var(--plot-text);
+          padding:3px 7px;
+          background:color-mix(in srgb, var(--plot-base-deep) 70%, transparent);
+          border-radius:9999px;
+          backdrop-filter:blur(4px);
+          -webkit-backdrop-filter:blur(4px);
         }
 
         /* ── identity ────────────────────────────────────── */
@@ -418,7 +506,7 @@ export default function PropertyPopup({ lead, onUpdate, onClose, onPin }: Props)
           font-weight:600;
           line-height:1.2;
           letter-spacing:-0.012em;
-          color:var(--cream);
+          color:var(--plot-text);
           overflow:hidden;
           text-overflow:ellipsis;
         }
@@ -426,7 +514,7 @@ export default function PropertyPopup({ lead, onUpdate, onClose, onPin }: Props)
           font-size:12px;
           font-weight:400;
           margin-top:1px;
-          color:var(--cream-muted);
+          color:var(--plot-text-muted);
         }
         .coords{
           font-family:'JetBrains Mono', ui-monospace, monospace;
@@ -434,7 +522,7 @@ export default function PropertyPopup({ lead, onUpdate, onClose, onPin }: Props)
           font-weight:400;
           letter-spacing:0.06em;
           margin-top:3px;
-          color:var(--cream-faint);
+          color:var(--plot-text-faint);
         }
         .price-row{
           display:flex; align-items:baseline; gap:10px; margin-top:6px;
@@ -445,8 +533,8 @@ export default function PropertyPopup({ lead, onUpdate, onClose, onPin }: Props)
           line-height:1;
           letter-spacing:-0.018em;
           font-variant-numeric:tabular-nums;
-          color:var(--cream-price);
-          text-shadow:0 0 14px rgba(255,233,168,0.30);
+          color:var(--plot-edge-hot);
+          text-shadow:0 0 14px color-mix(in srgb, var(--plot-edge-bloom) 30%, transparent);
         }
         .price-meta{
           font-family:'JetBrains Mono', ui-monospace, monospace;
@@ -454,7 +542,7 @@ export default function PropertyPopup({ lead, onUpdate, onClose, onPin }: Props)
           font-weight:400;
           letter-spacing:0.14em;
           text-transform:uppercase;
-          color:var(--cream-muted);
+          color:var(--plot-text-muted);
         }
 
         /* ── status pill ─────────────────────────────────── */
@@ -468,28 +556,27 @@ export default function PropertyPopup({ lead, onUpdate, onClose, onPin }: Props)
           border-radius:2px;
           backdrop-filter:blur(4px);
           -webkit-backdrop-filter:blur(4px);
-          background:rgba(12,9,4,0.34);
-          text-shadow:0 0 8px rgba(255,214,107,0.45);
+          background:color-mix(in srgb, var(--plot-base-deep) 60%, transparent);
           flex-shrink:0;
         }
         .pill-active{
-          color:var(--gold);
-          border:1px solid var(--gold);
-          box-shadow:0 0 10px -2px rgba(255,214,107,0.55);
+          color:var(--plot-status-active);
+          border:1px solid color-mix(in srgb, var(--plot-status-active) 80%, transparent);
+          text-shadow:0 0 6px color-mix(in srgb, var(--plot-status-active) 55%, transparent);
+          box-shadow:0 0 10px -2px color-mix(in srgb, var(--plot-status-active) 55%, transparent);
           animation: plot-pill-breathe 5s ease-in-out infinite;
         }
         .pill-pending{
-          color: #FFD9A8;
-          border:1px solid rgba(255,217,168,0.7);
+          color:var(--plot-status-pending);
+          border:1px solid color-mix(in srgb, var(--plot-status-pending) 70%, transparent);
         }
         .pill-sold{
-          color: rgba(245,237,216,0.65);
-          border:1px solid rgba(245,237,216,0.4);
-          text-shadow:none;
+          color:var(--plot-status-sold);
+          border:1px solid color-mix(in srgb, var(--plot-status-sold) 60%, transparent);
         }
         @keyframes plot-pill-breathe{
-          0%,100%{ box-shadow:0 0 8px -2px rgba(255,214,107,0.40); }
-          50%   { box-shadow:0 0 20px -2px rgba(255,214,107,0.85); }
+          0%,100%{ box-shadow:0 0 8px -2px color-mix(in srgb, var(--plot-status-active) 40%, transparent); }
+          50%   { box-shadow:0 0 20px -2px color-mix(in srgb, var(--plot-status-active) 85%, transparent); }
         }
         /* pill positioned over hero image, top-LEFT
            (top-right is reserved for the Pin/Close chrome) */
@@ -508,21 +595,20 @@ export default function PropertyPopup({ lead, onUpdate, onClose, onPin }: Props)
           border-radius:2px;
           margin:4px 0 14px;
           background:linear-gradient(90deg,
-            rgba(255,214,107,0)  0%,
-            var(--gold-bloom)   14%,
-            var(--gold-hot)     42%,
-            #FFF1B8             50%,
-            var(--gold-hot)     58%,
-            var(--gold-bloom)   86%,
-            rgba(255,214,107,0)100%);
+            transparent 0%,
+            var(--plot-edge-bloom) 14%,
+            var(--plot-edge-hot) 42%,
+            var(--plot-edge-hot) 58%,
+            var(--plot-edge-bloom) 86%,
+            transparent 100%);
           box-shadow:
-            0 0 18px 0 rgba(255,214,107,0.75),
-            0 0 6px  0 rgba(255,214,107,0.95),
-            0 0 2px  0 rgba(255,241,184,1.00);
+            0 0 18px 0 color-mix(in srgb, var(--plot-edge-bloom) 70%, transparent),
+            0 0 6px  0 color-mix(in srgb, var(--plot-edge-hot) 85%, transparent),
+            0 0 2px  0 var(--plot-edge-hot);
         }
         .seam::before, .seam::after{ content:""; position:absolute; pointer-events:none; left:8%; right:8%; }
-        .seam::before{ bottom:100%; height:20px; background:radial-gradient(ellipse at center bottom, rgba(255,214,107,0.36), transparent 70%); }
-        .seam::after{ top:100%; height:16px; background:radial-gradient(ellipse at center top, rgba(255,214,107,0.24), transparent 70%); }
+        .seam::before{ bottom:100%; height:20px; background:radial-gradient(ellipse at center bottom, color-mix(in srgb, var(--plot-edge-bloom) 35%, transparent), transparent 70%); }
+        .seam::after{ top:100%; height:16px; background:radial-gradient(ellipse at center top, color-mix(in srgb, var(--plot-edge-bloom) 22%, transparent), transparent 70%); }
 
         /* ── stat ledger ─────────────────────────────────── */
         .stats{
@@ -547,10 +633,10 @@ export default function PropertyPopup({ lead, onUpdate, onClose, onPin }: Props)
           justify-content:center;
           gap:3px;
           padding:9px 4px 8px;
-          background:rgba(12,9,4,0.34);
-          border:1px solid rgba(242,192,99,0.55);
+          background:color-mix(in srgb, var(--plot-base-deep) 60%, transparent);
+          border:1px solid color-mix(in srgb, var(--plot-edge) 55%, transparent);
           border-radius:6px;
-          color:var(--gold);
+          color:var(--plot-edge);
           font-family:'JetBrains Mono', ui-monospace, monospace;
           font-size:9px;
           font-weight:500;
@@ -561,9 +647,9 @@ export default function PropertyPopup({ lead, onUpdate, onClose, onPin }: Props)
           text-decoration:none;
         }
         .action:hover:not(:disabled){
-          background:rgba(242,192,99,0.18);
-          border-color:var(--gold-bloom);
-          color:var(--gold-hot);
+          background:color-mix(in srgb, var(--plot-signal) 16%, transparent);
+          border-color:var(--plot-signal);
+          color:var(--plot-signal);
         }
         .action:disabled,
         .action[aria-disabled="true"]{
@@ -571,7 +657,7 @@ export default function PropertyPopup({ lead, onUpdate, onClose, onPin }: Props)
           cursor:not-allowed;
         }
         .open-record{
-          border-color:rgba(242,192,99,0.85);
+          border-color:color-mix(in srgb, var(--plot-edge) 85%, transparent);
         }
 
         /* ── inquiry toast (inline below actions) ────────── */
@@ -582,14 +668,14 @@ export default function PropertyPopup({ lead, onUpdate, onClose, onPin }: Props)
           letter-spacing:0.14em;
           text-transform:uppercase;
         }
-        .inquiry-toast-ok{ color:#aef0c0; }
-        .inquiry-toast-err{ color:#f0a8a8; }
+        .inquiry-toast-ok{ color:var(--plot-status-active); }
+        .inquiry-toast-err{ color:var(--plot-status-sold); }
 
         /* ── footer ──────────────────────────────────────── */
         .footer{
           margin-top:14px;
           padding-top:10px;
-          border-top:1px dashed rgba(242,192,99,0.25);
+          border-top:1px dashed var(--plot-divider);
           display:flex;
           justify-content:space-between;
           align-items:center;
@@ -600,16 +686,16 @@ export default function PropertyPopup({ lead, onUpdate, onClose, onPin }: Props)
           font-weight:400;
           letter-spacing:0.18em;
           text-transform:uppercase;
-          color:var(--cream-faint);
+          color:var(--plot-text-faint);
         }
         .captured .dot{
           display:inline-block;
           width:5px; height:5px;
           border-radius:50%;
-          background:var(--gold);
+          background:var(--plot-signal);
           margin:0 7px 1px 0;
           vertical-align:middle;
-          box-shadow:0 0 6px var(--gold);
+          box-shadow:0 0 6px var(--plot-signal);
           animation: plot-dot-pulse 2.4s ease-in-out infinite;
         }
         @keyframes plot-dot-pulse{
@@ -621,9 +707,9 @@ export default function PropertyPopup({ lead, onUpdate, onClose, onPin }: Props)
           font-size:9.5px;
           font-weight:600;
           letter-spacing:0.32em;
-          color:var(--gold-40);
+          color:var(--plot-text-faint);
         }
-        .mark .pl{ color:var(--gold); }
+        .mark .pl{ color:var(--plot-edge); }
 
         @media (prefers-reduced-motion: reduce){
           .plot-popup::before,
@@ -655,14 +741,14 @@ function Stat({ label, value, mono = false }: { label: string; value: string; mo
           font-weight:500;
           letter-spacing:0.16em;
           text-transform:uppercase;
-          color:rgba(245,237,216,0.58);
+          color:var(--plot-text-muted);
         }
         .val{
           font-size:12.5px;
           font-weight:500;
           font-variant-numeric:tabular-nums;
           letter-spacing:-0.005em;
-          color:#F5EDD8;
+          color:var(--plot-text);
           text-align:right;
         }
         .val-mono{

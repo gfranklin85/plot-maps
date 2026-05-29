@@ -22,6 +22,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import PlotMapsLogo from '@/components/brand/PlotMapsLogo';
 import PositionFooter from '@/components/public/PositionFooter';
+import ThemeToggle from '@/components/public/ThemeToggle';
 import {
   LANDING_DESTINATIONS,
   type Destination,
@@ -186,16 +187,17 @@ export default function LandingHome() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col">
+    <div className="plot-page min-h-screen bg-zinc-950 text-zinc-100 flex flex-col">
 
       {/* ── Top bar ──────────────────────────────────────────── */}
       {/* PlotMaps wordmark moved INTO the hero (below); the header is
-          now nav-only so the corner can't shrink the brand mark. */}
-      <header className="absolute top-0 left-0 right-0 z-30 px-6 md:px-10 pt-6 flex items-center justify-end">
+          now nav-only + theme toggle. */}
+      <header className="absolute top-0 left-0 right-0 z-30 px-6 md:px-10 pt-6 flex items-center justify-end gap-5">
         <nav className="hidden md:flex items-center gap-7 text-sm text-zinc-300">
           <Link href="/position" className="hover:text-white transition-colors">Position Realty</Link>
           <Link href="/contact" className="hover:text-white transition-colors">Contact</Link>
         </nav>
+        <ThemeToggle />
       </header>
 
       {/* ── HERO ─────────────────────────────────────────────── */}
@@ -216,7 +218,7 @@ export default function LandingHome() {
           <div className="flex justify-center mb-2">
             <Link href="/" aria-label="Plot Maps home" className="inline-block">
               <PlotMapsLogo
-                color="#F5EDD8"
+                color="var(--plot-text)"
                 className="h-12 md:h-16 w-auto opacity-95 hover:opacity-100 transition-opacity"
               />
             </Link>

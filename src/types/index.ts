@@ -90,6 +90,10 @@ export interface Lead {
   //    data sets them for the June 9 demo). All optional — popup
   //    degrades gracefully when missing. ──
   listing_photo_url?: string | null;
+  /** Full photo set (RESO Media[]). When present, the popup renders
+   *  a scrollable carousel; listing_photo_url is the cover thumbnail
+   *  and typically equals listing_photo_urls[0]. */
+  listing_photo_urls?: string[] | null;
   bedrooms?: number | null;
   bathrooms?: number | null;
   listing_agent_name?: string | null;

@@ -5,6 +5,7 @@ import "./globals.css";
 import { Analytics } from "@vercel/analytics/next";
 import ClientProviders from "@/components/layout/ClientProviders";
 import AppShell from "@/components/layout/AppShell";
+import { ThemeProvider, THEME_BOOTSTRAP_SCRIPT } from "@/lib/theme-context";
 
 export const metadata: Metadata = {
   title: "Plot Maps | Circle Prospecting Tool",
@@ -36,6 +37,13 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning className={`${GeistSans.variable} ${GeistMono.variable}`}>
       <head>
+        {/* Theme bootstrap — runs BEFORE React hydration to set
+            data-theme on <html> from localStorage / prefers-color-scheme.
+            Prevents flash-of-wrong-theme on the public pages. The
+            ThemeProvider below reads what this script painted. */}
+        <script
+          dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP_SCRIPT }}
+        />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="mobile-web-app-capable" content="yes" />
@@ -51,11 +59,13 @@ export default function RootLayout({
         />
       </head>
       <body className="font-body antialiased bg-surface text-on-surface">
-        <ClientProviders>
-          <AppShell>
-            {children}
-          </AppShell>
-        </ClientProviders>
+        <ThemeProvider>
+          <ClientProviders>
+            <AppShell>
+              {children}
+            </AppShell>
+          </ClientProviders>
+        </ThemeProvider>
         <Analytics />
       </body>
     </html>

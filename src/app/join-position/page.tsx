@@ -27,6 +27,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import PlotMapsLogo from '@/components/brand/PlotMapsLogo';
 import PositionFooter from '@/components/public/PositionFooter';
+import ThemeToggle from '@/components/public/ThemeToggle';
 
 export default function JoinPositionPage() {
   const [status, setStatus] = useState<'idle' | 'sending' | 'sent' | 'failed'>('idle');
@@ -60,16 +61,19 @@ export default function JoinPositionPage() {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col">
+    <div className="plot-page min-h-screen bg-zinc-950 text-zinc-100 flex flex-col">
       <header className="absolute top-0 left-0 right-0 z-30 px-6 md:px-10 pt-6 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-3">
-          <PlotMapsLogo color="#F5EDD8" className="h-7 w-auto" />
+          <PlotMapsLogo color="var(--plot-text)" className="h-7 w-auto" />
         </Link>
-        <nav className="hidden md:flex items-center gap-7 text-sm text-zinc-300">
-          <Link href="/map" className="hover:text-white transition-colors">Enter Map</Link>
-          <Link href="/position" className="hover:text-white transition-colors">Position Realty</Link>
-          <Link href="/contact" className="hover:text-white transition-colors">Contact</Link>
-        </nav>
+        <div className="flex items-center gap-5">
+          <nav className="hidden md:flex items-center gap-7 text-sm text-zinc-300">
+            <Link href="/map" className="hover:text-white transition-colors">Enter Map</Link>
+            <Link href="/position" className="hover:text-white transition-colors">Position Realty</Link>
+            <Link href="/contact" className="hover:text-white transition-colors">Contact</Link>
+          </nav>
+          <ThemeToggle />
+        </div>
       </header>
 
       <section className="relative flex-1 px-6 md:px-10 pt-32 pb-20">

@@ -21,6 +21,7 @@ import Link from 'next/link';
 import PlotMapsLogo from '@/components/brand/PlotMapsLogo';
 import PositionWordmark from '@/components/brand/PositionWordmark';
 import PositionFooter from '@/components/public/PositionFooter';
+import ThemeToggle from '@/components/public/ThemeToggle';
 
 export const metadata: Metadata = {
   title: 'Position Realty — Plot Maps',
@@ -30,18 +31,21 @@ export const metadata: Metadata = {
 
 export default function PositionPage() {
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col">
+    <div className="plot-page min-h-screen bg-zinc-950 text-zinc-100 flex flex-col">
 
       {/* ── Top bar ──────────────────────────────────────────── */}
       <header className="absolute top-0 left-0 right-0 z-30 px-6 md:px-10 pt-6 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-3">
-          <PlotMapsLogo color="#F5EDD8" className="h-7 w-auto" />
+          <PlotMapsLogo color="var(--plot-text)" className="h-7 w-auto" />
         </Link>
-        <nav className="hidden md:flex items-center gap-7 text-sm text-zinc-300">
-          <Link href="/map" className="hover:text-white transition-colors">Enter Map</Link>
-          <Link href="/position" className="text-amber-200 transition-colors">Position Realty</Link>
-          <Link href="/contact" className="hover:text-white transition-colors">Contact</Link>
-        </nav>
+        <div className="flex items-center gap-5">
+          <nav className="hidden md:flex items-center gap-7 text-sm text-zinc-300">
+            <Link href="/map" className="hover:text-white transition-colors">Enter Map</Link>
+            <Link href="/position" className="text-amber-200 transition-colors">Position Realty</Link>
+            <Link href="/contact" className="hover:text-white transition-colors">Contact</Link>
+          </nav>
+          <ThemeToggle />
+        </div>
       </header>
 
       {/* ── HERO ─────────────────────────────────────────────── */}
@@ -55,11 +59,12 @@ export default function PositionPage() {
           </div>
           {/* Position wordmark replaces the typeset h1 so the locked
               logomark IS the page's headline. Accessible name on the
-              SVG covers what an h1 would have given screen readers. */}
+              SVG covers what an h1 would have given screen readers.
+              Color tied to --plot-text so it inverts with the theme. */}
           <h1 className="mt-5 leading-none">
             <span className="sr-only">Position Realty</span>
             <PositionWordmark
-              color="#F5EDD8"
+              color="var(--plot-text)"
               className="h-12 md:h-16 w-auto"
             />
           </h1>

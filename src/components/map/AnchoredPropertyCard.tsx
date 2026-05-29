@@ -163,7 +163,14 @@ export default function AnchoredPropertyCard({
   // popover's own screen-space transforms. Greg locked 2026-05-28:
   // beam stays with UI, not the screen.
   return createPortal(
-    <div style={{ position: 'relative', display: 'inline-block' }}>
+    // data-plot-popup marker is what the globals.css :has() selectors
+    // hook to suppress gmp-popover's default container/scrollbar/tail
+    // chrome around Plot's hologram popup. Without it, Google paints
+    // its own pill + scroll wrapper underneath our card.
+    <div
+      data-plot-popup="1"
+      style={{ position: 'relative', display: 'inline-block', overflow: 'visible' }}
+    >
       {children}
       <CardBeamTail />
     </div>,

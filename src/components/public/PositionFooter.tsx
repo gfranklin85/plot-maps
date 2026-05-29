@@ -34,11 +34,12 @@ export default function PositionFooter() {
 
         {/* Brokerage block — the Position wordmark replaces the typeset
             "Position Realty" header so the locked logomark gets its own
-            quiet placement on every public page footer. */}
+            quiet placement on every public page footer.
+            Color is themed via --plot-text so it inverts with the theme. */}
         <div className="space-y-3">
           <Link href="/position" aria-label="Position Realty" className="inline-block">
             <PositionWordmark
-              color="#F5EDD8"
+              color="var(--plot-text)"
               className="h-5 w-auto opacity-90 hover:opacity-100 transition-opacity"
             />
           </Link>

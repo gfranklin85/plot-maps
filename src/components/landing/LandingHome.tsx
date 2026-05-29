@@ -190,12 +190,24 @@ export default function LandingHome() {
     <div className="plot-page min-h-screen bg-zinc-950 text-zinc-100 flex flex-col">
 
       {/* ── Top bar ──────────────────────────────────────────── */}
-      {/* PlotMaps wordmark moved INTO the hero (below); the header is
-          now nav-only + theme toggle. */}
+      {/* PlotMaps wordmark moved INTO the hero (below); header is
+          nav-only + a quiet "For agents" door on the right.
+          The public surface is unauthenticated; the "For agents"
+          link routes to /login for operator/agent-layer access
+          (project-two-layer-audience-strategy). */}
       <header className="absolute top-0 left-0 right-0 z-30 px-6 md:px-10 pt-6 flex items-center justify-end gap-5">
         <nav className="hidden md:flex items-center gap-7 text-sm text-zinc-300">
           <Link href="/position" className="hover:text-white transition-colors">Position Realty</Link>
           <Link href="/contact" className="hover:text-white transition-colors">Contact</Link>
+          <Link
+            href="/login"
+            className="inline-flex items-center gap-1.5 rounded-full border border-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-300 hover:text-white hover:border-zinc-500 transition-colors"
+          >
+            For agents
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-3 w-3">
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </Link>
         </nav>
         <ThemeToggle />
       </header>

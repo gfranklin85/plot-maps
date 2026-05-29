@@ -4,25 +4,37 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Lead } from "@/types";
 import MaterialIcon from "@/components/ui/MaterialIcon";
-import { usePhone } from "@/lib/phone-context";
 
-// PropertyPopup — Plot's in-flight hologram projection over a selected
-// property. Locked 2026-05-28 evening. Replaces the prior dense card.
-// Brand thesis: this is NOT a glass object; it's an information field
-// surfaced from the substrate (see project-design-intelligence-thesis).
-// All content is fully resolved frame 1 — no entrance animations on
-// content (see feedback-no-focus-in-animations). Ambient effects only:
-// breathing outer bloom and slow rim sweep.
+// PropertyPopup — Plot's public-layer property card.
+// Locked 2026-05-30 evening. Replaces the warm-gold hologram with a
+// modern 2026 dark glass card (Stitch-direction).
+//
+// TWO MODES based on lead.listing_status:
+//   LISTED   (Active/Pending/Sold) → buyer-facing card with photo
+//                                    carousel, price, status pill,
+//                                    listing-agent attribution, and
+//                                    Call/Email/Message/Tour buttons
+//                                    that ALL route to Position via
+//                                    /api/inbox/message. Plot respects
+//                                    the listing — listing agent contact
+//                                    info is shown for attribution but
+//                                    never as click-to-call.
+//   UNLISTED (no listing_status)   → research-only card. Address,
+//                                    beds/baths/sf/year/lot/APN, last
+//                                    sale price+date from public
+//                                    records, "Off market" tag.
+//                                    NO action buttons. The public
+//                                    layer never surfaces operator
+//                                    tools (skip-trace, postcard, etc.).
+//                                    Those live behind the agent layer
+//                                    login (project_two_layer_audience_strategy).
 //
 // Data resolution: lead.id may be a stub
 //   parcel:<APN>    → /api/parcel?apn=…       (PostGIS parcel)
 //   gpoi:<placeId>  → /api/google-poi?…       (Google Place Details)
 //   addr:<id>       → /api/addresses/[id]     (Plot address layer)
+//   mock-*          → already populated (mock listings JSON)
 //   normal id       → /api/parcel?lat=&lng=   (proximity guess)
-//
-// Workflows that lived in the prior popup (call outcomes, script editor,
-// market context paste, parcel section expanders, owner-tier gate) now
-// live on /leads/[id] — accessed via the Open Full Record action.
 
 interface Props {
   lead: Lead;
@@ -31,16 +43,15 @@ interface Props {
   onWalkHere?: (lead: Lead) => void;
   onToggleProspectMode?: () => void;
   prospectMode?: boolean;
-  /** Close handler — renders the X button when provided. */
   onClose?: () => void;
-  /** Pin handler — renders the pin button when provided. */
   onPin?: () => void;
 }
 
-export default function PropertyPopup({ lead, onUpdate, onClose, onPin }: Props) {
-  const { makeCall, isDesktop } = usePhone();
+type InquiryAction = 'call' | 'email' | 'message' | 'tour';
 
-  // Resolver state slots — exactly one is populated based on stub id.
+export default function PropertyPopup({ lead, onClose, onPin }: Props) {
+  // Resolver state (parcel takes precedence; popup pulls assessor
+  // fields from there when listing fields are missing)
   const [parcel, setParcel] = useState<import('@/lib/property-data/types').ResolvedProperty | null>(null);
   const [googlePoi, setGooglePoi] = useState<{
     placeId: string;
@@ -48,20 +59,11 @@ export default function PropertyPopup({ lead, onUpdate, onClose, onPin }: Props)
     address: string | null;
     lat: number | null;
     lng: number | null;
-    types: string[];
-    phone: string | null;
-    website: string | null;
   } | null>(null);
   const [addressRecord, setAddressRecord] = useState<{
     id: number;
     fullAddress: string;
-    city: string | null;
-    state: string | null;
-    zip: string | null;
   } | null>(null);
-
-  const [inquiryStatus, setInquiryStatus] = useState<'idle' | 'sending' | 'sent' | 'failed'>('idle');
-  const [inquiryError, setInquiryError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -94,91 +96,45 @@ export default function PropertyPopup({ lead, onUpdate, onClose, onPin }: Props)
     return () => { cancelled = true; };
   }, [lead.id, lead.latitude, lead.longitude]);
 
-  // ── Address composition ────────────────────────────────────────
-  // Prefer in this order: lead row → parcel resolver → address layer
-  // → Google POI. Split into headline (street) + tail (city/state/zip).
-  const fullAddr = lead.property_address
-    || parcel?.address
-    || addressRecord?.fullAddress
-    || googlePoi?.address
-    || '';
+  // ── Resolved data ──────────────────────────────────────────────
+  const fullAddr =
+    lead.property_address ||
+    parcel?.address ||
+    addressRecord?.fullAddress ||
+    googlePoi?.address ||
+    '';
   const poiName = googlePoi?.name ?? null;
   const headline = poiName || (fullAddr.split(',')[0]?.trim() || 'Unknown address');
-  const tail = poiName
-    ? fullAddr
-    : fullAddr.split(',').slice(1).join(',').trim();
+  const tail = poiName ? fullAddr : fullAddr.split(',').slice(1).join(',').trim();
 
-  // ── Coordinates ghost (the surveyor's tell) ────────────────────
-  const coords = lead.latitude != null && lead.longitude != null
-    ? `${Math.abs(lead.latitude).toFixed(4)}° ${lead.latitude >= 0 ? 'N' : 'S'} · ${Math.abs(lead.longitude).toFixed(4)}° ${lead.longitude >= 0 ? 'E' : 'W'}`
-    : null;
-
-  // ── Status + price ─────────────────────────────────────────────
   const status = lead.listing_status as 'Active' | 'Pending' | 'Sold' | null | undefined;
+  const isListed = !!status; // any status (Active, Pending, Sold) shows as a listing card
+
   const price = lead.selling_price || lead.listing_price;
   const priceStr = price ? `$${price.toLocaleString()}` : null;
-  const priceLabel = lead.selling_price ? 'sold price' : lead.listing_price ? 'list price' : null;
+  const priceLabel =
+    status === 'Sold' ? 'sold price' :
+    status === 'Pending' ? 'pending price' :
+    status === 'Active' ? 'list price' : null;
 
-  // ── Stat grid values (lead row → parcel resolver fallback) ────
   const beds = lead.bedrooms ?? (typeof parcel?.bedrooms === 'number' ? parcel.bedrooms : null);
   const baths = lead.bathrooms ?? (typeof parcel?.bathrooms === 'number' ? parcel.bathrooms : null);
   const sqft = lead.sqft ?? (parcel?.buildingSize ?? null);
-  const lot = lead.lot_acres
-    ? `${lead.lot_acres} ac`
-    : (parcel?.acres != null ? `${parcel.acres.toFixed(2)} ac` : null);
+  const lotAcres = lead.lot_acres ?? (parcel?.acres ?? null);
   const built = lead.year_built ?? parcel?.yearBuilt ?? null;
   const apn = parcel?.apn ?? null;
 
-  // ── Action targeting (listed → listing agent, unlisted → owner) ──
-  const isListed = !!status && status !== 'Sold';
-  const ownerPhone = lead.phone || lead.phone_2 || lead.phone_3 || null;
+  // NOTE on last-sale public-record data: the Kings County parcel
+  // resolver (src/lib/property-data/types.ts ResolvedProperty) does
+  // not yet expose lastSalePrice / lastSaleDate. When it does, the
+  // unlisted card should surface them as a "Last sold" fact-row item.
+  // See project-two-layer-audience-strategy + Greg 2026-05-30: this
+  // is exactly the public-record context that helps buyers research
+  // off-market homes without crossing into operator-tier territory.
 
-  const dialPhone = isListed
-    ? (lead.listing_agent_phone || null)
-    : ownerPhone;
-  const dialTarget = isListed
-    ? (lead.listing_agent_name || lead.listing_office_name || 'listing agent')
-    : (lead.owner_name || lead.name || 'owner');
-
-  const fireInquiry = async (channel: 'text_invite' | 'direct_mail' | 'phone_call') => {
-    setInquiryStatus('sending');
-    setInquiryError(null);
-    try {
-      const res = await fetch('/api/inquiry/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ leadId: lead.id, channel }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        setInquiryStatus('failed');
-        setInquiryError(data?.error || 'Failed');
-        return;
-      }
-      setInquiryStatus('sent');
-      onUpdate?.();
-    } catch {
-      setInquiryStatus('failed');
-      setInquiryError('Network error');
-    }
-  };
-
-  const handleDial = () => {
-    if (!dialPhone) return;
-    if (isDesktop) {
-      makeCall(dialPhone, dialTarget, lead.id);
-    } else {
-      window.location.href = `tel:${dialPhone}`;
-    }
-  };
-
-  // ── Photo carousel source ──────────────────────────────────────
-  // Prefers listing_photo_urls[] (full MLS media set) and falls back
-  // to listing_photo_url (single thumbnail). Mock data and the live
-  // RESO feed both flow through this path.
+  // ── Photos ─────────────────────────────────────────────────────
   const photos: string[] = (() => {
     if (Array.isArray(lead.listing_photo_urls) && lead.listing_photo_urls.length > 0) {
-      // Filter empties + de-dupe in case the feed has both fields
       const seen = new Set<string>();
       const out: string[] = [];
       for (const u of lead.listing_photo_urls) {
@@ -194,47 +150,103 @@ export default function PropertyPopup({ lead, onUpdate, onClose, onPin }: Props)
   })();
   const hasPhotos = photos.length > 0;
   const [photoIdx, setPhotoIdx] = useState(0);
-  // Reset index when the lead changes so the carousel doesn't carry
-  // a stale index from the prior property
   useEffect(() => { setPhotoIdx(0); }, [lead.id]);
   const goPrev = () => setPhotoIdx((i) => (i - 1 + photos.length) % photos.length);
   const goNext = () => setPhotoIdx((i) => (i + 1) % photos.length);
 
+  // ── Buyer inquiry state (listed mode only) ─────────────────────
+  // All four buttons (Call/Email/Message/Tour) capture intent to
+  // /api/inbox/message. Tour is the primary CTA; the others are
+  // smaller secondary buttons.
+  const [inquiryAction, setInquiryAction] = useState<InquiryAction | null>(null);
+  const [inquiryStatus, setInquiryStatus] = useState<'idle' | 'sending' | 'sent' | 'failed'>('idle');
+  const [inquiryError, setInquiryError] = useState<string | null>(null);
+  const [buyerName, setBuyerName] = useState('');
+  const [buyerContact, setBuyerContact] = useState('');
+  const [buyerMessage, setBuyerMessage] = useState('');
+
+  const openInquiry = (a: InquiryAction) => {
+    setInquiryAction(a);
+    setInquiryStatus('idle');
+    setInquiryError(null);
+  };
+  const closeInquiry = () => {
+    setInquiryAction(null);
+    setBuyerName('');
+    setBuyerContact('');
+    setBuyerMessage('');
+  };
+
+  const sendInquiry = async () => {
+    if (!inquiryAction) return;
+    setInquiryStatus('sending');
+    setInquiryError(null);
+    // Sort the buyer's contact into phone vs email by sniffing
+    const c = buyerContact.trim();
+    const looksLikeEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c);
+    try {
+      const res = await fetch('/api/inbox/message', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: inquiryAction,
+          listing_id: lead.id,
+          listing_address: fullAddr || headline,
+          listing_price: price || undefined,
+          listing_status: status || undefined,
+          listing_agent: lead.listing_agent_name || undefined,
+          listing_brokerage: lead.listing_office_name || undefined,
+          buyer_name: buyerName.trim() || undefined,
+          buyer_phone: !looksLikeEmail ? c || undefined : undefined,
+          buyer_email: looksLikeEmail ? c || undefined : undefined,
+          buyer_message: buyerMessage.trim() || undefined,
+        }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        setInquiryStatus('failed');
+        setInquiryError(d?.error || 'Could not send right now.');
+        return;
+      }
+      setInquiryStatus('sent');
+    } catch {
+      setInquiryStatus('failed');
+      setInquiryError('Network error.');
+    }
+  };
+
+  const inquiryHeader = (() => {
+    switch (inquiryAction) {
+      case 'call': return 'Request a call';
+      case 'email': return 'Send an email';
+      case 'message': return 'Send a message';
+      case 'tour': return 'Schedule a tour';
+      default: return '';
+    }
+  })();
+
+  // ── Render ─────────────────────────────────────────────────────
   return (
     <div className="plot-popup">
-      {/* registration marks — surveyor's tell, sit OUTSIDE the rounded edge */}
-      <span className="reg tl" />
-      <span className="reg tr" />
-      <span className="reg bl" />
-      <span className="reg br" />
-      <span className="tick t" />
-      <span className="tick b" />
-      <span className="tick l" />
-      <span className="tick r" />
 
-      {/* Top-right chrome — Pin + Close. Tucked into the popup's
-          upper-right corner. Sits at z-index 3 above the hero pill. */}
+      {/* Top-right chrome — pin + close */}
       {(onPin || onClose) && (
         <div className="chrome">
           {onPin && (
             <button type="button" className="chrome-btn" onClick={onPin} title="Pin as reference">
-              <MaterialIcon icon="push_pin" className="text-[14px]" />
+              <MaterialIcon icon="push_pin" className="text-[16px]" />
             </button>
           )}
           {onClose && (
             <button type="button" className="chrome-btn" onClick={onClose} title="Close">
-              <MaterialIcon icon="close" className="text-[14px]" />
+              <MaterialIcon icon="close" className="text-[16px]" />
             </button>
           )}
         </div>
       )}
 
-      {/* ── HERO PHOTO CAROUSEL ────────────────────────────────
-          Renders when listing photos are present. Single photo →
-          static image with overlaid status pill. Multiple photos →
-          scrollable carousel with prev/next arrows and a count
-          indicator. Pattern mirrors Zillow's listing card model. */}
-      {hasPhotos && (
+      {/* HERO — photo carousel for listings, simple band for unlisted */}
+      {hasPhotos ? (
         <div className="hero">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -247,568 +259,620 @@ export default function PropertyPopup({ lead, onUpdate, onClose, onPin }: Props)
           )}
           {photos.length > 1 && (
             <>
-              <button
-                type="button"
-                className="carousel-btn carousel-prev"
-                onClick={(e) => { e.stopPropagation(); goPrev(); }}
-                aria-label="Previous photo"
-              >
+              <button type="button" className="car-btn car-prev" onClick={(e) => { e.stopPropagation(); goPrev(); }} aria-label="Previous photo">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
                   <polyline points="15 18 9 12 15 6" />
                 </svg>
               </button>
-              <button
-                type="button"
-                className="carousel-btn carousel-next"
-                onClick={(e) => { e.stopPropagation(); goNext(); }}
-                aria-label="Next photo"
-              >
+              <button type="button" className="car-btn car-next" onClick={(e) => { e.stopPropagation(); goNext(); }} aria-label="Next photo">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
                   <polyline points="9 18 15 12 9 6" />
                 </svg>
               </button>
-              <div className="carousel-count">{photoIdx + 1} / {photos.length}</div>
+              <div className="car-count">{photoIdx + 1} / {photos.length}</div>
             </>
           )}
         </div>
-      )}
+      ) : !isListed ? (
+        // Unlisted card: small label band where the photo would be,
+        // honest about the state ("Off market — public record")
+        <div className="hero hero-empty">
+          <div className="hero-empty-tag">Off market</div>
+        </div>
+      ) : null}
 
-      {/* ── IDENTITY ─────────────────────────────────────────────── */}
-      <div className="identity">
-        <div className="addr-row">
-          <div className="addr">
+      {/* CONTENT */}
+      <div className="content">
+
+        {/* Identity row: price + address */}
+        <div className="identity">
+          {isListed && priceStr && (
+            <div className="price-block">
+              <div className="price">{priceStr}</div>
+              {priceLabel && <div className="price-meta">{priceLabel}</div>}
+            </div>
+          )}
+          <div className="addr-block">
             <div className="addr-head">{headline}</div>
             {tail && <div className="addr-tail">{tail}</div>}
-            {coords && <div className="coords">{coords}</div>}
           </div>
-          {/* pill renders here when there's no hero image */}
-          {!hasPhotos && status && (
-            <div className={`pill pill-${status.toLowerCase()} pill-inline`}>{status.toUpperCase()}</div>
-          )}
         </div>
 
-        {priceStr && (
-          <div className="price-row">
-            <div className="price">{priceStr}</div>
-            {priceLabel && <div className="price-meta">{priceLabel}</div>}
+        {/* Stats box */}
+        {(beds != null || baths != null || sqft != null || lotAcres != null) && (
+          <div className="stats">
+            {beds != null && <Stat label="Beds" value={String(beds)} />}
+            {baths != null && <Stat label="Baths" value={String(baths)} />}
+            {sqft != null && <Stat label="Sqft" value={sqft.toLocaleString()} />}
+            {lotAcres != null && <Stat label="Acres" value={Number(lotAcres).toFixed(2)} />}
+          </div>
+        )}
+
+        {/* Secondary facts row (built, APN, and \"Last sold\" once the
+            parcel resolver exposes sale history — see note above). */}
+        {(built != null || apn != null) && (
+          <div className="facts">
+            {built != null && <span className="fact"><span className="fact-lab">Built</span> {built}</span>}
+            {apn != null && <span className="fact"><span className="fact-lab">APN</span> {apn}</span>}
+          </div>
+        )}
+
+        {/* LISTED: attribution line + action cluster */}
+        {isListed && (
+          <>
+            {(lead.listing_agent_name || lead.listing_office_name) && (
+              <div className="attribution">
+                Listed by{' '}
+                {lead.listing_agent_name && <span className="attr-name">{lead.listing_agent_name}</span>}
+                {lead.listing_agent_name && lead.listing_office_name && ' · '}
+                {lead.listing_office_name && <span className="attr-broker">{lead.listing_office_name}</span>}
+              </div>
+            )}
+
+            <div className="actions">
+              <div className="secondary-row">
+                <button type="button" className="sec-btn" onClick={() => openInquiry('call')}>
+                  <MaterialIcon icon="call" className="text-[18px]" />
+                  <span>Call</span>
+                </button>
+                <button type="button" className="sec-btn" onClick={() => openInquiry('email')}>
+                  <MaterialIcon icon="mail" className="text-[18px]" />
+                  <span>Email</span>
+                </button>
+                <button type="button" className="sec-btn" onClick={() => openInquiry('message')}>
+                  <MaterialIcon icon="chat_bubble" className="text-[18px]" />
+                  <span>Message</span>
+                </button>
+              </div>
+              <button type="button" className="primary-btn" onClick={() => openInquiry('tour')}>
+                Schedule a tour
+                <MaterialIcon icon="arrow_forward" className="text-[18px]" />
+              </button>
+              <Link href={`/listings/${lead.id}`} className="link">
+                Open full record →
+              </Link>
+            </div>
+          </>
+        )}
+
+        {/* UNLISTED: research card has no buttons; just the data above.
+            A discreet link to the full record stays so curious users
+            can dive deeper. */}
+        {!isListed && (
+          <div className="actions actions-unlisted">
+            <Link href={`/listings/${lead.id}`} className="link">
+              Open full record →
+            </Link>
+            <div className="research-tag">Public record · not a listing</div>
           </div>
         )}
       </div>
 
-      {/* ── LUMEN SEAM (data substrate boundary) ────────────────── */}
-      <div className="seam" />
+      {/* Demo badge for mock listings (committee honesty) */}
+      {lead.id?.startsWith('mock-') && (
+        <div className="demo-badge">DEMO DATA · SAMPLE LISTING</div>
+      )}
 
-      {/* ── STAT LEDGER (graceful — only renders what's available) */}
-      {(beds != null || baths != null || sqft != null || lot != null || built != null || apn != null) && (
-        <div className="stats">
-          {beds != null && (<Stat label="Beds" value={String(beds)} />)}
-          {baths != null && (<Stat label="Baths" value={String(baths)} />)}
-          {sqft != null && (<Stat label="Living" value={`${sqft.toLocaleString()} SF`} />)}
-          {lot != null && (<Stat label="Lot" value={lot} />)}
-          {built != null && (<Stat label="Built" value={String(built)} />)}
-          {apn != null && (<Stat label="APN" value={apn} mono />)}
+      {/* Inquiry sheet — overlays the popup when an action is clicked */}
+      {inquiryAction && (
+        <div className="inquiry-sheet">
+          <div className="inquiry-card">
+            <div className="inq-head">
+              <div className="inq-title">{inquiryHeader}</div>
+              <button type="button" className="inq-close" onClick={closeInquiry}>
+                <MaterialIcon icon="close" className="text-[16px]" />
+              </button>
+            </div>
+            {inquiryStatus === 'sent' ? (
+              <div className="inq-sent">
+                <div className="inq-sent-title">Sent</div>
+                <div className="inq-sent-body">
+                  We&apos;ll be in touch about <span className="inq-sent-addr">{headline}</span>.
+                </div>
+                <button type="button" className="primary-btn" onClick={closeInquiry}>OK</button>
+              </div>
+            ) : (
+              <>
+                <div className="inq-fields">
+                  <input
+                    type="text"
+                    className="inq-input"
+                    placeholder="Your name (optional)"
+                    value={buyerName}
+                    onChange={(e) => setBuyerName(e.target.value)}
+                    autoComplete="name"
+                  />
+                  <input
+                    type="text"
+                    className="inq-input"
+                    placeholder={inquiryAction === 'call' ? 'Phone number' : 'Email or phone'}
+                    value={buyerContact}
+                    onChange={(e) => setBuyerContact(e.target.value)}
+                    autoComplete="email"
+                  />
+                  {(inquiryAction === 'message' || inquiryAction === 'email' || inquiryAction === 'tour') && (
+                    <textarea
+                      className="inq-textarea"
+                      rows={3}
+                      placeholder={
+                        inquiryAction === 'tour'
+                          ? 'Best times for a tour?'
+                          : inquiryAction === 'email'
+                            ? 'What would you like to ask?'
+                            : 'Your message'
+                      }
+                      value={buyerMessage}
+                      onChange={(e) => setBuyerMessage(e.target.value)}
+                    />
+                  )}
+                </div>
+                {inquiryError && <div className="inq-error">{inquiryError}</div>}
+                <button
+                  type="button"
+                  className="primary-btn"
+                  disabled={inquiryStatus === 'sending' || !buyerContact.trim()}
+                  onClick={sendInquiry}
+                >
+                  {inquiryStatus === 'sending' ? 'Sending…' : 'Send to Position Realty'}
+                  <MaterialIcon icon="arrow_forward" className="text-[18px]" />
+                </button>
+                <div className="inq-note">
+                  Routed to Position Realty · Greg Franklin, Broker · CA DRE #02090737
+                </div>
+              </>
+            )}
+          </div>
         </div>
       )}
 
-      {/* ── ACTION ROW ──────────────────────────────────────────── */}
-      <div className="actions">
-        <ActionBtn
-          icon="call"
-          label="Dial"
-          tooltip={dialPhone ? `Dial ${dialTarget}` : 'No phone available'}
-          disabled={!dialPhone || inquiryStatus === 'sending'}
-          onClick={handleDial}
-        />
-        <ActionBtn
-          icon="mail"
-          label="Mail"
-          tooltip="Send postcard to this address"
-          disabled={inquiryStatus === 'sending'}
-          onClick={() => fireInquiry('direct_mail')}
-        />
-        <ActionBtn
-          icon="sms"
-          label="Text"
-          tooltip={isListed ? `Text ${dialTarget}` : 'Send Plot invitation'}
-          disabled={inquiryStatus === 'sending' || !!lead.text_declined}
-          onClick={() => fireInquiry('text_invite')}
-        />
-        <Link href={`/leads/${lead.id}`} className="action open-record" title="Open full record">
-          <MaterialIcon icon="open_in_full" className="text-[16px]" />
-          <span className="lab">Record</span>
-        </Link>
-      </div>
-
-      {inquiryStatus === 'sent' && (
-        <div className="inquiry-toast inquiry-toast-ok">Inquiry queued.</div>
-      )}
-      {inquiryStatus === 'failed' && inquiryError && (
-        <div className="inquiry-toast inquiry-toast-err">{inquiryError}</div>
-      )}
-
-      {/* ── FOOTER ──────────────────────────────────────────────── */}
-      <div className="footer">
-        <div className="captured">
-          <span className="dot" />
-          Plot · {new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })} PT
-        </div>
-        {/* Honesty badge for mock listings — surfaced for the June 9
-            KCBOR committee demo so the panel always knows what's real
-            sample data vs. eventual MLS data. Removes when lead.id is
-            no longer prefixed mock-. */}
-        {lead.id?.startsWith('mock-') ? (
-          <div className="demo-badge">DEMO DATA · SAMPLE LISTING</div>
-        ) : (
-          <div className="mark">PLOT <span className="pl">PL</span></div>
-        )}
-      </div>
-
-      {/* All component styles scoped under .plot-popup.
-          Consumes the canonical --plot-* token palette so the popup
-          inverts with the active theme (light/dark) without code
-          changes — see src/lib/theme-context.tsx + globals.css. */}
       <style jsx>{`
         .plot-popup{
           position:relative;
           width:380px;
           border-radius:14px;
-          padding:18px 18px 20px;
           color:var(--plot-text);
           font-family:'Inter', system-ui, -apple-system, sans-serif;
-          font-feature-settings:'ss01','cv11';
+          background:var(--plot-base-glass);
+          backdrop-filter:blur(32px);
+          -webkit-backdrop-filter:blur(32px);
+          border:1px solid var(--plot-divider-strong);
+          box-shadow:
+            0 18px 48px -12px rgba(0,0,0,0.7),
+            0 0 0 1px rgba(255,255,255,0.04) inset;
+          overflow:hidden;
           isolation:isolate;
-          /* Atmospheric pooling — soft warm pools on the base color.
-             Both themes get the same recipe; the base shifts the mood. */
-          background:
-            radial-gradient(circle at 88% 12%, color-mix(in srgb, var(--plot-edge) 14%, transparent) 0px, transparent 45%),
-            radial-gradient(circle at 8% 88%,  color-mix(in srgb, var(--plot-edge) 10%, transparent) 0px, transparent 50%),
-            radial-gradient(circle at 50% 50%, var(--plot-base-deep) 0px, transparent 70%),
-            var(--plot-base);
-          /* glow stack: hard rim, tight, far halo, inside edge, inner highlight */
-          box-shadow:
-            0 0 1px 0 var(--plot-edge),
-            0 0 14px 0 color-mix(in srgb, var(--plot-edge) 80%, transparent),
-            0 0 36px -2px color-mix(in srgb, var(--plot-edge-bloom) 45%, transparent),
-            inset 0 0 0 1.5px var(--plot-edge),
-            inset 0 0 10px 0 color-mix(in srgb, var(--plot-edge-hot) 35%, transparent);
-        }
-        .plot-popup::before{
-          /* breathing outer bloom — ambient ~5s loop */
-          content:""; position:absolute; inset:0;
-          border-radius:14px; z-index:-1; pointer-events:none;
-          box-shadow:
-            0 0 28px 1px color-mix(in srgb, var(--plot-edge-bloom) 75%, transparent),
-            0 0 64px 8px color-mix(in srgb, var(--plot-edge-bloom) 20%, transparent);
-          animation: plot-popup-breathe 5s ease-in-out infinite;
-          will-change:opacity, transform;
-        }
-        @keyframes plot-popup-breathe{
-          0%,100%{ opacity:0.68; transform:scale(1.000); }
-          50%   { opacity:1.00; transform:scale(1.010); }
         }
 
-        /* registration corners — surveyor's tell */
-        .reg{ position:absolute; width:14px; height:14px; pointer-events:none; z-index:2; }
-        .reg.tl{ top:-6px;    left:-6px;   border-top:1.5px solid var(--plot-edge); border-left:1.5px solid var(--plot-edge); }
-        .reg.tr{ top:-6px;    right:-6px;  border-top:1.5px solid var(--plot-edge); border-right:1.5px solid var(--plot-edge); }
-        .reg.bl{ bottom:-6px; left:-6px;   border-bottom:1.5px solid var(--plot-edge); border-left:1.5px solid var(--plot-edge); }
-        .reg.br{ bottom:-6px; right:-6px;  border-bottom:1.5px solid var(--plot-edge); border-right:1.5px solid var(--plot-edge); }
-
-        /* midpoint tick marks */
-        .tick{ position:absolute; background:var(--plot-edge); pointer-events:none; opacity:0.85; z-index:2; }
-        .tick.t{ top:-3.5px;   left:50%; transform:translateX(-50%); width:1.5px; height:6px; }
-        .tick.b{ bottom:-3.5px;left:50%; transform:translateX(-50%); width:1.5px; height:6px; }
-        .tick.l{ left:-3.5px;  top:50%;  transform:translateY(-50%); width:6px; height:1.5px; }
-        .tick.r{ right:-3.5px; top:50%;  transform:translateY(-50%); width:6px; height:1.5px; }
-
-        /* top-right chrome — Pin + Close */
+        /* top-right chrome */
         .chrome{
           position:absolute;
-          top:10px; right:10px;
-          z-index:3;
-          display:flex;
-          gap:6px;
+          top:12px; right:12px;
+          z-index:4;
+          display:flex; gap:6px;
         }
         .chrome-btn{
-          width:24px; height:24px;
+          width:30px; height:30px;
           display:flex; align-items:center; justify-content:center;
-          background:color-mix(in srgb, var(--plot-base-deep) 70%, transparent);
-          border:1px solid var(--plot-divider-strong);
-          border-radius:4px;
-          color:var(--plot-edge);
+          background:rgba(13,14,16,0.6);
+          border:0;
+          border-radius:9999px;
+          color:var(--plot-text);
           cursor:pointer;
           padding:0;
-          backdrop-filter:blur(3px);
-          -webkit-backdrop-filter:blur(3px);
-          transition:background 120ms ease, color 120ms ease, border-color 120ms ease;
+          backdrop-filter:blur(8px);
+          -webkit-backdrop-filter:blur(8px);
+          transition: background 120ms ease, color 120ms ease;
         }
         .chrome-btn:hover{
-          background:color-mix(in srgb, var(--plot-edge) 22%, transparent);
-          border-color:var(--plot-edge-bloom);
-          color:var(--plot-edge-hot);
+          background:rgba(13,14,16,0.85);
+          color:var(--plot-edge);
         }
 
-        /* ── hero photo (and carousel) ────────────────────── */
+        /* hero photo */
         .hero{
           position:relative;
           width:100%;
-          height:148px;
-          border-radius:8px;
-          overflow:hidden;
-          margin-bottom:14px;
+          height:200px;
           background:var(--plot-base-deep);
-          box-shadow: inset 0 -42px 50px -32px color-mix(in srgb, var(--plot-base-deep) 80%, black);
+          overflow:hidden;
         }
         .hero img{
-          width:100%; height:100%; display:block;
-          object-fit:cover;
+          width:100%; height:100%; display:block; object-fit:cover;
+        }
+        .hero-empty{
+          display:flex;
+          align-items:center;
+          justify-content:center;
+          background:linear-gradient(135deg, var(--plot-base-deep), var(--plot-base-soft));
+          height:84px;
+        }
+        .hero-empty-tag{
+          font-family:'JetBrains Mono', ui-monospace, monospace;
+          font-size:10px;
+          font-weight:700;
+          letter-spacing:0.24em;
+          text-transform:uppercase;
+          color:var(--plot-status-off);
         }
 
-        /* carousel arrows + count indicator */
-        .carousel-btn{
+        /* status pill on hero */
+        .pill{
+          position:absolute;
+          top:14px; left:14px;
+          z-index:2;
+          font-family:'JetBrains Mono', ui-monospace, monospace;
+          font-size:10px;
+          font-weight:700;
+          letter-spacing:0.16em;
+          padding:5px 9px;
+          border-radius:4px;
+          color:#0D0E10;
+        }
+        .pill-active{ background:var(--plot-status-active); }
+        .pill-pending{ background:var(--plot-status-pending); }
+        .pill-sold{ background:var(--plot-status-sold); color:#FFF; }
+
+        /* carousel controls */
+        .car-btn{
           position:absolute;
           top:50%;
           transform:translateY(-50%);
-          width:28px; height:28px;
+          width:32px; height:32px;
           display:flex; align-items:center; justify-content:center;
-          background:color-mix(in srgb, var(--plot-base-deep) 80%, transparent);
-          border:1px solid var(--plot-divider-strong);
+          background:rgba(13,14,16,0.6);
+          border:0;
           border-radius:9999px;
-          color:var(--plot-text);
+          color:#FFF;
           cursor:pointer;
           padding:0;
           z-index:3;
-          backdrop-filter:blur(4px);
-          -webkit-backdrop-filter:blur(4px);
+          backdrop-filter:blur(6px);
+          -webkit-backdrop-filter:blur(6px);
           opacity:0.85;
-          transition: opacity 120ms ease, background 120ms ease, color 120ms ease;
+          transition:opacity 120ms ease, background 120ms ease;
         }
-        .carousel-btn:hover{
-          opacity:1;
-          background:color-mix(in srgb, var(--plot-signal) 22%, var(--plot-base-deep));
-          color:var(--plot-signal);
-        }
-        .carousel-prev{ left:8px; }
-        .carousel-next{ right:8px; }
-        .carousel-count{
+        .car-btn:hover{ opacity:1; background:rgba(13,14,16,0.85); }
+        .car-prev{ left:10px; }
+        .car-next{ right:10px; }
+        .car-count{
           position:absolute;
-          bottom:8px; right:10px;
+          bottom:12px; right:14px;
           z-index:3;
           font-family:'JetBrains Mono', ui-monospace, monospace;
           font-size:10px;
-          letter-spacing:0.14em;
-          color:var(--plot-text);
-          padding:3px 7px;
-          background:color-mix(in srgb, var(--plot-base-deep) 70%, transparent);
+          letter-spacing:0.10em;
+          color:#FFF;
+          padding:3px 8px;
+          background:rgba(13,14,16,0.6);
           border-radius:9999px;
-          backdrop-filter:blur(4px);
-          -webkit-backdrop-filter:blur(4px);
+          backdrop-filter:blur(6px);
+          -webkit-backdrop-filter:blur(6px);
         }
 
-        /* ── identity ────────────────────────────────────── */
-        .identity{ display:flex; flex-direction:column; gap:5px; margin-bottom:12px; }
-        .addr-row{ display:flex; gap:10px; align-items:flex-start; justify-content:space-between; }
-        .addr{ min-width:0; flex:1; }
+        /* CONTENT */
+        .content{ padding:18px 18px 16px; }
+
+        /* identity */
+        .identity{
+          display:flex; align-items:flex-start; justify-content:space-between;
+          gap:14px;
+          margin-bottom:14px;
+        }
+        .price-block{ flex:0 0 auto; }
+        .price{
+          font-size:24px;
+          font-weight:700;
+          line-height:1;
+          letter-spacing:-0.02em;
+          font-variant-numeric:tabular-nums;
+          color:var(--plot-edge);
+        }
+        .price-meta{
+          font-family:'JetBrains Mono', ui-monospace, monospace;
+          font-size:9px;
+          font-weight:700;
+          letter-spacing:0.18em;
+          text-transform:uppercase;
+          color:var(--plot-text-muted);
+          margin-top:4px;
+        }
+        .addr-block{ min-width:0; flex:1; text-align:right; }
         .addr-head{
-          font-size:16px;
+          font-size:15px;
           font-weight:600;
-          line-height:1.2;
-          letter-spacing:-0.012em;
+          line-height:1.25;
+          letter-spacing:-0.005em;
           color:var(--plot-text);
-          overflow:hidden;
-          text-overflow:ellipsis;
         }
         .addr-tail{
           font-size:12px;
           font-weight:400;
-          margin-top:1px;
-          color:var(--plot-text-muted);
-        }
-        .coords{
-          font-family:'JetBrains Mono', ui-monospace, monospace;
-          font-size:9.5px;
-          font-weight:400;
-          letter-spacing:0.06em;
-          margin-top:3px;
-          color:var(--plot-text-faint);
-        }
-        .price-row{
-          display:flex; align-items:baseline; gap:10px; margin-top:6px;
-        }
-        .price{
-          font-size:24px;
-          font-weight:600;
-          line-height:1;
-          letter-spacing:-0.018em;
-          font-variant-numeric:tabular-nums;
-          color:var(--plot-edge-hot);
-          text-shadow:0 0 14px color-mix(in srgb, var(--plot-edge-bloom) 30%, transparent);
-        }
-        .price-meta{
-          font-family:'JetBrains Mono', ui-monospace, monospace;
-          font-size:9.5px;
-          font-weight:400;
-          letter-spacing:0.14em;
-          text-transform:uppercase;
+          margin-top:2px;
           color:var(--plot-text-muted);
         }
 
-        /* ── status pill ─────────────────────────────────── */
-        .pill{
-          font-family:'JetBrains Mono', ui-monospace, monospace;
-          font-size:9.5px;
-          font-weight:500;
-          letter-spacing:0.26em;
-          padding:4px 9px;
-          line-height:1;
-          border-radius:2px;
-          backdrop-filter:blur(4px);
-          -webkit-backdrop-filter:blur(4px);
-          background:color-mix(in srgb, var(--plot-base-deep) 60%, transparent);
-          flex-shrink:0;
-        }
-        .pill-active{
-          color:var(--plot-status-active);
-          border:1px solid color-mix(in srgb, var(--plot-status-active) 80%, transparent);
-          text-shadow:0 0 6px color-mix(in srgb, var(--plot-status-active) 55%, transparent);
-          box-shadow:0 0 10px -2px color-mix(in srgb, var(--plot-status-active) 55%, transparent);
-          animation: plot-pill-breathe 5s ease-in-out infinite;
-        }
-        .pill-pending{
-          color:var(--plot-status-pending);
-          border:1px solid color-mix(in srgb, var(--plot-status-pending) 70%, transparent);
-        }
-        .pill-sold{
-          color:var(--plot-status-sold);
-          border:1px solid color-mix(in srgb, var(--plot-status-sold) 60%, transparent);
-        }
-        @keyframes plot-pill-breathe{
-          0%,100%{ box-shadow:0 0 8px -2px color-mix(in srgb, var(--plot-status-active) 40%, transparent); }
-          50%   { box-shadow:0 0 20px -2px color-mix(in srgb, var(--plot-status-active) 85%, transparent); }
-        }
-        /* pill positioned over hero image, top-LEFT
-           (top-right is reserved for the Pin/Close chrome) */
-        .hero .pill{
-          position:absolute;
-          top:12px; left:12px;
-          z-index:2;
-        }
-        /* pill positioned inline next to address when no hero */
-        .pill-inline{ align-self:flex-start; margin-top:2px; }
-
-        /* ── lumen seam ──────────────────────────────────── */
-        .seam{
-          position:relative;
-          height:1.5px;
-          border-radius:2px;
-          margin:4px 0 14px;
-          background:linear-gradient(90deg,
-            transparent 0%,
-            var(--plot-edge-bloom) 14%,
-            var(--plot-edge-hot) 42%,
-            var(--plot-edge-hot) 58%,
-            var(--plot-edge-bloom) 86%,
-            transparent 100%);
-          box-shadow:
-            0 0 18px 0 color-mix(in srgb, var(--plot-edge-bloom) 70%, transparent),
-            0 0 6px  0 color-mix(in srgb, var(--plot-edge-hot) 85%, transparent),
-            0 0 2px  0 var(--plot-edge-hot);
-        }
-        .seam::before, .seam::after{ content:""; position:absolute; pointer-events:none; left:8%; right:8%; }
-        .seam::before{ bottom:100%; height:20px; background:radial-gradient(ellipse at center bottom, color-mix(in srgb, var(--plot-edge-bloom) 35%, transparent), transparent 70%); }
-        .seam::after{ top:100%; height:16px; background:radial-gradient(ellipse at center top, color-mix(in srgb, var(--plot-edge-bloom) 22%, transparent), transparent 70%); }
-
-        /* ── stat ledger ─────────────────────────────────── */
+        /* stats box */
         .stats{
           display:grid;
-          grid-template-columns:1fr 1fr;
-          column-gap:28px;
-          row-gap:10px;
-          margin-bottom:14px;
-        }
-
-        /* ── action row ──────────────────────────────────── */
-        .actions{
-          display:grid;
           grid-template-columns:repeat(4, 1fr);
-          gap:8px;
-          margin-top:4px;
-        }
-        .action{
-          display:flex;
-          flex-direction:column;
-          align-items:center;
-          justify-content:center;
-          gap:3px;
-          padding:9px 4px 8px;
-          background:color-mix(in srgb, var(--plot-base-deep) 60%, transparent);
-          border:1px solid color-mix(in srgb, var(--plot-edge) 55%, transparent);
-          border-radius:6px;
-          color:var(--plot-edge);
-          font-family:'JetBrains Mono', ui-monospace, monospace;
-          font-size:9px;
-          font-weight:500;
-          letter-spacing:0.18em;
-          text-transform:uppercase;
-          cursor:pointer;
-          transition:background 120ms ease, border-color 120ms ease, color 120ms ease;
-          text-decoration:none;
-        }
-        .action:hover:not(:disabled){
-          background:color-mix(in srgb, var(--plot-signal) 16%, transparent);
-          border-color:var(--plot-signal);
-          color:var(--plot-signal);
-        }
-        .action:disabled,
-        .action[aria-disabled="true"]{
-          opacity:0.35;
-          cursor:not-allowed;
-        }
-        .open-record{
-          border-color:color-mix(in srgb, var(--plot-edge) 85%, transparent);
+          gap:0;
+          margin-bottom:14px;
+          padding:10px 0;
+          background:rgba(13,14,16,0.35);
+          border:1px solid var(--plot-divider);
+          border-radius:10px;
         }
 
-        /* ── inquiry toast (inline below actions) ────────── */
-        .inquiry-toast{
-          margin-top:8px;
+        /* secondary facts */
+        .facts{
+          display:flex;
+          flex-wrap:wrap;
+          gap:6px 12px;
+          margin-bottom:14px;
+          font-size:11px;
+          color:var(--plot-text-muted);
+        }
+        .fact{
+          font-variant-numeric:tabular-nums;
+        }
+        .fact-lab{
           font-family:'JetBrains Mono', ui-monospace, monospace;
           font-size:9.5px;
+          font-weight:700;
           letter-spacing:0.14em;
           text-transform:uppercase;
+          color:var(--plot-text-faint);
+          margin-right:4px;
         }
-        .inquiry-toast-ok{ color:var(--plot-status-active); }
-        .inquiry-toast-err{ color:var(--plot-status-sold); }
 
-        /* ── footer ──────────────────────────────────────── */
-        .footer{
-          margin-top:14px;
+        /* attribution */
+        .attribution{
+          font-size:11.5px;
+          color:var(--plot-text-muted);
           padding-top:10px;
-          border-top:1px dashed var(--plot-divider);
-          display:flex;
-          justify-content:space-between;
-          align-items:center;
+          border-top:1px solid var(--plot-divider);
+          margin-bottom:12px;
         }
-        .captured{
+        .attr-name{ color:var(--plot-text); font-weight:500; }
+        .attr-broker{ color:var(--plot-text); font-weight:500; }
+
+        /* actions */
+        .actions{
+          display:flex;
+          flex-direction:column;
+          gap:8px;
+        }
+        .secondary-row{
+          display:grid;
+          grid-template-columns:repeat(3, 1fr);
+          gap:6px;
+        }
+        .sec-btn{
+          display:flex;
+          align-items:center;
+          justify-content:center;
+          gap:6px;
+          padding:9px 4px;
+          background:var(--plot-base-soft);
+          color:var(--plot-text);
+          border:1px solid var(--plot-divider);
+          border-radius:8px;
+          font-size:12px;
+          font-weight:500;
+          letter-spacing:0.01em;
+          cursor:pointer;
+          transition:background 120ms ease, border-color 120ms ease, color 120ms ease;
+        }
+        .sec-btn:hover{
+          background:rgba(0,242,255,0.08);
+          border-color:var(--plot-edge);
+          color:var(--plot-edge);
+        }
+        .primary-btn{
+          display:flex;
+          align-items:center;
+          justify-content:center;
+          gap:8px;
+          padding:11px 12px;
+          background:var(--plot-action);
+          color:var(--plot-on-action);
+          border:0;
+          border-radius:8px;
+          font-size:13px;
+          font-weight:700;
+          letter-spacing:0.02em;
+          cursor:pointer;
+          box-shadow:0 4px 14px -4px color-mix(in srgb, var(--plot-action) 60%, transparent);
+          transition:filter 120ms ease, transform 120ms ease;
+        }
+        .primary-btn:hover:not(:disabled){ filter:brightness(1.08); }
+        .primary-btn:active:not(:disabled){ transform:scale(0.98); }
+        .primary-btn:disabled{ opacity:0.5; cursor:not-allowed; }
+        .link{
+          display:inline-block;
+          text-align:center;
+          font-size:11.5px;
+          color:var(--plot-text-muted);
+          text-decoration:none;
+          padding:4px;
+          transition:color 120ms ease;
+        }
+        .link:hover{ color:var(--plot-edge); }
+
+        .actions-unlisted{
+          gap:6px;
+          padding-top:6px;
+          border-top:1px solid var(--plot-divider);
+        }
+        .research-tag{
           font-family:'JetBrains Mono', ui-monospace, monospace;
           font-size:9px;
-          font-weight:400;
+          font-weight:600;
           letter-spacing:0.18em;
           text-transform:uppercase;
           color:var(--plot-text-faint);
-        }
-        .captured .dot{
-          display:inline-block;
-          width:5px; height:5px;
-          border-radius:50%;
-          background:var(--plot-signal);
-          margin:0 7px 1px 0;
-          vertical-align:middle;
-          box-shadow:0 0 6px var(--plot-signal);
-          animation: plot-dot-pulse 2.4s ease-in-out infinite;
-        }
-        @keyframes plot-dot-pulse{
-          0%,100%{ opacity:0.55; }
-          50%   { opacity:1.00; }
-        }
-        .mark{
-          font-family:'JetBrains Mono', ui-monospace, monospace;
-          font-size:9.5px;
-          font-weight:600;
-          letter-spacing:0.32em;
-          color:var(--plot-text-faint);
-        }
-        .mark .pl{ color:var(--plot-edge); }
-        /* DEMO DATA badge — only renders for mock listings (id prefix
-           mock-). Designed to read clearly without screaming. */
-        .demo-badge{
-          font-family:'JetBrains Mono', ui-monospace, monospace;
-          font-size:9px;
-          font-weight:600;
-          letter-spacing:0.22em;
-          color:var(--plot-action);
-          border:1px solid color-mix(in srgb, var(--plot-action) 55%, transparent);
-          background:color-mix(in srgb, var(--plot-action) 12%, transparent);
-          border-radius:3px;
-          padding:3px 7px;
+          text-align:center;
         }
 
-        @media (prefers-reduced-motion: reduce){
-          .plot-popup::before,
-          .pill-active,
-          .captured .dot{ animation:none; }
-          .plot-popup::before{ opacity:0.85; }
+        /* demo badge */
+        .demo-badge{
+          position:absolute;
+          bottom:8px; left:14px;
+          font-family:'JetBrains Mono', ui-monospace, monospace;
+          font-size:8.5px;
+          font-weight:700;
+          letter-spacing:0.18em;
+          color:var(--plot-edge);
+          border:1px solid color-mix(in srgb, var(--plot-edge) 50%, transparent);
+          background:rgba(0,242,255,0.08);
+          border-radius:3px;
+          padding:2px 6px;
+          pointer-events:none;
+        }
+
+        /* inquiry sheet */
+        .inquiry-sheet{
+          position:absolute;
+          inset:0;
+          z-index:10;
+          background:rgba(13,14,16,0.85);
+          backdrop-filter:blur(8px);
+          -webkit-backdrop-filter:blur(8px);
+          display:flex;
+          align-items:flex-end;
+          justify-content:stretch;
+          animation:plot-inq-in 220ms ease-out;
+        }
+        @keyframes plot-inq-in{
+          from{ opacity:0; }
+          to  { opacity:1; }
+        }
+        .inquiry-card{
+          flex:1;
+          background:var(--plot-base-soft);
+          border-top:1px solid var(--plot-divider-strong);
+          padding:18px;
+          display:flex; flex-direction:column; gap:12px;
+        }
+        .inq-head{
+          display:flex; align-items:center; justify-content:space-between;
+        }
+        .inq-title{
+          font-size:15px;
+          font-weight:600;
+          color:var(--plot-text);
+        }
+        .inq-close{
+          background:transparent;
+          border:0;
+          color:var(--plot-text-muted);
+          cursor:pointer;
+          padding:4px;
+          border-radius:6px;
+          display:flex; align-items:center; justify-content:center;
+        }
+        .inq-close:hover{ color:var(--plot-text); }
+        .inq-fields{ display:flex; flex-direction:column; gap:8px; }
+        .inq-input, .inq-textarea{
+          background:var(--plot-base-deep);
+          color:var(--plot-text);
+          border:1px solid var(--plot-divider);
+          border-radius:8px;
+          padding:9px 12px;
+          font-size:13px;
+          font-family:inherit;
+          outline:none;
+          transition:border-color 120ms ease;
+        }
+        .inq-input::placeholder, .inq-textarea::placeholder{ color:var(--plot-text-faint); }
+        .inq-input:focus, .inq-textarea:focus{ border-color:var(--plot-edge); }
+        .inq-textarea{ resize:vertical; min-height:56px; }
+        .inq-error{
+          font-size:11.5px;
+          color:var(--plot-status-sold);
+        }
+        .inq-note{
+          font-size:10.5px;
+          color:var(--plot-text-faint);
+          text-align:center;
+          line-height:1.4;
+        }
+        .inq-sent{
+          display:flex; flex-direction:column; gap:10px;
+          padding:14px 0;
+        }
+        .inq-sent-title{
+          font-family:'JetBrains Mono', ui-monospace, monospace;
+          font-size:11px;
+          font-weight:700;
+          letter-spacing:0.22em;
+          text-transform:uppercase;
+          color:var(--plot-edge);
+        }
+        .inq-sent-body{
+          font-size:14px;
+          color:var(--plot-text);
+        }
+        .inq-sent-addr{
+          color:var(--plot-edge);
+          font-weight:500;
         }
       `}</style>
     </div>
   );
 }
 
-// ── Stat row helper ────────────────────────────────────────────
-function Stat({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
+// ── Stat cell ────────────────────────────────────────────────────
+function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="stat">
-      <span className="lab">{label}</span>
-      <span className={mono ? "val val-mono" : "val"}>{value}</span>
+    <div className="stat-cell">
+      <div className="val">{value}</div>
+      <div className="lab">{label}</div>
       <style jsx>{`
-        .stat{
-          display:flex;
-          align-items:baseline;
-          justify-content:space-between;
-          gap:8px;
+        .stat-cell{
+          text-align:center;
+          padding:0 4px;
+          border-right:1px solid var(--plot-divider);
+        }
+        .stat-cell:last-child{ border-right:0; }
+        .val{
+          font-family:'JetBrains Mono', ui-monospace, monospace;
+          font-size:15px;
+          font-weight:700;
+          color:var(--plot-text);
+          font-variant-numeric:tabular-nums;
+          line-height:1.1;
         }
         .lab{
           font-family:'JetBrains Mono', ui-monospace, monospace;
-          font-size:9px;
-          font-weight:500;
+          font-size:8.5px;
+          font-weight:700;
           letter-spacing:0.16em;
           text-transform:uppercase;
-          color:var(--plot-text-muted);
-        }
-        .val{
-          font-size:12.5px;
-          font-weight:500;
-          font-variant-numeric:tabular-nums;
-          letter-spacing:-0.005em;
-          color:var(--plot-text);
-          text-align:right;
-        }
-        .val-mono{
-          font-family:'JetBrains Mono', ui-monospace, monospace;
-          font-size:11px;
-          letter-spacing:0.02em;
+          color:var(--plot-text-faint);
+          margin-top:3px;
         }
       `}</style>
     </div>
-  );
-}
-
-// ── Action button helper ───────────────────────────────────────
-function ActionBtn({
-  icon,
-  label,
-  tooltip,
-  disabled,
-  onClick,
-}: {
-  icon: string;
-  label: string;
-  tooltip: string;
-  disabled?: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      className="action"
-      title={tooltip}
-      disabled={disabled}
-      onClick={onClick}
-    >
-      <MaterialIcon icon={icon} className="text-[16px]" />
-      <span className="lab">{label}</span>
-      <style jsx>{`
-        .lab{ display:block; }
-      `}</style>
-    </button>
   );
 }

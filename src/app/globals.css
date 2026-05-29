@@ -64,26 +64,29 @@ html, body {
 
 :root,
 :root[data-theme="dark"] {
-  /* Dark theme — the default. Deep navy base, warm brass edge,
-     electric cyan signal, ivory text. */
-  --plot-base:           #0E1B2A;     /* deep navy */
-  --plot-base-soft:      #15263A;     /* one tier lighter for stratification */
-  --plot-base-deep:      #0A1422;     /* one tier darker, used behind glows */
-  --plot-edge:           #C9A35A;     /* warm brass */
-  --plot-edge-bloom:     #E2C285;     /* brighter brass for glow */
-  --plot-edge-hot:       #F2D89D;     /* hot peak of the lumen seam */
-  --plot-signal:         #53D8FF;     /* electric cyan */
-  --plot-signal-soft:    #AEEBFF;     /* pale ice blue for soft hovers */
-  --plot-action:         #E87857;     /* coral — primary action only */
-  --plot-action-hover:   #FF9077;     /* coral lighter for hover */
-  --plot-text:           #F5F1E8;     /* warm ivory */
-  --plot-text-muted:     rgba(245,241,232,0.62);
-  --plot-text-faint:     rgba(245,241,232,0.38);
-  --plot-divider:        rgba(201,163,90,0.25);  /* brass at low alpha */
-  --plot-divider-strong: rgba(201,163,90,0.55);
+  /* Dark theme — the default. Modern 2026 dark glass palette
+     (locked 2026-05-30 evening, replaces the warm brass/cream
+     direction). Deep charcoal-near-black base + electric mint
+     accent. Reads against bright daytime aerial. */
+  --plot-base:           #0D0E10;     /* near-black surface */
+  --plot-base-soft:      #1F2022;     /* glass card body, slightly lighter */
+  --plot-base-deep:      #16171A;     /* recessed surfaces */
+  --plot-base-glass:     rgba(29,29,31,0.85); /* the popup glass body */
+  --plot-edge:           #00F2FF;     /* electric mint primary accent */
+  --plot-edge-bloom:     #00DBE7;     /* slightly deeper mint for glow */
+  --plot-edge-hot:       #74F5FF;     /* hottest tint for highlights */
+  --plot-signal:         #00F2FF;     /* same as edge — single brand accent */
+  --plot-signal-soft:    rgba(0,242,255,0.35);
+  --plot-action:         #00F2FF;     /* primary action button */
+  --plot-action-hover:   #74F5FF;
+  --plot-on-action:      #0D0E10;     /* dark text on mint button */
+  --plot-text:           #E3E2E5;     /* near-white text */
+  --plot-text-muted:     #A1A1A6;     /* zinc 400-ish */
+  --plot-text-faint:     rgba(227,226,229,0.40);
+  --plot-divider:        rgba(255,255,255,0.08);
+  --plot-divider-strong: rgba(255,255,255,0.15);
 
-  /* Status colors — same across themes (the only tokens that don't
-     invert; status semantics are theme-independent). */
+  /* Status colors — same across themes (semantic, theme-independent) */
   --plot-status-active:  #35D07F;
   --plot-status-pending: #F2B84B;
   --plot-status-sold:    #E15A5A;
@@ -91,23 +94,25 @@ html, body {
 }
 
 :root[data-theme="light"] {
-  /* Light theme — the inverse. Warm ivory base, deeper brass edge,
-     deep cyan signal (darker for legibility), navy text. */
-  --plot-base:           #F5F1E8;     /* warm ivory */
-  --plot-base-soft:      #ECE5D4;     /* slightly toned for stratification */
-  --plot-base-deep:      #FFFAEE;     /* lighter for elevated surfaces */
-  --plot-edge:           #A8842F;     /* deeper brass for light-bg legibility */
-  --plot-edge-bloom:     #C9A35A;     /* warmer brass for glow */
-  --plot-edge-hot:       #E2C285;     /* peak of the lumen seam */
-  --plot-signal:         #0E7FB8;     /* deep cyan */
-  --plot-signal-soft:    #B6E0F2;     /* pale ice */
-  --plot-action:         #C5563A;     /* deeper coral for light-bg legibility */
-  --plot-action-hover:   #B14730;
-  --plot-text:           #0E1B2A;     /* deep navy */
-  --plot-text-muted:     rgba(14,27,42,0.62);
-  --plot-text-faint:     rgba(14,27,42,0.40);
-  --plot-divider:        rgba(168,132,47,0.28);
-  --plot-divider-strong: rgba(168,132,47,0.55);
+  /* Light theme — inverse: white-paper base + same mint accent
+     darkened for legibility. */
+  --plot-base:           #FAFAFA;
+  --plot-base-soft:      #FFFFFF;
+  --plot-base-deep:      #F1F1F4;
+  --plot-base-glass:     rgba(255,255,255,0.92);
+  --plot-edge:           #007E89;     /* mint darkened for white-bg legibility */
+  --plot-edge-bloom:     #00DBE7;
+  --plot-edge-hot:       #00F2FF;
+  --plot-signal:         #007E89;
+  --plot-signal-soft:    rgba(0,126,137,0.18);
+  --plot-action:         #007E89;
+  --plot-action-hover:   #00A3B0;
+  --plot-on-action:      #FFFFFF;
+  --plot-text:           #0D0E10;
+  --plot-text-muted:     #5A5A60;
+  --plot-text-faint:     rgba(13,14,16,0.42);
+  --plot-divider:        rgba(13,14,16,0.10);
+  --plot-divider-strong: rgba(13,14,16,0.18);
 
   --plot-status-active:  #2BAE6C;
   --plot-status-pending: #D9991F;
@@ -115,28 +120,27 @@ html, body {
   --plot-status-off:     #6B7A8A;
 }
 
-/* Prevent flash-of-wrong-theme during SSR/hydration: ThemeProvider
-   sets data-theme on <html> client-side, but the first paint can use
-   the prefers-color-scheme media query as a sensible fallback. Default
-   :root above is dark, so this only fires when the system is light AND
-   the visitor hasn't set a stored preference yet. */
+/* Prevent flash-of-wrong-theme during SSR: matches stored pref or
+   system pref. Default (no media match) = dark. */
 @media (prefers-color-scheme: light) {
   :root:not([data-theme]) {
-    --plot-base:           #F5F1E8;
-    --plot-base-soft:      #ECE5D4;
-    --plot-base-deep:      #FFFAEE;
-    --plot-edge:           #A8842F;
-    --plot-edge-bloom:     #C9A35A;
-    --plot-edge-hot:       #E2C285;
-    --plot-signal:         #0E7FB8;
-    --plot-signal-soft:    #B6E0F2;
-    --plot-action:         #C5563A;
-    --plot-action-hover:   #B14730;
-    --plot-text:           #0E1B2A;
-    --plot-text-muted:     rgba(14,27,42,0.62);
-    --plot-text-faint:     rgba(14,27,42,0.40);
-    --plot-divider:        rgba(168,132,47,0.28);
-    --plot-divider-strong: rgba(168,132,47,0.55);
+    --plot-base:           #FAFAFA;
+    --plot-base-soft:      #FFFFFF;
+    --plot-base-deep:      #F1F1F4;
+    --plot-base-glass:     rgba(255,255,255,0.92);
+    --plot-edge:           #007E89;
+    --plot-edge-bloom:     #00DBE7;
+    --plot-edge-hot:       #00F2FF;
+    --plot-signal:         #007E89;
+    --plot-signal-soft:    rgba(0,126,137,0.18);
+    --plot-action:         #007E89;
+    --plot-action-hover:   #00A3B0;
+    --plot-on-action:      #FFFFFF;
+    --plot-text:           #0D0E10;
+    --plot-text-muted:     #5A5A60;
+    --plot-text-faint:     rgba(13,14,16,0.42);
+    --plot-divider:        rgba(13,14,16,0.10);
+    --plot-divider-strong: rgba(13,14,16,0.18);
     --plot-status-active:  #2BAE6C;
     --plot-status-pending: #D9991F;
     --plot-status-sold:    #C24545;

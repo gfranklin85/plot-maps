@@ -2,7 +2,25 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { createMiddlewareClient } from '@/lib/supabase-middleware';
 
 // Public marketing / informational pages reachable without login.
-const PUBLIC_PATHS = ['/login', '/signup', '/auth', '/subscribe', '/landing', '/privacy', '/terms', '/cookies', '/support', '/waitlist'];
+// Locked 2026-05-29: /position, /join-position, /contact must stay
+// public per project_landing_search_first_no_gate + the brokerage
+// hierarchy thesis. Visitors browsing Plot Maps need to reach the
+// brokerage identity page and the contact form without an OAuth wall.
+const PUBLIC_PATHS = [
+  '/login',
+  '/signup',
+  '/auth',
+  '/subscribe',
+  '/landing',
+  '/privacy',
+  '/terms',
+  '/cookies',
+  '/support',
+  '/waitlist',
+  '/position',
+  '/join-position',
+  '/contact',
+];
 
 // Logged-in pages reachable even for users without beta access. The
 // app proper is gated; these are the "you're on the waitlist" / "log

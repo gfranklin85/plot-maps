@@ -189,12 +189,15 @@ export default function LandingHome() {
     <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col">
 
       {/* ── Top bar ──────────────────────────────────────────── */}
+      {/* Wordmark sized to actually read (h-10 ~ 40px). "Enter Map" was
+          duplicate of the search bar's primary action so it's gone;
+          the nav now just lists the two destinations that aren't
+          reachable through the hero (Position + Contact). */}
       <header className="absolute top-0 left-0 right-0 z-30 px-6 md:px-10 pt-6 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <PlotMapsLogo color="#F5EDD8" className="h-7 w-auto" />
-        </div>
+        <Link href="/" className="flex items-center gap-3" aria-label="Plot Maps home">
+          <PlotMapsLogo color="#F5EDD8" className="h-10 w-auto" />
+        </Link>
         <nav className="hidden md:flex items-center gap-7 text-sm text-zinc-300">
-          <Link href="/map" className="hover:text-white transition-colors">Enter Map</Link>
           <Link href="/position" className="hover:text-white transition-colors">Position Realty</Link>
           <Link href="/contact" className="hover:text-white transition-colors">Contact</Link>
         </nav>
@@ -212,12 +215,17 @@ export default function LandingHome() {
         </div>
 
         <div className="w-full max-w-3xl text-center space-y-6">
-          <h1 className="font-headline text-4xl md:text-6xl font-light tracking-tight text-zinc-50 leading-[1.05]">
-            Where do you want to fly?
+          {/* Three-word action verb headline. Direct, declarative,
+              tells the user what the product does in the same breath
+              as inviting them to do it. No question mark, no asking. */}
+          <h1 className="font-headline text-5xl md:text-7xl font-light tracking-tight text-zinc-50 leading-[1.02]">
+            Search.{' '}
+            <span className="text-amber-200">Fly.</span>{' '}
+            Discover.
           </h1>
           <p className="text-base md:text-lg text-zinc-300 max-w-xl mx-auto leading-relaxed">
-            Plot Maps is a spatial real-estate platform. Search any city,
-            address, neighborhood, or place. Then fly the world.
+            A spatial real-estate platform. Type any place on Earth —
+            a city, a street, your future neighborhood — and fly it.
           </p>
 
           {/* Search bar — the main CTA */}

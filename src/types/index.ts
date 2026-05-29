@@ -86,6 +86,15 @@ export interface Lead {
   // Set by the inbound STOP webhook. NOT an owner-will signal — purely
   // tells the UI to gray out the text-invite button and suggest mail.
   text_declined?: boolean | null;
+  // ── MLS listing extensions (populated from RESO feed June 18+, mock
+  //    data sets them for the June 9 demo). All optional — popup
+  //    degrades gracefully when missing. ──
+  listing_photo_url?: string | null;
+  bedrooms?: number | null;
+  bathrooms?: number | null;
+  listing_agent_name?: string | null;
+  listing_agent_phone?: string | null;
+  listing_office_name?: string | null;
 }
 
 export type InquiryChannel = 'text_invite' | 'direct_mail' | 'phone_call';

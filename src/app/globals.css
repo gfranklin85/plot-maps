@@ -303,6 +303,26 @@ gmp-map-3d [class*="poi-info-window"] {
   visibility: hidden !important;
 }
 
+/* ─── GroundGlow popover chrome suppression. The gmp-popover that
+       hosts the glow disc needs ZERO visible container — only the
+       child disc should render. Without this, Google renders its
+       default popover bubble (white card + tail) around the glow,
+       which appears as a "tiny box on the property" instead of a
+       clean glow. Scoped to [plot-ground-glow] so it doesn't affect
+       the property card's popover. */
+gmp-popover[plot-ground-glow]::part(container),
+gmp-popover[plot-ground-glow]::part(content),
+gmp-popover[plot-ground-glow]::part(tail) {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+gmp-popover[plot-ground-glow] {
+  --gmp-popover-background: transparent;
+  background: transparent !important;
+}
+
 /* ─── Skiptrace-pending pin overlay (ambient pulse over any pin
        whose lead is awaiting Tracerfy results) ─── */
 .skiptrace-pending-pin {

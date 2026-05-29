@@ -16,6 +16,7 @@ import UpgradeGate from "@/components/ui/UpgradeGate";
 import PropertyPopup from "@/components/map/PropertyPopup";
 import AnchoredPropertyCard from "@/components/map/AnchoredPropertyCard";
 import GroundGlow from "@/components/map/GroundGlow";
+import MarketRequestPrompt from "@/components/map/MarketRequestPrompt";
 import type { RitualTetherHandle } from "@/components/map/RitualTether";
 import ProspectListPanel from "@/components/map/ProspectListPanel";
 import OnboardingTooltips from "@/components/ui/OnboardingTooltips";
@@ -220,6 +221,15 @@ export default function MapPage() {
   // the armed channel, or the target is a parcel without a Lead row).
   const [reticleToast, setReticleToast] = useState<string | null>(null);
 
+  // Market-request prompt — surfaced when a visitor arrives from the
+  // landing search bar at a place Plot doesn't cover, or when the
+  // geocoder couldn't resolve their query at all. Locked 2026-05-29.
+  // Drives the demand-capture funnel that feeds county rollout
+  // (memory/project_rollout_as_marketing_surface.md).
+  const [marketRequest, setMarketRequest] = useState<
+    { query: string; mode: 'miss' | 'uncovered' } | null
+  >(null);
+
   // ── Airplane-mode armed channel + shot animation ─────────────────────
   // The "weapon" the user is currently shooting with. X rotates through
   // text → mail → call. Default = text since it's the cheapest, fastest
@@ -325,6 +335,17 @@ export default function MapPage() {
     const prospectParam = searchParams.get('prospect');
     const leadIdParam = searchParams.get('leadId');
     const destinationParam = searchParams.get('destination');
+    // Search-first landing routes here with the visitor's query in ?q,
+    // and ?miss=1 when the geocoder couldn't resolve it. We surface the
+    // MarketRequestPrompt either way — for misses (geocoder failed) we
+    // show it immediately; for hits (lat/lng present) we still capture
+    // the query for the demand-capture funnel in case the destination
+    // isn't yet covered by Plot's property data.
+    const queryParam = searchParams.get('q');
+    const missParam = searchParams.get('miss');
+    if (queryParam && missParam === '1') {
+      setMarketRequest({ query: queryParam, mode: 'miss' });
+    }
 
     // Resolve ?destination=<slug> to lat/lng + full camera pose via the
     // destinations catalog (shared with the landing carousel). When
@@ -1485,51 +1506,24 @@ export default function MapPage() {
           altitudeM={12}
           popoverForwardRef={popoverElRef}
         >
-          <div
-            className="rounded-2xl bg-card border border-card-border shadow-2xl overflow-hidden"
-            style={{
-              width: '360px',
-              maxHeight: '320px',
-              overflowY: 'auto',
+          {/* PropertyPopup is now self-contained — gold edge, glow, footer,
+              and its own Pin + Close chrome. No wrapper card needed. */}
+          <PropertyPopup
+            lead={selectedLead}
+            onUpdate={refetchLeads}
+            onToggleProspectMode={() => handleToggleProspectMode(selectedLead)}
+            prospectMode={prospectMode}
+            onPin={() => { setPinnedRef(selectedLead); setSelectedLead(null); }}
+            onClose={() => setSelectedLead(null)}
+            onWalkHere={(lead) => {
+              if (!isSubscribed) { setShowGate(true); return; }
+              if (lead.latitude && lead.longitude) {
+                setMapCenter({ lat: lead.latitude, lng: lead.longitude });
+                setWalkMode(true);
+                setSelectedLead(null);
+              }
             }}
-          >
-            <div className="flex items-center justify-between px-4 pt-3 pb-1">
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => { setPinnedRef(selectedLead); setSelectedLead(null); }}
-                  className="flex items-center gap-1 text-[10px] font-bold text-primary uppercase tracking-widest hover:underline"
-                  title="Pin as reference property"
-                >
-                  <MaterialIcon icon="push_pin" className="text-[14px]" />
-                  Pin
-                </button>
-                <button
-                  onClick={() => { setExpandedLead(selectedLead); setSelectedLead(null); }}
-                  className="flex items-center gap-1 text-[10px] font-bold text-primary uppercase tracking-widest hover:underline"
-                >
-                  <MaterialIcon icon="open_in_full" className="text-[14px]" />
-                  Expand
-                </button>
-              </div>
-              <button onClick={() => setSelectedLead(null)} className="text-secondary hover:text-on-surface transition-colors">
-                <MaterialIcon icon="close" className="text-[18px]" />
-              </button>
-            </div>
-            <PropertyPopup
-              lead={selectedLead}
-              onUpdate={refetchLeads}
-              onToggleProspectMode={() => handleToggleProspectMode(selectedLead)}
-              prospectMode={prospectMode}
-              onWalkHere={(lead) => {
-                if (!isSubscribed) { setShowGate(true); return; }
-                if (lead.latitude && lead.longitude) {
-                  setMapCenter({ lat: lead.latitude, lng: lead.longitude });
-                  setWalkMode(true);
-                  setSelectedLead(null);
-                }
-              }}
-            />
-          </div>
+          />
         </AnchoredPropertyCard>
         </>
       )}
@@ -1591,6 +1585,16 @@ export default function MapPage() {
       >
         <MaterialIcon icon="fullscreen" className="text-[20px]" />
       </button>
+
+      {/* Market-request prompt — graceful state for unsupported markets
+          and geocoder misses arriving from the search-first landing. */}
+      {marketRequest && (
+        <MarketRequestPrompt
+          query={marketRequest.query}
+          mode={marketRequest.mode}
+          onDismiss={() => setMarketRequest(null)}
+        />
+      )}
 
       {/* Prospect toast */}
       {prospectToast && (

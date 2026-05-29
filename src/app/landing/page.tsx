@@ -1,39 +1,41 @@
-// Plot's landing page.
+// Plot Maps landing.
 //
-// Direction (2026-05-25 refresh): no live globe, no cesium on the
-// landing. The page is the entry point — a single-viewport horizontal
-// carousel of destination cards. The user picks a city; ArrivalSequence
-// takes over (questions form + OAuth + handoff to /map).
-//
-// Decisions baked in:
-//   - One screen, no scroll. The cards are the page.
-//   - Modern, dark, high-end. Survey-tick accents in the corners are
-//     the one vintage-cartography callback; the rest is contemporary.
-//   - Locked PlotMaps wordmark, top-left. No invented logo.
-//   - No fictional copy (no fake "LIDAR ENGAGED", no fictional nav).
-//   - The active card carries the primary action; arrow controls let
-//     the user flip through. Keyboard + (later) controller D-pad
-//     navigate the same indices.
-//   - Card images come from public/assets/landing/destinations/<slug>.jpg
-//     when present. Cards without imageSrc render a typographic
-//     placeholder so the page reads "screenshot pending" instead of
-//     broken. Composition stays the same when real screenshots land.
+// Direction (locked 2026-05-29 — supersedes the earlier carousel-only
+// landing for the public-launch surface): search-first hero with a
+// cinematic search bar + horizontally scrolling destination cards
+// underneath. NO gate, NO signup, NO claim-before-entry. Participation
+// prompts fire after engagement, never at the door.
 //
 // See:
-//   - src/lib/destinations.ts (single canonical destination catalog)
-//   - src/components/landing/destinations/ArrivalSequence.tsx (handles
-//     the post-click questions form + OAuth + /map handoff)
-//   - src/components/brand/PlotMapsLogo.tsx (locked wordmark)
+//   memory/project_landing_search_first_no_gate.md
+//   memory/project_plot_maps_position_hierarchy.md
+//
+// Architecture:
+//   src/components/landing/LandingHome.tsx           — this page's shell
+//   src/components/public/PositionFooter.tsx        — compliance footer
+//   src/app/api/public/geocode/route.ts             — unauthenticated
+//                                                     geocode for the
+//                                                     search bar
+//   src/lib/destinations.ts                         — destination catalog
+//   src/app/map/page.tsx                            — receives ?destination,
+//                                                     ?q, ?lat, ?lng,
+//                                                     ?miss=1 (graceful
+//                                                     unsupported-market
+//                                                     state)
+//
+// The earlier carousel-only landing is preserved at
+// src/components/landing/LandingCarousel.tsx for the cold-open mode
+// that may layer on top later.
 
 import type { Metadata } from 'next';
-import LandingCarousel from '@/components/landing/LandingCarousel';
+import LandingHome from '@/components/landing/LandingHome';
 
 export const metadata: Metadata = {
-  title: 'Plotmaps — Fly your market',
+  title: 'Plot Maps — Fly your market',
   description:
-    'Plot is a real-estate prospecting platform that puts you in the air over the markets you work. Pick a city and fly.',
+    'A spatial real-estate platform. Search any city, address, neighborhood, or place — then fly the world. Operated by Position Realty, a California-licensed brokerage.',
 };
 
 export default function LandingPage() {
-  return <LandingCarousel />;
+  return <LandingHome />;
 }

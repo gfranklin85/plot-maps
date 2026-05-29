@@ -352,7 +352,15 @@ export default function PropertyPopup({ lead, onUpdate, onClose, onPin }: Props)
           <span className="dot" />
           Plot · {new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })} PT
         </div>
-        <div className="mark">PLOT <span className="pl">PL</span></div>
+        {/* Honesty badge for mock listings — surfaced for the June 9
+            KCBOR committee demo so the panel always knows what's real
+            sample data vs. eventual MLS data. Removes when lead.id is
+            no longer prefixed mock-. */}
+        {lead.id?.startsWith('mock-') ? (
+          <div className="demo-badge">DEMO DATA · SAMPLE LISTING</div>
+        ) : (
+          <div className="mark">PLOT <span className="pl">PL</span></div>
+        )}
       </div>
 
       {/* All component styles scoped under .plot-popup.
@@ -710,6 +718,19 @@ export default function PropertyPopup({ lead, onUpdate, onClose, onPin }: Props)
           color:var(--plot-text-faint);
         }
         .mark .pl{ color:var(--plot-edge); }
+        /* DEMO DATA badge — only renders for mock listings (id prefix
+           mock-). Designed to read clearly without screaming. */
+        .demo-badge{
+          font-family:'JetBrains Mono', ui-monospace, monospace;
+          font-size:9px;
+          font-weight:600;
+          letter-spacing:0.22em;
+          color:var(--plot-action);
+          border:1px solid color-mix(in srgb, var(--plot-action) 55%, transparent);
+          background:color-mix(in srgb, var(--plot-action) 12%, transparent);
+          border-radius:3px;
+          padding:3px 7px;
+        }
 
         @media (prefers-reduced-motion: reduce){
           .plot-popup::before,

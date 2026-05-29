@@ -643,6 +643,25 @@ export default function MapPage() {
     fetchLeads();
   }, [user]);
 
+  // ── Mock listings (June 9 KCBOR demo) ──────────────────────────
+  // Fetched once on map mount, merged into the pin pipeline alongside
+  // the user's own leads. Each carries id prefix mock- so PropertyPopup
+  // can surface the DEMO DATA badge for honesty during committee
+  // browsing. Removed when the real RESO/IDX feed flows June 18+.
+  const [mockListings, setMockListings] = useState<Lead[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/mock-listings')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (!cancelled && data?.listings && Array.isArray(data.listings)) {
+          setMockListings(data.listings as Lead[]);
+        }
+      })
+      .catch(() => { /* silent — pins still render from leads */ });
+    return () => { cancelled = true; };
+  }, []);
+
   function refetchLeads() {
     if (!user) return;
     supabase.from("leads").select("*")
@@ -730,11 +749,16 @@ export default function MapPage() {
   }
 
   const filteredLeads = useMemo(() => {
-    let result = leads;
+    // Mock listings always join the pin pipeline regardless of the
+    // user's filter tab — the June 9 demo needs them visible whether
+    // the user is viewing "All", "Hot", "Listings", etc. They pass
+    // through search + tag + city filters unchanged.
+    let result = [...leads, ...mockListings];
 
     const tab = FILTER_TABS.find((t) => t.key === activeTab);
     if (tab && tab.statuses.length > 0) {
-      result = result.filter((l) => tab.statuses.includes(l.status));
+      // Keep mock listings (they carry listing_status, not lead status)
+      result = result.filter((l) => l.id.startsWith('mock-') || tab.statuses.includes(l.status));
     }
 
     if (search.trim()) {
@@ -763,7 +787,7 @@ export default function MapPage() {
     }
 
     return result;
-  }, [leads, activeTab, search, selectedTags, selectedCity, selectedPriority, selectedSource, listingFilters]);
+  }, [leads, mockListings, activeTab, search, selectedTags, selectedCity, selectedPriority, selectedSource, listingFilters]);
 
   // Targetable leads for airplane-mode reticle hover. Strip down to id +
   // lat/lng so the controller doesn't see the full Lead shape.

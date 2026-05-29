@@ -303,10 +303,13 @@ export default function MapPage() {
     // work (no Steam, or browser already woken from a prior session).
 
     let cancelled = false;
-    let lastConnectedState = false;
+    let isConnected = false;            // sticky — once true, only a
+                                        // native gamepaddisconnected event
+                                        // (or the seed scan finding nothing
+                                        // at next mount) ever flips it back.
     const setConnected = (v: boolean) => {
-      if (cancelled || v === lastConnectedState) return;
-      lastConnectedState = v;
+      if (cancelled || v === isConnected) return;
+      isConnected = v;
       setPageGamepadConnected(v);
     };
 
@@ -338,20 +341,33 @@ export default function MapPage() {
     // reload with controller already paired), accept it immediately.
     if (scanForConnected()) setConnected(true);
 
-    // Activity poll — once per ~250ms. Runs as long as the page is
-    // mounted; cheap, doesn't allocate. The instant we observe stick
-    // or trigger motion, we mark the gamepad live. We keep polling
-    // even after detection so a disconnect (controller dies / unplugged)
-    // can flip us back to overhead mode.
+    // ── Sticky-true activity poll ──────────────────────────────────
+    // We only ever flip pageGamepadConnected to true via this poll.
+    // We never flip it back to false based on activity-going-quiet,
+    // because:
+    //   1. The browser may still see the pad as "connected" when
+    //      sticks are at rest (no activity ≠ no controller)
+    //   2. On Steam Input setups, navigator.getGamepads() may return
+    //      [null,null,null,null] entirely (Steam consumes all events),
+    //      so "no connected pads" is not authoritative either
+    //   3. The previous version flipped false the instant the user
+    //      released the sticks, which killed mid-flight steering — the
+    //      bug Greg hit 2026-05-29.
+    // Disconnect is ONLY ever fired by the native gamepaddisconnected
+    // event (real unplug / controller death) or by the unmount path.
     const pollId = window.setInterval(() => {
-      const active = scanForActivity() || scanForConnected();
-      setConnected(active);
+      if (isConnected) return; // already detected; nothing to do
+      if (scanForActivity() || scanForConnected()) setConnected(true);
     }, 250);
 
-    // Native events still help when Steam doesn't swallow the first
-    // button press. They fire instantly; the poll is the backstop.
+    // Native events: connect immediately wakes us; disconnect is the
+    // ONE legitimate "lost gamepad" signal we trust.
     const onConnect = () => setConnected(true);
-    const onDisconnect = () => setConnected(scanForConnected());
+    const onDisconnect = () => {
+      // Only mark disconnected if no other pads remain. Multi-pad
+      // setups shouldn't false-disconnect when pad #2 unplugs.
+      if (!scanForConnected()) setConnected(false);
+    };
     window.addEventListener('gamepadconnected', onConnect);
     window.addEventListener('gamepaddisconnected', onDisconnect);
 

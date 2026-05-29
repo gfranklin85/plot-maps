@@ -16,7 +16,7 @@
 // fire AFTER engagement, not at the door. The product earns the right
 // to ask (per project-participation-based-monetization-thesis).
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -27,6 +27,13 @@ import {
   type Destination,
 } from '@/lib/destinations';
 
+interface Suggestion {
+  placeId: string;
+  mainText: string;
+  secondaryText: string;
+  primaryType: string | null;
+}
+
 export default function LandingHome() {
   const router = useRouter();
   const [query, setQuery] = useState('');
@@ -34,13 +41,104 @@ export default function LandingHome() {
   const [searchError, setSearchError] = useState<string | null>(null);
   const stripRef = useRef<HTMLDivElement | null>(null);
 
-  // ── Search submit ─────────────────────────────────────────────
-  // 1. Hand the raw text to the public geocoder
-  // 2. On a hit, route to /map?q=<text>&lat=…&lng=… so the map page
-  //    can fly there immediately without re-geocoding
-  // 3. On a miss, route to /map?q=<text>&miss=1 so the map page can
-  //    surface the "Request this market" graceful state
+  // ── Autocomplete state ───────────────────────────────────────
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [highlightIdx, setHighlightIdx] = useState<number>(-1);
+  const [suggestLoading, setSuggestLoading] = useState(false);
+  const debounceRef = useRef<number | null>(null);
+  const fetchSeqRef = useRef(0);
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
+
+  // ── Fetch suggestions on query change (debounced) ────────────
+  useEffect(() => {
+    const q = query.trim();
+    if (debounceRef.current !== null) {
+      window.clearTimeout(debounceRef.current);
+    }
+    if (q.length < 2) {
+      setSuggestions([]);
+      setSuggestLoading(false);
+      return;
+    }
+    setSuggestLoading(true);
+    debounceRef.current = window.setTimeout(async () => {
+      const seq = ++fetchSeqRef.current;
+      try {
+        const res = await fetch(`/api/public/places-autocomplete?q=${encodeURIComponent(q)}`);
+        const data = await res.json().catch(() => ({}));
+        // Drop stale responses if the user kept typing past this fetch
+        if (seq !== fetchSeqRef.current) return;
+        const list: Suggestion[] = Array.isArray(data?.suggestions) ? data.suggestions : [];
+        setSuggestions(list);
+        setShowSuggestions(list.length > 0);
+        setHighlightIdx(list.length > 0 ? 0 : -1);
+      } catch {
+        if (seq === fetchSeqRef.current) {
+          setSuggestions([]);
+          setShowSuggestions(false);
+        }
+      } finally {
+        if (seq === fetchSeqRef.current) setSuggestLoading(false);
+      }
+    }, 180);
+    return () => {
+      if (debounceRef.current !== null) window.clearTimeout(debounceRef.current);
+    };
+  }, [query]);
+
+  // ── Close dropdown on outside click ──────────────────────────
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      if (!wrapperRef.current) return;
+      if (!wrapperRef.current.contains(e.target as Node)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', onClick);
+    return () => document.removeEventListener('mousedown', onClick);
+  }, []);
+
+  // ── Pick a suggestion (or submit raw text) ───────────────────
+  // - Suggestion picked → resolve place_id to lat/lng via place-details
+  // - Raw text → fall back to /api/public/geocode (current behavior)
+  const pickSuggestion = useCallback(
+    async (s: Suggestion) => {
+      setShowSuggestions(false);
+      setSearching(true);
+      setSearchError(null);
+      // Cosmetic: show the chosen text in the input while the details fetch flies
+      setQuery(`${s.mainText}${s.secondaryText ? ', ' + s.secondaryText : ''}`);
+      try {
+        const res = await fetch(
+          `/api/public/place-details?placeId=${encodeURIComponent(s.placeId)}`
+        );
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data?.hit) {
+          // Fall back to the typed text — let the map page surface the miss prompt
+          router.push(`/map?q=${encodeURIComponent(s.mainText)}&miss=1`);
+          return;
+        }
+        const params = new URLSearchParams({
+          q: data.formatted || s.mainText,
+          lat: String(data.lat),
+          lng: String(data.lng),
+        });
+        router.push(`/map?${params.toString()}`);
+      } catch {
+        setSearchError('Search is unavailable right now. Try a destination card below.');
+        setSearching(false);
+      }
+    },
+    [router]
+  );
+
   const submitSearch = useCallback(async () => {
+    // If the dropdown has a highlighted suggestion, prefer it
+    if (showSuggestions && highlightIdx >= 0 && suggestions[highlightIdx]) {
+      pickSuggestion(suggestions[highlightIdx]);
+      return;
+    }
     const q = query.trim();
     if (!q) return;
     setSearching(true);
@@ -49,8 +147,6 @@ export default function LandingHome() {
       const res = await fetch(`/api/public/geocode?q=${encodeURIComponent(q)}`);
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data?.hit) {
-        // Route to map with the raw query and a miss flag so the map
-        // page can show "Request this market" rather than just failing.
         router.push(`/map?q=${encodeURIComponent(q)}&miss=1`);
         return;
       }
@@ -64,7 +160,24 @@ export default function LandingHome() {
       setSearchError('Search is unavailable right now. Try a destination card below.');
       setSearching(false);
     }
-  }, [query, router]);
+  }, [query, router, showSuggestions, highlightIdx, suggestions, pickSuggestion]);
+
+  // ── Keyboard nav for the dropdown ────────────────────────────
+  const onKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (!showSuggestions || suggestions.length === 0) return;
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setHighlightIdx((i) => (i + 1) % suggestions.length);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setHighlightIdx((i) => (i - 1 + suggestions.length) % suggestions.length);
+      } else if (e.key === 'Escape') {
+        setShowSuggestions(false);
+      }
+    },
+    [showSuggestions, suggestions]
+  );
 
   const scrollStrip = useCallback((delta: number) => {
     const el = stripRef.current;
@@ -112,11 +225,11 @@ export default function LandingHome() {
             onSubmit={(e) => { e.preventDefault(); submitSearch(); }}
             className="relative max-w-2xl mx-auto"
           >
-            <div className="relative">
+            <div ref={wrapperRef} className="relative">
               <svg
                 aria-hidden="true"
                 viewBox="0 0 24 24"
-                className="absolute left-5 top-1/2 -translate-y-1/2 h-5 w-5 text-amber-300/70"
+                className="absolute left-5 top-1/2 -translate-y-1/2 h-5 w-5 text-amber-300/70 z-10"
                 fill="none"
                 stroke="currentColor"
                 strokeWidth="1.6"
@@ -131,16 +244,71 @@ export default function LandingHome() {
                 spellCheck={false}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={onKeyDown}
+                onFocus={() => { if (suggestions.length > 0) setShowSuggestions(true); }}
                 placeholder="Search any city, address, neighborhood, or place..."
-                className="w-full rounded-full bg-zinc-900/85 backdrop-blur border border-amber-300/30 pl-14 pr-32 py-4 text-base md:text-lg text-zinc-50 placeholder:text-zinc-500 outline-none focus:border-amber-300/70 focus:ring-2 focus:ring-amber-300/20 shadow-[0_0_40px_-12px_rgba(255,214,107,0.45)] transition-all"
+                className="relative w-full rounded-full bg-zinc-900/85 backdrop-blur border border-amber-300/30 pl-14 pr-32 py-4 text-base md:text-lg text-zinc-50 placeholder:text-zinc-500 outline-none focus:border-amber-300/70 focus:ring-2 focus:ring-amber-300/20 shadow-[0_0_40px_-12px_rgba(255,214,107,0.45)] transition-all"
+                aria-autocomplete="list"
+                aria-controls="plot-landing-suggestions"
+                aria-expanded={showSuggestions}
+                role="combobox"
               />
               <button
                 type="submit"
                 disabled={searching || !query.trim()}
-                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-amber-300 text-zinc-950 px-5 py-2 text-sm font-semibold tracking-wide hover:bg-amber-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-amber-300 text-zinc-950 px-5 py-2 text-sm font-semibold tracking-wide hover:bg-amber-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors z-10"
               >
                 {searching ? 'Searching…' : 'Fly There'}
               </button>
+
+              {/* Autocomplete dropdown */}
+              {showSuggestions && suggestions.length > 0 && (
+                <ul
+                  id="plot-landing-suggestions"
+                  role="listbox"
+                  className="absolute left-0 right-0 top-full mt-2 rounded-2xl bg-zinc-950/95 backdrop-blur border border-amber-300/30 shadow-[0_20px_60px_-10px_rgba(0,0,0,0.8)] overflow-hidden z-20 text-left"
+                >
+                  {suggestions.map((s, i) => (
+                    <li
+                      key={s.placeId}
+                      role="option"
+                      aria-selected={i === highlightIdx}
+                      onMouseEnter={() => setHighlightIdx(i)}
+                      onMouseDown={(e) => { e.preventDefault(); pickSuggestion(s); }}
+                      className={`flex items-center gap-3 px-5 py-3 cursor-pointer transition-colors ${
+                        i === highlightIdx
+                          ? 'bg-amber-300/15 text-amber-100'
+                          : 'text-zinc-200 hover:bg-amber-300/10'
+                      }`}
+                    >
+                      <svg
+                        aria-hidden="true"
+                        viewBox="0 0 24 24"
+                        className="h-4 w-4 shrink-0 text-amber-300/70"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.6"
+                      >
+                        <path d="M12 21s-7-7-7-12a7 7 0 0 1 14 0c0 5-7 12-7 12z" />
+                        <circle cx="12" cy="9" r="2.5" />
+                      </svg>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-medium truncate">{s.mainText}</div>
+                        {s.secondaryText && (
+                          <div className="text-xs text-zinc-400 truncate">{s.secondaryText}</div>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              {/* Loading shimmer beneath the bar — tiny, low-friction */}
+              {suggestLoading && !showSuggestions && query.trim().length >= 2 && (
+                <div className="absolute left-0 right-0 -bottom-6 text-center text-[10px] uppercase tracking-[0.32em] text-amber-300/50">
+                  Searching…
+                </div>
+              )}
             </div>
             {searchError && (
               <p className="mt-3 text-xs text-rose-300">{searchError}</p>

@@ -437,30 +437,37 @@ gmp-popover[plot-ground-glow] {
 }
 
 /* ─── PropertyPopup popover chrome suppression. Mirrors the
-       GroundGlow rules, scoped to the OTHER gmp-popover Plot uses —
-       the one hosting AnchoredPropertyCard. Without this, Google's
-       default popover container adds:
-         - a white pill background under our hologram
-         - a tail/pointer that pokes out
-         - a max-height + overflow:auto wrapper that paints scrollbars
-       Greg flagged the scrollbar bleed 2026-05-30. Plot's PropertyPopup
-       owns its own visual chrome (gold edge, glow, footer); we want
-       Google's host to be invisible.
-       The wrapper div Plot portals into carries [data-plot-popup="1"]
-       so we can target by attribute selector. */
-gmp-popover:has([data-plot-popup="1"])::part(container),
-gmp-popover:has([data-plot-popup="1"])::part(content),
-gmp-popover:has([data-plot-popup="1"])::part(tail) {
+       GroundGlow rules. AnchoredPropertyCard sets the
+       [plot-property-card] attribute directly on the gmp-popover host
+       element (NOT on a slotted child) because:
+         1. :has() can't pierce the Web Component's shadow DOM, so a
+            descendant-based selector never matches.
+         2. ::part() only works for parts the author explicitly
+            exposes, which gmp-popover doesn't reliably do for the
+            chrome subparts.
+       Attribute on the host is the only reliable scoping vector. The
+       host's inline styles (set in AnchoredPropertyCard.tsx) are the
+       primary defense; these CSS rules are the secondary one. */
+gmp-popover[plot-property-card]::part(container),
+gmp-popover[plot-property-card]::part(content),
+gmp-popover[plot-property-card]::part(tail) {
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
   padding: 0 !important;
   max-height: none !important;
+  max-width: none !important;
   overflow: visible !important;
 }
-gmp-popover:has([data-plot-popup="1"]) {
+gmp-popover[plot-property-card] {
   --gmp-popover-background: transparent;
   background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  max-height: none !important;
+  max-width: none !important;
+  overflow: visible !important;
 }
 
 /* ─── Plot landing destination strip — hide native scrollbar across

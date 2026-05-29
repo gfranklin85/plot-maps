@@ -108,6 +108,26 @@ export default function AnchoredPropertyCard({
       // Also try the alternate attribute form for older preview API
       // versions that haven't switched to property-style yet.
       try { p.setAttribute('disable-pan-while-open', ''); } catch { /* ignore */ }
+      // Marker attribute on the popover HOST (not a descendant) so the
+      // globals.css selectors can target it without crossing the shadow
+      // DOM boundary. Plot's hologram popup ships its own gold-edged
+      // chrome; Google's default container/tail/scrollbars must be
+      // invisible. Mirrors the GroundGlow pattern.
+      try { p.setAttribute('plot-property-card', ''); } catch { /* ignore */ }
+      // Belt-and-suspenders: inline-style the host so neither Google's
+      // stylesheet nor any shadow-DOM defaults can re-paint the chrome.
+      // Sets background to transparent + lifts every overflow/max-size
+      // cap so the popover never paints scrollbars around our card.
+      try {
+        p.style.setProperty('--gmp-popover-background', 'transparent');
+        p.style.background = 'transparent';
+        p.style.border = '0';
+        p.style.boxShadow = 'none';
+        p.style.padding = '0';
+        p.style.maxHeight = 'none';
+        p.style.maxWidth = 'none';
+        p.style.overflow = 'visible';
+      } catch { /* ignore — style not settable on every host */ }
       p.open = true;
 
       mapEl.appendChild(p);

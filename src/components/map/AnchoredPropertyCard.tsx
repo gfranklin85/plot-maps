@@ -178,21 +178,50 @@ export default function AnchoredPropertyCard({
   }
 
   if (!popover) return null;
-  // Wrap children + CardBeamTail in a relative container so the beam
-  // can absolute-position below the card and ride along with the
-  // popover's own screen-space transforms. Greg locked 2026-05-28:
-  // beam stays with UI, not the screen.
+  // ── ZERO-SIZE PORTAL PATTERN (locked 2026-05-30 evening) ──────
+  // gmp-popover's shadow DOM wraps slotted children in an internal
+  // container that paints background, padding, max-height, and a
+  // scrollbar. We tried for days to suppress that chrome via
+  // ::part() (not exposed), inline host styles (don't pierce shadow
+  // DOM), display:contents (doesn't kill the shadow tree's internal
+  // layout), and every plausible --gmp-popover-* custom property
+  // (none of them are bound by Google's stylesheet). The shell kept
+  // painting because the internal container kept finding a sized
+  // child to wrap.
+  //
+  // The fix: give it nothing to wrap. The portal target itself is a
+  // 0×0 element. The actual visible popup card lives in a child
+  // that's position:absolute outside the parent's box flow — it
+  // escapes the popover's internal layout entirely, so the container
+  // has no reason to expand or paint chrome.
+  //
+  // This is exactly the pattern GroundGlow uses (src/components/map/
+  // GroundGlow.tsx) where it's been working since 2026-05-28.
   return createPortal(
-    // data-plot-popup marker is what the globals.css :has() selectors
-    // hook to suppress gmp-popover's default container/scrollbar/tail
-    // chrome around Plot's hologram popup. Without it, Google paints
-    // its own pill + scroll wrapper underneath our card.
     <div
       data-plot-popup="1"
-      style={{ position: 'relative', display: 'inline-block', overflow: 'visible' }}
+      style={{
+        position: 'relative',
+        width: 0,
+        height: 0,
+        overflow: 'visible',
+      }}
     >
-      {children}
-      <CardBeamTail />
+      <div
+        style={{
+          position: 'absolute',
+          left: 0,
+          top: 0,
+          // The card centers itself horizontally on the anchor point
+          // and floats above it. Translating -50% X + -100% Y puts
+          // the card so its bottom-center sits on the lat/lng anchor.
+          transform: 'translate(-50%, -100%)',
+          pointerEvents: 'auto',
+        }}
+      >
+        {children}
+        <CardBeamTail />
+      </div>
     </div>,
     popover,
   );

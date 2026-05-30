@@ -226,27 +226,63 @@ export default function PropertyPopup({ lead, onClose, onPin }: Props) {
   })();
 
   // ── Render ─────────────────────────────────────────────────────
+  // Single return — branches inside on isListed. The styled-jsx block
+  // at the bottom scopes to .plot-popup and .plot-popup-compact so
+  // both modes get the right rules from one source.
   return (
-    <div className="plot-popup">
+    <div className={isListed ? "plot-popup" : "plot-popup plot-popup-compact"}>
 
-      {/* Top-right chrome — pin + close */}
+      {/* Top-right chrome — pin + close. Present in both modes. */}
       {(onPin || onClose) && (
-        <div className="chrome">
+        <div className={isListed ? "chrome" : "chrome chrome-compact"}>
           {onPin && (
             <button type="button" className="chrome-btn" onClick={onPin} title="Pin as reference">
-              <MaterialIcon icon="push_pin" className="text-[16px]" />
+              <MaterialIcon icon="push_pin" className={isListed ? "text-[16px]" : "text-[14px]"} />
             </button>
           )}
           {onClose && (
             <button type="button" className="chrome-btn" onClick={onClose} title="Close">
-              <MaterialIcon icon="close" className="text-[16px]" />
+              <MaterialIcon icon="close" className={isListed ? "text-[16px]" : "text-[14px]"} />
             </button>
           )}
         </div>
       )}
 
-      {/* HERO — photo carousel for listings, simple band for unlisted */}
-      {hasPhotos ? (
+      {/* UNLISTED — compact research card. No hero, no big banner.
+          Just bare facts: address, beds, baths, sqft, lot, year. */}
+      {!isListed && (
+        <div className="content content-compact">
+          <div className="off-tag">OFF MARKET</div>
+
+          <div className="compact-addr">
+            <div className="addr-head">{headline}</div>
+            {tail && <div className="addr-tail">{tail}</div>}
+          </div>
+
+          {(beds != null || baths != null || sqft != null || lotAcres != null) && (
+            <div className="stats stats-compact">
+              {beds != null && <Stat label="Beds" value={String(beds)} />}
+              {baths != null && <Stat label="Baths" value={String(baths)} />}
+              {sqft != null && <Stat label="Sqft" value={sqft.toLocaleString()} />}
+              {lotAcres != null && <Stat label="Acres" value={Number(lotAcres).toFixed(2)} />}
+            </div>
+          )}
+
+          {built != null && (
+            <div className="compact-built">
+              <span className="fact-lab">Built</span> {built}
+            </div>
+          )}
+
+          <Link href={`/listings/${lead.id}`} className="link link-compact">
+            Open full record →
+          </Link>
+        </div>
+      )}
+
+      {/* LISTED — full buyer-facing card with photo carousel, price,
+          attribution, action cluster. */}
+      {isListed && hasPhotos && (
         <div className="hero">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -273,16 +309,10 @@ export default function PropertyPopup({ lead, onClose, onPin }: Props) {
             </>
           )}
         </div>
-      ) : !isListed ? (
-        // Unlisted card: small label band where the photo would be,
-        // honest about the state ("Off market — public record")
-        <div className="hero hero-empty">
-          <div className="hero-empty-tag">Off market</div>
-        </div>
-      ) : null}
+      )}
 
-      {/* CONTENT */}
-      <div className="content">
+      {/* LISTED content block */}
+      {isListed && <div className="content">
 
         {/* Identity row: price + address */}
         <div className="identity">
@@ -354,19 +384,7 @@ export default function PropertyPopup({ lead, onClose, onPin }: Props) {
             </div>
           </>
         )}
-
-        {/* UNLISTED: research card has no buttons; just the data above.
-            A discreet link to the full record stays so curious users
-            can dive deeper. */}
-        {!isListed && (
-          <div className="actions actions-unlisted">
-            <Link href={`/listings/${lead.id}`} className="link">
-              Open full record →
-            </Link>
-            <div className="research-tag">Public record · not a listing</div>
-          </div>
-        )}
-      </div>
+      </div>}
 
       {/* Demo badge for mock listings (committee honesty) */}
       {lead.id?.startsWith('mock-') && (
@@ -461,6 +479,10 @@ export default function PropertyPopup({ lead, onClose, onPin }: Props) {
             0 0 0 1px rgba(255,255,255,0.04) inset;
           overflow:hidden;
           isolation:isolate;
+        }
+        /* compact unlisted card — smaller width, no hero, tight padding */
+        .plot-popup-compact{
+          width:300px;
         }
 
         /* top-right chrome */
@@ -571,6 +593,60 @@ export default function PropertyPopup({ lead, onClose, onPin }: Props) {
 
         /* CONTENT */
         .content{ padding:18px 18px 16px; }
+        /* compact content — tight padding, vertical-stack layout */
+        .content-compact{
+          padding:14px 14px 12px;
+          display:flex;
+          flex-direction:column;
+          gap:10px;
+        }
+        .chrome-compact{
+          top:8px; right:8px;
+        }
+        .chrome-compact .chrome-btn{
+          width:24px; height:24px;
+        }
+        .off-tag{
+          font-family:'JetBrains Mono', ui-monospace, monospace;
+          font-size:9px;
+          font-weight:700;
+          letter-spacing:0.22em;
+          color:var(--plot-status-off);
+          align-self:flex-start;
+        }
+        .compact-addr .addr-head{
+          font-size:14px;
+          font-weight:600;
+          line-height:1.25;
+          color:var(--plot-text);
+        }
+        .compact-addr .addr-tail{
+          font-size:11.5px;
+          color:var(--plot-text-muted);
+          margin-top:1px;
+        }
+        .stats-compact{
+          padding:8px 0;
+          margin-bottom:0;
+        }
+        .compact-built{
+          font-size:11.5px;
+          color:var(--plot-text-muted);
+          font-variant-numeric:tabular-nums;
+        }
+        .compact-built .fact-lab{
+          font-family:'JetBrains Mono', ui-monospace, monospace;
+          font-size:9.5px;
+          font-weight:700;
+          letter-spacing:0.14em;
+          text-transform:uppercase;
+          color:var(--plot-text-faint);
+          margin-right:4px;
+        }
+        .link-compact{
+          align-self:flex-start;
+          padding:2px 0;
+        }
 
         /* identity */
         .identity{

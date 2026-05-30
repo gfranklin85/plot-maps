@@ -463,15 +463,17 @@ gmp-popover[plot-property-card]::part(tail) {
   max-width: none !important;
   overflow: visible !important;
 }
+/* display:contents removes the gmp-popover host from the visual box
+   tree entirely — children render at the host's would-be position
+   but the host itself contributes NO box. This is the strongest
+   defense against Google re-painting their default chrome. We
+   couldn't get there with attribute-targeted styles alone because
+   the gmp-popover shadow DOM seems to reassert background/overflow
+   via internal rules our specificity can't override.
+   Locked 2026-05-30 evening after Greg flagged the scroll shell
+   was still visible in production.  */
 gmp-popover[plot-property-card] {
-  --gmp-popover-background: transparent;
-  background: transparent !important;
-  border: 0 !important;
-  box-shadow: none !important;
-  padding: 0 !important;
-  max-height: none !important;
-  max-width: none !important;
-  overflow: visible !important;
+  display: contents !important;
 }
 
 /* ─── Plot landing destination strip — hide native scrollbar across

@@ -73,10 +73,14 @@ export default function AnchoredPropertyCard({
   useEffect(() => {
     let cancelled = false;
     let rafId = 0;
+    const mountedAt = performance.now();
+    let gotValidProjection = false;
+    const FALLBACK_MS = 300;
 
     const tick = () => {
       if (cancelled) return;
       const mapEl = mapElRef.current as Map3DElement | null;
+      let setThisFrame = false;
       if (mapEl) {
         const rect = mapEl.getBoundingClientRect();
         const cam: Map3DCameraState = {
@@ -85,18 +89,12 @@ export default function AnchoredPropertyCard({
           tilt: mapEl.tilt,
           range: mapEl.range,
         };
-        // Defensive: camera fields can be undefined during the brief
-        // window before Map3D initializes its scene. Skip the frame
-        // and let the RAF loop retry next frame.
         if (
           cam.center &&
           typeof cam.heading === 'number' &&
           typeof cam.tilt === 'number' &&
           typeof cam.range === 'number'
         ) {
-          // Map the target relative to viewport ORIGIN at the map's
-          // bounding rect (so the popup sits in viewport coords, not
-          // map-element-local coords).
           const projected = projectMap3DLatLngToScreen(
             { lat, lng, altitude: altitudeM },
             cam,
@@ -116,7 +114,26 @@ export default function AnchoredPropertyCard({
             lastPosRef.current = next;
             setScreenPos(next);
           }
+          gotValidProjection = true;
+          setThisFrame = true;
         }
+      }
+      // Fallback: if camera state isn't readable within FALLBACK_MS,
+      // park the popup at viewport center so the user at least sees
+      // it. Better than the popup never appearing at all.
+      if (
+        !setThisFrame &&
+        !gotValidProjection &&
+        performance.now() - mountedAt > FALLBACK_MS &&
+        !lastPosRef.current
+      ) {
+        const next = {
+          x: window.innerWidth / 2,
+          y: window.innerHeight / 2,
+          visible: true,
+        };
+        lastPosRef.current = next;
+        setScreenPos(next);
       }
       rafId = window.requestAnimationFrame(tick);
     };
@@ -126,13 +143,15 @@ export default function AnchoredPropertyCard({
       cancelled = true;
       window.cancelAnimationFrame(rafId);
     };
-    // mapElRef is stable; lat/lng/altitude changes re-trigger projection
-    // automatically because we re-read them every frame inside the loop.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lat, lng, altitudeM]);
 
   if (!screenPos || typeof document === 'undefined') return null;
-  if (!screenPos.visible) return null;
+  // Note: we no longer cull on !visible. The projection may falsely
+  // report off-screen (especially during initial frames when camera
+  // state is still settling). Letting the popup render even off-screen
+  // is safer than silently disappearing. CSS clipping handles the
+  // actual off-viewport case naturally.
 
   return createPortal(
     <div

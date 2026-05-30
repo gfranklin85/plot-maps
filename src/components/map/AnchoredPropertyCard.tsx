@@ -107,6 +107,15 @@ export default function AnchoredPropertyCard({
       try { m.position = { lat, lng, altitude: altitudeM }; } catch { /* ignore */ }
       // Mark for any CSS hooks + DOM debug
       try { m.setAttribute('plot-property-anchor', ''); } catch { /* ignore */ }
+      // NOTE on visibility: we tried hiding the marker (visibility:hidden,
+      // opacity:0) but Google's WebGL renderer paints the default pin
+      // into a separate canvas that DOM CSS can't reach. Worse, setting
+      // visibility:hidden may zero out the host's bounding rect, which
+      // would break the screen-space projection RAF loop. So we leave
+      // the default red pin visible TEMPORARILY — Greg said he's making
+      // the Plot 3D pin asset, which will replace this once dropped in.
+      // The popup card paints on top regardless. The default pin sits
+      // beneath it at ground level.
 
       mapEl.appendChild(m);
       createdMarker = m;
@@ -137,26 +146,46 @@ export default function AnchoredPropertyCard({
   }, [marker, lat, lng, altitudeM]);
 
   // ── RAF loop: project marker rect → screenPos each frame ─────
+  // Defensive: if marker.getBoundingClientRect() doesn't yield a real
+  // screen position within FALLBACK_MS, we seed screenPos to the
+  // viewport center so the popup at least RENDERS (so the user sees
+  // their click did something). If projection works, this fallback
+  // is overwritten on the next frame.
   const lastPosRef = useRef<{ x: number; y: number } | null>(null);
   useEffect(() => {
     if (!marker) return;
     let cancelled = false;
     let rafId = 0;
+    let gotValidProjection = false;
+    const mountedAt = performance.now();
+    const FALLBACK_MS = 400;
 
     const tick = () => {
       if (cancelled) return;
       const rect = marker.getBoundingClientRect();
-      // Marker may have 0×0 bounds when off-screen / behind the camera.
-      // In that case skip the update and keep the prior position so the
-      // popup gracefully fades out rather than jumping to (0,0).
-      if (rect.width > 0 || rect.height > 0 || rect.left !== 0 || rect.top !== 0) {
+      const rectIsValid =
+        rect.width > 0 ||
+        rect.height > 0 ||
+        rect.left !== 0 ||
+        rect.top !== 0;
+
+      if (rectIsValid) {
+        gotValidProjection = true;
         const x = rect.left + rect.width / 2;
         const y = rect.top + rect.height / 2;
         const last = lastPosRef.current;
-        // Throttle React state updates — only commit when the position
-        // shifted enough to be visually meaningful. Saves render churn
-        // during smooth camera animations.
         if (!last || Math.abs(last.x - x) > 0.5 || Math.abs(last.y - y) > 0.5) {
+          lastPosRef.current = { x, y };
+          setScreenPos({ x, y });
+        }
+      } else if (!gotValidProjection && performance.now() - mountedAt > FALLBACK_MS) {
+        // Marker's rect never projected. Fall back to a centered-overlay
+        // anchor so the popup AT LEAST renders. The user clicked
+        // something; they should see the popup, even if it's not
+        // perfectly tied to the property point.
+        const x = window.innerWidth / 2;
+        const y = window.innerHeight / 2;
+        if (!lastPosRef.current) {
           lastPosRef.current = { x, y };
           setScreenPos({ x, y });
         }
@@ -170,6 +199,23 @@ export default function AnchoredPropertyCard({
       window.cancelAnimationFrame(rafId);
     };
   }, [marker]);
+
+  // Defensive: also kick a fallback if the marker itself failed to
+  // mount within 800ms. supported=true with no screenPos within that
+  // window means projection is dead-ended; show the popup centered.
+  useEffect(() => {
+    if (supported !== true) return;
+    if (screenPos) return;
+    const t = window.setTimeout(() => {
+      if (!screenPos) {
+        setScreenPos({
+          x: window.innerWidth / 2,
+          y: window.innerHeight / 2,
+        });
+      }
+    }, 800);
+    return () => window.clearTimeout(t);
+  }, [supported, screenPos]);
 
   // ── Fallback: marker element not registered ──────────────────
   if (supported === false) {

@@ -79,7 +79,7 @@ export default function MapPage() {
   // 05-17); we default to 'land_use' until we redesign that surface.
   const [showParcels, setShowParcels] = useState(false);
   const parcelColorMode: import('@/components/map/ParcelOverlay').ParcelColorMode = 'land_use';
-  const [view3D, setView3D] = useState(false);
+  const [view3D, setView3D] = useState(true);
   const has3DSupport = !!process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID;
   const [show3DCoach, setShow3DCoach] = useState(false);
   // Two flight models for the gamepad. 'overhead' = free pan + rotate

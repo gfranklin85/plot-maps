@@ -452,28 +452,40 @@ gmp-popover[plot-ground-glow] {
        Attribute on the host is the only reliable scoping vector. The
        host's inline styles (set in AnchoredPropertyCard.tsx) are the
        primary defense; these CSS rules are the secondary one. */
-gmp-popover[plot-property-card]::part(container),
-gmp-popover[plot-property-card]::part(content),
-gmp-popover[plot-property-card]::part(tail) {
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
-  padding: 0 !important;
-  max-height: none !important;
-  max-width: none !important;
-  overflow: visible !important;
-}
-/* display:contents removes the gmp-popover host from the visual box
-   tree entirely — children render at the host's would-be position
-   but the host itself contributes NO box. This is the strongest
-   defense against Google re-painting their default chrome. We
-   couldn't get there with attribute-targeted styles alone because
-   the gmp-popover shadow DOM seems to reassert background/overflow
-   via internal rules our specificity can't override.
-   Locked 2026-05-30 evening after Greg flagged the scroll shell
-   was still visible in production.  */
+/* gmp-popover[plot-property-card] chrome suppression v5
+   (locked 2026-05-30 — fifth attempt; investigator agent confirmed
+   prior approaches failed because the gray scroll track is painted
+   by an internal container INSIDE gmp-popover's shadow DOM, and:
+     - ::part() doesn't reach it (Google didn't mark parts)
+     - Host inline styles don't reach it (shadow DOM encapsulation)
+     - display:contents removes the host box but the shadow tree
+       keeps rendering its internal container
+   CSS custom properties on the host DO pierce shadow DOM via the
+   normal inheritance channel. Google's own theming uses this. The
+   GroundGlow popover (lines 426-438) relies on this for its
+   --gmp-popover-background override. Setting every plausible
+   --gmp-popover-* token on the host is the most reliable
+   suppression vector available without shadow-piercing combinators. */
 gmp-popover[plot-property-card] {
-  display: contents !important;
+  --gmp-popover-background: transparent;
+  --gmp-popover-padding: 0;
+  --gmp-popover-border: 0;
+  --gmp-popover-box-shadow: none;
+  --gmp-popover-max-height: none;
+  --gmp-popover-max-width: none;
+  --gmp-popover-min-height: 0;
+  --gmp-popover-min-width: 0;
+  --gmp-popover-overflow: visible;
+  --gmp-popover-tail-display: none;
+  --gmp-popover-container-background: transparent;
+  --gmp-popover-container-border: 0;
+  --gmp-popover-container-padding: 0;
+  --gmp-popover-content-padding: 0;
+  --gmp-popover-content-overflow: visible;
+  --gmp-popover-content-max-height: none;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
 }
 
 /* ─── Plot landing destination strip — hide native scrollbar across

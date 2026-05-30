@@ -14,6 +14,9 @@ import { useAuth } from "@/lib/auth-context";
 import MaterialIcon from "@/components/ui/MaterialIcon";
 import UpgradeGate from "@/components/ui/UpgradeGate";
 import PropertyPopup from "@/components/map/PropertyPopup";
+import PropertyCardBillboard, { CardAudience } from "@/components/map/PropertyCardBillboard";
+import { BuyerSettingsProvider } from "@/lib/buyer-settings/context";
+import BuyerSettingsPanel from "@/components/map/BuyerSettingsPanel";
 import AnchoredPropertyCard from "@/components/map/AnchoredPropertyCard";
 import GroundGlow from "@/components/map/GroundGlow";
 import PlotPinMarker from "@/components/map/PlotPinMarker";
@@ -1048,8 +1051,25 @@ export default function MapPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedLead, mapCenter, filteredLeads, walkMode, dispatchFlight, reticlePosition]);
 
+  // Audience derivation for the property card.
+  //   public   — anyone unauthenticated, OR authed but unsubscribed.
+  //              Sees Schedule Tour / Save / Share. MLS-compliant.
+  //   agent    — paying subscriber. Sees Skip Trace / Postcard / Add to Campaign / Owner.
+  //   position — Position-internal operator. Sees the agent toolkit plus
+  //              Assign / Mark Hot. (Field not wired yet; future once the
+  //              brokerage tenant column lands.)
+  const cardAudience: CardAudience = isSubscribed ? 'agent' : 'public';
+
   return (
+    <BuyerSettingsProvider>
     <div className="relative h-screen w-full overflow-hidden">
+      {/* ═══ BUYER SETTINGS PANEL ═══
+          Persistent knob strip at the top-center. Adjusts mortgage assumptions
+          (down payment, rate, term) AND the headline mode (monthly vs price)
+          for every visible property card on this page.
+          Locked 2026-05-30 evening — Plot's "shop by monthly payment" wedge. */}
+      {!walkMode && <BuyerSettingsPanel />}
+
       {/* ═══ CONTROLS ═══ */}
       {walkMode ? (
         <button
@@ -1652,21 +1672,41 @@ export default function MapPage() {
           altitudeM={12}
           popoverForwardRef={popoverElRef}
         >
-          {/* PropertyPopup is now self-contained — gold edge, glow, footer,
-              and its own Pin + Close chrome. No wrapper card needed. */}
-          <PropertyPopup
+          {/* PropertyCardBillboard — the new public-launch property card.
+              Off-white neumorphic, monthly-PITI headline by default
+              (toggle to price via the BuyerSettingsPanel above).
+              Status pill + button row vary by listing_status and the
+              user's audience (public vs agent vs position). The
+              monthly recalculates live as the user adjusts knobs in
+              the BuyerSettingsPanel above — single source of truth
+              via BuyerSettingsContext. */}
+          <PropertyCardBillboard
             lead={selectedLead}
-            onUpdate={refetchLeads}
-            onToggleProspectMode={() => handleToggleProspectMode(selectedLead)}
-            prospectMode={prospectMode}
-            onPin={() => { setPinnedRef(selectedLead); setSelectedLead(null); }}
+            audience={cardAudience}
             onClose={() => setSelectedLead(null)}
-            onWalkHere={(lead) => {
-              if (!isSubscribed) { setShowGate(true); return; }
-              if (lead.latitude && lead.longitude) {
-                setMapCenter({ lat: lead.latitude, lng: lead.longitude });
-                setWalkMode(true);
-                setSelectedLead(null);
+            onAction={(action, lead) => {
+              if (action === 'tour' || action === 'save' || action === 'share' || action === 'notify') {
+                // Public-layer demand-capture routes through the existing
+                // inbox-message API. Each action surfaces a different
+                // server-side intent; for now the API treats them all as
+                // "buyer touched this listing."
+                fetch('/api/inbox/message', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    leadId: lead.id,
+                    action,
+                    address: lead.property_address,
+                    listingPrice: lead.listing_price,
+                  }),
+                }).catch(() => { /* silent — best-effort */ });
+              }
+              if (action === 'skiptrace' || action === 'postcard' || action === 'campaign' ||
+                  action === 'owner' || action === 'assign' || action === 'hot' || action === 'log') {
+                // Agent/Position-layer operator actions are gated to the
+                // subscription. Free public visitors get the upgrade gate.
+                if (!isSubscribed) { setShowGate(true); return; }
+                // TODO: wire to the agent-layer endpoints once Phase 2 lands.
               }
             }}
           />
@@ -1846,5 +1886,6 @@ export default function MapPage() {
         </div>
       )}
     </div>
+    </BuyerSettingsProvider>
   );
 }

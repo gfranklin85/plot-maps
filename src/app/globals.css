@@ -91,6 +91,30 @@ html, body {
   --plot-status-pending: #F2B84B;
   --plot-status-sold:    #E15A5A;
   --plot-status-off:     #8A97A6;
+
+  /* Card billboard tokens (locked 2026-05-30). Off-white neumorphic card
+     surface with friendly Plot blue as the primary CTA. Same exact
+     surface across themes — the card is paper that floats over the
+     world, not a glass that reflects the theme. */
+  --plot-card-surface:        #FAFAF7;     /* warm off-white body */
+  --plot-card-hero-empty:     #F6F5EF;     /* hero area for Off Market (deeper cream) */
+  --plot-card-divider:        #E1DFD8;     /* hairline between facts and PITI */
+  --plot-card-ink:            #131820;     /* primary text (price, address strong) */
+  --plot-card-ink-mid:        #646A75;     /* secondary text (caption, supporting) */
+  --plot-card-ink-faint:      #8A8E96;     /* labels, microcopy */
+  --plot-card-watermark-ink:  #C6C1B5;     /* parchment ink for the Off Market reticle + wordmark */
+  --plot-card-shadow:         rgba(20,22,28,0.10);
+  --plot-card-shadow-inner:   rgba(255,255,255,0.85);
+
+  /* Plot blue — the friendly-blue primary CTA. Used on the card's
+     Schedule Tour, Save, Share buttons (Public audience), and as the
+     active accent on the buyer-settings panel knobs. Reserved for
+     ACTION; never used for status or background. */
+  --plot-blue:           #2B6BFF;
+  --plot-blue-hover:     #3A7AFF;
+  --plot-blue-press:     #1F58DD;
+  --plot-blue-soft:      rgba(43,107,255,0.12);
+  --plot-on-blue:        #FFFFFF;
 }
 
 :root[data-theme="light"] {

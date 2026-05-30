@@ -627,7 +627,16 @@ export default function MapPage() {
 
   useEffect(() => {
     async function fetchLeads() {
-      if (!user) return;
+      if (!user) {
+        // Public visitor — no leads to fetch, but the map must still
+        // render. Flip loading off so the skeleton stops blocking the
+        // map. Mock listings flow through a separate public endpoint
+        // and pin themselves via filteredLeads. Locked 2026-05-30
+        // after Greg confirmed unauth visitors saw an infinite cream
+        // skeleton on /map.
+        setLoading(false);
+        return;
+      }
 
       // Fetch user's own leads only (no shared data)
       const { data } = await supabase

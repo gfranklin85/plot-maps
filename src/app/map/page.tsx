@@ -451,8 +451,25 @@ export default function MapPage() {
           // Formula: tilt = 90 + pitch, clamped to [0, 85]
           const tilt = Math.max(0, Math.min(85, 90 + match.pose.pitch));
           resolvedDestinationTilt = tilt;
+          // FORCE 3D MODE on destination arrival. The whole point of
+          // clicking a destination card is the cinematic 3D approach;
+          // landing in 2D is dead-on-arrival. Locked 2026-05-30 after
+          // Greg flew Lemoore from the landing card and got dropped
+          // into the flat 2D map. Mobile + 3D-unsupported devices
+          // fall back to 2D via the has3DSupport check in MapDynamic.
+          setView3D(true);
         }
       }
+    }
+    // Also force 3D when arriving with an explicit lat/lng (search
+    // bar Places autocomplete hits). Search-first landing assumes
+    // the spatial experience; 2D is the operator dashboard default,
+    // not the public-arrival default.
+    if (
+      (queryParam || destinationParam) &&
+      !Number.isNaN(lat) && !Number.isNaN(lng)
+    ) {
+      setView3D(true);
     }
     const hasCoords = !Number.isNaN(lat) && !Number.isNaN(lng);
 

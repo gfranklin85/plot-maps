@@ -3,60 +3,51 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import CardBeamTail from "./CardBeamTail";
+import {
+  projectMap3DLatLngToScreen,
+  type Map3DCameraState,
+} from "@/lib/map3DProjection";
 
-// AnchoredPropertyCard v2 — Plot's PropertyCard anchored at a parcel's
-// lat/lng in screen space.
+// AnchoredPropertyCard v3 — manual perspective projection.
 //
-// Locked 2026-05-30: replaces the prior gmp-popover-based anchor.
-// Google's docs (release note 3.62.12c) confirmed gmp-popover's
-// chrome (background pill, max-height, scrollbar) is NOT user-
-// suppressible — only background-color, border-radius, box-shadow,
-// padding are themable; container/overflow/max-height are internal.
-// After 8+ attempts to fight the shadow DOM, we abandoned the popover
-// approach for the OFFICIAL Google-recommended pattern:
+// Locked 2026-05-30. v1 used gmp-popover (chrome we couldn't kill).
+// v2 used gmp-marker-3d-interactive + getBoundingClientRect (marker
+// rect doesn't reflect projected screen position — Google paints into
+// a separate WebGL canvas). v3 reads the map's camera state each frame
+// (center, heading, tilt, range) and computes the lat/lng → screen
+// pixel projection ourselves via standard perspective math.
 //
-//   1. Create an invisible <gmp-marker-3d-interactive> at the lat/lng.
-//      Marker3DInteractiveElement extends HTMLElement, so it inherits
-//      getBoundingClientRect() — that gives us the screen-space pixel
-//      position of the lat/lng on every camera change.
+// Math lives in src/lib/map3DProjection.ts. This component:
+//   1. Reads the gmp-map-3d host's camera state each animation frame
+//   2. Projects target.lat/lng to viewport pixel coords
+//   3. Renders the React children via createPortal(..., document.body)
+//      as a position:fixed div at the projected coordinates
 //
-//   2. Run a requestAnimationFrame loop that reads the marker's
-//      bounding rect and writes the center coord to state when it
-//      changes meaningfully (>1px).
-//
-//   3. Render the React children as position:fixed via a body portal,
-//      transformed to the marker's projected screen position. The
-//      children get full pixel-perfect chrome control because Google
-//      is no longer wrapping them.
-//
-//   4. The marker itself renders nothing (we set no slotted children
-//      and let it self-default to an invisible point).
-//
-// This matches Map3D's documented patterns: Marker3DInteractiveElement
-// is Google's primitive for "I want a clickable point in 3D space" —
-// it handles projection, depth, occlusion automatically. We just read
-// its rect.
+// When the camera moves, the popup tracks the property naturally
+// because we recompute every frame. When the target goes off-screen
+// or behind the camera, we hide the popup.
 
 interface AnchoredPropertyCardProps {
   mapElRef: React.MutableRefObject<HTMLElement | null>;
   lat: number;
   lng: number;
-  /** Altitude above ground in meters. The marker uses this as its
-   *  z-anchor; the popup card floats above it on screen. */
+  /** Altitude above ground in meters. The popup floats above this
+   *  point on the screen. */
   altitudeM?: number;
-  /** Forwarded ref to the marker element so other components
-   *  (e.g. RitualTether's vertical beam) can read its projected
-   *  screen position each frame and stay attached. */
+  /** Forwarded ref so other components (CardBeamTail, RitualTether)
+   *  can find the popup's host position. Kept for API compatibility
+   *  with v1 callers — points at the map element rather than a marker
+   *  in this version. */
   popoverForwardRef?: React.MutableRefObject<HTMLElement | null>;
   children: ReactNode;
 }
 
-interface Marker3DInteractiveElement extends HTMLElement {
-  position: { lat: number; lng: number; altitude?: number };
-  altitudeMode: string;
+interface Map3DElement extends HTMLElement {
+  center: { lat: number; lng: number; altitude?: number };
+  heading: number;
+  tilt: number;
+  range: number;
 }
-
-const MARKER_TAG = 'gmp-marker-3d-interactive';
 
 export default function AnchoredPropertyCard({
   mapElRef,
@@ -66,128 +57,65 @@ export default function AnchoredPropertyCard({
   popoverForwardRef,
   children,
 }: AnchoredPropertyCardProps) {
-  const [marker, setMarker] = useState<Marker3DInteractiveElement | null>(null);
-  const [supported, setSupported] = useState<boolean | null>(null);
-  // Screen position of the marker (the popup card's bottom-center
-  // anchor). null while waiting for first projection.
-  const [screenPos, setScreenPos] = useState<{ x: number; y: number } | null>(null);
+  const [screenPos, setScreenPos] = useState<{ x: number; y: number; visible: boolean } | null>(null);
+  const lastPosRef = useRef<{ x: number; y: number; visible: boolean } | null>(null);
 
-  // ── Mount marker ─────────────────────────────────────────────
+  // Forward the map element to the popoverForwardRef so callers that
+  // expected a positionable element still get one.
   useEffect(() => {
-    let retryId: number | null = null;
-    const MAX_ATTEMPTS = 50; // 5s budget at 100ms intervals
-    let attempt = 0;
-    let createdMarker: Marker3DInteractiveElement | null = null;
-
-    const tryMount = () => {
-      attempt += 1;
-      const mapEl = mapElRef.current;
-      if (!mapEl) {
-        if (attempt < MAX_ATTEMPTS) {
-          retryId = window.setTimeout(tryMount, 100);
-        } else {
-          setSupported(false);
-        }
-        return;
-      }
-      const def = window.customElements?.get?.(MARKER_TAG);
-      if (!def) {
-        if (attempt < MAX_ATTEMPTS) {
-          retryId = window.setTimeout(tryMount, 100);
-        } else {
-          // eslint-disable-next-line no-console
-          console.warn('[AnchoredPropertyCard] gmp-marker-3d-interactive not registered after retries; falling back to centered overlay.');
-          setSupported(false);
-        }
-        return;
-      }
-
-      const m = document.createElement(MARKER_TAG) as Marker3DInteractiveElement;
-      try { m.altitudeMode = 'RELATIVE_TO_GROUND'; } catch { /* ignore */ }
-      try { m.position = { lat, lng, altitude: altitudeM }; } catch { /* ignore */ }
-      // Mark for any CSS hooks + DOM debug
-      try { m.setAttribute('plot-property-anchor', ''); } catch { /* ignore */ }
-      // NOTE on visibility: we tried hiding the marker (visibility:hidden,
-      // opacity:0) but Google's WebGL renderer paints the default pin
-      // into a separate canvas that DOM CSS can't reach. Worse, setting
-      // visibility:hidden may zero out the host's bounding rect, which
-      // would break the screen-space projection RAF loop. So we leave
-      // the default red pin visible TEMPORARILY — Greg said he's making
-      // the Plot 3D pin asset, which will replace this once dropped in.
-      // The popup card paints on top regardless. The default pin sits
-      // beneath it at ground level.
-
-      mapEl.appendChild(m);
-      createdMarker = m;
-      setMarker(m);
-      if (popoverForwardRef) popoverForwardRef.current = m;
-      setSupported(true);
-    };
-
-    tryMount();
-
+    if (popoverForwardRef) popoverForwardRef.current = mapElRef.current;
     return () => {
-      if (retryId !== null) window.clearTimeout(retryId);
-      if (createdMarker) {
-        try { createdMarker.remove(); } catch { /* already gone */ }
-      }
       if (popoverForwardRef) popoverForwardRef.current = null;
-      setMarker(null);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [popoverForwardRef, mapElRef]);
 
-  // Update marker position when lat/lng changes (different property selected).
+  // ── RAF loop: read camera state → project → setScreenPos ─────
   useEffect(() => {
-    if (!marker) return;
-    try {
-      marker.position = { lat, lng, altitude: altitudeM };
-    } catch { /* ignore */ }
-  }, [marker, lat, lng, altitudeM]);
-
-  // ── RAF loop: project marker rect → screenPos each frame ─────
-  // Defensive: if marker.getBoundingClientRect() doesn't yield a real
-  // screen position within FALLBACK_MS, we seed screenPos to the
-  // viewport center so the popup at least RENDERS (so the user sees
-  // their click did something). If projection works, this fallback
-  // is overwritten on the next frame.
-  const lastPosRef = useRef<{ x: number; y: number } | null>(null);
-  useEffect(() => {
-    if (!marker) return;
     let cancelled = false;
     let rafId = 0;
-    let gotValidProjection = false;
-    const mountedAt = performance.now();
-    const FALLBACK_MS = 400;
 
     const tick = () => {
       if (cancelled) return;
-      const rect = marker.getBoundingClientRect();
-      const rectIsValid =
-        rect.width > 0 ||
-        rect.height > 0 ||
-        rect.left !== 0 ||
-        rect.top !== 0;
-
-      if (rectIsValid) {
-        gotValidProjection = true;
-        const x = rect.left + rect.width / 2;
-        const y = rect.top + rect.height / 2;
-        const last = lastPosRef.current;
-        if (!last || Math.abs(last.x - x) > 0.5 || Math.abs(last.y - y) > 0.5) {
-          lastPosRef.current = { x, y };
-          setScreenPos({ x, y });
-        }
-      } else if (!gotValidProjection && performance.now() - mountedAt > FALLBACK_MS) {
-        // Marker's rect never projected. Fall back to a centered-overlay
-        // anchor so the popup AT LEAST renders. The user clicked
-        // something; they should see the popup, even if it's not
-        // perfectly tied to the property point.
-        const x = window.innerWidth / 2;
-        const y = window.innerHeight / 2;
-        if (!lastPosRef.current) {
-          lastPosRef.current = { x, y };
-          setScreenPos({ x, y });
+      const mapEl = mapElRef.current as Map3DElement | null;
+      if (mapEl) {
+        const rect = mapEl.getBoundingClientRect();
+        const cam: Map3DCameraState = {
+          center: mapEl.center,
+          heading: mapEl.heading,
+          tilt: mapEl.tilt,
+          range: mapEl.range,
+        };
+        // Defensive: camera fields can be undefined during the brief
+        // window before Map3D initializes its scene. Skip the frame
+        // and let the RAF loop retry next frame.
+        if (
+          cam.center &&
+          typeof cam.heading === 'number' &&
+          typeof cam.tilt === 'number' &&
+          typeof cam.range === 'number'
+        ) {
+          // Map the target relative to viewport ORIGIN at the map's
+          // bounding rect (so the popup sits in viewport coords, not
+          // map-element-local coords).
+          const projected = projectMap3DLatLngToScreen(
+            { lat, lng, altitude: altitudeM },
+            cam,
+            { width: rect.width, height: rect.height }
+          );
+          const x = rect.left + projected.x;
+          const y = rect.top + projected.y;
+          const visible = projected.visible;
+          const last = lastPosRef.current;
+          if (
+            !last ||
+            last.visible !== visible ||
+            Math.abs(last.x - x) > 0.5 ||
+            Math.abs(last.y - y) > 0.5
+          ) {
+            const next = { x, y, visible };
+            lastPosRef.current = next;
+            setScreenPos(next);
+          }
         }
       }
       rafId = window.requestAnimationFrame(tick);
@@ -198,52 +126,14 @@ export default function AnchoredPropertyCard({
       cancelled = true;
       window.cancelAnimationFrame(rafId);
     };
-  }, [marker]);
+    // mapElRef is stable; lat/lng/altitude changes re-trigger projection
+    // automatically because we re-read them every frame inside the loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lat, lng, altitudeM]);
 
-  // Defensive: also kick a fallback if the marker itself failed to
-  // mount within 800ms. supported=true with no screenPos within that
-  // window means projection is dead-ended; show the popup centered.
-  useEffect(() => {
-    if (supported !== true) return;
-    if (screenPos) return;
-    const t = window.setTimeout(() => {
-      if (!screenPos) {
-        setScreenPos({
-          x: window.innerWidth / 2,
-          y: window.innerHeight / 2,
-        });
-      }
-    }, 800);
-    return () => window.clearTimeout(t);
-  }, [supported, screenPos]);
-
-  // ── Fallback: marker element not registered ──────────────────
-  if (supported === false) {
-    return (
-      <div
-        style={{
-          position: 'fixed',
-          left: '50%',
-          top: '20%',
-          transform: 'translate(-50%, 0)',
-          zIndex: 50,
-          pointerEvents: 'auto',
-        }}
-      >
-        {children}
-      </div>
-    );
-  }
-
-  // Wait until we have a screen position before painting anything.
-  // Otherwise the popup would briefly flash at (0,0) before the first
-  // RAF frame runs.
   if (!screenPos || typeof document === 'undefined') return null;
+  if (!screenPos.visible) return null;
 
-  // ── Portal the popup card to <body> at the projected screen pos ──
-  // position:fixed so it's anchored to the viewport, not any parent's
-  // transformed/scrolled context. Translate -50% horizontal centers
-  // it on the property; -100% vertical floats it above the point.
   return createPortal(
     <div
       data-plot-popup="1"
@@ -254,9 +144,6 @@ export default function AnchoredPropertyCard({
         transform: 'translate(-50%, -100%)',
         zIndex: 40,
         pointerEvents: 'auto',
-        // Smooth interpolation between RAF state updates would feel
-        // weird at high update rates (visible easing during normal
-        // camera moves). Leave it instant; RAF is already smooth.
       }}
     >
       {children}

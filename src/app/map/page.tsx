@@ -1681,15 +1681,19 @@ export default function MapPage() {
           mapElRef={map3DElRef}
           apn={selectedApn}
         />
-        {/* LAYER 4 — Cone-beam projector emitter. Translucent emissive
-            blue cone (Blender .glb at /assets/markers/plot-beam.glb)
-            mounted as gmp-model-3d-interactive at the property roof.
-            The cone spreads upward toward the card anchor altitude. */}
+        {/* LAYER 4 — Plot beam projector + card slab. Blender glb at
+            /assets/markers/plot-beam.glb, mounted via gmp-model-3d-
+            interactive at the property's lat/lng. Beam origin sits on
+            the roof; slab on top of beam at ~7.5m local Z.
+            scale + orientation are diagnostic knobs while we tune the
+            live-render presentation; first deploy showed tiny + flat. */}
         <PlotPropertyBeam
           mapElRef={map3DElRef}
           lat={selectedLead.latitude}
           lng={selectedLead.longitude}
-          altitudeM={4}
+          altitudeM={0}
+          scale={1}
+          orientation={{ heading: 0, tilt: 0, roll: 0 }}
         />
         <PlotCardMarker3D
           mapElRef={map3DElRef}

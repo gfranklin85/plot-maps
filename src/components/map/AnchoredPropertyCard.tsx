@@ -1,55 +1,62 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import CardBeamTail from "./CardBeamTail";
 
-// AnchoredPropertyCard — Plot's PropertyCard rendered IN the 3D world,
-// anchored at a parcel's lat/lng via Google's PopoverElement
-// (<gmp-popover>). This is Map3D's native primitive for HTML content
-// anchored to a world position; Google handles projection, depth,
-// occlusion, and camera tracking internally.
+// AnchoredPropertyCard v2 — Plot's PropertyCard anchored at a parcel's
+// lat/lng in screen space.
 //
-// Architecture:
-//   - Creates a <gmp-popover> with positionAnchor = {lat, lng, altitude}
-//   - Portals React children into the popover's default slot, where
-//     they render with real DOM layout (real bounding boxes, real
-//     event handling — unlike children of gmp-marker-3d-interactive
-//     which are detached from layout flow)
-//   - Polls for the popover element type to register (Map3D's preview
-//     library mounts asynchronously); retries up to 5 seconds
-//   - On lat/lng change, updates positionAnchor without rebuild
-//   - Graceful fallback: if PopoverElement isn't registered, renders
-//     the card as a centered fixed overlay so the user still gets UI
+// Locked 2026-05-30: replaces the prior gmp-popover-based anchor.
+// Google's docs (release note 3.62.12c) confirmed gmp-popover's
+// chrome (background pill, max-height, scrollbar) is NOT user-
+// suppressible — only background-color, border-radius, box-shadow,
+// padding are themable; container/overflow/max-height are internal.
+// After 8+ attempts to fight the shadow DOM, we abandoned the popover
+// approach for the OFFICIAL Google-recommended pattern:
 //
-// Locked 2026-05-27 after research confirmed gmp-popover is the
-// canonical Map3D HTML-anchor primitive (GA Oct 2025).
+//   1. Create an invisible <gmp-marker-3d-interactive> at the lat/lng.
+//      Marker3DInteractiveElement extends HTMLElement, so it inherits
+//      getBoundingClientRect() — that gives us the screen-space pixel
+//      position of the lat/lng on every camera change.
+//
+//   2. Run a requestAnimationFrame loop that reads the marker's
+//      bounding rect and writes the center coord to state when it
+//      changes meaningfully (>1px).
+//
+//   3. Render the React children as position:fixed via a body portal,
+//      transformed to the marker's projected screen position. The
+//      children get full pixel-perfect chrome control because Google
+//      is no longer wrapping them.
+//
+//   4. The marker itself renders nothing (we set no slotted children
+//      and let it self-default to an invisible point).
+//
+// This matches Map3D's documented patterns: Marker3DInteractiveElement
+// is Google's primitive for "I want a clickable point in 3D space" —
+// it handles projection, depth, occlusion automatically. We just read
+// its rect.
 
 interface AnchoredPropertyCardProps {
   mapElRef: React.MutableRefObject<HTMLElement | null>;
   lat: number;
   lng: number;
-  /** Altitude above ground in meters. */
+  /** Altitude above ground in meters. The marker uses this as its
+   *  z-anchor; the popup card floats above it on screen. */
   altitudeM?: number;
-  /** Forwarded ref to the popover element so other components
+  /** Forwarded ref to the marker element so other components
    *  (e.g. RitualTether's vertical beam) can read its projected
    *  screen position each frame and stay attached. */
   popoverForwardRef?: React.MutableRefObject<HTMLElement | null>;
   children: ReactNode;
 }
 
-interface PopoverElement extends HTMLElement {
-  positionAnchor: { lat: number; lng: number; altitude?: number };
+interface Marker3DInteractiveElement extends HTMLElement {
+  position: { lat: number; lng: number; altitude?: number };
   altitudeMode: string;
-  open: boolean;
-  lightDismissDisabled?: boolean;
-  // Mar 2026 GA release added this — disables the camera auto-pan
-  // that fires when the popover opens. Plot owns its own camera
-  // model; we never want Google jerking the camera toward the popup.
-  disablePanWhileOpen?: boolean;
 }
 
-const POPOVER_TAG = 'gmp-popover';
+const MARKER_TAG = 'gmp-marker-3d-interactive';
 
 export default function AnchoredPropertyCard({
   mapElRef,
@@ -59,15 +66,18 @@ export default function AnchoredPropertyCard({
   popoverForwardRef,
   children,
 }: AnchoredPropertyCardProps) {
-  const [popover, setPopover] = useState<PopoverElement | null>(null);
+  const [marker, setMarker] = useState<Marker3DInteractiveElement | null>(null);
   const [supported, setSupported] = useState<boolean | null>(null);
+  // Screen position of the marker (the popup card's bottom-center
+  // anchor). null while waiting for first projection.
+  const [screenPos, setScreenPos] = useState<{ x: number; y: number } | null>(null);
 
+  // ── Mount marker ─────────────────────────────────────────────
   useEffect(() => {
-    let attached = false;
     let retryId: number | null = null;
     const MAX_ATTEMPTS = 50; // 5s budget at 100ms intervals
     let attempt = 0;
-    let createdPopover: PopoverElement | null = null;
+    let createdMarker: Marker3DInteractiveElement | null = null;
 
     const tryMount = () => {
       attempt += 1;
@@ -80,86 +90,88 @@ export default function AnchoredPropertyCard({
         }
         return;
       }
-      // PopoverElement is registered as the custom element gmp-popover.
-      // If the Maps3D library load doesn't include it (older preview
-      // versions, restricted API key), the constructor is undefined.
-      const def = window.customElements?.get?.(POPOVER_TAG);
+      const def = window.customElements?.get?.(MARKER_TAG);
       if (!def) {
         if (attempt < MAX_ATTEMPTS) {
           retryId = window.setTimeout(tryMount, 100);
         } else {
           // eslint-disable-next-line no-console
-          console.warn('[AnchoredPropertyCard] gmp-popover not registered after retries; falling back to centered overlay.');
+          console.warn('[AnchoredPropertyCard] gmp-marker-3d-interactive not registered after retries; falling back to centered overlay.');
           setSupported(false);
         }
         return;
       }
 
-      const p = document.createElement(POPOVER_TAG) as PopoverElement;
-      p.altitudeMode = 'RELATIVE_TO_GROUND';
-      p.positionAnchor = { lat, lng, altitude: altitudeM };
-      // Disable the camera auto-pan that Google's default fires when
-      // the popover opens. Plot owns its own camera (flight model);
-      // we never want Google jerking the camera. Set BEFORE open.
-      try { p.disablePanWhileOpen = true; } catch { /* property may not be settable */ }
-      // Don't auto-close when the user clicks the map; Plot owns the
-      // dismiss path via the card's own close button.
-      try { p.lightDismissDisabled = true; } catch { /* property may not be settable */ }
-      // Also try the alternate attribute form for older preview API
-      // versions that haven't switched to property-style yet.
-      try { p.setAttribute('disable-pan-while-open', ''); } catch { /* ignore */ }
-      // Marker attribute on the popover HOST (not a descendant) so the
-      // globals.css selectors can target it without crossing the shadow
-      // DOM boundary. Plot's hologram popup ships its own gold-edged
-      // chrome; Google's default container/tail/scrollbars must be
-      // invisible. Mirrors the GroundGlow pattern.
-      try { p.setAttribute('plot-property-card', ''); } catch { /* ignore */ }
-      // Belt-and-suspenders: inline-style the host so neither Google's
-      // stylesheet nor any shadow-DOM defaults can re-paint the chrome.
-      // Sets background to transparent + lifts every overflow/max-size
-      // cap so the popover never paints scrollbars around our card.
-      try {
-        p.style.setProperty('--gmp-popover-background', 'transparent');
-        p.style.background = 'transparent';
-        p.style.border = '0';
-        p.style.boxShadow = 'none';
-        p.style.padding = '0';
-        p.style.maxHeight = 'none';
-        p.style.maxWidth = 'none';
-        p.style.overflow = 'visible';
-      } catch { /* ignore — style not settable on every host */ }
-      p.open = true;
+      const m = document.createElement(MARKER_TAG) as Marker3DInteractiveElement;
+      try { m.altitudeMode = 'RELATIVE_TO_GROUND'; } catch { /* ignore */ }
+      try { m.position = { lat, lng, altitude: altitudeM }; } catch { /* ignore */ }
+      // Mark for any CSS hooks + DOM debug
+      try { m.setAttribute('plot-property-anchor', ''); } catch { /* ignore */ }
 
-      mapEl.appendChild(p);
-      createdPopover = p;
-      setPopover(p);
-      if (popoverForwardRef) popoverForwardRef.current = p;
+      mapEl.appendChild(m);
+      createdMarker = m;
+      setMarker(m);
+      if (popoverForwardRef) popoverForwardRef.current = m;
       setSupported(true);
-      attached = true;
     };
 
     tryMount();
 
     return () => {
       if (retryId !== null) window.clearTimeout(retryId);
-      if (attached && createdPopover) {
-        try { createdPopover.remove(); } catch { /* already gone */ }
+      if (createdMarker) {
+        try { createdMarker.remove(); } catch { /* already gone */ }
       }
       if (popoverForwardRef) popoverForwardRef.current = null;
-      setPopover(null);
+      setMarker(null);
     };
-    // mapElRef is stable; lat/lng/altitude changes handled by separate
-    // effect to avoid rebuilding the popover on every selection.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Update anchor when lat/lng changes (different property selected).
+  // Update marker position when lat/lng changes (different property selected).
   useEffect(() => {
-    if (!popover) return;
-    popover.positionAnchor = { lat, lng, altitude: altitudeM };
-  }, [popover, lat, lng, altitudeM]);
+    if (!marker) return;
+    try {
+      marker.position = { lat, lng, altitude: altitudeM };
+    } catch { /* ignore */ }
+  }, [marker, lat, lng, altitudeM]);
 
-  // Fallback: PopoverElement not available; render as centered overlay.
+  // ── RAF loop: project marker rect → screenPos each frame ─────
+  const lastPosRef = useRef<{ x: number; y: number } | null>(null);
+  useEffect(() => {
+    if (!marker) return;
+    let cancelled = false;
+    let rafId = 0;
+
+    const tick = () => {
+      if (cancelled) return;
+      const rect = marker.getBoundingClientRect();
+      // Marker may have 0×0 bounds when off-screen / behind the camera.
+      // In that case skip the update and keep the prior position so the
+      // popup gracefully fades out rather than jumping to (0,0).
+      if (rect.width > 0 || rect.height > 0 || rect.left !== 0 || rect.top !== 0) {
+        const x = rect.left + rect.width / 2;
+        const y = rect.top + rect.height / 2;
+        const last = lastPosRef.current;
+        // Throttle React state updates — only commit when the position
+        // shifted enough to be visually meaningful. Saves render churn
+        // during smooth camera animations.
+        if (!last || Math.abs(last.x - x) > 0.5 || Math.abs(last.y - y) > 0.5) {
+          lastPosRef.current = { x, y };
+          setScreenPos({ x, y });
+        }
+      }
+      rafId = window.requestAnimationFrame(tick);
+    };
+
+    rafId = window.requestAnimationFrame(tick);
+    return () => {
+      cancelled = true;
+      window.cancelAnimationFrame(rafId);
+    };
+  }, [marker]);
+
+  // ── Fallback: marker element not registered ──────────────────
   if (supported === false) {
     return (
       <div
@@ -177,52 +189,33 @@ export default function AnchoredPropertyCard({
     );
   }
 
-  if (!popover) return null;
-  // ── ZERO-SIZE PORTAL PATTERN (locked 2026-05-30 evening) ──────
-  // gmp-popover's shadow DOM wraps slotted children in an internal
-  // container that paints background, padding, max-height, and a
-  // scrollbar. We tried for days to suppress that chrome via
-  // ::part() (not exposed), inline host styles (don't pierce shadow
-  // DOM), display:contents (doesn't kill the shadow tree's internal
-  // layout), and every plausible --gmp-popover-* custom property
-  // (none of them are bound by Google's stylesheet). The shell kept
-  // painting because the internal container kept finding a sized
-  // child to wrap.
-  //
-  // The fix: give it nothing to wrap. The portal target itself is a
-  // 0×0 element. The actual visible popup card lives in a child
-  // that's position:absolute outside the parent's box flow — it
-  // escapes the popover's internal layout entirely, so the container
-  // has no reason to expand or paint chrome.
-  //
-  // This is exactly the pattern GroundGlow uses (src/components/map/
-  // GroundGlow.tsx) where it's been working since 2026-05-28.
+  // Wait until we have a screen position before painting anything.
+  // Otherwise the popup would briefly flash at (0,0) before the first
+  // RAF frame runs.
+  if (!screenPos || typeof document === 'undefined') return null;
+
+  // ── Portal the popup card to <body> at the projected screen pos ──
+  // position:fixed so it's anchored to the viewport, not any parent's
+  // transformed/scrolled context. Translate -50% horizontal centers
+  // it on the property; -100% vertical floats it above the point.
   return createPortal(
     <div
       data-plot-popup="1"
       style={{
-        position: 'relative',
-        width: 0,
-        height: 0,
-        overflow: 'visible',
+        position: 'fixed',
+        left: screenPos.x,
+        top: screenPos.y,
+        transform: 'translate(-50%, -100%)',
+        zIndex: 40,
+        pointerEvents: 'auto',
+        // Smooth interpolation between RAF state updates would feel
+        // weird at high update rates (visible easing during normal
+        // camera moves). Leave it instant; RAF is already smooth.
       }}
     >
-      <div
-        style={{
-          position: 'absolute',
-          left: 0,
-          top: 0,
-          // The card centers itself horizontally on the anchor point
-          // and floats above it. Translating -50% X + -100% Y puts
-          // the card so its bottom-center sits on the lat/lng anchor.
-          transform: 'translate(-50%, -100%)',
-          pointerEvents: 'auto',
-        }}
-      >
-        {children}
-        <CardBeamTail />
-      </div>
+      {children}
+      <CardBeamTail />
     </div>,
-    popover,
+    document.body,
   );
 }

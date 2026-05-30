@@ -440,51 +440,19 @@ gmp-popover[plot-ground-glow] {
   background: transparent !important;
 }
 
-/* ─── PropertyPopup popover chrome suppression. Mirrors the
-       GroundGlow rules. AnchoredPropertyCard sets the
-       [plot-property-card] attribute directly on the gmp-popover host
-       element (NOT on a slotted child) because:
-         1. :has() can't pierce the Web Component's shadow DOM, so a
-            descendant-based selector never matches.
-         2. ::part() only works for parts the author explicitly
-            exposes, which gmp-popover doesn't reliably do for the
-            chrome subparts.
-       Attribute on the host is the only reliable scoping vector. The
-       host's inline styles (set in AnchoredPropertyCard.tsx) are the
-       primary defense; these CSS rules are the secondary one. */
-/* gmp-popover[plot-property-card] chrome suppression v5
-   (locked 2026-05-30 — fifth attempt; investigator agent confirmed
-   prior approaches failed because the gray scroll track is painted
-   by an internal container INSIDE gmp-popover's shadow DOM, and:
-     - ::part() doesn't reach it (Google didn't mark parts)
-     - Host inline styles don't reach it (shadow DOM encapsulation)
-     - display:contents removes the host box but the shadow tree
-       keeps rendering its internal container
-   CSS custom properties on the host DO pierce shadow DOM via the
-   normal inheritance channel. Google's own theming uses this. The
-   GroundGlow popover (lines 426-438) relies on this for its
-   --gmp-popover-background override. Setting every plausible
-   --gmp-popover-* token on the host is the most reliable
-   suppression vector available without shadow-piercing combinators. */
-/* Per Google release note 3.62.12c (Oct 30, 2025): "Added CSS variables
-   for background-color, border-radius, box-shadow, and padding to Map
-   3D PopoverElement." Those are the ONLY four properties Google
-   officially exposes for theming. Variable names weren't published;
-   trying both common-sense forms (camelCase and kebab-case) so
-   whichever Google bound takes effect. The remaining --gmp-popover-*
-   tokens above were speculative and removed. */
-gmp-popover[plot-property-card] {
-  --gmp-popover-background-color: transparent;
-  --gmp-popover-background: transparent;
-  --gmp-popover-border-radius: 0;
-  --gmp-popover-box-shadow: none;
-  --gmp-popover-padding: 0;
-  background: transparent !important;
-  background-color: transparent !important;
-  border: 0 !important;
-  box-shadow: none !important;
-  padding: 0 !important;
-  border-radius: 0 !important;
+/* ─── PropertyPopup anchor v2: marker-based, no chrome to suppress ──
+   The prior gmp-popover-based approach is gone (AnchoredPropertyCard
+   now uses gmp-marker-3d-interactive + screen-space projection).
+   gmp-marker-3d-interactive renders nothing visible by default, so
+   there's nothing to fight. The card is portaled to document.body as
+   a position:fixed React component anchored to the marker's projected
+   screen rect via RAF. See src/components/map/AnchoredPropertyCard.tsx.
+   The [plot-property-anchor] attribute on the marker is kept as a
+   debug hook only — no styling is needed. */
+gmp-marker-3d-interactive[plot-property-anchor] {
+  /* Marker is invisible by default; this is just defensive in case
+     a future preview release starts rendering a visible default. */
+  visibility: hidden;
 }
 
 /* ─── Plot landing destination strip — hide native scrollbar across

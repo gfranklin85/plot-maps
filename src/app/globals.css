@@ -466,26 +466,25 @@ gmp-popover[plot-ground-glow] {
    --gmp-popover-background override. Setting every plausible
    --gmp-popover-* token on the host is the most reliable
    suppression vector available without shadow-piercing combinators. */
+/* Per Google release note 3.62.12c (Oct 30, 2025): "Added CSS variables
+   for background-color, border-radius, box-shadow, and padding to Map
+   3D PopoverElement." Those are the ONLY four properties Google
+   officially exposes for theming. Variable names weren't published;
+   trying both common-sense forms (camelCase and kebab-case) so
+   whichever Google bound takes effect. The remaining --gmp-popover-*
+   tokens above were speculative and removed. */
 gmp-popover[plot-property-card] {
+  --gmp-popover-background-color: transparent;
   --gmp-popover-background: transparent;
-  --gmp-popover-padding: 0;
-  --gmp-popover-border: 0;
+  --gmp-popover-border-radius: 0;
   --gmp-popover-box-shadow: none;
-  --gmp-popover-max-height: none;
-  --gmp-popover-max-width: none;
-  --gmp-popover-min-height: 0;
-  --gmp-popover-min-width: 0;
-  --gmp-popover-overflow: visible;
-  --gmp-popover-tail-display: none;
-  --gmp-popover-container-background: transparent;
-  --gmp-popover-container-border: 0;
-  --gmp-popover-container-padding: 0;
-  --gmp-popover-content-padding: 0;
-  --gmp-popover-content-overflow: visible;
-  --gmp-popover-content-max-height: none;
+  --gmp-popover-padding: 0;
   background: transparent !important;
+  background-color: transparent !important;
   border: 0 !important;
   box-shadow: none !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
 }
 
 /* ─── Plot landing destination strip — hide native scrollbar across

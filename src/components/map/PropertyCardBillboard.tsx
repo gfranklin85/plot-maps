@@ -44,6 +44,11 @@ interface Props {
   audience?: CardAudience;
   onAction?: (action: string, lead: Lead) => void;
   onClose?: () => void;
+  /** Fires when the resolver lands a parcel APN. Lifted to the page so
+   *  the property-highlight polygon (PlotPropertyHighlight) can request
+   *  the matching PostGIS geometry. Page also reads it for /listings/[id]
+   *  routing later. */
+  onApnResolved?: (apn: string | null) => void;
 }
 
 function resolveStatus(lead: Lead): CardStatus {
@@ -87,7 +92,7 @@ function fmtDateShort(iso: string | null | undefined): string | null {
   return iso.slice(0, 10);
 }
 
-export default function PropertyCardBillboard({ lead: rawLead, audience = 'public', onAction, onClose }: Props) {
+export default function PropertyCardBillboard({ lead: rawLead, audience = 'public', onAction, onClose, onApnResolved }: Props) {
   const { settings } = useBuyerSettings();
 
   // ── Stub Lead resolver ──────────────────────────────────────────
@@ -144,6 +149,15 @@ export default function PropertyCardBillboard({ lead: rawLead, audience = 'publi
       .catch(() => { /* silent */ });
     return () => { cancelled = true; };
   }, [rawLead.id, rawLead.latitude, rawLead.longitude]);
+
+  // Surface the resolved APN to the page so PlotPropertyHighlight can
+  // request the parcel polygon. APN comes from (1) the parcel: prefix
+  // in the stub id, (2) the resolved parcel record.
+  useEffect(() => {
+    const idApn = rawLead.id?.startsWith('parcel:') ? rawLead.id.slice(7) : null;
+    const apn = idApn ?? resolved.parcel?.apn ?? null;
+    onApnResolved?.(apn);
+  }, [rawLead.id, resolved.parcel?.apn, onApnResolved]);
 
   // Merge resolved data into a hydrated lead view so the renderer below
   // can treat everything uniformly. Resolved fields fill in only when

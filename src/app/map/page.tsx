@@ -18,7 +18,8 @@ import PropertyCardBillboard, { CardAudience } from "@/components/map/PropertyCa
 import { BuyerSettingsProvider } from "@/lib/buyer-settings/context";
 import BuyerSettingsPanel from "@/components/map/BuyerSettingsPanel";
 import PlotCardMarker3D from "@/components/map/PlotCardMarker3D";
-import AnchorTestBlock from "@/components/map/AnchorTestBlock";
+import PlotPropertyHighlight from "@/components/map/PlotPropertyHighlight";
+import PlotPropertyBeam from "@/components/map/PlotPropertyBeam";
 import GroundGlow from "@/components/map/GroundGlow";
 import PlotPinMarker from "@/components/map/PlotPinMarker";
 import MarketRequestPrompt from "@/components/map/MarketRequestPrompt";
@@ -152,13 +153,15 @@ export default function MapPage() {
   // the world. Greg locked 2026-05-28 evening: "the bounce stays
   // with the UI, not the reticle."
   const popoverElRef = useRef<HTMLElement | null>(null);
-  // Wrap setSelectedLead so dismiss (null) also retracts the tether.
+  // Wrap setSelectedLead so dismiss (null) also retracts the tether
+  // AND clears the highlight APN so the parcel outline disappears.
   const setSelectedLead = (next: Lead | null | ((prev: Lead | null) => Lead | null)) => {
     setSelectedLeadRaw((prev) => {
       const resolved = typeof next === 'function' ? next(prev) : next;
       if (resolved === null && prev !== null) {
-        // Card is closing — collapse the rebound beam.
+        // Card is closing — collapse the rebound beam + clear highlight.
         try { ritualTetherRef.current?.retract(); } catch { /* noop */ }
+        setSelectedApn(null);
       }
       return resolved;
     });
@@ -187,6 +190,11 @@ export default function MapPage() {
   }, [selectedLead]);
   const [pinnedRef, setPinnedRef] = useState<Lead | null>(null);
   const [expandedLead, setExpandedLead] = useState<Lead | null>(null);
+  // APN of the currently-selected property's parcel, surfaced upward
+  // from PropertyCardBillboard's resolver. Feeds PlotPropertyHighlight
+  // so the actual lot polygon (from PostGIS) outlines under the card.
+  // Locked 2026-05-30 evening per the in-world stack spec.
+  const [selectedApn, setSelectedApn] = useState<string | null>(null);
   // Pin-style toolbar pills were stripped 2026-05-17; default to 'dots'
   // until the pin-style chooser gets a redesign that earns the chrome.
   const pinMode: PinMode = 'dots';
@@ -1666,18 +1674,23 @@ export default function MapPage() {
           lat={selectedLead.latitude}
           lng={selectedLead.longitude}
         />
-        {/* ENGINEERING TEST — verifies that gmp-marker anchors HTML in
-            world space. The bright "PLOT WAS HERE" block should sit on
-            the building. Delete once the real card is verified working
-            through PlotCardMarker3D. */}
-        <PlotCardMarker3D
+        {/* LAYER 5 — Real parcel polygon highlight from PostGIS.
+            Covers Kings/Tulare/Fresno/Sacramento today; outside coverage
+            renders nothing (no fabricated footprint). */}
+        <PlotPropertyHighlight
+          mapElRef={map3DElRef}
+          apn={selectedApn}
+        />
+        {/* LAYER 4 — Cone-beam projector emitter. Translucent emissive
+            blue cone (Blender .glb at /assets/markers/plot-beam.glb)
+            mounted as gmp-model-3d-interactive at the property roof.
+            The cone spreads upward toward the card anchor altitude. */}
+        <PlotPropertyBeam
           mapElRef={map3DElRef}
           lat={selectedLead.latitude}
           lng={selectedLead.longitude}
-          altitudeM={20}
-        >
-          <AnchorTestBlock />
-        </PlotCardMarker3D>
+          altitudeM={4}
+        />
         <PlotCardMarker3D
           mapElRef={map3DElRef}
           lat={selectedLead.latitude}
@@ -1696,6 +1709,7 @@ export default function MapPage() {
             lead={selectedLead}
             audience={cardAudience}
             onClose={() => setSelectedLead(null)}
+            onApnResolved={setSelectedApn}
             onAction={(action, lead) => {
               if (action === 'tour' || action === 'save' || action === 'share' || action === 'notify') {
                 // Public-layer demand-capture routes through the existing

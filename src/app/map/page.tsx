@@ -16,6 +16,7 @@ import UpgradeGate from "@/components/ui/UpgradeGate";
 import PropertyPopup from "@/components/map/PropertyPopup";
 import AnchoredPropertyCard from "@/components/map/AnchoredPropertyCard";
 import GroundGlow from "@/components/map/GroundGlow";
+import PlotPinMarker from "@/components/map/PlotPinMarker";
 import MarketRequestPrompt from "@/components/map/MarketRequestPrompt";
 import type { RitualTetherHandle } from "@/components/map/RitualTether";
 import ProspectListPanel from "@/components/map/ProspectListPanel";
@@ -1616,6 +1617,27 @@ export default function MapPage() {
           the property's lat/lng. Google's renderer handles projection,
           depth, occlusion, and camera tracking. The card stays glued
           to the building as the camera moves. Cathedral grade. */}
+      {/* ═══ PLOT PIN MARKERS — one Plot pin per filtered lead at its
+              lat/lng. World-space 3D model anchored via Google's
+              gmp-model-3d-interactive, loaded from
+              public/assets/markers/plot-pin.glb (mint emissive
+              surveyor stake, modeled in Blender 2026-05-30 evening).
+              Click opens the lead's PropertyPopup.
+              Cathedral grade — Google handles projection, depth,
+              occlusion, camera tracking. No screen-space math. */}
+      {!walkMode && filteredLeads.map((lead) => (
+        lead.latitude != null && lead.longitude != null ? (
+          <PlotPinMarker
+            key={lead.id}
+            mapElRef={map3DElRef}
+            lat={lead.latitude}
+            lng={lead.longitude}
+            altitudeM={0}
+            onClick={() => setSelectedLead(lead)}
+          />
+        ) : null
+      ))}
+
       {selectedLead && !walkMode && selectedLead.latitude != null && selectedLead.longitude != null && (
         <>
         <GroundGlow

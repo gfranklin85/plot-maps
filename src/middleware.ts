@@ -4,8 +4,13 @@ import { createMiddlewareClient } from '@/lib/supabase-middleware';
 // Public marketing / informational pages reachable without login.
 // Locked 2026-05-29: /position, /join-position, /contact must stay
 // public per project_landing_search_first_no_gate + the brokerage
-// hierarchy thesis. Visitors browsing Plot Maps need to reach the
-// brokerage identity page and the contact form without an OAuth wall.
+// hierarchy thesis.
+// Locked 2026-05-30: /map is now public too. The two-layer audience
+// strategy (project_two_layer_audience_strategy.md) says casual buyers
+// browse without auth, the listings popup is the public layer, and the
+// agent layer (skip-trace, postcard, owner lookup) is gated INSIDE the
+// map at the component level by userIsOperator. The route itself is
+// public so the committee + casual buyers can fly the map freely.
 const PUBLIC_PATHS = [
   '/login',
   '/signup',
@@ -20,6 +25,8 @@ const PUBLIC_PATHS = [
   '/position',
   '/join-position',
   '/contact',
+  '/map',
+  '/listings',
 ];
 
 // Logged-in pages reachable even for users without beta access. The

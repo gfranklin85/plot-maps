@@ -1,25 +1,28 @@
 "use client";
 
-// PlotCardMarker3D — mounts a React HTML billboard as the content of
-// a gmp-marker-3d-interactive at lat/lng/altitude in world space.
+// PlotCardMarker3D — mounts a React HTML element as the content of a
+// <gmp-marker> at a lat/lng/altitude inside <gmp-map-3d>. Google projects
+// the marker in world space and tracks the camera; our HTML rides along.
 //
-// Locked 2026-05-30 evening. Replaces AnchoredPropertyCard's manual
-// screen-space projection (which was silently falling back to top-center
-// because the polled camera state from gmp-map-3d wasn't matching the
-// projection math's expectations).
+// CORRECTED 2026-05-30 evening. Earlier version used
+// gmp-marker-3d-interactive — wrong primitive. The 3D-suffixed marker
+// variants anchor 3D model files (.glb) and do NOT accept HTML children.
+// The classic gmp-marker IS the HTML-billboard primitive on gmp-map-3d
+// (per Google's "Add HTML markers" doc:
+// developers.google.com/maps/documentation/javascript/3d/marker-html-css).
 //
-// Google's gmp-marker-3d-interactive accepts arbitrary HTML children
-// via its <slot>. The browser places that HTML at the marker's world
-// position, with Google handling projection, depth, occlusion, and
-// camera tracking internally. No screen-space math. No fallback path.
-// This is the same primitive family we already use for the 3D Plot pin
-// (PlotPinMarker via gmp-model-3d-interactive).
+// Pattern (per spec):
+//   <gmp-map-3d ...>
+//     <gmp-marker position="lat,lng,altitude">
+//       <div>...your HTML here...</div>
+//     </gmp-marker>
+//   </gmp-map-3d>
 //
 // Implementation:
-//   1. Create a gmp-marker-3d-interactive at lat/lng/altitudeM
-//   2. Create a host <div> inside it
+//   1. Create a <gmp-marker> as a child of gmp-map-3d
+//   2. Create a host <div> inside the marker
 //   3. Portal the React children into that host
-//   4. Google projects the marker each frame; the HTML rides along
+//   4. Google's marker handles projection + camera tracking
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
@@ -34,12 +37,16 @@ interface PlotCardMarker3DProps {
   children: ReactNode;
 }
 
-interface Marker3DInteractiveElement extends HTMLElement {
-  position: { lat: number; lng: number; altitude?: number };
-  altitudeMode: string;
-}
-
-const MARKER_TAG = 'gmp-marker-3d-interactive';
+// Google has shipped multiple HTML-marker element names over the lifetime
+// of the Maps JS API. On photoreal 3D maps the docs say "gmp-marker"
+// works as a child of gmp-map-3d, but the registered tag in the loaded
+// libraries may be one of the AdvancedMarker variants instead. We probe
+// the registry on mount and use whichever is actually defined, logging
+// the winner so the next teammate isn't guessing.
+const CANDIDATE_MARKER_TAGS = [
+  'gmp-marker',                // docs example for HTML on gmp-map-3d
+  'gmp-advanced-marker',       // AdvancedMarkerElement (2D marker, registered by 'marker' library)
+] as const;
 
 export default function PlotCardMarker3D({
   mapElRef,
@@ -49,14 +56,14 @@ export default function PlotCardMarker3D({
   children,
 }: PlotCardMarker3DProps) {
   const [host, setHost] = useState<HTMLDivElement | null>(null);
-  const markerRef = useRef<Marker3DInteractiveElement | null>(null);
+  const markerRef = useRef<HTMLElement | null>(null);
 
   // Mount the marker + host div as a child of gmp-map-3d.
   useEffect(() => {
     let retryId: number | null = null;
     let attempt = 0;
     const MAX_ATTEMPTS = 50;
-    let createdMarker: Marker3DInteractiveElement | null = null;
+    let createdMarker: HTMLElement | null = null;
 
     const tryMount = () => {
       attempt += 1;
@@ -67,30 +74,35 @@ export default function PlotCardMarker3D({
         }
         return;
       }
-      const def = window.customElements?.get?.(MARKER_TAG);
-      if (!def) {
+      const winnerTag = CANDIDATE_MARKER_TAGS.find(
+        (t) => !!window.customElements?.get?.(t)
+      );
+      if (!winnerTag) {
         if (attempt < MAX_ATTEMPTS) {
           retryId = window.setTimeout(tryMount, 100);
         } else {
           // eslint-disable-next-line no-console
-          console.warn('[PlotCardMarker3D] gmp-marker-3d-interactive not registered after retries.');
+          console.warn(
+            `[PlotCardMarker3D] No candidate marker element registered: ${CANDIDATE_MARKER_TAGS.join(', ')}`
+          );
         }
         return;
       }
+      // eslint-disable-next-line no-console
+      console.log(`[PlotCardMarker3D] using <${winnerTag}> at ${lat},${lng},${altitudeM}m`);
 
-      const marker = document.createElement(MARKER_TAG) as Marker3DInteractiveElement;
-      try { marker.altitudeMode = 'RELATIVE_TO_GROUND'; } catch { /* ignore */ }
-      try { marker.position = { lat, lng, altitude: altitudeM }; } catch { /* ignore */ }
-      try { marker.setAttribute('plot-card-billboard', ''); } catch { /* ignore */ }
+      const marker = document.createElement(winnerTag);
+      // gmp-marker's position attribute is "lat,lng[,altitude]" (string).
+      // gmp-advanced-marker also accepts a comma-separated position string.
+      marker.setAttribute('position', `${lat},${lng},${altitudeM}`);
+      marker.setAttribute('plot-card-billboard', '');
 
-      // Host element — receives the React children via portal. Sits
-      // inside the marker so Google tracks its world position.
+      // Host element — receives the React children via portal. The host
+      // is inside the marker so Google tracks its world position.
       const div = document.createElement('div');
       div.setAttribute('data-plot-card-host', '1');
-      // The marker positions its origin at the world point; we want the
-      // card to sit ABOVE that point (so the property reads first, card
-      // floats above). The host applies a CSS transform so the card's
-      // bottom anchors at the marker's world position.
+      // Anchor the card's bottom-center at the marker's world point so
+      // the property reads first and the card floats above.
       div.style.position = 'relative';
       div.style.transform = 'translate(-50%, -100%)';
       div.style.pointerEvents = 'auto';
@@ -121,7 +133,7 @@ export default function PlotCardMarker3D({
     const m = markerRef.current;
     if (!m) return;
     try {
-      m.position = { lat, lng, altitude: altitudeM };
+      m.setAttribute('position', `${lat},${lng},${altitudeM}`);
     } catch { /* ignore */ }
   }, [lat, lng, altitudeM]);
 

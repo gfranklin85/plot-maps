@@ -18,6 +18,7 @@ import PropertyCardBillboard, { CardAudience } from "@/components/map/PropertyCa
 import { BuyerSettingsProvider } from "@/lib/buyer-settings/context";
 import BuyerSettingsPanel from "@/components/map/BuyerSettingsPanel";
 import PlotCardMarker3D from "@/components/map/PlotCardMarker3D";
+import AnchorTestBlock from "@/components/map/AnchorTestBlock";
 import GroundGlow from "@/components/map/GroundGlow";
 import PlotPinMarker from "@/components/map/PlotPinMarker";
 import MarketRequestPrompt from "@/components/map/MarketRequestPrompt";
@@ -1665,6 +1666,18 @@ export default function MapPage() {
           lat={selectedLead.latitude}
           lng={selectedLead.longitude}
         />
+        {/* ENGINEERING TEST — verifies that gmp-marker anchors HTML in
+            world space. The bright "PLOT WAS HERE" block should sit on
+            the building. Delete once the real card is verified working
+            through PlotCardMarker3D. */}
+        <PlotCardMarker3D
+          mapElRef={map3DElRef}
+          lat={selectedLead.latitude}
+          lng={selectedLead.longitude}
+          altitudeM={20}
+        >
+          <AnchorTestBlock />
+        </PlotCardMarker3D>
         <PlotCardMarker3D
           mapElRef={map3DElRef}
           lat={selectedLead.latitude}

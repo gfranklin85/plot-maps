@@ -19,9 +19,22 @@
 //     In Price mode (user toggle), the headline IS the price and the
 //     supporting line becomes "$X/mo est."
 
+import { useEffect, useState } from "react";
 import { Lead } from "@/types";
+import type { ResolvedProperty } from "@/lib/property-data/types";
 import { useBuyerSettings } from "@/lib/buyer-settings/context";
 import { calculatePiti, formatMoney, formatPitiCaption } from "@/lib/buyer-settings/piti";
+
+// Resolver: when the click handler creates a stub Lead with one of
+// the recognized ID prefixes (parcel: / gpoi: / addr:), the lead carries
+// almost no data. Fetch the real source row and merge it into a
+// hydrated view of the lead so the card can render real facts. Mirrors
+// the resolver originally inside PropertyPopup (lines 68-97 there).
+interface ResolverState {
+  parcel: ResolvedProperty | null;
+  googlePoi: { placeId: string; name: string | null; address: string | null; lat: number | null; lng: number | null } | null;
+  addressRecord: { id: number; fullAddress: string } | null;
+}
 
 export type CardStatus = 'Active' | 'Pending' | 'Sold' | 'Off Market';
 export type CardAudience = 'public' | 'agent' | 'position';
@@ -74,8 +87,94 @@ function fmtDateShort(iso: string | null | undefined): string | null {
   return iso.slice(0, 10);
 }
 
-export default function PropertyCardBillboard({ lead, audience = 'public', onAction, onClose }: Props) {
+export default function PropertyCardBillboard({ lead: rawLead, audience = 'public', onAction, onClose }: Props) {
   const { settings } = useBuyerSettings();
+
+  // ── Stub Lead resolver ──────────────────────────────────────────
+  // Stub Leads with id prefixes parcel: / gpoi: / addr: need server
+  // resolution before the card has real facts to render. Fall back
+  // to the lat/lng parcel lookup when there's no prefix but coords
+  // exist. Mock listings (id starts with "mock-") are already
+  // populated and skip the fetch entirely.
+  const [resolved, setResolved] = useState<ResolverState>({
+    parcel: null,
+    googlePoi: null,
+    addressRecord: null,
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+    const id = rawLead.id ?? '';
+
+    // Mock + fully populated rows skip resolution.
+    if (id.startsWith('mock-')) return;
+
+    if (id.startsWith('addr:')) {
+      fetch(`/api/addresses/${encodeURIComponent(id.slice(5))}`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          if (!cancelled && data) setResolved((s) => ({ ...s, addressRecord: data }));
+        })
+        .catch(() => { /* silent */ });
+      return () => { cancelled = true; };
+    }
+
+    if (id.startsWith('gpoi:')) {
+      fetch(`/api/google-poi?placeId=${encodeURIComponent(id.slice(5))}`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          if (!cancelled && data) setResolved((s) => ({ ...s, googlePoi: data }));
+        })
+        .catch(() => { /* silent */ });
+      return () => { cancelled = true; };
+    }
+
+    const apn = id.startsWith('parcel:') ? id.slice(7) : null;
+    const url = apn
+      ? `/api/parcel?apn=${encodeURIComponent(apn)}`
+      : (rawLead.latitude != null && rawLead.longitude != null
+          ? `/api/parcel?lat=${rawLead.latitude}&lng=${rawLead.longitude}`
+          : null);
+    if (!url) return;
+    fetch(url)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!cancelled && data) setResolved((s) => ({ ...s, parcel: data }));
+      })
+      .catch(() => { /* silent */ });
+    return () => { cancelled = true; };
+  }, [rawLead.id, rawLead.latitude, rawLead.longitude]);
+
+  // Merge resolved data into a hydrated lead view so the renderer below
+  // can treat everything uniformly. Resolved fields fill in only when
+  // the raw lead is missing them — explicit data on a mock listing wins.
+  const lead: Lead = {
+    ...rawLead,
+    property_address:
+      rawLead.property_address ??
+      resolved.parcel?.address ??
+      resolved.addressRecord?.fullAddress ??
+      resolved.googlePoi?.address ??
+      rawLead.property_address,
+    bedrooms:
+      rawLead.bedrooms ??
+      (typeof resolved.parcel?.bedrooms === 'string' ? Number(resolved.parcel.bedrooms) : resolved.parcel?.bedrooms ?? null),
+    bathrooms:
+      rawLead.bathrooms ??
+      (typeof resolved.parcel?.bathrooms === 'string' ? Number(resolved.parcel.bathrooms) : resolved.parcel?.bathrooms ?? null),
+    sqft:
+      rawLead.sqft ??
+      (typeof resolved.parcel?.buildingSize === 'number' ? resolved.parcel.buildingSize : null),
+    lot_acres:
+      rawLead.lot_acres ??
+      (typeof resolved.parcel?.acres === 'number' ? resolved.parcel.acres : null),
+    year_built:
+      rawLead.year_built ??
+      (resolved.parcel?.yearBuilt != null
+        ? (typeof resolved.parcel.yearBuilt === 'string' ? Number(resolved.parcel.yearBuilt) : resolved.parcel.yearBuilt)
+        : null),
+  };
+
   const status = resolveStatus(lead);
   const pill = statusPillColors(status);
 

@@ -17,7 +17,7 @@ import PropertyPopup from "@/components/map/PropertyPopup";
 import PropertyCardBillboard, { CardAudience } from "@/components/map/PropertyCardBillboard";
 import { BuyerSettingsProvider } from "@/lib/buyer-settings/context";
 import BuyerSettingsPanel from "@/components/map/BuyerSettingsPanel";
-import AnchoredPropertyCard from "@/components/map/AnchoredPropertyCard";
+import PlotCardMarker3D from "@/components/map/PlotCardMarker3D";
 import GroundGlow from "@/components/map/GroundGlow";
 import PlotPinMarker from "@/components/map/PlotPinMarker";
 import MarketRequestPrompt from "@/components/map/MarketRequestPrompt";
@@ -1665,12 +1665,11 @@ export default function MapPage() {
           lat={selectedLead.latitude}
           lng={selectedLead.longitude}
         />
-        <AnchoredPropertyCard
+        <PlotCardMarker3D
           mapElRef={map3DElRef}
           lat={selectedLead.latitude}
           lng={selectedLead.longitude}
           altitudeM={12}
-          popoverForwardRef={popoverElRef}
         >
           {/* PropertyCardBillboard — the new public-launch property card.
               Off-white neumorphic, monthly-PITI headline by default
@@ -1710,7 +1709,7 @@ export default function MapPage() {
               }
             }}
           />
-        </AnchoredPropertyCard>
+        </PlotCardMarker3D>
         </>
       )}
 

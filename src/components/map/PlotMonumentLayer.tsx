@@ -45,13 +45,11 @@ interface Model3DInteractiveElement extends HTMLElement {
 
 const MODEL_TAG = 'gmp-model-3d-interactive';
 
-// Altitude in meters. Set to surface (0m) so EVERY parcel in the
-// camera radius has its monument visible above ground. The rise/sink
-// animation is parked until the visible-state is confirmed; for now
-// monuments mount at ground level and stay there. Greg 2026-05-30:
-// "can we stick a monument under every parcel" → start by making
-// them visible, then add the rise.
-const BURIED_ALT_M = 0;
+// Altitude in meters. Buried far below ground at rest — invisible
+// to the camera at every angle. Only the SELECTED parcel's monument
+// rises to ground level on call. World stays unmarked at rest;
+// selection lifts the curtain. Greg locked 2026-05-30 evening.
+const BURIED_ALT_M = -30;
 const RISEN_ALT_M = 0;
 // Rise/sink durations
 const RISE_MS = 850;

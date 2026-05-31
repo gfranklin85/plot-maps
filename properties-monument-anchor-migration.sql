@@ -110,14 +110,34 @@ BEGIN
 END;
 $$;
 
--- One-shot backfill: populate monument_lat/lng for every parcel that
--- has a geom but no anchor yet. Idempotent — re-running only fills
--- new/changed rows.
+-- Diagnostic findings 2026-05-30 evening (scripts/parcel-geom-diagnostic.mjs):
+--   - 52,531 parcels with geom, 100% city coverage in Kings
+--   - Median 819 sqm, p90 87k sqm — bulk is real residential
+--   - 6,676 RUNAWAYS (area > 50k sqm) — almost all are ag parcels
+--     whose geometry covers acreage. Excluded from monument backfill
+--     so clicks on town never resolve to "PO BOX 877" rows that eat
+--     the neighborhood.
+--   - 5 invalid geoms — repaired in-place with ST_MakeValid below
+--     before computing anchors.
+--   - 87 tiny geoms (<50 sqm) — slivers, excluded as well.
+
+-- 1. Repair the 5 invalid polygons before anything else touches them.
+UPDATE properties
+SET geom = ST_Multi(ST_MakeValid(geom))
+WHERE geom IS NOT NULL AND NOT ST_IsValid(geom);
+
+-- 2. Backfill monument anchors ONLY for sane residential-scale parcels.
+--    Runaways and slivers get NULL, which the monument layer skips
+--    silently. This means clicks on ag fields produce no monument,
+--    which is the desired behavior — we don't have meaningful "back-
+--    yards" on 750-acre cotton fields anyway.
 UPDATE properties
 SET
   monument_lng = ST_X(compute_monument_anchor(geom)),
   monument_lat = ST_Y(compute_monument_anchor(geom))
 WHERE geom IS NOT NULL
+  AND ST_IsValid(geom)
+  AND ST_Area(geom::geography) BETWEEN 50 AND 50000
   AND (monument_lat IS NULL OR monument_lng IS NULL);
 
 -- Future ingest hook: trigger recomputes the anchor whenever geom
@@ -129,14 +149,23 @@ LANGUAGE plpgsql
 AS $$
 DECLARE
   anchor geometry;
+  area_sqm double precision;
 BEGIN
-  IF NEW.geom IS NULL THEN
+  IF NEW.geom IS NULL OR NOT ST_IsValid(NEW.geom) THEN
     NEW.monument_lat := NULL;
     NEW.monument_lng := NULL;
     RETURN NEW;
   END IF;
   -- Skip recompute if geom unchanged on UPDATE
   IF TG_OP = 'UPDATE' AND OLD.geom IS NOT DISTINCT FROM NEW.geom THEN
+    RETURN NEW;
+  END IF;
+  -- Residential-scale gate: only compute anchors for parcels in the
+  -- 50-50,000 sqm band. Ag parcels and slivers get NULL → no monument.
+  area_sqm := ST_Area(NEW.geom::geography);
+  IF area_sqm IS NULL OR area_sqm < 50 OR area_sqm > 50000 THEN
+    NEW.monument_lat := NULL;
+    NEW.monument_lng := NULL;
     RETURN NEW;
   END IF;
   anchor := compute_monument_anchor(NEW.geom);

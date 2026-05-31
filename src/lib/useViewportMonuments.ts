@@ -34,13 +34,17 @@ export function useViewportMonuments(
   const acRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
-    if (!center) return;
+    if (!center) {
+      console.log('[useViewportMonuments] center is null, skipping');
+      return;
+    }
     const last = lastFetchedCenterRef.current;
     if (last) {
       const dLat = Math.abs(center.lat - last.lat);
       const dLng = Math.abs(center.lng - last.lng);
       if (dLat < REFETCH_THRESHOLD_DEG && dLng < REFETCH_THRESHOLD_DEG) {
-        return;  // close enough; don't re-fetch
+        console.log('[useViewportMonuments] skip — center moved less than threshold', { dLat, dLng });
+        return;
       }
     }
 
@@ -57,13 +61,17 @@ export function useViewportMonuments(
       const ac = new AbortController();
       acRef.current = ac;
 
-      fetch(
-        `/api/parcels/monuments?minLat=${minLat}&minLng=${minLng}&maxLat=${maxLat}&maxLng=${maxLng}`,
-        { signal: ac.signal },
-      )
+      const url = `/api/parcels/monuments?minLat=${minLat}&minLng=${minLng}&maxLat=${maxLat}&maxLng=${maxLng}`;
+      console.log('[useViewportMonuments] fetching', { center, url });
+
+      fetch(url, { signal: ac.signal })
         .then(r => r.ok ? r.json() : null)
         .then(data => {
-          if (!data || !Array.isArray(data.monuments)) return;
+          if (!data || !Array.isArray(data.monuments)) {
+            console.warn('[useViewportMonuments] bad response', data);
+            return;
+          }
+          console.log('[useViewportMonuments] got', data.monuments.length, 'monuments for center', center);
           lastFetchedCenterRef.current = { lat: center.lat, lng: center.lng };
           setMonuments(data.monuments as MonumentAnchor[]);
         })

@@ -5,12 +5,12 @@ import { createMiddlewareClient } from '@/lib/supabase-middleware';
 // Locked 2026-05-29: /position, /join-position, /contact must stay
 // public per project_landing_search_first_no_gate + the brokerage
 // hierarchy thesis.
-// Locked 2026-05-30: /map is now public too. The two-layer audience
-// strategy (project_two_layer_audience_strategy.md) says casual buyers
-// browse without auth, the listings popup is the public layer, and the
-// agent layer (skip-trace, postcard, owner lookup) is gated INSIDE the
-// map at the component level by userIsOperator. The route itself is
-// public so the committee + casual buyers can fly the map freely.
+// Locked 2026-05-31: /map and /listings are GATED again. Universal
+// Google OAuth is the entry — same friction as Zillow/Realtor/Loopnet,
+// data layer + future ad targeting. The OAuth happens MID-CINEMATIC
+// inside ArrivalSequence (pick destination → camera arc starts → OAuth
+// → ?resumeArrival=1 → arrival lands user in the map authed). Direct
+// URLs to /map bounce here, take the same cinematic-OAuth path.
 const PUBLIC_PATHS = [
   '/login',
   '/signup',
@@ -25,8 +25,6 @@ const PUBLIC_PATHS = [
   '/position',
   '/join-position',
   '/contact',
-  '/map',
-  '/listings',
 ];
 
 // Logged-in pages reachable even for users without beta access. The
@@ -105,11 +103,16 @@ export async function middleware(request: NextRequest) {
     // Logged-in root falls through to beta-gate check below.
   }
 
-  // Not logged in on protected page → redirect to login
+  // Not logged in on protected page → redirect to /landing so the only
+  // forward path is pick a destination → ArrivalSequence → mid-flight
+  // Google OAuth → ?resumeArrival=1 → land here authed. Direct URLs
+  // (bookmarks, refresh) all take this same cinematic entrance.
+  // Locked 2026-05-31: universal Google OAuth, no boring /login wall.
   if (!user && !isPublicPath) {
-    const loginUrl = request.nextUrl.clone();
-    loginUrl.pathname = '/login';
-    return NextResponse.redirect(loginUrl);
+    const landingUrl = request.nextUrl.clone();
+    landingUrl.pathname = '/landing';
+    landingUrl.search = '';
+    return NextResponse.redirect(landingUrl);
   }
 
   // Logged in on auth pages → redirect home.

@@ -14,13 +14,11 @@ import { useAuth } from "@/lib/auth-context";
 import MaterialIcon from "@/components/ui/MaterialIcon";
 import UpgradeGate from "@/components/ui/UpgradeGate";
 import PropertyPopup from "@/components/map/PropertyPopup";
-import PropertyCardBillboard, { CardAudience } from "@/components/map/PropertyCardBillboard";
+import type { CardAudience } from "@/components/map/PropertyCardBillboard";
 import { BuyerSettingsProvider } from "@/lib/buyer-settings/context";
 import BuyerSettingsPanel from "@/components/map/BuyerSettingsPanel";
-import PlotCardMarker3D from "@/components/map/PlotCardMarker3D";
 import PlotPropertyHighlight from "@/components/map/PlotPropertyHighlight";
 import PlotPropertyBeam from "@/components/map/PlotPropertyBeam";
-import { farSideOf } from "@/lib/farSideOffset";
 import GroundGlow from "@/components/map/GroundGlow";
 import PlotPinMarker from "@/components/map/PlotPinMarker";
 import MarketRequestPrompt from "@/components/map/MarketRequestPrompt";
@@ -154,55 +152,17 @@ export default function MapPage() {
   // the world. Greg locked 2026-05-28 evening: "the bounce stays
   // with the UI, not the reticle."
   const popoverElRef = useRef<HTMLElement | null>(null);
-  // Wrap setSelectedLead so dismiss (null) also retracts the tether,
-  // clears the highlight APN, AND clears the card-anchor snapshot.
-  // On NEW selection, snapshot the camera lat/lng and compute the
-  // far-side coordinate ONCE per [[feedback-snapshot-state-at-fire-not-continuously]].
-  const FAR_SIDE_OFFSET_M = 10; // tight offset; tune after we see live render
+  // Wrap setSelectedLead so dismiss (null) also retracts the tether
+  // and clears the highlight APN. The card-anchor snapshot logic was
+  // removed when the HTML PlotCardMarker3D was dropped — the in-world
+  // tower+slab glb (PlotPropertyBeam) is the only card surface now and
+  // it mounts at the property's own lat/lng.
   const setSelectedLead = (next: Lead | null | ((prev: Lead | null) => Lead | null)) => {
     setSelectedLeadRaw((prev) => {
       const resolved = typeof next === 'function' ? next(prev) : next;
       if (resolved === null && prev !== null) {
-        // Card is closing — collapse the rebound beam + clear highlight + clear anchor.
         try { ritualTetherRef.current?.retract(); } catch { /* noop */ }
         setSelectedApn(null);
-        setCardAnchor(null);
-      } else if (resolved !== null && resolved.latitude != null && resolved.longitude != null) {
-        // Card is opening — snapshot the camera center and compute the
-        // far-side coordinate ONCE. Camera state is read from the
-        // gmp-map-3d element; falls back to property's own lat/lng if
-        // camera unreadable (degrades to anchored-at-property which is
-        // still better than top-center).
-        try {
-          const mapEl = map3DElRef.current as (HTMLElement & {
-            center?: { lat: number; lng: number; altitude?: number };
-          }) | null;
-          const cam = mapEl?.center;
-          if (cam && Number.isFinite(cam.lat) && Number.isFinite(cam.lng)) {
-            const farSide = farSideOf(
-              { lat: resolved.latitude, lng: resolved.longitude },
-              { lat: cam.lat, lng: cam.lng },
-              FAR_SIDE_OFFSET_M,
-            );
-            setCardAnchor(farSide);
-            // eslint-disable-next-line no-console
-            console.log(
-              `[card-anchor] property=(${resolved.latitude.toFixed(6)}, ${resolved.longitude.toFixed(6)})`,
-              `camera=(${cam.lat.toFixed(6)}, ${cam.lng.toFixed(6)})`,
-              `far-side=(${farSide.lat.toFixed(6)}, ${farSide.lng.toFixed(6)})`,
-              `offset=${FAR_SIDE_OFFSET_M}m`,
-            );
-          } else {
-            // No camera readable — fall back to property's own lat/lng
-            setCardAnchor({ lat: resolved.latitude, lng: resolved.longitude });
-            // eslint-disable-next-line no-console
-            console.warn('[card-anchor] camera unreadable, falling back to property coordinate');
-          }
-        } catch (e) {
-          setCardAnchor({ lat: resolved.latitude, lng: resolved.longitude });
-          // eslint-disable-next-line no-console
-          console.warn('[card-anchor] error reading camera, falling back:', e);
-        }
       }
       return resolved;
     });
@@ -236,15 +196,6 @@ export default function MapPage() {
   // so the actual lot polygon (from PostGIS) outlines under the card.
   // Locked 2026-05-30 evening per the in-world stack spec.
   const [selectedApn, setSelectedApn] = useState<string | null>(null);
-  // Snapshot of the FAR-SIDE coordinate where PlotCardMarker3D should
-  // mount. Computed once at the moment a property is selected (snapshot
-  // semantics — see [[feedback-snapshot-state-at-fire-not-continuously]]).
-  // The far-side position is along the camera→property bearing, extended
-  // past the property by FAR_SIDE_OFFSET_M meters, so the photoreal
-  // building sits between the camera and the card. Google's renderer
-  // Z-occludes the card with the building mesh (we hope — this is the
-  // diagnostic). Cleared on dismiss.
-  const [cardAnchor, setCardAnchor] = useState<{ lat: number; lng: number } | null>(null);
   // Pin-style toolbar pills were stripped 2026-05-17; default to 'dots'
   // until the pin-style chooser gets a redesign that earns the chrome.
   const pinMode: PinMode = 'dots';
@@ -1117,7 +1068,9 @@ export default function MapPage() {
   //   position — Position-internal operator. Sees the agent toolkit plus
   //              Assign / Mark Hot. (Field not wired yet; future once the
   //              brokerage tenant column lands.)
-  const cardAudience: CardAudience = isSubscribed ? 'agent' : 'public';
+  // cardAudience was wired to the HTML PropertyCardBillboard; that card
+  // was removed (UI now lives in the world as the slab texture). When
+  // the click-through detail page lands, recompute audience there.
 
   return (
     <BuyerSettingsProvider>
@@ -1744,68 +1697,21 @@ export default function MapPage() {
         {/* PLOT TOWER — in-world info-pin tower (12m white square column
             rising from the property) with slab on top for the UI surface.
             Mounted at the property's lat/lng, altitudeM=0 so the tower
-            base sits on the ground. The slab's front face is where the
-            HTML card visually attaches. */}
+            base sits on the ground. The slab's front face carries the
+            card texture baked from Figma. scale=5 is intentionally large
+            for the first verification — we'll dial down once it's
+            visible. */}
         <PlotPropertyBeam
           mapElRef={map3DElRef}
           lat={selectedLead.latitude}
           lng={selectedLead.longitude}
           altitudeM={0}
+          scale={5}
         />
-        {/* DIAGNOSTIC: card mounts at the FAR-SIDE coordinate snapshotted
-            when the lead was selected (10m past the property from the
-            camera's POV at fire time). altitudeM=0 puts it on the
-            ground, so the photoreal building rises between camera and
-            card. If Google's renderer Z-occludes gmp-marker HTML with
-            building meshes, the card's bottom is invisible because it's
-            literally behind the building. Falls back to property
-            coordinate if camera wasn't readable at snapshot time. */}
-        <PlotCardMarker3D
-          mapElRef={map3DElRef}
-          lat={cardAnchor?.lat ?? selectedLead.latitude}
-          lng={cardAnchor?.lng ?? selectedLead.longitude}
-          altitudeM={0}
-        >
-          {/* PropertyCardBillboard — the new public-launch property card.
-              Off-white neumorphic, monthly-PITI headline by default
-              (toggle to price via the BuyerSettingsPanel above).
-              Status pill + button row vary by listing_status and the
-              user's audience (public vs agent vs position). The
-              monthly recalculates live as the user adjusts knobs in
-              the BuyerSettingsPanel above — single source of truth
-              via BuyerSettingsContext. */}
-          <PropertyCardBillboard
-            lead={selectedLead}
-            audience={cardAudience}
-            onClose={() => setSelectedLead(null)}
-            onApnResolved={setSelectedApn}
-            onAction={(action, lead) => {
-              if (action === 'tour' || action === 'save' || action === 'share' || action === 'notify') {
-                // Public-layer demand-capture routes through the existing
-                // inbox-message API. Each action surfaces a different
-                // server-side intent; for now the API treats them all as
-                // "buyer touched this listing."
-                fetch('/api/inbox/message', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    leadId: lead.id,
-                    action,
-                    address: lead.property_address,
-                    listingPrice: lead.listing_price,
-                  }),
-                }).catch(() => { /* silent — best-effort */ });
-              }
-              if (action === 'skiptrace' || action === 'postcard' || action === 'campaign' ||
-                  action === 'owner' || action === 'assign' || action === 'hot' || action === 'log') {
-                // Agent/Position-layer operator actions are gated to the
-                // subscription. Free public visitors get the upgrade gate.
-                if (!isSubscribed) { setShowGate(true); return; }
-                // TODO: wire to the agent-layer endpoints once Phase 2 lands.
-              }
-            }}
-          />
-        </PlotCardMarker3D>
+        {/* HTML PlotCardMarker3D REMOVED 2026-05-30 evening per the
+            "UI lives in the 3D world" direction. The tower+slab+card-
+            as-texture glb (mounted above) is the only card surface
+            now. No DOM overlay. */}
         </>
       )}
 

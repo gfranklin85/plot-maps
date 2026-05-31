@@ -765,10 +765,12 @@ function Inner({
         // gamepad A-press synthetic-click race can suppress its
         // follow-up parcel ray-cast. See A-press handler.
         lastPoiClickAtRef.current = performance.now();
-        // Fire the confirmation ritual; popup reveals after impact.
-        fireRitualRef.current(() => {
-          onGooglePoiClickRef.current?.(placeId, { lat, lng });
-        });
+        // Direct dispatch — no ritual zoom/tether. Greg's 2026-05-30
+        // call: selecting a property must not pull the camera or run
+        // an "awful zoom to the UI" while flying. The selection just
+        // surfaces the in-world card via PlotPropertyBeam; flight stays
+        // unbroken.
+        onGooglePoiClickRef.current?.(placeId, { lat, lng });
         return;
       }
       // LocationClickEvent — extract the click lat/lng. Resolve order
@@ -793,34 +795,27 @@ function Inner({
       const ac = new AbortController();
       lastParcelLookupAcRef.current?.abort();
       lastParcelLookupAcRef.current = ac;
-      // Fire the confirmation ritual IMMEDIATELY at the cursor pixel.
-      // The data query runs in parallel; whichever resolver wins
-      // (address vs parcel) is invoked from the reveal callback after
-      // impact + REVEAL_DELAY_AFTER_IMPACT_MS. If the API resolves
-      // before the reveal timer fires, we stash the result and fire
-      // exactly on time. If it resolves after, we fire whenever it
-      // lands (degraded but functional).
-      let resolved: { kind: 'address'; id: number; lat: number; lng: number }
-        | { kind: 'parcel'; apn: string; lat: number; lng: number }
-        | null = null;
-      let revealReady = false;
-      const tryReveal = () => {
-        if (!revealReady) return;
-        if (!resolved) return;
+      // Direct dispatch — no ritual zoom/tether. Whichever resolver
+      // wins (address vs parcel) fires its callback the instant the
+      // API returns. Flight is never interrupted. Greg locked
+      // 2026-05-30: no zoom-to-UI during flight.
+      const tryReveal = (
+        resolved:
+          | { kind: 'address'; id: number; lat: number; lng: number }
+          | { kind: 'parcel'; apn: string; lat: number; lng: number }
+      ) => {
         if (resolved.kind === 'address') {
           onAddressClickRef.current?.(resolved.id, { lat: resolved.lat, lng: resolved.lng });
         } else {
           onParcelClickRef.current?.(resolved.apn, { lat: resolved.lat, lng: resolved.lng });
         }
       };
-      fireRitualRef.current(() => { revealReady = true; tryReveal(); });
       // Try Plot address layer first.
       fetch(`/api/addresses/at-point?lat=${lat}&lng=${lng}&radius=30`, { signal: ac.signal })
         .then((r) => r.ok ? r.json() : null)
         .then((json) => {
           if (json && typeof json.id === 'number') {
-            resolved = { kind: 'address', id: json.id, lat, lng };
-            tryReveal();
+            tryReveal({ kind: 'address', id: json.id, lat, lng });
             return;
           }
           // No address hit — fall through to parcel.
@@ -828,8 +823,7 @@ function Inner({
             .then((r2) => r2.ok ? r2.json() : null)
             .then((parcelJson) => {
               if (!parcelJson || !parcelJson.apn) return;
-              resolved = { kind: 'parcel', apn: parcelJson.apn as string, lat, lng };
-              tryReveal();
+              tryReveal({ kind: 'parcel', apn: parcelJson.apn as string, lat, lng });
             });
         })
         .catch((err) => {

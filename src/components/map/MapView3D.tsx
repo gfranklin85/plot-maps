@@ -853,8 +853,17 @@ function Inner({
     // poisVisible is intentionally excluded — seeding the initial
     // attribute on mount is the only thing it does here; the reactive
     // effect just below handles subsequent toggles without remounting.
+    //
+    // `center` is ALSO intentionally excluded. This effect mounts the
+    // gmp-map-3d element ONCE per maps3d load. Including center in the
+    // dep array caused the effect to re-run on every click (onCenter-
+    // Changed → setMapCenter → new center prop → effect re-runs →
+    // cleanup unmounts the element → re-creates from the seed pose →
+    // user sees a violent "zoom far out" on every click). The seed is
+    // only used on first mount; subsequent center changes are routed
+    // through the gamepad/flyTo paths.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [maps3d, center]);
+  }, [maps3d]);
 
   // React to POI visibility prop changes (after mount). The user
   // toggling the POI button on the toolbar should reflect immediately

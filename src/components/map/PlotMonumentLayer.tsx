@@ -89,53 +89,77 @@ export default function PlotMonumentLayer({
   const animStateRef = useRef<Map<string, { startedAt: number; from: number; to: number; durationMs: number }>>(new Map());
   const rafRef = useRef<number | null>(null);
 
-  // Mount / unmount monuments as the viewport set changes
+  // Mount / unmount monuments as the viewport set changes.
+  //
+  // Refs aren't reactive — if mapElRef.current is null on first run we
+  // can't just bail and wait for a re-render; the effect won't fire
+  // again until `monuments` changes (which may never happen if the
+  // bbox fetch resolved before the map mounted). Same for the custom-
+  // elements registry. So poll the readiness conditions from inside
+  // the effect with a setTimeout retry, matching PlotPropertyBeam.
   useEffect(() => {
-    const mapEl = mapElRef.current;
-    if (!mapEl) {
-      console.log('[monument] viewport effect: mapEl not ready, skipping');
-      return;
-    }
-    const def = window.customElements?.get?.(MODEL_TAG);
-    if (!def) {
-      console.log('[monument] viewport effect:', MODEL_TAG, 'not registered yet, skipping');
-      return;
-    }
+    let retryId: number | null = null;
+    let attempt = 0;
+    const MAX_ATTEMPTS = 50;
+    let cancelled = false;
 
-    const currentApns = new Set(monuments.map(m => m.apn));
-    const mounted = modelsRef.current;
+    const sync = () => {
+      if (cancelled) return;
+      attempt += 1;
+      const mapEl = mapElRef.current;
+      const def = window.customElements?.get?.(MODEL_TAG);
+      if (!mapEl || !def) {
+        if (attempt < MAX_ATTEMPTS) {
+          retryId = window.setTimeout(sync, 100);
+        } else {
+          console.warn('[monument] gave up after', attempt, 'attempts: mapEl=', !!mapEl, 'def=', !!def);
+        }
+        return;
+      }
 
-    // Remove monuments that left the viewport
-    const apnsToRemove: string[] = [];
-    mounted.forEach((_, apn) => { if (!currentApns.has(apn)) apnsToRemove.push(apn); });
-    apnsToRemove.forEach(apn => {
-      const el = mounted.get(apn);
-      if (el) { try { el.remove(); } catch { /* already gone */ } }
-      mounted.delete(apn);
-      animStateRef.current.delete(apn);
-    });
+      const currentApns = new Set(monuments.map(m => m.apn));
+      const mounted = modelsRef.current;
 
-    // Mount monuments that entered the viewport
-    let mountedCount = 0;
-    for (const m of monuments) {
-      if (mounted.has(m.apn)) continue;
-      const el = document.createElement(MODEL_TAG) as Model3DInteractiveElement;
-      try { el.altitudeMode = 'RELATIVE_TO_GROUND'; } catch { /* noop */ }
-      try { el.position = { lat: m.lat, lng: m.lng, altitude: BURIED_ALT_M }; } catch { /* noop */ }
-      try { el.src = src; } catch { /* noop */ }
-      try { el.scale = scale; } catch { /* noop */ }
-      try { el.setAttribute('plot-monument', m.apn); } catch { /* noop */ }
-      mapEl.appendChild(el);
-      mounted.set(m.apn, el);
-      mountedCount += 1;
-    }
-    console.log(
-      '[monument] viewport sync:',
-      'incoming=', monuments.length,
-      'newly_mounted=', mountedCount,
-      'removed=', apnsToRemove.length,
-      'total_mounted=', mounted.size,
-    );
+      // Remove monuments that left the viewport
+      const apnsToRemove: string[] = [];
+      mounted.forEach((_, apn) => { if (!currentApns.has(apn)) apnsToRemove.push(apn); });
+      apnsToRemove.forEach(apn => {
+        const el = mounted.get(apn);
+        if (el) { try { el.remove(); } catch { /* already gone */ } }
+        mounted.delete(apn);
+        animStateRef.current.delete(apn);
+      });
+
+      // Mount monuments that entered the viewport
+      let mountedCount = 0;
+      for (const m of monuments) {
+        if (mounted.has(m.apn)) continue;
+        const el = document.createElement(MODEL_TAG) as Model3DInteractiveElement;
+        try { el.altitudeMode = 'RELATIVE_TO_GROUND'; } catch { /* noop */ }
+        try { el.position = { lat: m.lat, lng: m.lng, altitude: BURIED_ALT_M }; } catch { /* noop */ }
+        try { el.src = src; } catch { /* noop */ }
+        try { el.scale = scale; } catch { /* noop */ }
+        try { el.setAttribute('plot-monument', m.apn); } catch { /* noop */ }
+        mapEl.appendChild(el);
+        mounted.set(m.apn, el);
+        mountedCount += 1;
+      }
+      console.log(
+        '[monument] viewport sync:',
+        'incoming=', monuments.length,
+        'newly_mounted=', mountedCount,
+        'removed=', apnsToRemove.length,
+        'total_mounted=', mounted.size,
+        'attempt=', attempt,
+      );
+    };
+
+    sync();
+
+    return () => {
+      cancelled = true;
+      if (retryId !== null) window.clearTimeout(retryId);
+    };
   }, [monuments, mapElRef, src, scale]);
 
   // Update positions on any existing monument when its lat/lng changes

@@ -34,13 +34,21 @@ export function useIdleDetection(): boolean {
   // Snapshot of last gamepad state so we can detect stick/trigger
   // movement without firing on rest-state poll cycles.
   const lastGamepadSnapshotRef = useRef<string>('');
+  // Live ref of isIdle so the effect can read it without re-installing
+  // listeners every time it flips. The effect dep array stays empty —
+  // mount listeners once for the lifetime of the component.
+  const isIdleRef = useRef<boolean>(false);
+  isIdleRef.current = isIdle;
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
     function markActive() {
       lastActivityRef.current = performance.now();
-      if (isIdle) setIsIdle(false);
+      if (isIdleRef.current) {
+        isIdleRef.current = false;
+        setIsIdle(false);
+      }
     }
 
     // ── Standard DOM input listeners ────────────────────────────────
@@ -94,7 +102,10 @@ export function useIdleDetection(): boolean {
     const tickId = window.setInterval(() => {
       const elapsed = performance.now() - lastActivityRef.current;
       const shouldBeIdle = elapsed > IDLE_THRESHOLD_MS;
-      if (shouldBeIdle !== isIdle) setIsIdle(shouldBeIdle);
+      if (shouldBeIdle !== isIdleRef.current) {
+        isIdleRef.current = shouldBeIdle;
+        setIsIdle(shouldBeIdle);
+      }
     }, 1000);
 
     return () => {
@@ -107,7 +118,11 @@ export function useIdleDetection(): boolean {
       window.clearInterval(pollId);
       window.clearInterval(tickId);
     };
-  }, [isIdle]);
+    // Empty dep array intentional — listeners install ONCE for the
+    // component lifetime. Reading isIdle through isIdleRef means we
+    // never need to re-run this effect.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return isIdle;
 }

@@ -1713,6 +1713,56 @@ export default function MapPage() {
         </>
       )}
 
+      {/* ═══ SELECTED PROPERTY SIDEBAR (LEFT) ═══
+          Mounts on parcel selection. Mirrors the pinnedRef sidebar
+          pattern but anchored LEFT so the two can coexist. Reads the
+          parcel:<APN> stub id in PropertyPopup, which fetches the
+          full assessor stack via /api/parcel?apn=. Side panel doesn't
+          fight the camera (no auto-zoom) and doesn't cover the
+          highlighted lot polygon centered on screen. */}
+      {selectedLead && !walkMode && !expandedLead && !pinnedRef && (
+        <div className="absolute left-0 top-0 h-full w-full md:w-[400px] z-20 bg-card/95 backdrop-blur-xl border-r border-card-border shadow-2xl flex flex-col overflow-hidden">
+          <div className="px-4 py-3 bg-primary/10 border-b border-card-border shrink-0 flex items-center justify-between">
+            <span className="text-[10px] font-black uppercase tracking-[0.15em] text-primary">
+              Selected Property
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => { setPinnedRef(selectedLead); setSelectedLead(null); }}
+                className="text-[10px] font-bold text-primary uppercase tracking-widest hover:underline flex items-center gap-1"
+                title="Pin as reference"
+              >
+                <MaterialIcon icon="push_pin" className="text-[14px]" />
+                Pin
+              </button>
+              <button
+                onClick={() => setSelectedLead(null)}
+                className="text-secondary hover:text-on-surface"
+                title="Close"
+              >
+                <MaterialIcon icon="close" className="text-[18px]" />
+              </button>
+            </div>
+          </div>
+          <div className="flex-1 overflow-y-auto">
+            <PropertyPopup
+              lead={selectedLead}
+              onUpdate={refetchLeads}
+              onToggleProspectMode={() => handleToggleProspectMode(selectedLead)}
+              prospectMode={prospectMode}
+              onWalkHere={(lead) => {
+                if (!isSubscribed) { setShowGate(true); return; }
+                if (lead.latitude && lead.longitude) {
+                  setMapCenter({ lat: lead.latitude, lng: lead.longitude });
+                  setWalkMode(true);
+                }
+              }}
+              onClose={() => setSelectedLead(null)}
+            />
+          </div>
+        </div>
+      )}
+
       {/* ═══ MONUMENT LAYER ═══
           Every parcel in the camera radius has its monument pre-mounted
           BURIED beneath its own backyard (altitudeM = -30m). Selection

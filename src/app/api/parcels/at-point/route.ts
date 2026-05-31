@@ -44,14 +44,27 @@ export async function GET(req: Request) {
   if (!row || !row.apn) {
     return NextResponse.json({ apn: null, lat, lng });
   }
+  // Defensive runaway-polygon clamp. Some ingested rows (the "always-
+  // Leoni-Dr" bug, 2026-05-26) have a corrupted geom that covers the
+  // entire neighborhood instead of a single lot, so ST_Contains matches
+  // them for every click in town. Reject anything larger than a
+  // residential lot until the bad geom is fixed at the DB layer.
+  // Threshold: 50,000 sqm = ~12 acres. Real residential parcels are
+  // 500-3000 sqm; large commercial up to ~20,000 sqm. Anything over
+  // 50k is corrupted geometry, not a real parcel.
+  const RUNAWAY_AREA_SQM = 50_000;
+  const areaSqm = typeof row.area_sqm === 'number' ? row.area_sqm : null;
+  if (areaSqm !== null && areaSqm > RUNAWAY_AREA_SQM) {
+    console.warn(
+      `[parcel_at_point] rejecting runaway parcel ${row.apn} (area=${areaSqm.toFixed(0)} sqm) at ${lat},${lng}`,
+    );
+    return NextResponse.json({ apn: null, lat, lng, rejectedRunaway: true });
+  }
   return NextResponse.json({
     apn: row.apn as string,
     address: (row.address as string | null) ?? null,
     city: (row.city as string | null) ?? null,
-    // Diagnostic fields (2026-05-26 — chase always-Leoni-Dr bug).
-    // area_sqm should be ~500–3000 for a residential lot. n_points
-    // should be ~5-30. Way larger = ingested geometry is wrong.
-    areaSqm: typeof row.area_sqm === 'number' ? row.area_sqm : null,
+    areaSqm,
     nPoints: typeof row.n_points === 'number' ? row.n_points : null,
     lat,
     lng,

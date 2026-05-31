@@ -1699,7 +1699,7 @@ export default function MapPage() {
           mapElRef={map3DElRef}
           lat={selectedLead.latitude}
           lng={selectedLead.longitude}
-          altitudeM={12}
+          altitudeM={25}
         >
           {/* PropertyCardBillboard — the new public-launch property card.
               Off-white neumorphic, monthly-PITI headline by default

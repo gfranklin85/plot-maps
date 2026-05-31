@@ -297,10 +297,10 @@ export default function PropertyCardBillboard({ lead: rawLead, audience = 'publi
 
       <style jsx>{`
         .pcb-root {
-          width: 480px;
+          width: 300px;
           max-width: calc(100vw - 32px);
           background: var(--plot-card-surface);
-          border-radius: 24px;
+          border-radius: 18px;
           overflow: hidden;
           box-shadow:
             0 20px 50px var(--plot-card-shadow),

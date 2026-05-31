@@ -91,20 +91,38 @@ export default function PlotCardMarker3D({
       // eslint-disable-next-line no-console
       console.log(`[PlotCardMarker3D] using <${winnerTag}> at ${lat},${lng},${altitudeM}m`);
 
-      const marker = document.createElement(winnerTag);
-      // gmp-marker's position attribute is "lat,lng[,altitude]" (string).
-      // gmp-advanced-marker also accepts a comma-separated position string.
-      marker.setAttribute('position', `${lat},${lng},${altitudeM}`);
+      // Try setting position as an OBJECT property first (the modern
+      // AdvancedMarkerElement API), then fall back to the comma-separated
+      // attribute (older signature) if the object form rejects. We log
+      // which path succeeded so we can debug if neither projects.
+      const marker = document.createElement(winnerTag) as HTMLElement & {
+        position?: unknown;
+      };
+      let positionSetVia = 'attr';
+      try {
+        // Modern shape — AdvancedMarkerElement.position
+        marker.position = { lat, lng, altitude: altitudeM };
+        positionSetVia = 'prop-obj';
+      } catch {
+        try {
+          marker.setAttribute('position', `${lat},${lng},${altitudeM}`);
+          positionSetVia = 'attr';
+        } catch { /* ignore */ }
+      }
       marker.setAttribute('plot-card-billboard', '');
 
       // Host element — receives the React children via portal. The host
       // is inside the marker so Google tracks its world position.
+      //
+      // IMPORTANT — no positioning transform here. Earlier versions
+      // applied translate(-50%, -100%) to anchor the card's bottom-
+      // center at the marker's world point. That transform was applied
+      // INSIDE the marker's coordinate system, which broke projection.
+      // Google's marker handles world-anchoring; we let the children
+      // sit at the host's origin and Google places that origin in 2D
+      // screen space at the projected lat/lng each frame.
       const div = document.createElement('div');
       div.setAttribute('data-plot-card-host', '1');
-      // Anchor the card's bottom-center at the marker's world point so
-      // the property reads first and the card floats above.
-      div.style.position = 'relative';
-      div.style.transform = 'translate(-50%, -100%)';
       div.style.pointerEvents = 'auto';
 
       marker.appendChild(div);
@@ -113,6 +131,11 @@ export default function PlotCardMarker3D({
       createdMarker = marker;
       markerRef.current = marker;
       setHost(div);
+
+      // eslint-disable-next-line no-console
+      console.log(
+        `[PlotCardMarker3D] mounted <${winnerTag}> position via ${positionSetVia} at lat=${lat} lng=${lng} alt=${altitudeM}m`
+      );
     };
 
     tryMount();
@@ -130,11 +153,15 @@ export default function PlotCardMarker3D({
 
   // Update marker position when lat/lng/altitude change without remount.
   useEffect(() => {
-    const m = markerRef.current;
+    const m = markerRef.current as (HTMLElement & { position?: unknown }) | null;
     if (!m) return;
     try {
-      m.setAttribute('position', `${lat},${lng},${altitudeM}`);
-    } catch { /* ignore */ }
+      m.position = { lat, lng, altitude: altitudeM };
+    } catch {
+      try {
+        m.setAttribute('position', `${lat},${lng},${altitudeM}`);
+      } catch { /* ignore */ }
+    }
   }, [lat, lng, altitudeM]);
 
   if (!host) return null;

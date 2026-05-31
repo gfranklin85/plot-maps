@@ -19,7 +19,6 @@ import { BuyerSettingsProvider } from "@/lib/buyer-settings/context";
 import BuyerSettingsPanel from "@/components/map/BuyerSettingsPanel";
 import PlotCardMarker3D from "@/components/map/PlotCardMarker3D";
 import PlotPropertyHighlight from "@/components/map/PlotPropertyHighlight";
-import PlotPropertyBeam from "@/components/map/PlotPropertyBeam";
 import GroundGlow from "@/components/map/GroundGlow";
 import PlotPinMarker from "@/components/map/PlotPinMarker";
 import MarketRequestPrompt from "@/components/map/MarketRequestPrompt";
@@ -1681,25 +1680,17 @@ export default function MapPage() {
           mapElRef={map3DElRef}
           apn={selectedApn}
         />
-        {/* LAYER 4 — Plot beam projector + card slab. Blender glb at
-            /assets/markers/plot-beam.glb, mounted via gmp-model-3d-
-            interactive at the property's lat/lng. Beam origin sits on
-            the roof; slab on top of beam at ~7.5m local Z.
-            scale + orientation are diagnostic knobs while we tune the
-            live-render presentation; first deploy showed tiny + flat. */}
-        <PlotPropertyBeam
-          mapElRef={map3DElRef}
-          lat={selectedLead.latitude}
-          lng={selectedLead.longitude}
-          altitudeM={0}
-          scale={1}
-          orientation={{ heading: 0, tilt: 0, roll: 0 }}
-        />
+        {/* Plot beam + slab cinematic PARKED 2026-05-30 per
+            [[project-rooted-rise-card-no-visible-base]]. The card now
+            rises from the rooftop directly via PlotCardMarker3D's
+            clipping wrapper. The beam asset (plot-beam.glb + .blend)
+            stays in the repo for future use cases (premium listings,
+            Plot Space, hero properties); just not surfaced here. */}
         <PlotCardMarker3D
           mapElRef={map3DElRef}
           lat={selectedLead.latitude}
           lng={selectedLead.longitude}
-          altitudeM={25}
+          altitudeM={8}
         >
           {/* PropertyCardBillboard — the new public-launch property card.
               Off-white neumorphic, monthly-PITI headline by default

@@ -45,11 +45,13 @@ interface Model3DInteractiveElement extends HTMLElement {
 
 const MODEL_TAG = 'gmp-model-3d-interactive';
 
-// Altitude in meters. Buried far below ground so even at steep camera
-// angles you can't see the top peeking through the photoreal mesh.
-const BURIED_ALT_M = -30;
-// Resting altitude when fully risen. Slight positive lift so the slab
-// sits ABOVE the building roof instead of intersecting it.
+// Altitude in meters. Set to surface (0m) so EVERY parcel in the
+// camera radius has its monument visible above ground. The rise/sink
+// animation is parked until the visible-state is confirmed; for now
+// monuments mount at ground level and stay there. Greg 2026-05-30:
+// "can we stick a monument under every parcel" → start by making
+// them visible, then add the rise.
+const BURIED_ALT_M = 0;
 const RISEN_ALT_M = 0;
 // Rise/sink durations
 const RISE_MS = 850;

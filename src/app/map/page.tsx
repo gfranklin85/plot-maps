@@ -14,7 +14,6 @@ import { useAuth } from "@/lib/auth-context";
 import MaterialIcon from "@/components/ui/MaterialIcon";
 import UpgradeGate from "@/components/ui/UpgradeGate";
 import PropertyPopup from "@/components/map/PropertyPopup";
-import type { CardAudience } from "@/components/map/PropertyCardBillboard";
 import { BuyerSettingsProvider } from "@/lib/buyer-settings/context";
 import BuyerSettingsPanel from "@/components/map/BuyerSettingsPanel";
 import PlotPropertyHighlight from "@/components/map/PlotPropertyHighlight";

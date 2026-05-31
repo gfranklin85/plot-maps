@@ -795,36 +795,22 @@ function Inner({
       const ac = new AbortController();
       lastParcelLookupAcRef.current?.abort();
       lastParcelLookupAcRef.current = ac;
-      // Direct dispatch — no ritual zoom/tether. Whichever resolver
-      // wins (address vs parcel) fires its callback the instant the
-      // API returns. Flight is never interrupted. Greg locked
-      // 2026-05-30: no zoom-to-UI during flight.
-      const tryReveal = (
-        resolved:
-          | { kind: 'address'; id: number; lat: number; lng: number }
-          | { kind: 'parcel'; apn: string; lat: number; lng: number }
-      ) => {
-        if (resolved.kind === 'address') {
-          onAddressClickRef.current?.(resolved.id, { lat: resolved.lat, lng: resolved.lng });
-        } else {
-          onParcelClickRef.current?.(resolved.apn, { lat: resolved.lat, lng: resolved.lng });
-        }
-      };
-      // Try Plot address layer first.
-      fetch(`/api/addresses/at-point?lat=${lat}&lng=${lng}&radius=30`, { signal: ac.signal })
+      // PARCELS-ONLY resolver. Greg locked 2026-05-30 evening: monument
+      // belongs to a parcel; clicks on streets / sidewalks / non-parcel
+      // ground are a deliberate no-op. No address-layer fallback — the
+      // address layer was raising the slab anywhere in town.
+      //
+      // The page mounts the rising slab at the parcel's stored MONUMENT
+      // ANCHOR (its pre-computed backyard coord), not the click point.
+      // The click is just the trigger; the geometry decides where the
+      // monument rises from.
+      fetch(`/api/parcels/at-point?lat=${lat}&lng=${lng}`, { signal: ac.signal })
         .then((r) => r.ok ? r.json() : null)
-        .then((json) => {
-          if (json && typeof json.id === 'number') {
-            tryReveal({ kind: 'address', id: json.id, lat, lng });
-            return;
-          }
-          // No address hit — fall through to parcel.
-          return fetch(`/api/parcels/at-point?lat=${lat}&lng=${lng}`, { signal: ac.signal })
-            .then((r2) => r2.ok ? r2.json() : null)
-            .then((parcelJson) => {
-              if (!parcelJson || !parcelJson.apn) return;
-              tryReveal({ kind: 'parcel', apn: parcelJson.apn as string, lat, lng });
-            });
+        .then((parcelJson) => {
+          if (!parcelJson || !parcelJson.apn) return;
+          const mlat = typeof parcelJson.monumentLat === 'number' ? parcelJson.monumentLat : lat;
+          const mlng = typeof parcelJson.monumentLng === 'number' ? parcelJson.monumentLng : lng;
+          onParcelClickRef.current?.(parcelJson.apn as string, { lat: mlat, lng: mlng });
         })
         .catch((err) => {
           if ((err as Error).name !== 'AbortError') {

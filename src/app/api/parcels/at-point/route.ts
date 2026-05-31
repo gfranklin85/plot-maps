@@ -60,12 +60,23 @@ export async function GET(req: Request) {
     );
     return NextResponse.json({ apn: null, lat, lng, rejectedRunaway: true });
   }
+  // Monument anchor — the pre-computed backyard lat/lng where this
+  // parcel's monument lives buried. The client mounts the rising slab
+  // at THIS coordinate, NOT the click point. Falls back to the click
+  // point only if the parcel pre-dates the monument backfill migration.
+  const monumentLat =
+    typeof row.monument_lat === 'number' ? row.monument_lat : null;
+  const monumentLng =
+    typeof row.monument_lng === 'number' ? row.monument_lng : null;
+
   return NextResponse.json({
     apn: row.apn as string,
     address: (row.address as string | null) ?? null,
     city: (row.city as string | null) ?? null,
     areaSqm,
     nPoints: typeof row.n_points === 'number' ? row.n_points : null,
+    monumentLat,
+    monumentLng,
     lat,
     lng,
   });

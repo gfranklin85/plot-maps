@@ -17,7 +17,8 @@ import PropertyPopup from "@/components/map/PropertyPopup";
 import { BuyerSettingsProvider } from "@/lib/buyer-settings/context";
 import BuyerSettingsPanel from "@/components/map/BuyerSettingsPanel";
 import PlotPropertyHighlight from "@/components/map/PlotPropertyHighlight";
-import PlotPropertyBeam from "@/components/map/PlotPropertyBeam";
+import PlotMonumentLayer from "@/components/map/PlotMonumentLayer";
+import { useViewportMonuments } from "@/lib/useViewportMonuments";
 import GroundGlow from "@/components/map/GroundGlow";
 import PlotPinMarker from "@/components/map/PlotPinMarker";
 import MarketRequestPrompt from "@/components/map/MarketRequestPrompt";
@@ -162,6 +163,15 @@ export default function MapPage() {
       if (resolved === null && prev !== null) {
         try { ritualTetherRef.current?.retract(); } catch { /* noop */ }
         setSelectedApn(null);
+      } else if (resolved !== null) {
+        // Extract APN from parcel:<APN> stub ids so the monument layer
+        // knows which buried monument to rise. Non-parcel selections
+        // (gpoi, addr, mock, real leads) leave the APN untouched and
+        // the layer simply doesn't rise anything.
+        const id = resolved.id ?? '';
+        if (typeof id === 'string' && id.startsWith('parcel:')) {
+          setSelectedApn(id.slice('parcel:'.length));
+        }
       }
       return resolved;
     });
@@ -195,6 +205,9 @@ export default function MapPage() {
   // so the actual lot polygon (from PostGIS) outlines under the card.
   // Locked 2026-05-30 evening per the in-world stack spec.
   const [selectedApn, setSelectedApn] = useState<string | null>(null);
+  // Every parcel near the camera has its monument pre-mounted (buried)
+  // in its own backyard via PlotMonumentLayer. The hook re-fetches as
+  // the camera flies; the layer mounts/unmounts glbs to match.
   // Pin-style toolbar pills were stripped 2026-05-17; default to 'dots'
   // until the pin-style chooser gets a redesign that earns the chrome.
   const pinMode: PinMode = 'dots';
@@ -842,6 +855,10 @@ export default function MapPage() {
   // and seeds the default. Both the visual MapReticle and the
   // controller's hit-test sample point read from this.
   const { position: reticlePosition } = useReticlePosition();
+  // Monument anchors for every parcel in the camera radius. Re-fetches
+  // debounced as the camera moves. PlotMonumentLayer mounts one buried
+  // monument glb per anchor; selection raises the selected one.
+  const viewportMonuments = useViewportMonuments(mapCenter);
   // Flight feel tuning — single master multiplier + preset chips.
   // Lives in a toolbar-opened panel; live-previews changes while open.
   const { tuning: flightTuning, setMultiplier: setFlightMultiplier, setClimbRate: setFlightClimbRate, setTurnRate: setFlightTurnRate, setTiltRate: setFlightTiltRate, resetToDefault: resetFlightTuning } = useFlightTuning();
@@ -1686,32 +1703,31 @@ export default function MapPage() {
           lat={selectedLead.latitude}
           lng={selectedLead.longitude}
         />
-        {/* LAYER 5 — Real parcel polygon highlight from PostGIS.
-            Covers Kings/Tulare/Fresno/Sacramento today; outside coverage
+        {/* Real parcel polygon highlight from PostGIS. Covers
+            Kings/Tulare/Fresno/Sacramento today; outside coverage
             renders nothing (no fabricated footprint). */}
         <PlotPropertyHighlight
           mapElRef={map3DElRef}
           apn={selectedApn}
         />
-        {/* PLOT TOWER — in-world info-pin tower (12m white square column
-            rising from the property) with slab on top for the UI surface.
-            Mounted at the property's lat/lng, altitudeM=0 so the tower
-            base sits on the ground. The slab's front face carries the
-            card texture baked from Figma. scale=5 is intentionally large
-            for the first verification — we'll dial down once it's
-            visible. */}
-        <PlotPropertyBeam
+        </>
+      )}
+
+      {/* ═══ MONUMENT LAYER ═══
+          Every parcel in the camera radius has its monument pre-mounted
+          BURIED beneath its own backyard (altitudeM = -30m). Selection
+          rises THAT parcel's monument to ground level with a heavy
+          ease-out + settle. Dismiss reverses. The data is the source of
+          truth; the renderer just animates visibility.
+          Greg locked 2026-05-30: "each place has its hidden huge slab
+          monument below ready to rise." */}
+      {!walkMode && (
+        <PlotMonumentLayer
           mapElRef={map3DElRef}
-          lat={selectedLead.latitude}
-          lng={selectedLead.longitude}
-          altitudeM={0}
+          monuments={viewportMonuments}
+          selectedApn={selectedApn}
           scale={5}
         />
-        {/* HTML PlotCardMarker3D REMOVED 2026-05-30 evening per the
-            "UI lives in the 3D world" direction. The tower+slab+card-
-            as-texture glb (mounted above) is the only card surface
-            now. No DOM overlay. */}
-        </>
       )}
 
       {/* ═══ EXPANDED FULL SIDEBAR — deep dive on selected property ═══ */}

@@ -17,8 +17,6 @@ import PropertyPopup from "@/components/map/PropertyPopup";
 import { BuyerSettingsProvider } from "@/lib/buyer-settings/context";
 import BuyerSettingsPanel from "@/components/map/BuyerSettingsPanel";
 import PlotPropertyHighlight from "@/components/map/PlotPropertyHighlight";
-import PlotMonumentLayer from "@/components/map/PlotMonumentLayer";
-import { useViewportMonuments } from "@/lib/useViewportMonuments";
 import GroundGlow from "@/components/map/GroundGlow";
 import PlotPinMarker from "@/components/map/PlotPinMarker";
 import MarketRequestPrompt from "@/components/map/MarketRequestPrompt";
@@ -867,10 +865,11 @@ export default function MapPage() {
   // and seeds the default. Both the visual MapReticle and the
   // controller's hit-test sample point read from this.
   const { position: reticlePosition } = useReticlePosition();
-  // Monument anchors for every parcel in the camera radius. Re-fetches
-  // debounced as the camera moves. PlotMonumentLayer mounts one buried
-  // monument glb per anchor; selection raises the selected one.
-  const viewportMonuments = useViewportMonuments(mapCenter);
+  // Monument viewport mass-mount REMOVED 2026-05-31. Greg's call: pre-
+  // mounting 1000 buried glbs per viewport is the wrong axis. The
+  // monument spawns ON the selected parcel only (1, not 1000). When
+  // we re-introduce it, mount it on `selectedApn` directly at the
+  // parcel's stored monument_lat/lng — no viewport fetch needed.
   // Flight feel tuning — single master multiplier + preset chips.
   // Lives in a toolbar-opened panel; live-previews changes while open.
   const { tuning: flightTuning, setMultiplier: setFlightMultiplier, setClimbRate: setFlightClimbRate, setTurnRate: setFlightTurnRate, setTiltRate: setFlightTiltRate, resetToDefault: resetFlightTuning } = useFlightTuning();
@@ -1742,23 +1741,6 @@ export default function MapPage() {
         </>
       )}
 
-
-      {/* ═══ MONUMENT LAYER ═══
-          Every parcel in the camera radius has its monument pre-mounted
-          BURIED beneath its own backyard (altitudeM = -30m). Selection
-          rises THAT parcel's monument to ground level with a heavy
-          ease-out + settle. Dismiss reverses. The data is the source of
-          truth; the renderer just animates visibility.
-          Greg locked 2026-05-30: "each place has its hidden huge slab
-          monument below ready to rise." */}
-      {!walkMode && (
-        <PlotMonumentLayer
-          mapElRef={map3DElRef}
-          monuments={viewportMonuments}
-          selectedApn={selectedApn}
-          scale={5}
-        />
-      )}
 
       {/* ═══ EXPANDED FULL SIDEBAR — deep dive on selected property ═══ */}
       {expandedLead && !walkMode && (

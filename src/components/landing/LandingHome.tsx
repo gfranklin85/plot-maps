@@ -26,54 +26,31 @@ import {
   LANDING_DESTINATIONS,
   type Destination,
 } from '@/lib/destinations';
-import { supabase } from '@/lib/supabase';
+import ArrivalSequence from '@/components/landing/destinations/ArrivalSequence';
 
-// Set the arrival cookies + dispatch Google OAuth. Mirrors the pattern
-// in ArrivalSequence (which is wired for the LandingCarousel surface).
-// Cookie scoped to .plot.solutions so it survives the apex↔subdomain
-// hop through Google. After OAuth, /auth/callback reads the cookie
-// and routes to /landing?resumeArrival=1&dest=<slug>, which we then
-// forward to /map?destination=<slug>.
-//
-// Greg locked 2026-05-31: universal Google OAuth — every action that
-// takes the user into the product surface dispatches sign-in first.
-async function dispatchOauthWithDestination(slug: string | null) {
-  if (typeof document !== 'undefined' && slug) {
-    const host = window.location.hostname;
-    const domainAttr =
-      host.endsWith('.plot.solutions') || host === 'plot.solutions'
-        ? '; domain=.plot.solutions'
-        : '';
-    const v = encodeURIComponent(slug);
-    document.cookie = `pm_arrival_dest=${v}; path=/; max-age=600; samesite=lax; secure${domainAttr}`;
-    document.cookie = `pm_arrival_oauth=1; path=/; max-age=600; samesite=lax; secure${domainAttr}`;
-  }
-  try {
-    await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
-  } catch (err) {
-    console.error('[LandingHome] signInWithOAuth failed', err);
-  }
-}
-
-// Store an ad-hoc lat/lng/label so /landing?resumeArrival=1 can forward
-// to /map?q=&lat=&lng= after the OAuth round trip. Cookie scoped same
-// way as the destination one. Used by the search bar when the user
-// types a place that isn't one of our curated destinations.
-function stashSearchHit(payload: { q: string; lat: number; lng: number }) {
-  if (typeof document === 'undefined') return;
-  const host = window.location.hostname;
-  const domainAttr =
-    host.endsWith('.plot.solutions') || host === 'plot.solutions'
-      ? '; domain=.plot.solutions'
-      : '';
-  const v = encodeURIComponent(JSON.stringify(payload));
-  document.cookie = `pm_arrival_search=${v}; path=/; max-age=600; samesite=lax; secure${domainAttr}`;
-  document.cookie = `pm_arrival_oauth=1; path=/; max-age=600; samesite=lax; secure${domainAttr}`;
+// Build a synthetic Destination object for a search-bar hit so we can
+// hand it to ArrivalSequence (which expects the Destination shape).
+// The slug becomes the search query for downstream routing; lat/lng
+// come from the place-details / geocode resolution.
+function buildSearchDestination(payload: {
+  q: string;
+  lat: number;
+  lng: number;
+}): Destination {
+  return {
+    slug: `search:${encodeURIComponent(payload.q)}`,
+    name: payload.q,
+    region: '',
+    surfaces: ['landing'],
+    pose: {
+      lat: payload.lat,
+      lng: payload.lng,
+      altitude: 280,
+      heading: 0,
+      pitch: -45,
+      range: 600,
+    },
+  };
 }
 
 interface Suggestion {
@@ -88,6 +65,11 @@ export default function LandingHome() {
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const stripRef = useRef<HTMLDivElement | null>(null);
+  // Active arrival — when set, ArrivalSequence overlays the landing
+  // and runs darken → instrument → manifest (OAuth) → expansion →
+  // release into /map. Both the search bar and destination cards
+  // set this; ArrivalSequence owns the cookie + OAuth dispatch.
+  const [arrivalDestination, setArrivalDestination] = useState<Destination | null>(null);
 
   // ── Autocomplete state ───────────────────────────────────────
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
@@ -151,10 +133,11 @@ export default function LandingHome() {
   // - Suggestion picked → resolve place_id to lat/lng via place-details
   // - Raw text → fall back to /api/public/geocode (current behavior)
   // Picking a suggestion or submitting the search bar resolves the
-  // place to lat/lng/label, stashes it in a cookie, and dispatches
-  // Google OAuth. After OAuth, /auth/callback reads the cookie and
-  // forwards to /map with the destination preserved. Greg locked
-  // 2026-05-31: universal OAuth before any product surface.
+  // place to lat/lng and mounts the ArrivalSequence cinematic. That
+  // sequence owns the Flight Manifest OAuth gate, the camera approach,
+  // and the handoff into /map. Greg locked 2026-05-31: ArrivalSequence
+  // is THE sign-in surface — no boring /login page, no popup, no
+  // direct OAuth dispatch outside the cinematic.
   const pickSuggestion = useCallback(
     async (s: Suggestion) => {
       setShowSuggestions(false);
@@ -167,21 +150,19 @@ export default function LandingHome() {
         );
         const data = await res.json().catch(() => ({}));
         if (!res.ok || !data?.hit) {
-          // Couldn't resolve — still send the user into OAuth with the
-          // raw text as a miss; the map handles it with the
-          // market-request prompt.
-          stashSearchHit({ q: s.mainText, lat: NaN, lng: NaN });
-          await dispatchOauthWithDestination(null);
+          setSearchError("Couldn't resolve that place. Try a destination below.");
+          setSearching(false);
           return;
         }
-        stashSearchHit({
-          q: data.formatted || s.mainText,
-          lat: Number(data.lat),
-          lng: Number(data.lng),
-        });
-        await dispatchOauthWithDestination(null);
+        setArrivalDestination(
+          buildSearchDestination({
+            q: data.formatted || s.mainText,
+            lat: Number(data.lat),
+            lng: Number(data.lng),
+          }),
+        );
       } catch {
-        setSearchError('Sign-in is unavailable right now. Try a destination card below.');
+        setSearchError('Search is unavailable right now. Try a destination card below.');
         setSearching(false);
       }
     },
@@ -201,14 +182,19 @@ export default function LandingHome() {
       const res = await fetch(`/api/public/geocode?q=${encodeURIComponent(q)}`);
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data?.hit) {
-        stashSearchHit({ q, lat: NaN, lng: NaN });
-        await dispatchOauthWithDestination(null);
+        setSearchError("Couldn't resolve that place. Try a destination below.");
+        setSearching(false);
         return;
       }
-      stashSearchHit({ q, lat: Number(data.lat), lng: Number(data.lng) });
-      await dispatchOauthWithDestination(null);
+      setArrivalDestination(
+        buildSearchDestination({
+          q,
+          lat: Number(data.lat),
+          lng: Number(data.lng),
+        }),
+      );
     } catch {
-      setSearchError('Sign-in is unavailable right now. Try a destination card below.');
+      setSearchError('Search is unavailable right now. Try a destination card below.');
       setSearching(false);
     }
   }, [query, showSuggestions, highlightIdx, suggestions, pickSuggestion]);
@@ -438,7 +424,11 @@ export default function LandingHome() {
             }}
           >
             {LANDING_DESTINATIONS.map((d) => (
-              <DestinationCard key={d.slug} destination={d} />
+              <DestinationCard
+                key={d.slug}
+                destination={d}
+                onSelect={setArrivalDestination}
+              />
             ))}
           </div>
         </div>
@@ -514,19 +504,37 @@ export default function LandingHome() {
       </section>
 
       <PositionFooter />
+
+      {/* Flight Manifest cinematic — full-viewport overlay that runs
+          darken → instrument → manifest (OAuth) → expansion → release
+          into /map. Cancel returns the visitor to LandingHome. */}
+      {arrivalDestination && (
+        <ArrivalSequence
+          destination={arrivalDestination}
+          onCancel={() => {
+            setArrivalDestination(null);
+            setSearching(false);
+          }}
+        />
+      )}
     </div>
   );
 }
 
 // ── DestinationCard ─────────────────────────────────────────────
-// Clicking a card flies the map to the destination's hand-tuned pose.
-// The map page already accepts ?destination=<slug> and resolves it
-// via findDestinationBySlug().
-function DestinationCard({ destination }: { destination: Destination }) {
+// Clicking a card mounts the ArrivalSequence cinematic on this destination.
+// The sequence owns: darken → instrument → Flight Manifest OAuth → expansion → release into /map.
+function DestinationCard({
+  destination,
+  onSelect,
+}: {
+  destination: Destination;
+  onSelect: (d: Destination) => void;
+}) {
   return (
     <button
       type="button"
-      onClick={() => { void dispatchOauthWithDestination(destination.slug); }}
+      onClick={() => onSelect(destination)}
       className="snap-start shrink-0 group relative overflow-hidden rounded-2xl bg-zinc-900 border border-zinc-800 hover:border-amber-300/50 transition-all w-[260px] h-[320px] text-left focus:outline-none focus:ring-2 focus:ring-amber-300/40"
       aria-label={`Fly to ${destination.name}`}
     >

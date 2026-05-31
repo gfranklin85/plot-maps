@@ -92,11 +92,13 @@ export default function PlotMonumentLayer({
   // Mount / unmount monuments as the viewport set changes
   useEffect(() => {
     const mapEl = mapElRef.current;
-    if (!mapEl) return;
+    if (!mapEl) {
+      console.log('[monument] viewport effect: mapEl not ready, skipping');
+      return;
+    }
     const def = window.customElements?.get?.(MODEL_TAG);
     if (!def) {
-      // Map3D web components not registered yet — skip. The next
-      // render after registration will catch up.
+      console.log('[monument] viewport effect:', MODEL_TAG, 'not registered yet, skipping');
       return;
     }
 
@@ -114,6 +116,7 @@ export default function PlotMonumentLayer({
     });
 
     // Mount monuments that entered the viewport
+    let mountedCount = 0;
     for (const m of monuments) {
       if (mounted.has(m.apn)) continue;
       const el = document.createElement(MODEL_TAG) as Model3DInteractiveElement;
@@ -124,7 +127,15 @@ export default function PlotMonumentLayer({
       try { el.setAttribute('plot-monument', m.apn); } catch { /* noop */ }
       mapEl.appendChild(el);
       mounted.set(m.apn, el);
+      mountedCount += 1;
     }
+    console.log(
+      '[monument] viewport sync:',
+      'incoming=', monuments.length,
+      'newly_mounted=', mountedCount,
+      'removed=', apnsToRemove.length,
+      'total_mounted=', mounted.size,
+    );
   }, [monuments, mapElRef, src, scale]);
 
   // Update positions on any existing monument when its lat/lng changes
@@ -144,6 +155,12 @@ export default function PlotMonumentLayer({
   useEffect(() => {
     const mounted = modelsRef.current;
     const now = performance.now();
+    const hasMatch = selectedApn ? mounted.has(selectedApn) : null;
+    console.log(
+      '[monument] selection effect: selectedApn=', selectedApn,
+      'mounted_total=', mounted.size,
+      'selected_is_mounted=', hasMatch,
+    );
 
     mounted.forEach((el, apn) => {
       const isSelected = apn === selectedApn;
@@ -156,6 +173,12 @@ export default function PlotMonumentLayer({
       // Skip if already animating toward this target
       const existing = animStateRef.current.get(apn);
       if (existing && existing.to === targetAlt) return;
+
+      console.log(
+        '[monument] scheduling anim:', apn,
+        'from=', currentAlt, 'to=', targetAlt,
+        'isSelected=', isSelected,
+      );
 
       animStateRef.current.set(apn, {
         startedAt: now,

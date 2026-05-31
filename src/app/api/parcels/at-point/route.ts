@@ -32,8 +32,8 @@ export async function GET(req: Request) {
   }
 
   const { data, error } = await supabaseAdmin.rpc('parcel_at_point', {
-    lng,
-    lat,
+    _lng: lng,
+    _lat: lat,
   });
   if (error) {
     console.error('parcel_at_point RPC error:', error.message);

@@ -50,11 +50,11 @@ export async function GET(req: Request) {
   // viewport contains more than MAX_FEATURES parcels, we return the cap
   // and tell the client it was truncated.
   const { data, error } = await supabaseAdmin.rpc('parcels_in_bbox', {
-    min_lng: minLng,
-    min_lat: minLat,
-    max_lng: maxLng,
-    max_lat: maxLat,
-    max_features: MAX_FEATURES,
+    _min_lng: minLng,
+    _min_lat: minLat,
+    _max_lng: maxLng,
+    _max_lat: maxLat,
+    _max_features: MAX_FEATURES,
   });
 
   if (error) {

@@ -30,11 +30,11 @@ export async function GET(req: Request) {
   }
 
   const { data, error } = await supabaseAdmin.rpc('monuments_in_bbox', {
-    min_lng: minLng,
-    min_lat: minLat,
-    max_lng: maxLng,
-    max_lat: maxLat,
-    max_features: 1500,
+    _min_lng: minLng,
+    _min_lat: minLat,
+    _max_lng: maxLng,
+    _max_lat: maxLat,
+    _max_features: 1500,
   });
 
   if (error) {

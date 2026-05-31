@@ -190,10 +190,26 @@ CREATE TRIGGER trg_refresh_monument_anchor
 -- monument at the stored anchor (NOT the click point). parcels_in_bbox
 -- returns it so the viewport renderer can pre-mount every parcel's
 -- monument (buried) in the camera radius.
+--
+-- Postgres can't change a function's return shape in place
+-- (ERROR 42P13). DROP before CREATE so the new monument_lat/lng
+-- columns can be added to the result.
+
+DROP FUNCTION IF EXISTS parcel_at_point(double precision, double precision);
+DROP FUNCTION IF EXISTS parcels_in_bbox(double precision, double precision, double precision, double precision, integer);
+
+-- CRITICAL: parameter names CANNOT be 'lat' / 'lng' / 'min_lat' etc.,
+-- because the properties table has columns of those names. In SQL, an
+-- unqualified column reference inside the function body resolves to the
+-- TABLE COLUMN, not the function parameter, silently using the row's
+-- own lat/lng instead of the caller's input. That's exactly the bug
+-- behind "every click returns Leoni" — every row was effectively asking
+-- "does my own polygon contain my own lat/lng" against the FIRST row's
+-- coords. Fix: prefix params with an underscore so they can't collide.
 
 CREATE OR REPLACE FUNCTION parcel_at_point(
-  lng double precision,
-  lat double precision
+  _lng double precision,
+  _lat double precision
 )
 RETURNS TABLE (
   id uuid,
@@ -220,8 +236,8 @@ AS $$
     p.monument_lng
   FROM properties p
   WHERE p.geom IS NOT NULL
-    AND p.geom && ST_SetSRID(ST_MakePoint(lng, lat), 4326)
-    AND ST_Contains(p.geom, ST_SetSRID(ST_MakePoint(lng, lat), 4326))
+    AND p.geom && ST_SetSRID(ST_MakePoint(_lng, _lat), 4326)
+    AND ST_Contains(p.geom, ST_SetSRID(ST_MakePoint(_lng, _lat), 4326))
   LIMIT 1;
 $$;
 
@@ -229,11 +245,11 @@ GRANT EXECUTE ON FUNCTION parcel_at_point(double precision, double precision)
   TO service_role, authenticated;
 
 CREATE OR REPLACE FUNCTION parcels_in_bbox(
-  min_lng double precision,
-  min_lat double precision,
-  max_lng double precision,
-  max_lat double precision,
-  max_features integer DEFAULT 5000
+  _min_lng double precision,
+  _min_lat double precision,
+  _max_lng double precision,
+  _max_lat double precision,
+  _max_features integer DEFAULT 5000
 )
 RETURNS TABLE (
   id uuid,
@@ -270,8 +286,8 @@ AS $$
     p.monument_lng
   FROM properties p
   WHERE p.geom IS NOT NULL
-    AND p.geom && ST_MakeEnvelope(min_lng, min_lat, max_lng, max_lat, 4326)
-  LIMIT max_features;
+    AND p.geom && ST_MakeEnvelope(_min_lng, _min_lat, _max_lng, _max_lat, 4326)
+  LIMIT _max_features;
 $$;
 
 GRANT EXECUTE ON FUNCTION parcels_in_bbox(
@@ -282,12 +298,14 @@ GRANT EXECUTE ON FUNCTION parcels_in_bbox(
 -- every parcel in the camera radius. Tighter payload than parcels_in_bbox
 -- (no geom_json, no property fields) — the renderer just needs to know
 -- where to mount each buried monument glb.
+DROP FUNCTION IF EXISTS monuments_in_bbox(double precision, double precision, double precision, double precision, integer);
+
 CREATE OR REPLACE FUNCTION monuments_in_bbox(
-  min_lng double precision,
-  min_lat double precision,
-  max_lng double precision,
-  max_lat double precision,
-  max_features integer DEFAULT 1500
+  _min_lng double precision,
+  _min_lat double precision,
+  _max_lng double precision,
+  _max_lat double precision,
+  _max_features integer DEFAULT 1500
 )
 RETURNS TABLE (
   apn text,
@@ -306,8 +324,8 @@ AS $$
   WHERE p.geom IS NOT NULL
     AND p.monument_lat IS NOT NULL
     AND p.monument_lng IS NOT NULL
-    AND p.geom && ST_MakeEnvelope(min_lng, min_lat, max_lng, max_lat, 4326)
-  LIMIT max_features;
+    AND p.geom && ST_MakeEnvelope(_min_lng, _min_lat, _max_lng, _max_lat, 4326)
+  LIMIT _max_features;
 $$;
 
 GRANT EXECUTE ON FUNCTION monuments_in_bbox(

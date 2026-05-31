@@ -19,6 +19,7 @@ import { BuyerSettingsProvider } from "@/lib/buyer-settings/context";
 import BuyerSettingsPanel from "@/components/map/BuyerSettingsPanel";
 import PlotCardMarker3D from "@/components/map/PlotCardMarker3D";
 import PlotPropertyHighlight from "@/components/map/PlotPropertyHighlight";
+import PlotPropertyBeam from "@/components/map/PlotPropertyBeam";
 import { farSideOf } from "@/lib/farSideOffset";
 import GroundGlow from "@/components/map/GroundGlow";
 import PlotPinMarker from "@/components/map/PlotPinMarker";
@@ -1740,12 +1741,17 @@ export default function MapPage() {
           mapElRef={map3DElRef}
           apn={selectedApn}
         />
-        {/* Plot beam + slab cinematic PARKED 2026-05-30 per
-            [[project-rooted-rise-card-no-visible-base]]. The card now
-            rises from the rooftop directly via PlotCardMarker3D's
-            clipping wrapper. The beam asset (plot-beam.glb + .blend)
-            stays in the repo for future use cases (premium listings,
-            Plot Space, hero properties); just not surfaced here. */}
+        {/* PLOT TOWER — in-world info-pin tower (12m white square column
+            rising from the property) with slab on top for the UI surface.
+            Mounted at the property's lat/lng, altitudeM=0 so the tower
+            base sits on the ground. The slab's front face is where the
+            HTML card visually attaches. */}
+        <PlotPropertyBeam
+          mapElRef={map3DElRef}
+          lat={selectedLead.latitude}
+          lng={selectedLead.longitude}
+          altitudeM={0}
+        />
         {/* DIAGNOSTIC: card mounts at the FAR-SIDE coordinate snapshotted
             when the lead was selected (10m past the property from the
             camera's POV at fire time). altitudeM=0 puts it on the

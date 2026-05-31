@@ -19,6 +19,7 @@ import { BuyerSettingsProvider } from "@/lib/buyer-settings/context";
 import BuyerSettingsPanel from "@/components/map/BuyerSettingsPanel";
 import PlotCardMarker3D from "@/components/map/PlotCardMarker3D";
 import PlotPropertyHighlight from "@/components/map/PlotPropertyHighlight";
+import { farSideOf } from "@/lib/farSideOffset";
 import GroundGlow from "@/components/map/GroundGlow";
 import PlotPinMarker from "@/components/map/PlotPinMarker";
 import MarketRequestPrompt from "@/components/map/MarketRequestPrompt";
@@ -152,15 +153,55 @@ export default function MapPage() {
   // the world. Greg locked 2026-05-28 evening: "the bounce stays
   // with the UI, not the reticle."
   const popoverElRef = useRef<HTMLElement | null>(null);
-  // Wrap setSelectedLead so dismiss (null) also retracts the tether
-  // AND clears the highlight APN so the parcel outline disappears.
+  // Wrap setSelectedLead so dismiss (null) also retracts the tether,
+  // clears the highlight APN, AND clears the card-anchor snapshot.
+  // On NEW selection, snapshot the camera lat/lng and compute the
+  // far-side coordinate ONCE per [[feedback-snapshot-state-at-fire-not-continuously]].
+  const FAR_SIDE_OFFSET_M = 10; // tight offset; tune after we see live render
   const setSelectedLead = (next: Lead | null | ((prev: Lead | null) => Lead | null)) => {
     setSelectedLeadRaw((prev) => {
       const resolved = typeof next === 'function' ? next(prev) : next;
       if (resolved === null && prev !== null) {
-        // Card is closing — collapse the rebound beam + clear highlight.
+        // Card is closing — collapse the rebound beam + clear highlight + clear anchor.
         try { ritualTetherRef.current?.retract(); } catch { /* noop */ }
         setSelectedApn(null);
+        setCardAnchor(null);
+      } else if (resolved !== null && resolved.latitude != null && resolved.longitude != null) {
+        // Card is opening — snapshot the camera center and compute the
+        // far-side coordinate ONCE. Camera state is read from the
+        // gmp-map-3d element; falls back to property's own lat/lng if
+        // camera unreadable (degrades to anchored-at-property which is
+        // still better than top-center).
+        try {
+          const mapEl = map3DElRef.current as (HTMLElement & {
+            center?: { lat: number; lng: number; altitude?: number };
+          }) | null;
+          const cam = mapEl?.center;
+          if (cam && Number.isFinite(cam.lat) && Number.isFinite(cam.lng)) {
+            const farSide = farSideOf(
+              { lat: resolved.latitude, lng: resolved.longitude },
+              { lat: cam.lat, lng: cam.lng },
+              FAR_SIDE_OFFSET_M,
+            );
+            setCardAnchor(farSide);
+            // eslint-disable-next-line no-console
+            console.log(
+              `[card-anchor] property=(${resolved.latitude.toFixed(6)}, ${resolved.longitude.toFixed(6)})`,
+              `camera=(${cam.lat.toFixed(6)}, ${cam.lng.toFixed(6)})`,
+              `far-side=(${farSide.lat.toFixed(6)}, ${farSide.lng.toFixed(6)})`,
+              `offset=${FAR_SIDE_OFFSET_M}m`,
+            );
+          } else {
+            // No camera readable — fall back to property's own lat/lng
+            setCardAnchor({ lat: resolved.latitude, lng: resolved.longitude });
+            // eslint-disable-next-line no-console
+            console.warn('[card-anchor] camera unreadable, falling back to property coordinate');
+          }
+        } catch (e) {
+          setCardAnchor({ lat: resolved.latitude, lng: resolved.longitude });
+          // eslint-disable-next-line no-console
+          console.warn('[card-anchor] error reading camera, falling back:', e);
+        }
       }
       return resolved;
     });
@@ -194,6 +235,15 @@ export default function MapPage() {
   // so the actual lot polygon (from PostGIS) outlines under the card.
   // Locked 2026-05-30 evening per the in-world stack spec.
   const [selectedApn, setSelectedApn] = useState<string | null>(null);
+  // Snapshot of the FAR-SIDE coordinate where PlotCardMarker3D should
+  // mount. Computed once at the moment a property is selected (snapshot
+  // semantics — see [[feedback-snapshot-state-at-fire-not-continuously]]).
+  // The far-side position is along the camera→property bearing, extended
+  // past the property by FAR_SIDE_OFFSET_M meters, so the photoreal
+  // building sits between the camera and the card. Google's renderer
+  // Z-occludes the card with the building mesh (we hope — this is the
+  // diagnostic). Cleared on dismiss.
+  const [cardAnchor, setCardAnchor] = useState<{ lat: number; lng: number } | null>(null);
   // Pin-style toolbar pills were stripped 2026-05-17; default to 'dots'
   // until the pin-style chooser gets a redesign that earns the chrome.
   const pinMode: PinMode = 'dots';
@@ -1070,7 +1120,17 @@ export default function MapPage() {
 
   return (
     <BuyerSettingsProvider>
-    <div className="relative h-screen w-full overflow-hidden">
+    <div
+      className="relative h-screen w-full overflow-hidden"
+      onContextMenu={(e) => {
+        // Prevent the browser/OS right-click menu. Steam Input on the
+        // gamepad maps B to right-click; without this, pressing B opens
+        // the OS context menu instead of dismissing the popup. The flight
+        // app has no use for a context menu. See:
+        // [[project-b-press-opens-os-menu-bug]]
+        e.preventDefault();
+      }}
+    >
       {/* ═══ BUYER SETTINGS PANEL ═══
           Persistent knob strip at the top-center. Adjusts mortgage assumptions
           (down payment, rate, term) AND the headline mode (monthly vs price)
@@ -1686,11 +1746,19 @@ export default function MapPage() {
             clipping wrapper. The beam asset (plot-beam.glb + .blend)
             stays in the repo for future use cases (premium listings,
             Plot Space, hero properties); just not surfaced here. */}
+        {/* DIAGNOSTIC: card mounts at the FAR-SIDE coordinate snapshotted
+            when the lead was selected (10m past the property from the
+            camera's POV at fire time). altitudeM=0 puts it on the
+            ground, so the photoreal building rises between camera and
+            card. If Google's renderer Z-occludes gmp-marker HTML with
+            building meshes, the card's bottom is invisible because it's
+            literally behind the building. Falls back to property
+            coordinate if camera wasn't readable at snapshot time. */}
         <PlotCardMarker3D
           mapElRef={map3DElRef}
-          lat={selectedLead.latitude}
-          lng={selectedLead.longitude}
-          altitudeM={8}
+          lat={cardAnchor?.lat ?? selectedLead.latitude}
+          lng={cardAnchor?.lng ?? selectedLead.longitude}
+          altitudeM={0}
         >
           {/* PropertyCardBillboard — the new public-launch property card.
               Off-white neumorphic, monthly-PITI headline by default

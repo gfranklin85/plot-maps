@@ -295,6 +295,18 @@ export default function MapPage() {
   const firstProspectClickRef = useRef(false);
   const isSubscribed = profile.subscriptionStatus === 'active';
 
+  // Import-prompt dismiss state — seeded from localStorage so a user
+  // who already X-ed the empty-state card doesn't see it again every
+  // time they reload. Public visitors don't see the card at all
+  // (gated by `user` truthiness below).
+  const [importPromptDismissed, setImportPromptDismissed] = useState(true);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    setImportPromptDismissed(
+      window.localStorage.getItem('plotmaps.importPrompt.dismissed') === '1'
+    );
+  }, []);
+
   // Gamepad — auto-detected. Status drives the bottom-right chip; the map's
   // GamepadFlightController owns the input loop and reports up via
   // onGamepadStatusChange. Once a controller has ever connected this session,
@@ -1621,8 +1633,12 @@ export default function MapPage() {
             successfully dispatches an outreach. Cleared after ~320ms. */}
         <ShotAnimation shot={shot} />
 
-        {/* Empty state — bottom center */}
-        {!loading && leads.length === 0 && !walkMode && (
+        {/* Empty state — bottom center.
+            Only for AUTHED users with 0 leads (operator empty state).
+            Public visitors don't see this. Dismissible + state persists
+            in localStorage so it doesn't nag the same user repeatedly.
+            Locked 2026-05-31 morning. */}
+        {!loading && user && leads.length === 0 && !walkMode && !importPromptDismissed && (
           <div className="absolute left-1/2 -translate-x-1/2 bottom-6 w-full max-w-md z-10 px-6">
             <div className="bg-surface/80 backdrop-blur-xl rounded-2xl border border-card-border p-5 flex items-center gap-4 shadow-2xl">
               <div className="w-12 h-12 rounded-xl bg-surface-container/50 flex items-center justify-center border border-card-border shrink-0">
@@ -1635,6 +1651,19 @@ export default function MapPage() {
               <a href="/imports" className="px-4 py-2.5 bg-gradient-to-br from-indigo-400 to-indigo-600 text-white font-bold text-xs rounded-xl shadow-lg shadow-indigo-600/20 hover:opacity-90 transition-all whitespace-nowrap">
                 Import
               </a>
+              <button
+                onClick={() => {
+                  setImportPromptDismissed(true);
+                  if (typeof window !== 'undefined') {
+                    window.localStorage.setItem('plotmaps.importPrompt.dismissed', '1');
+                  }
+                }}
+                className="w-8 h-8 rounded-full flex items-center justify-center text-secondary hover:text-on-surface hover:bg-surface-container/60 transition-all shrink-0"
+                title="Dismiss"
+                aria-label="Dismiss"
+              >
+                <MaterialIcon icon="close" className="text-[18px]" />
+              </button>
             </div>
           </div>
         )}

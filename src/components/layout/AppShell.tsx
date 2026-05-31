@@ -26,7 +26,28 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const isAuthPage = AUTH_PAGES.some((p) => pathname.startsWith(p));
   const isImmersivePage = IMMERSIVE_PAGES.some((p) => pathname.startsWith(p));
 
-  if (isAuthPage || (!loading && !user)) {
+  if (isAuthPage) {
+    return <>{children}</>;
+  }
+
+  // Immersive pages (the map) render the MapNavOverlay for BOTH
+  // authed and public visitors — public users still need to navigate
+  // to /landing, /position, etc. The overlay surfaces a different
+  // menu for unauthenticated users (no Dashboard / Leads).
+  if (isImmersivePage) {
+    return (
+      <>
+        <MapNavOverlay />
+        <main className="min-h-screen">{children}</main>
+        {user && <CallBar />}
+      </>
+    );
+  }
+
+  // Non-immersive routes: public visitors get the raw page (no
+  // sidebar/topbar/bottomnav). Auth-gated chrome only renders for
+  // signed-in users.
+  if (!loading && !user) {
     return <>{children}</>;
   }
 
@@ -35,16 +56,6 @@ export default function AppShell({ children }: { children: ReactNode }) {
       <div className="min-h-screen bg-surface flex items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
       </div>
-    );
-  }
-
-  if (isImmersivePage) {
-    return (
-      <>
-        <MapNavOverlay />
-        <main className="min-h-screen">{children}</main>
-        <CallBar />
-      </>
     );
   }
 

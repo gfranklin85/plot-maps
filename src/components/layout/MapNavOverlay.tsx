@@ -33,7 +33,7 @@ export default function MapNavOverlay() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement | null>(null);
-  const { signOut } = useAuth();
+  const { user, signOut } = useAuth();
   const { profile, initials } = useProfile();
 
   // Outside-click + Esc dismiss.
@@ -77,49 +77,84 @@ export default function MapNavOverlay() {
       {/* Expanded drawer — vertical column of nav items + profile. */}
       {open && (
         <div className="pointer-events-auto flex flex-col gap-1 w-56 rounded-2xl bg-surface/95 backdrop-blur-md shadow-2xl border border-card-border p-2 animate-in fade-in slide-in-from-top-2 duration-150">
-          {/* Nav items */}
-          {NAV_ITEMS.map((item) => {
-            const isActive = item.href === '/'
-              ? pathname === '/'
-              : pathname.startsWith(item.href);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={() => setOpen(false)}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition-all ${
-                  isActive
-                    ? 'bg-primary/15 text-primary'
-                    : 'text-on-surface-variant hover:bg-surface-container hover:text-on-surface'
-                }`}
-              >
-                <MaterialIcon icon={item.icon} className="text-[18px]" />
-                {item.label}
-              </Link>
-            );
-          })}
+          {/* Nav items — full set for authed users, just Map for public
+              visitors so they can return here from /landing /position */}
+          {user
+            ? NAV_ITEMS.map((item) => {
+                const isActive = item.href === '/'
+                  ? pathname === '/'
+                  : pathname.startsWith(item.href);
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={() => setOpen(false)}
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition-all ${
+                      isActive
+                        ? 'bg-primary/15 text-primary'
+                        : 'text-on-surface-variant hover:bg-surface-container hover:text-on-surface'
+                    }`}
+                  >
+                    <MaterialIcon icon={item.icon} className="text-[18px]" />
+                    {item.label}
+                  </Link>
+                );
+              })
+            : (
+              <>
+                <Link
+                  href="/landing"
+                  onClick={() => setOpen(false)}
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all"
+                >
+                  <MaterialIcon icon="home" className="text-[18px]" />
+                  Home
+                </Link>
+                <Link
+                  href="/position"
+                  onClick={() => setOpen(false)}
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all"
+                >
+                  <MaterialIcon icon="storefront" className="text-[18px]" />
+                  Position Realty
+                </Link>
+              </>
+            )}
 
           {/* Divider */}
           <div className="my-1 h-px bg-card-border" />
 
-          {/* Profile / Settings / Sign out */}
-          <Link
-            href="/settings"
-            onClick={() => setOpen(false)}
-            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all"
-          >
-            <div className="w-6 h-6 rounded-full bg-primary text-white text-[10px] font-bold flex items-center justify-center">
-              {initials}
-            </div>
-            <span className="truncate">{profile.fullName || profile.email || 'Settings'}</span>
-          </Link>
-          <button
-            onClick={() => { setOpen(false); signOut(); }}
-            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold text-red-400 hover:bg-red-500/10 transition-all"
-          >
-            <MaterialIcon icon="logout" className="text-[18px]" />
-            Sign out
-          </button>
+          {user ? (
+            <>
+              {/* Profile / Settings / Sign out */}
+              <Link
+                href="/settings"
+                onClick={() => setOpen(false)}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all"
+              >
+                <div className="w-6 h-6 rounded-full bg-primary text-white text-[10px] font-bold flex items-center justify-center">
+                  {initials}
+                </div>
+                <span className="truncate">{profile.fullName || profile.email || 'Settings'}</span>
+              </Link>
+              <button
+                onClick={() => { setOpen(false); signOut(); }}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold text-red-400 hover:bg-red-500/10 transition-all"
+              >
+                <MaterialIcon icon="logout" className="text-[18px]" />
+                Sign out
+              </button>
+            </>
+          ) : (
+            <Link
+              href="/login"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold text-primary hover:bg-primary/10 transition-all"
+            >
+              <MaterialIcon icon="login" className="text-[18px]" />
+              Sign in
+            </Link>
+          )}
         </div>
       )}
     </div>

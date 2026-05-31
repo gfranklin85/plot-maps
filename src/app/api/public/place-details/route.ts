@@ -69,8 +69,14 @@ export async function GET(req: NextRequest) {
       }
     );
     if (!res.ok) {
+      // Surface the upstream body so we can see WHY Google rejected.
+      // Most common cause: GCP project missing "Places API (New)" product
+      // (it's separate from the legacy "Places API" that powers the
+      // autocomplete dropdown — easy to enable one and forget the other).
+      const body = await res.text().catch(() => '(no body)');
+      console.error('[place-details] upstream', res.status, body.slice(0, 500));
       return NextResponse.json(
-        { hit: false, error: 'Place details upstream error' },
+        { hit: false, error: 'Place details upstream error', upstream: res.status },
         { status: 502 }
       );
     }

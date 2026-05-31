@@ -13,6 +13,7 @@ import { mergeAnonymousSession } from '@/lib/analytics-merge';
 // Google round-trip and the apex↔subdomain hop.
 const ARRIVAL_FLAG_COOKIE = 'pm_arrival_oauth';
 const ARRIVAL_DEST_COOKIE = 'pm_arrival_dest';
+const ARRIVAL_SEARCH_COOKIE = 'pm_arrival_search';
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
@@ -65,20 +66,47 @@ export async function GET(request: Request) {
       // /dashboard) and didn't carry an arrival slug.
       const arrivalFlag = cookieStore.get(ARRIVAL_FLAG_COOKIE)?.value;
       const destFromCookie = cookieStore.get(ARRIVAL_DEST_COOKIE)?.value;
+      const searchFromCookie = cookieStore.get(ARRIVAL_SEARCH_COOKIE)?.value;
       console.log('[auth/callback] cookies', {
         hasArrivalFlag: !!arrivalFlag,
         destFromCookie: destFromCookie ?? null,
+        hasSearch: !!searchFromCookie,
       });
 
       let destination: string;
+      // Routing priority:
+      //   1. Curated destination slug (Lemoore, Acapulco, etc.) →
+      //      fly to its hand-tuned pose via /map?destination=<slug>
+      //   2. Ad-hoc search hit (typed place / autocomplete pick) →
+      //      route to /map?q=&lat=&lng= so the map page's existing
+      //      ?q= handler animates to the resolved coords
+      //   3. Generic arrival flag (no specific target) → /landing to
+      //      let them pick a destination
+      //   4. Explicit ?next= override (e.g. /login → /dashboard)
       if (destFromCookie) {
-        destination = `/landing?resumeArrival=1&dest=${encodeURIComponent(destFromCookie)}`;
+        destination = `/map?destination=${encodeURIComponent(destFromCookie)}`;
+      } else if (searchFromCookie) {
+        try {
+          const parsed = JSON.parse(decodeURIComponent(searchFromCookie)) as {
+            q?: string; lat?: number; lng?: number;
+          };
+          const q = parsed?.q ? encodeURIComponent(parsed.q) : '';
+          const lat = Number.isFinite(parsed?.lat) ? parsed?.lat : null;
+          const lng = Number.isFinite(parsed?.lng) ? parsed?.lng : null;
+          if (lat !== null && lng !== null && lat !== undefined && lng !== undefined) {
+            destination = `/map?q=${q}&lat=${lat}&lng=${lng}`;
+          } else {
+            destination = `/map?q=${q}&miss=1`;
+          }
+        } catch {
+          destination = '/map';
+        }
       } else if (arrivalFlag) {
         destination = '/landing?resumeArrival=1';
       } else if (nextFromQuery) {
         destination = nextFromQuery;
       } else {
-        destination = '/landing?resumeArrival=1';
+        destination = '/map';
       }
 
       const response = NextResponse.redirect(`${origin}${destination}`);
@@ -100,6 +128,13 @@ export async function GET(request: Request) {
       }
       if (destFromCookie) {
         response.cookies.set(ARRIVAL_DEST_COOKIE, '', {
+          maxAge: 0,
+          path: '/',
+          domain: cookieDomain,
+        });
+      }
+      if (searchFromCookie) {
+        response.cookies.set(ARRIVAL_SEARCH_COOKIE, '', {
           maxAge: 0,
           path: '/',
           domain: cookieDomain,

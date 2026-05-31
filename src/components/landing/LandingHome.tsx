@@ -17,7 +17,6 @@
 // to ask (per project-participation-based-monetization-thesis).
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import PlotMapsLogo from '@/components/brand/PlotMapsLogo';
@@ -27,6 +26,55 @@ import {
   LANDING_DESTINATIONS,
   type Destination,
 } from '@/lib/destinations';
+import { supabase } from '@/lib/supabase';
+
+// Set the arrival cookies + dispatch Google OAuth. Mirrors the pattern
+// in ArrivalSequence (which is wired for the LandingCarousel surface).
+// Cookie scoped to .plot.solutions so it survives the apex↔subdomain
+// hop through Google. After OAuth, /auth/callback reads the cookie
+// and routes to /landing?resumeArrival=1&dest=<slug>, which we then
+// forward to /map?destination=<slug>.
+//
+// Greg locked 2026-05-31: universal Google OAuth — every action that
+// takes the user into the product surface dispatches sign-in first.
+async function dispatchOauthWithDestination(slug: string | null) {
+  if (typeof document !== 'undefined' && slug) {
+    const host = window.location.hostname;
+    const domainAttr =
+      host.endsWith('.plot.solutions') || host === 'plot.solutions'
+        ? '; domain=.plot.solutions'
+        : '';
+    const v = encodeURIComponent(slug);
+    document.cookie = `pm_arrival_dest=${v}; path=/; max-age=600; samesite=lax; secure${domainAttr}`;
+    document.cookie = `pm_arrival_oauth=1; path=/; max-age=600; samesite=lax; secure${domainAttr}`;
+  }
+  try {
+    await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+      },
+    });
+  } catch (err) {
+    console.error('[LandingHome] signInWithOAuth failed', err);
+  }
+}
+
+// Store an ad-hoc lat/lng/label so /landing?resumeArrival=1 can forward
+// to /map?q=&lat=&lng= after the OAuth round trip. Cookie scoped same
+// way as the destination one. Used by the search bar when the user
+// types a place that isn't one of our curated destinations.
+function stashSearchHit(payload: { q: string; lat: number; lng: number }) {
+  if (typeof document === 'undefined') return;
+  const host = window.location.hostname;
+  const domainAttr =
+    host.endsWith('.plot.solutions') || host === 'plot.solutions'
+      ? '; domain=.plot.solutions'
+      : '';
+  const v = encodeURIComponent(JSON.stringify(payload));
+  document.cookie = `pm_arrival_search=${v}; path=/; max-age=600; samesite=lax; secure${domainAttr}`;
+  document.cookie = `pm_arrival_oauth=1; path=/; max-age=600; samesite=lax; secure${domainAttr}`;
+}
 
 interface Suggestion {
   placeId: string;
@@ -36,7 +84,6 @@ interface Suggestion {
 }
 
 export default function LandingHome() {
-  const router = useRouter();
   const [query, setQuery] = useState('');
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
@@ -103,12 +150,16 @@ export default function LandingHome() {
   // ── Pick a suggestion (or submit raw text) ───────────────────
   // - Suggestion picked → resolve place_id to lat/lng via place-details
   // - Raw text → fall back to /api/public/geocode (current behavior)
+  // Picking a suggestion or submitting the search bar resolves the
+  // place to lat/lng/label, stashes it in a cookie, and dispatches
+  // Google OAuth. After OAuth, /auth/callback reads the cookie and
+  // forwards to /map with the destination preserved. Greg locked
+  // 2026-05-31: universal OAuth before any product surface.
   const pickSuggestion = useCallback(
     async (s: Suggestion) => {
       setShowSuggestions(false);
       setSearching(true);
       setSearchError(null);
-      // Cosmetic: show the chosen text in the input while the details fetch flies
       setQuery(`${s.mainText}${s.secondaryText ? ', ' + s.secondaryText : ''}`);
       try {
         const res = await fetch(
@@ -116,26 +167,28 @@ export default function LandingHome() {
         );
         const data = await res.json().catch(() => ({}));
         if (!res.ok || !data?.hit) {
-          // Fall back to the typed text — let the map page surface the miss prompt
-          router.push(`/map?q=${encodeURIComponent(s.mainText)}&miss=1`);
+          // Couldn't resolve — still send the user into OAuth with the
+          // raw text as a miss; the map handles it with the
+          // market-request prompt.
+          stashSearchHit({ q: s.mainText, lat: NaN, lng: NaN });
+          await dispatchOauthWithDestination(null);
           return;
         }
-        const params = new URLSearchParams({
+        stashSearchHit({
           q: data.formatted || s.mainText,
-          lat: String(data.lat),
-          lng: String(data.lng),
+          lat: Number(data.lat),
+          lng: Number(data.lng),
         });
-        router.push(`/map?${params.toString()}`);
+        await dispatchOauthWithDestination(null);
       } catch {
-        setSearchError('Search is unavailable right now. Try a destination card below.');
+        setSearchError('Sign-in is unavailable right now. Try a destination card below.');
         setSearching(false);
       }
     },
-    [router]
+    []
   );
 
   const submitSearch = useCallback(async () => {
-    // If the dropdown has a highlighted suggestion, prefer it
     if (showSuggestions && highlightIdx >= 0 && suggestions[highlightIdx]) {
       pickSuggestion(suggestions[highlightIdx]);
       return;
@@ -148,20 +201,17 @@ export default function LandingHome() {
       const res = await fetch(`/api/public/geocode?q=${encodeURIComponent(q)}`);
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data?.hit) {
-        router.push(`/map?q=${encodeURIComponent(q)}&miss=1`);
+        stashSearchHit({ q, lat: NaN, lng: NaN });
+        await dispatchOauthWithDestination(null);
         return;
       }
-      const params = new URLSearchParams({
-        q,
-        lat: String(data.lat),
-        lng: String(data.lng),
-      });
-      router.push(`/map?${params.toString()}`);
+      stashSearchHit({ q, lat: Number(data.lat), lng: Number(data.lng) });
+      await dispatchOauthWithDestination(null);
     } catch {
-      setSearchError('Search is unavailable right now. Try a destination card below.');
+      setSearchError('Sign-in is unavailable right now. Try a destination card below.');
       setSearching(false);
     }
-  }, [query, router, showSuggestions, highlightIdx, suggestions, pickSuggestion]);
+  }, [query, showSuggestions, highlightIdx, suggestions, pickSuggestion]);
 
   // ── Keyboard nav for the dropdown ────────────────────────────
   const onKeyDown = useCallback(
@@ -345,7 +395,7 @@ export default function LandingHome() {
           </form>
 
           <div className="pt-2 text-xs text-zinc-400 uppercase tracking-[0.32em]">
-            No account required
+            Sign in with Google to fly
           </div>
         </div>
 
@@ -473,11 +523,10 @@ export default function LandingHome() {
 // The map page already accepts ?destination=<slug> and resolves it
 // via findDestinationBySlug().
 function DestinationCard({ destination }: { destination: Destination }) {
-  const router = useRouter();
   return (
     <button
       type="button"
-      onClick={() => router.push(`/map?destination=${destination.slug}`)}
+      onClick={() => { void dispatchOauthWithDestination(destination.slug); }}
       className="snap-start shrink-0 group relative overflow-hidden rounded-2xl bg-zinc-900 border border-zinc-800 hover:border-amber-300/50 transition-all w-[260px] h-[320px] text-left focus:outline-none focus:ring-2 focus:ring-amber-300/40"
       aria-label={`Fly to ${destination.name}`}
     >

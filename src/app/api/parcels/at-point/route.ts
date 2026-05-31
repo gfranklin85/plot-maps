@@ -69,6 +69,14 @@ export async function GET(req: Request) {
   const monumentLng =
     typeof row.monument_lng === 'number' ? row.monument_lng : null;
 
+  // Polygon geometry inline so the client can highlight the lot on the
+  // SAME round-trip — no separate /api/parcels/by-apn fetch needed.
+  // Cuts click-to-visible time roughly in half. Locked 2026-05-30.
+  let geometry: unknown = null;
+  if (typeof row.geom_json === 'string') {
+    try { geometry = JSON.parse(row.geom_json); } catch { /* skip */ }
+  }
+
   return NextResponse.json({
     apn: row.apn as string,
     address: (row.address as string | null) ?? null,
@@ -77,6 +85,7 @@ export async function GET(req: Request) {
     nPoints: typeof row.n_points === 'number' ? row.n_points : null,
     monumentLat,
     monumentLng,
+    geometry,
     lat,
     lng,
   });

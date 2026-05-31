@@ -77,11 +77,29 @@ export default function PlotPropertyHighlight({ mapElRef, apn }: Props) {
   const polyRef = useRef<Polygon3DElement | null>(null);
   const [ring, setRing] = useState<{ lat: number; lng: number }[] | null>(null);
 
-  // Fetch the polygon when APN changes.
+  // Resolve the polygon when APN changes. /api/parcels/at-point now
+  // returns the geometry inline on the click round trip and stashes
+  // it in window.__plotParcelGeomCache by APN. If we have a cache hit
+  // for this APN, render INSTANTLY — no second network round trip.
+  // Cache miss (e.g. APN came from search instead of a click) falls
+  // back to /api/parcels/by-apn. Locked 2026-05-30.
   useEffect(() => {
     let cancelled = false;
     setRing(null);
     if (!apn) return;
+
+    const cache = (window as unknown as {
+      __plotParcelGeomCache?: Map<string, unknown>;
+    }).__plotParcelGeomCache;
+    const cached = cache?.get(apn) as GeoJSONGeometry | undefined;
+    if (cached) {
+      const extracted = extractFirstRing(cached);
+      if (extracted) {
+        setRing(extracted);
+        return;
+      }
+    }
+
     fetch(`/api/parcels/by-apn?apn=${encodeURIComponent(apn)}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {

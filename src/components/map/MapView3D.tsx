@@ -810,6 +810,15 @@ function Inner({
           if (!parcelJson || !parcelJson.apn) return;
           const mlat = typeof parcelJson.monumentLat === 'number' ? parcelJson.monumentLat : lat;
           const mlng = typeof parcelJson.monumentLng === 'number' ? parcelJson.monumentLng : lng;
+          // Stash the polygon globally for PlotPropertyHighlight to pick
+          // up on selection — avoids a second /api/parcels/by-apn round
+          // trip. Keyed by APN so a stale stash from a previous click
+          // can't show on a new one.
+          if (parcelJson.geometry) {
+            (window as unknown as { __plotParcelGeomCache?: Map<string, unknown> }).__plotParcelGeomCache ??= new Map();
+            (window as unknown as { __plotParcelGeomCache: Map<string, unknown> }).__plotParcelGeomCache
+              .set(parcelJson.apn as string, parcelJson.geometry);
+          }
           onParcelClickRef.current?.(parcelJson.apn as string, { lat: mlat, lng: mlng });
         })
         .catch((err) => {

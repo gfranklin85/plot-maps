@@ -219,12 +219,17 @@ RETURNS TABLE (
   area_sqm double precision,
   n_points integer,
   monument_lat double precision,
-  monument_lng double precision
+  monument_lng double precision,
+  geom_json text
 )
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
 AS $$
+  -- geom_json is included so the client can highlight the lot
+  -- polygon on the SAME round-trip as the click resolver — no
+  -- second /api/parcels/by-apn fetch needed. Cuts click-to-visible
+  -- time roughly in half. Greg locked 2026-05-30 evening.
   SELECT
     p.id,
     p.apn,
@@ -233,7 +238,8 @@ AS $$
     ST_Area(p.geom::geography)::double precision AS area_sqm,
     ST_NPoints(p.geom)::integer AS n_points,
     p.monument_lat,
-    p.monument_lng
+    p.monument_lng,
+    ST_AsGeoJSON(p.geom, 6) AS geom_json
   FROM properties p
   WHERE p.geom IS NOT NULL
     AND p.geom && ST_SetSRID(ST_MakePoint(_lng, _lat), 4326)

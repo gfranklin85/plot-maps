@@ -464,6 +464,23 @@ gmp-popover[plot-ground-glow] {
   background: transparent !important;
 }
 
+/* ─── Property card popover chrome suppression. The gmp-popover that
+       anchors the in-world PropertyCardBillboard shows ONLY our card —
+       no Google default white bubble, padding, border, or tail. Our
+       card IS the chrome. Same recipe as GroundGlow above. */
+gmp-popover[plot-card-popover]::part(container),
+gmp-popover[plot-card-popover]::part(content),
+gmp-popover[plot-card-popover]::part(tail) {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+gmp-popover[plot-card-popover] {
+  --gmp-popover-background: transparent;
+  background: transparent !important;
+}
+
 /* ─── PropertyPopup anchor v2: marker-based, no chrome to suppress ──
    The prior gmp-popover-based approach is gone (AnchoredPropertyCard
    now uses gmp-marker-3d-interactive + screen-space projection).

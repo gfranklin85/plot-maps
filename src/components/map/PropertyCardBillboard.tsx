@@ -268,13 +268,18 @@ export default function PropertyCardBillboard({ lead: rawLead, audience = 'publi
         )}
         {footnote && <div className="pcb-footnote">{footnote}</div>}
 
-        {/* FACTS GRID */}
-        <div className="pcb-facts">
-          <Fact label="BEDS"      value={lead.bedrooms != null ? String(lead.bedrooms) : '—'} />
-          <Fact label="BATHS"     value={lead.bathrooms != null ? String(lead.bathrooms) : '—'} />
-          <Fact label="BLDG SQFT" value={fmtSqft(lead.sqft)} />
-          <Fact label="LOT SQFT"  value={fmtLot(lead.lot_acres)} />
-          <Fact label="YEAR"      value={lead.year_built != null ? String(lead.year_built) : '—'} />
+        {/* FACTS — one dense, bold inline line (Zillow-style legibility)
+            instead of a sparse 5-column grid. Big numbers, thin dividers. */}
+        <div className="pcb-factline">
+          <span className="pcb-fact"><b>{lead.bedrooms != null ? String(lead.bedrooms) : '—'}</b> bd</span>
+          <span className="pcb-fact-sep">·</span>
+          <span className="pcb-fact"><b>{lead.bathrooms != null ? String(lead.bathrooms) : '—'}</b> ba</span>
+          <span className="pcb-fact-sep">·</span>
+          <span className="pcb-fact"><b>{fmtSqft(lead.sqft)}</b> sqft</span>
+          <span className="pcb-fact-sep">·</span>
+          <span className="pcb-fact"><b>{fmtLot(lead.lot_acres)}</b> lot</span>
+          <span className="pcb-fact-sep">·</span>
+          <span className="pcb-fact"><b>{lead.year_built != null ? String(lead.year_built) : '—'}</b></span>
         </div>
 
         {/* PITI BREAKDOWN — listed variants only */}
@@ -297,7 +302,7 @@ export default function PropertyCardBillboard({ lead: rawLead, audience = 'publi
 
       <style jsx>{`
         .pcb-root {
-          width: 190px;
+          width: 480px;
           max-width: calc(100vw - 32px);
           background: var(--plot-card-surface);
           border-radius: 14px;
@@ -363,20 +368,20 @@ export default function PropertyCardBillboard({ lead: rawLead, audience = 'publi
         }
         .pcb-caption {
           margin-top: 8px;
-          font-size: 9.5px;
+          font-size: 13px;
           font-weight: 700;
           letter-spacing: 0.9px;
           color: var(--plot-card-ink-faint);
         }
         .pcb-address {
           margin-top: 12px;
-          font-size: 14px;
+          font-size: 17px;
           font-weight: 500;
           color: var(--plot-card-ink-mid);
         }
         .pcb-footnote {
           margin-top: 6px;
-          font-size: 11px;
+          font-size: 14px;
           font-weight: 600;
           letter-spacing: 0.3px;
           color: var(--plot-card-ink-faint);
@@ -387,6 +392,25 @@ export default function PropertyCardBillboard({ lead: rawLead, audience = 'publi
           grid-template-columns: repeat(5, 1fr);
           gap: 6px;
           margin-top: 18px;
+        }
+        /* Dense inline fact line — Zillow-style readability. */
+        .pcb-factline {
+          margin-top: 14px;
+          display: flex;
+          flex-wrap: wrap;
+          align-items: baseline;
+          gap: 8px;
+          font-size: 18px;
+          color: var(--plot-card-ink-mid);
+          line-height: 1.3;
+        }
+        .pcb-factline .pcb-fact b {
+          font-weight: 700;
+          color: var(--plot-card-ink);
+        }
+        .pcb-fact-sep {
+          color: var(--plot-card-ink-faint);
+          font-weight: 400;
         }
         .pcb-divider {
           margin-top: 14px;
@@ -424,13 +448,13 @@ function Fact({ label, value }: { label: string; value: string }) {
           gap: 4px;
         }
         .fact-label {
-          font-size: 9px;
+          font-size: 12px;
           font-weight: 700;
           letter-spacing: 0.7px;
           color: var(--plot-card-ink-faint);
         }
         .fact-value {
-          font-size: 15px;
+          font-size: 19px;
           font-weight: 600;
           color: var(--plot-card-ink);
         }

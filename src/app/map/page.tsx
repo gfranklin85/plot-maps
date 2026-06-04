@@ -17,6 +17,9 @@ import PropertyPopup from "@/components/map/PropertyPopup";
 import { BuyerSettingsProvider } from "@/lib/buyer-settings/context";
 import BuyerSettingsPanel from "@/components/map/BuyerSettingsPanel";
 import PlotPropertyHighlight from "@/components/map/PlotPropertyHighlight";
+import PlotSummonedMonument from "@/components/map/PlotSummonedMonument";
+import PlotWorldPopover from "@/components/map/PlotWorldPopover";
+import PropertyCardBillboard from "@/components/map/PropertyCardBillboard";
 import GroundGlow from "@/components/map/GroundGlow";
 import PlotPinMarker from "@/components/map/PlotPinMarker";
 import MarketRequestPrompt from "@/components/map/MarketRequestPrompt";
@@ -964,13 +967,10 @@ export default function MapPage() {
         : (currentIdx + dir + sorted.length) % sorted.length;
       const next = sorted[nextIdx];
       setSelectedLead(next);
-      if (next.latitude != null && next.longitude != null) {
-        dispatchFlight({
-          center: { lat: next.latitude, lng: next.longitude },
-          duration: 350,
-          easing: 'easeOutCubic',
-        });
-      }
+      // NO camera fly on selection. The camera belongs to the user; an
+      // auto-zoom on cycle/select breaks flight (feedback-no-zoom-to-ui,
+      // 2026-05-30). Selecting just surfaces the in-world card; the user
+      // flies to it themselves if they want a closer look.
     }
 
     function showReticleToast(message: string) {
@@ -1726,6 +1726,9 @@ export default function MapPage() {
 
       {selectedLead && !walkMode && selectedLead.latitude != null && selectedLead.longitude != null && (
         <>
+        {/* Re-enabled 2026-06-04 with the cancelAutoPan guard inside
+            GroundGlow itself — it was the zoom-on-select culprit, now
+            defused (its popover no longer pans the camera). */}
         <GroundGlow
           mapElRef={map3DElRef}
           lat={selectedLead.latitude}
@@ -1739,6 +1742,53 @@ export default function MapPage() {
           apn={selectedApn}
         />
         </>
+      )}
+
+      {/* ═══ SUMMONED MONUMENT — rises ONLY out of a confirmed parcel ═══
+          The gate is `selectedApn`: it's non-null only when the click
+          resolved to a real parcel via /api/parcels/at-point (PostGIS
+          ST_Contains). POI / address / street clicks leave it null, so
+          no monument rises off-parcel. Anchor = the parcel's stored
+          monument_lat/lng (centroid), carried on the selected stub Lead.
+          Kept mounted unconditionally + driven by `active` so the sink
+          animation can finish before the glb leaves the world. */}
+      <PlotSummonedMonument
+        mapElRef={map3DElRef}
+        lat={selectedApn ? selectedLead?.latitude ?? null : null}
+        lng={selectedApn ? selectedLead?.longitude ?? null : null}
+        active={!walkMode && selectedApn != null}
+        scale={3}
+        src="/assets/markers/plot-card-tower.glb"
+      />
+
+      {/* ═══ LIVE CARD — world-aware HTML on the risen shell ═══
+          Container belongs to the 3D world (the glb tower above);
+          CONTENT belongs to HTML. The live PropertyCardBillboard
+          (real price/PITI/beds, recalculates with BuyerSettings) is
+          mounted via gmp-marker at the SAME parcel anchor + the risen
+          altitude, so it rides at the top of the shell. Screen-facing
+          and crisp — we never tilt the readable layer (world-aware
+          interface model, locked 2026-05-31). Only present when a real
+          parcel is selected (selectedApn gate). */}
+      {/* World-anchored live card. Re-enabled 2026-06-04 after the
+          isolation test proved the zoom-on-select came from GroundGlow's
+          popover, NOT this one. This popover sets disable-pan-while-open +
+          cancelAutoPan so it never moves the camera. */}
+      {selectedApn && !walkMode && selectedLead?.latitude != null && selectedLead?.longitude != null && (
+        <PlotWorldPopover
+          mapElRef={map3DElRef}
+          lat={selectedLead.latitude}
+          lng={selectedLead.longitude}
+          altitudeM={20}
+        >
+          <div style={{ pointerEvents: 'auto' }}>
+            <PropertyCardBillboard
+              lead={selectedLead}
+              audience="public"
+              onClose={() => setSelectedLead(null)}
+            />
+          </div>
+        </PlotWorldPopover>
       )}
 
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 // GroundGlow — a glowing disc rendered at the ground point of the
@@ -33,8 +33,46 @@ interface PopoverElement extends HTMLElement {
 
 const POPOVER_TAG = 'gmp-popover';
 
+interface Map3DCam extends HTMLElement {
+  center?: { lat: number; lng: number; altitude?: number };
+  heading?: number;
+  tilt?: number;
+  range?: number;
+}
+
+// gmp-popover auto-pans the camera into view on open; the documented
+// disable-pan-while-open attribute is NOT honored by the JS web component
+// (confirmed 2026-06-04 — this popover was the real zoom-on-select bug).
+// Snapshot the camera right before open and restore it for ~8 frames to
+// cancel the auto-pan tween. Same defense the card popover uses.
+function cancelAutoPan(mapEl: HTMLElement) {
+  const cam = mapEl as unknown as Map3DCam;
+  const snap = {
+    center: cam.center ? { ...cam.center } : null,
+    heading: cam.heading,
+    tilt: cam.tilt,
+    range: cam.range,
+  };
+  if (!snap.center) return () => {};
+  let frames = 0;
+  let rafId = 0;
+  const tick = () => {
+    frames += 1;
+    try {
+      if (snap.center) cam.center = snap.center;
+      if (typeof snap.heading === 'number') cam.heading = snap.heading;
+      if (typeof snap.tilt === 'number') cam.tilt = snap.tilt;
+      if (typeof snap.range === 'number') cam.range = snap.range;
+    } catch { /* noop */ }
+    if (frames < 8) rafId = requestAnimationFrame(tick);
+  };
+  rafId = requestAnimationFrame(tick);
+  return () => cancelAnimationFrame(rafId);
+}
+
 export default function GroundGlow({ mapElRef, lat, lng }: GroundGlowProps) {
   const [popover, setPopover] = useState<PopoverElement | null>(null);
+  const stopPinRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     let attached = false;
@@ -66,13 +104,18 @@ export default function GroundGlow({ mapElRef, lat, lng }: GroundGlowProps) {
       try { p.disablePanWhileOpen = true; } catch { /* ignore */ }
       try { p.lightDismissDisabled = true; } catch { /* ignore */ }
       try { p.setAttribute('disable-pan-while-open', ''); } catch { /* ignore */ }
-      p.open = true;
       // Suppress Google's default popover chrome so only our glow
       // disc renders. The CSS in globals.css that hides .gm-style-iw
       // already handles most of this; belt-and-suspenders here.
       try { p.setAttribute('plot-ground-glow', ''); } catch { /* ignore */ }
 
       mapEl.appendChild(p);
+      // Capture camera THEN open, and restore over the next frames so the
+      // popover's auto-pan can't yank the user's flight. (The real fix —
+      // the attribute above is ignored by the web component.)
+      const stopPin = cancelAutoPan(mapEl);
+      p.open = true;
+      stopPinRef.current = stopPin;
       createdPopover = p;
       setPopover(p);
       attached = true;
@@ -82,6 +125,7 @@ export default function GroundGlow({ mapElRef, lat, lng }: GroundGlowProps) {
 
     return () => {
       if (retryId !== null) window.clearTimeout(retryId);
+      if (stopPinRef.current) { stopPinRef.current(); stopPinRef.current = null; }
       if (attached && createdPopover) {
         try { createdPopover.remove(); } catch { /* already gone */ }
       }

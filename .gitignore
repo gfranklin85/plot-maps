@@ -59,3 +59,13 @@ next-env.d.ts
 /scripts/openaddresses/*.geojson
 /scripts/openaddresses/*.geojson.meta
 /scripts/openaddresses/*.log
+
+# Blender autosave backups
+*.blend1
+*.blend2
+
+# Throwaway Blender exploration renders
+public/assets/cards/renders/
+
+# Unused Figma card PNG exports (card is React, not a texture)
+public/assets/cards/*.png

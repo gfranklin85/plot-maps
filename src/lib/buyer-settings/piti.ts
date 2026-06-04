@@ -32,6 +32,10 @@ export interface BuyerSettings {
   hoaMonthly: number;
   /** How the card headline reads: 'monthly' (new default) or 'price' (classic). */
   headlineMode: 'monthly' | 'price';
+  /** In-world card size multiplier — user-controlled via the CARD SIZE
+   *  slider in the top panel. The world-anchored popover reads this; the
+   *  camera never resizes the card. Range ~0.3–1.4. */
+  cardScale: number;
 }
 
 export const DEFAULT_BUYER_SETTINGS: BuyerSettings = {
@@ -43,6 +47,7 @@ export const DEFAULT_BUYER_SETTINGS: BuyerSettings = {
   insurancePerThousand: 0.5,
   hoaMonthly: 0,
   headlineMode: 'monthly',
+  cardScale: 0.7,
 };
 
 export interface PitiBreakdown {

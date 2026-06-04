@@ -103,6 +103,12 @@ async function assetExists(url: string): Promise<boolean> {
   }
 }
 
+// Build-time gate. The sky-dome .glb + textures aren't shipped yet, so by
+// default SkyDome does NOTHING — no asset probes, no 404s. Flip
+// NEXT_PUBLIC_SKY_DOME_ENABLED=1 once Greg's craft lands in public/assets/sky
+// and the component resumes its existence-check + render path.
+const SKY_DOME_ENABLED = process.env.NEXT_PUBLIC_SKY_DOME_ENABLED === '1';
+
 export default function SkyDome({ mapElRef, cameraRef, maps3dReady }: Props) {
   const atmos = useAtmosphere();
   const domeElRef = useRef<Model3DElement | null>(null);
@@ -115,7 +121,9 @@ export default function SkyDome({ mapElRef, cameraRef, maps3dReady }: Props) {
   // phase-appropriate texture .png exist on the server. The first
   // time a user lands on the map without assets, we silently no-op
   // and the demoted AtmosphereOverlay carries the surface alone.
+  // Skipped entirely when the build-time gate is off (no 404 probes).
   useEffect(() => {
+    if (!SKY_DOME_ENABLED) return;
     let cancelled = false;
     (async () => {
       const haveGeom = await assetExists(SKY_DOME_GLB);
@@ -135,6 +143,7 @@ export default function SkyDome({ mapElRef, cameraRef, maps3dReady }: Props) {
 
   // ── Mount the Model3DElement inside the Map3D element ────────────
   useEffect(() => {
+    if (!SKY_DOME_ENABLED) return;
     if (!maps3dReady) return;
     if (!mapElRef.current || !cameraRef.current) return;
     if (!assetsReadyRef.current) return;

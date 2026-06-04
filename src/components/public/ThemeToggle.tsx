@@ -7,11 +7,54 @@
 // Styled with the canonical --plot-* token palette so it inverts
 // correctly with the theme it controls.
 
+import { useEffect, useState } from 'react';
 import { useTheme } from '@/lib/theme-context';
 
 export default function ThemeToggle({ className = '' }: { className?: string }) {
   const { theme, toggleTheme } = useTheme();
+  // The actual theme is only knowable on the client (it depends on
+  // localStorage / data-theme painted by the bootstrap script). The
+  // server always renders with the dark default, so to avoid a
+  // hydration mismatch on the icon's <path>, we render a stable
+  // placeholder until mounted, then swap in the real sun/moon glyph.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+
   const isDark = theme === 'dark';
+
+  if (!mounted) {
+    // First paint (server + client pre-hydration): a neutral, theme-
+    // independent glyph so server and client markup match exactly.
+    return (
+      <button
+        type="button"
+        onClick={toggleTheme}
+        aria-label="Toggle theme"
+        title="Toggle theme"
+        className={`plot-theme-toggle ${className}`}
+        suppressHydrationWarning
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+          <circle cx="12" cy="12" r="4.5" />
+        </svg>
+        <style jsx>{`
+          .plot-theme-toggle{
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            width:34px;
+            height:34px;
+            border-radius:9999px;
+            border:1px solid var(--plot-divider-strong);
+            color:var(--plot-edge);
+            background:transparent;
+            cursor:pointer;
+          }
+        `}</style>
+      </button>
+    );
+  }
+
   return (
     <button
       type="button"

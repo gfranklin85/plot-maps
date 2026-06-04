@@ -137,6 +137,24 @@ export default function BuyerSettingsPanel() {
                 </button>
               </div>
             </div>
+
+            <div className="bsp-knob">
+              <label htmlFor="bsp-cardsize">CARD SIZE</label>
+              <div className="bsp-knob-row">
+                <input
+                  id="bsp-cardsize"
+                  type="range"
+                  min={30}
+                  max={140}
+                  step={2}
+                  value={Math.round((settings.cardScale ?? 0.7) * 100)}
+                  onChange={(e) =>
+                    updateSettings({ cardScale: Number(e.target.value) / 100 })
+                  }
+                />
+                <span className="bsp-knob-value">{Math.round((settings.cardScale ?? 0.7) * 100)}%</span>
+              </div>
+            </div>
           </div>
 
           <div className="bsp-footnote">
@@ -249,7 +267,7 @@ export default function BuyerSettingsPanel() {
 
         .bsp-knobs {
           display: grid;
-          grid-template-columns: 1fr 1fr 0.7fr 0.7fr;
+          grid-template-columns: 1fr 1fr 0.7fr 0.7fr 1fr;
           gap: 18px;
         }
         @media (max-width: 720px) {

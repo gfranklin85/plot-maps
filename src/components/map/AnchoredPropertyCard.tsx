@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import CardBeamTail from "./CardBeamTail";
 import {
   projectMap3DLatLngToScreen,
   type Map3DCameraState,
@@ -104,19 +103,18 @@ export default function AnchoredPropertyCard({
         }
       }
 
-      // If projection produced a position, use it. Otherwise use the
-      // fallback top-center (so the popup is ALWAYS visible).
-      const next = projectedNext ?? {
-        x: window.innerWidth / 2,
-        y: FALLBACK_TOP_PX,
-      };
+      // World-anchored only. When projection can't see the point (behind
+      // camera / off screen) we HIDE the card rather than snapping it to a
+      // screen-fixed corner — a corner snap reads as "stuck to the screen"
+      // and detaches the card from the box. Better to let it vanish at the
+      // edge like a real world object. (Greg 2026-05-31.)
+      const next = projectedNext; // may be null → hidden this frame
 
       const last = lastPosRef.current;
-      if (
-        !last ||
-        Math.abs(last.x - next.x) > 0.5 ||
-        Math.abs(last.y - next.y) > 0.5
-      ) {
+      const changed =
+        (next === null) !== (last === null) ||
+        (next && last && (Math.abs(last.x - next.x) > 0.5 || Math.abs(last.y - next.y) > 0.5));
+      if (changed) {
         lastPosRef.current = next;
         setPos(next);
       }
@@ -157,7 +155,6 @@ export default function AnchoredPropertyCard({
       }}
     >
       {children}
-      <CardBeamTail />
     </div>,
     document.body,
   );

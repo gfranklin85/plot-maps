@@ -1744,22 +1744,13 @@ export default function MapPage() {
         </>
       )}
 
-      {/* ═══ SUMMONED MONUMENT — rises ONLY out of a confirmed parcel ═══
-          The gate is `selectedApn`: it's non-null only when the click
-          resolved to a real parcel via /api/parcels/at-point (PostGIS
-          ST_Contains). POI / address / street clicks leave it null, so
-          no monument rises off-parcel. Anchor = the parcel's stored
-          monument_lat/lng (centroid), carried on the selected stub Lead.
-          Kept mounted unconditionally + driven by `active` so the sink
-          animation can finish before the glb leaves the world. */}
-      <PlotSummonedMonument
-        mapElRef={map3DElRef}
-        lat={selectedApn ? selectedLead?.latitude ?? null : null}
-        lng={selectedApn ? selectedLead?.longitude ?? null : null}
-        active={!walkMode && selectedApn != null}
-        scale={3}
-        src="/assets/markers/plot-card-tower.glb"
-      />
+      {/* SUMMONED MONUMENT REMOVED 2026-06-04. The rising glb block is
+          retired — moving to the HTML "easel" projection-card direction
+          (no 3D-world block). The glb (gmp-model-3d-interactive) mounting
+          in front of the camera on select was also the prime remaining
+          suspect for the zoom-on-select hijacking flight. Killing it does
+          both: no block + likely no zoom. PlotSummonedMonument.tsx kept on
+          disk (parked) in case the rising mechanic returns; just unmounted. */}
 
       {/* ═══ LIVE CARD — world-aware HTML on the risen shell ═══
           Container belongs to the 3D world (the glb tower above);
@@ -1770,10 +1761,12 @@ export default function MapPage() {
           and crisp — we never tilt the readable layer (world-aware
           interface model, locked 2026-05-31). Only present when a real
           parcel is selected (selectedApn gate). */}
-      {/* World-anchored live card. Re-enabled 2026-06-04 after the
-          isolation test proved the zoom-on-select came from GroundGlow's
-          popover, NOT this one. This popover sets disable-pan-while-open +
-          cancelAutoPan so it never moves the camera. */}
+      {/* CARD POPOVER REMOVED 2026-06-04 — rebuilding the card (HTML easel
+          direction) from scratch, and removing it here doubles as the next
+          zoom isolation step: block is gone and zoom persists, so this
+          popover (or GroundGlow's) is the remaining suspect. If zoom STOPS
+          with this off → it's PlotWorldPopover. PlotWorldPopover.tsx +
+          PropertyCardBillboard.tsx kept on disk.
       {selectedApn && !walkMode && selectedLead?.latitude != null && selectedLead?.longitude != null && (
         <PlotWorldPopover
           mapElRef={map3DElRef}
@@ -1790,6 +1783,7 @@ export default function MapPage() {
           </div>
         </PlotWorldPopover>
       )}
+      */}
 
 
       {/* ═══ EXPANDED FULL SIDEBAR — deep dive on selected property ═══ */}

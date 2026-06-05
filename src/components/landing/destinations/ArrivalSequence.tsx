@@ -177,6 +177,27 @@ export default function ArrivalSequence({
   const [oauthLoading, setOauthLoading] = useState(false);
   const expansionContainerRef = useRef<HTMLDivElement>(null);
 
+  // Map handoff URL. Catalog destinations resolve by slug on /map, but
+  // search-bar hits use a synthetic `search:<query>` slug that /map can't
+  // resolve to coordinates — and the real lat/lng are already in
+  // destination.pose (resolved at selection time). So we pass the pose
+  // through as explicit lat/lng (+ heading/tilt) params, which /map's URL
+  // handler consumes directly. Works for BOTH catalog and search arrivals;
+  // the slug rides along too (kept for analytics / the demand-capture
+  // funnel on unsupported markets). Locked 2026-06-04 — fixes the "Oops!
+  // Google Maps didn't load" white-map when arriving via the search bar.
+  const mapHref = useMemo(() => {
+    const p = destination.pose;
+    const qs = new URLSearchParams();
+    qs.set('destination', destination.slug);
+    if (Number.isFinite(p.lat) && Number.isFinite(p.lng)) {
+      qs.set('lat', String(p.lat));
+      qs.set('lng', String(p.lng));
+      if (Number.isFinite(p.heading)) qs.set('heading', String(p.heading));
+    }
+    return `/map?${qs.toString()}`;
+  }, [destination.pose, destination.slug]);
+
   // Derived: visitor's first name from the OAuth identity. Supabase
   // exposes user_metadata.full_name for Google sign-ins; we take the
   // first word.
@@ -190,9 +211,9 @@ export default function ArrivalSequence({
   // Cuts the JS-chunk download off the post-handoff transition.
   useEffect(() => {
     if (beat !== 'darken') {
-      router.prefetch(`/map?destination=${destination.slug}`);
+      router.prefetch(mapHref);
     }
-  }, [beat, router, destination.slug]);
+  }, [beat, router, mapHref]);
 
   // Body scroll lock — once arrival starts, the landing beneath is
   // out of reach until release.
@@ -236,11 +257,11 @@ export default function ArrivalSequence({
     if (beat === 'release') {
       clearArrivalInFlight();
       const t = setTimeout(() => {
-        router.push(`/map?destination=${destination.slug}`);
+        router.push(mapHref);
       }, 200);
       return () => clearTimeout(t);
     }
-  }, [beat, user, destination.slug, router]);
+  }, [beat, user, mapHref, router]);
 
   // ── Manifest beat: OAuth ─────────────────────────────────────────
   const handleSignIn = useCallback(async () => {

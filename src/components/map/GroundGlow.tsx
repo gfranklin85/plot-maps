@@ -45,7 +45,7 @@ interface Map3DCam extends HTMLElement {
 // (confirmed 2026-06-04 — this popover was the real zoom-on-select bug).
 // Snapshot the camera right before open and restore it for ~8 frames to
 // cancel the auto-pan tween. Same defense the card popover uses.
-function cancelAutoPan(mapEl: HTMLElement) {
+function cancelAutoPan(mapEl: HTMLElement): () => void {
   const cam = mapEl as unknown as Map3DCam;
   const snap = {
     center: cam.center ? { ...cam.center } : null,
@@ -54,20 +54,32 @@ function cancelAutoPan(mapEl: HTMLElement) {
     range: cam.range,
   };
   if (!snap.center) return () => {};
-  let frames = 0;
   let rafId = 0;
+  let released = false;
+  const MAX_MS = 2000;
+  const start = performance.now();
+  const release = () => {
+    if (released) return;
+    released = true;
+    window.removeEventListener('pointerdown', release, true);
+    window.removeEventListener('wheel', release, true);
+    window.removeEventListener('keydown', release, true);
+  };
+  window.addEventListener('pointerdown', release, true);
+  window.addEventListener('wheel', release, true);
+  window.addEventListener('keydown', release, true);
   const tick = () => {
-    frames += 1;
+    if (released || performance.now() - start > MAX_MS) { rafId = 0; return; }
     try {
       if (snap.center) cam.center = snap.center;
       if (typeof snap.heading === 'number') cam.heading = snap.heading;
       if (typeof snap.tilt === 'number') cam.tilt = snap.tilt;
       if (typeof snap.range === 'number') cam.range = snap.range;
     } catch { /* noop */ }
-    if (frames < 8) rafId = requestAnimationFrame(tick);
+    rafId = requestAnimationFrame(tick);
   };
   rafId = requestAnimationFrame(tick);
-  return () => cancelAnimationFrame(rafId);
+  return () => { release(); if (rafId) cancelAnimationFrame(rafId); };
 }
 
 export default function GroundGlow({ mapElRef, lat, lng }: GroundGlowProps) {

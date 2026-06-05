@@ -47,15 +47,15 @@ interface Map3DCam extends HTMLElement {
   range?: number;
 }
 
-// gmp-popover auto-pans the camera to bring itself into view on open,
-// and the documented disable-pan-while-open attribute is NOT honored by
-// the JS web component. We defeat the pan by snapshotting the camera
-// right before open and restoring it on the next few frames — long
-// enough to cancel the auto-pan's tween, short enough not to fight a
-// user who's actively flying. The user's camera is sacred
-// (feedback-no-zoom-to-ui). Restores only when the move is large (a real
-// auto-pan jump), so small intentional drift isn't clobbered.
-function cancelAutoPan(mapEl: Map3DCam) {
+// gmp-popover auto-pans the camera to bring itself into view on open, and
+// the documented disable-pan-while-open attribute is NOT honored by the JS
+// web component. We defeat it by snapshotting the camera and HOLDING it
+// pinned — restoring every frame — until the USER provides real input
+// (pointer / wheel / key / gamepad), which is the true "release the
+// camera" signal. The earlier fixed 8-frame guard was too short: the
+// auto-pan tween (and re-frames as the monument rises) outlast it. The
+// user's camera is sacred (feedback-no-zoom-to-ui).
+function cancelAutoPan(mapEl: Map3DCam): () => void {
   const snap = {
     center: mapEl.center ? { ...mapEl.center } : null,
     heading: mapEl.heading,
@@ -63,22 +63,38 @@ function cancelAutoPan(mapEl: Map3DCam) {
     range: mapEl.range,
   };
   if (!snap.center) return () => {};
-  let frames = 0;
+
   let rafId = 0;
+  let released = false;
+  const MAX_MS = 2000; // absolute safety cap so we never pin forever
+  const start = performance.now();
+
+  const release = () => {
+    if (released) return;
+    released = true;
+    window.removeEventListener("pointerdown", release, true);
+    window.removeEventListener("wheel", release, true);
+    window.removeEventListener("keydown", release, true);
+    window.removeEventListener("gamepadconnected", release, true);
+  };
+  // Any genuine user input ends the pin immediately so we never fight
+  // a user who starts flying while a card is open.
+  window.addEventListener("pointerdown", release, true);
+  window.addEventListener("wheel", release, true);
+  window.addEventListener("keydown", release, true);
+
   const tick = () => {
-    frames += 1;
+    if (released || performance.now() - start > MAX_MS) { rafId = 0; return; }
     try {
-      // Range is the value the auto-pan zoom changes most; restore the
-      // whole pose to be safe.
       if (snap.center) mapEl.center = snap.center;
       if (typeof snap.heading === "number") mapEl.heading = snap.heading;
       if (typeof snap.tilt === "number") mapEl.tilt = snap.tilt;
       if (typeof snap.range === "number") mapEl.range = snap.range;
     } catch { /* noop */ }
-    if (frames < 8) rafId = requestAnimationFrame(tick); // ~130ms guard
+    rafId = requestAnimationFrame(tick);
   };
   rafId = requestAnimationFrame(tick);
-  return () => cancelAnimationFrame(rafId);
+  return () => { release(); if (rafId) cancelAnimationFrame(rafId); };
 }
 
 const POPOVER_TAG = "gmp-popover";

@@ -17,9 +17,11 @@ import PropertyPopup from "@/components/map/PropertyPopup";
 import { BuyerSettingsProvider } from "@/lib/buyer-settings/context";
 import BuyerSettingsPanel from "@/components/map/BuyerSettingsPanel";
 import PlotPropertyHighlight from "@/components/map/PlotPropertyHighlight";
-import PlotSummonedMonument from "@/components/map/PlotSummonedMonument";
-import PlotWorldPopover from "@/components/map/PlotWorldPopover";
-import PropertyCardBillboard from "@/components/map/PropertyCardBillboard";
+// PlotSummonedMonument, PlotWorldPopover, PropertyCardBillboard were
+// unmounted 2026-06-04 during the world-aware-interface rebuild (HTML
+// easel direction + zoom isolation). Components remain on disk parked
+// for re-mount when the new card surface is wired. Re-add the imports
+// when those mounts come back.
 import GroundGlow from "@/components/map/GroundGlow";
 import PlotPinMarker from "@/components/map/PlotPinMarker";
 import MarketRequestPrompt from "@/components/map/MarketRequestPrompt";

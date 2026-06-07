@@ -68,6 +68,18 @@ function pxPerDegVertical(viewportPxTall: number, vFovDeg = 35): number {
 // so we don't pop at the literal edge.
 const OFFSCREEN_MARGIN_PX = 200;
 
+// Rise-in animation. The sticker begins this many pixels ABOVE its
+// anchor (further up the screen, already above the reticle) and 0
+// opacity, then over RISE_MS milliseconds settles down to the anchor
+// with full opacity. Greg locked 2026-06-06: "we want it to animate
+// up. But also, it cant animate up from behind, under, or cover the
+// reticle, it must begin rising already above the reticle." The
+// animation moves DOWN by RISE_FROM_OFFSET_PX to land at its anchor;
+// it never crosses the reticle line because the anchor is itself
+// already above the reticle.
+const RISE_FROM_OFFSET_PX = 36;
+const RISE_MS = 280;
+
 export default function PropertyStickerCard({
   cameraRef,
   anchorPxX,
@@ -80,6 +92,16 @@ export default function PropertyStickerCard({
   // to (e.g. opacity transitions). We mostly write straight to style
   // to avoid 60fps re-renders.
   const [visible, setVisible] = useState(true);
+  // Rise-in animation start timestamp. Captured on the FIRST frame
+  // we have a wrapper + camera. Reset whenever the anchor pixel
+  // changes (new selection → new rise).
+  const riseStartRef = useRef<number | null>(null);
+
+  // Reset the rise animation start whenever the anchor changes —
+  // makes a new click feel like a new rise, not a teleport.
+  useEffect(() => {
+    riseStartRef.current = null;
+  }, [anchorPxX, anchorPxY]);
 
   useEffect(() => {
     let rafId = 0;
@@ -93,6 +115,20 @@ export default function PropertyStickerCard({
         rafId = requestAnimationFrame(tick);
         return;
       }
+      // Stamp the rise start on the first frame we can render. Using
+      // performance.now() so the timer is monotonic across re-renders.
+      if (riseStartRef.current === null) {
+        riseStartRef.current = performance.now();
+      }
+      const riseElapsed = performance.now() - (riseStartRef.current ?? 0);
+      const riseT = Math.min(1, riseElapsed / RISE_MS);
+      // ease-out cubic so it lands soft
+      const riseEased = 1 - Math.pow(1 - riseT, 3);
+      // Sticker starts RISE_FROM_OFFSET_PX higher than the anchor (so it
+      // begins ALREADY above the reticle, never crossing it) and
+      // animates DOWN to the anchor.
+      const riseOffsetY = -RISE_FROM_OFFSET_PX * (1 - riseEased);
+      const riseOpacity = riseEased;
 
       // ── Camera deltas since click ──
       // heading change → horizontal world slide. If the camera has
@@ -119,7 +155,7 @@ export default function PropertyStickerCard({
       const slideY = -dPitch * pxPerDegV;
 
       const x = anchorPxX + slideX;
-      const y = anchorPxY + slideY;
+      const y = anchorPxY + slideY + riseOffsetY;
 
       const offscreen =
         x < -OFFSCREEN_MARGIN_PX ||
@@ -128,7 +164,7 @@ export default function PropertyStickerCard({
         y > vh + OFFSCREEN_MARGIN_PX;
 
       wrapper.style.transform = `translate3d(${x}px, ${y}px, 0) translate(-50%, -100%)`;
-      wrapper.style.opacity = offscreen ? '0' : '1';
+      wrapper.style.opacity = offscreen ? '0' : String(riseOpacity);
       wrapper.style.pointerEvents = offscreen ? 'none' : 'auto';
       if (visible && offscreen) setVisible(false);
       if (!visible && !offscreen) setVisible(true);

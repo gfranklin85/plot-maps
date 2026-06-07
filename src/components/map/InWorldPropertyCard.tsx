@@ -35,6 +35,16 @@ function statusLabel(s: string | null | undefined): string {
   return "Off Market";
 }
 
+// Status pill color per state. Active is the canonical green; Pending
+// is amber; Sold reads as cool slate; Off Market is the neutral
+// charcoal so it doesn't compete with active listings on the map.
+function statusBg(label: string): string {
+  if (label === "Active") return "#3aa767";
+  if (label === "Pending") return "#d9a23c";
+  if (label === "Sold") return "#4a6584";
+  return "#3a4658"; // Off Market
+}
+
 /** Build card data from a Lead (+ optional resolved street/city). The map
  *  page passes the selected Lead; missing fields degrade to em-dashes. */
 export function cardDataFromLead(lead: Lead): InWorldCardData {
@@ -157,7 +167,7 @@ export default function InWorldPropertyCard({ data, onAction }: Props) {
           className="absolute flex items-center justify-center"
           style={{
             left: 335, top: 18, height: 25, padding: "4px 7px",
-            borderRadius: 6, background: "#3aa767", border: "1px solid #f2f2f5",
+            borderRadius: 6, background: statusBg(data.status), border: "1px solid #f2f2f5",
           }}
         >
           <span className="font-bold text-white" style={{ fontSize: 11 }}>

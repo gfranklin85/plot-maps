@@ -20,14 +20,15 @@ import { BuyerSettingsProvider } from "@/lib/buyer-settings/context";
 // the panel returns.
 import PlotPropertyHighlight from "@/components/map/PlotPropertyHighlight";
 import PropertyStickerCard from "@/components/map/PropertyStickerCard";
+import InWorldPropertyCard, { cardDataFromLead } from "@/components/map/InWorldPropertyCard";
 // PlotSummonedMonument, PlotWorldPopover, PropertyCardBillboard were
 // unmounted 2026-06-04 during the world-aware-interface rebuild (HTML
 // easel direction + zoom isolation). Components remain on disk parked
 // for re-mount when the new card surface is wired. Re-add the imports
 // when those mounts come back.
 import GroundGlow from "@/components/map/GroundGlow";
-import InWorldPropertyCard, { cardDataFromLead } from "@/components/map/InWorldPropertyCard";
-import AnchoredPropertyCard from "@/components/map/AnchoredPropertyCard";
+// AnchoredPropertyCard import dropped 2026-06-06 — superseded by the
+// windshield-sticker model (PropertyStickerCard). Component file kept.
 import PlotPinMarker from "@/components/map/PlotPinMarker";
 import MarketRequestPrompt from "@/components/map/MarketRequestPrompt";
 import type { RitualTetherHandle } from "@/components/map/RitualTether";
@@ -1543,9 +1544,24 @@ export default function MapPage() {
                 created_at: new Date().toISOString(),
               } as unknown as Lead;
               setSelectedLead(stub);
-              // Capture click pixel + camera snapshot for the
-              // windshield-sticker popup. Zero-point math reference.
-              if (clickContext) setStickerContext(clickContext);
+              // Anchor the windshield-sticker popup ABOVE THE RETICLE,
+              // not at the click pixel. Greg locked 2026-06-06: "I dont
+              // want the UI right there where Im trying to look at, I
+              // want it to popup on top." Reticle XY is the reference;
+              // the sticker's bottom edge sits ABOVE_RETICLE_GAP px
+              // above the reticle, so the card body never crosses or
+              // covers the reticle. Camera snapshot still comes from
+              // the click frame so delta math zero-points correctly.
+              if (clickContext) {
+                const rx = reticlePosition.xFraction * window.innerWidth;
+                const ry = reticlePosition.yFraction * window.innerHeight;
+                const ABOVE_RETICLE_GAP = 32;
+                setStickerContext({
+                  ...clickContext,
+                  screenX: rx,
+                  screenY: ry - ABOVE_RETICLE_GAP,
+                });
+              }
             }}
             onGooglePoiClick={(placeId, latLng) => {
               // Google POI selection from the 3D photoreal surface
@@ -1786,48 +1802,21 @@ export default function MapPage() {
           cameraRef={cameraStateRef}
           anchorPxX={stickerContext.screenX}
           anchorPxY={stickerContext.screenY}
-          cameraAtClick={{
-            ...stickerContext.camera,
-          }}
+          cameraAtClick={{ ...stickerContext.camera }}
         >
-          {/* First-pass minimal content so we can SEE the sticker stick
-              before pulling in the full PropertyPopup. Replace once
-              the sliding-anchor proves out in flight. */}
-          <div
-            style={{
-              minWidth: 260,
-              maxWidth: 320,
-              padding: '12px 14px',
-              borderRadius: 12,
-              background: 'rgba(20, 28, 46, 0.94)',
-              border: '1px solid rgba(115, 204, 224, 0.6)',
-              boxShadow: '0 10px 30px rgba(0,0,0,0.45)',
-              color: '#f7fafc',
-              fontSize: 13,
-              lineHeight: 1.4,
-              pointerEvents: 'auto',
-            }}
-          >
-            <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>
-              {selectedLead.property_address || selectedLead.name || selectedLead.id}
-            </div>
-            <div style={{ fontSize: 11, opacity: 0.7, marginBottom: 8 }}>
-              {selectedLead.id}
-            </div>
-            <button
-              onClick={() => setSelectedLead(null)}
-              style={{
-                fontSize: 11,
-                padding: '4px 10px',
-                borderRadius: 6,
-                background: 'rgba(115, 204, 224, 0.15)',
-                border: '1px solid rgba(115, 204, 224, 0.4)',
-                color: '#73cce0',
-                cursor: 'pointer',
+          {/* Real InWorldPropertyCard, scaled down to card-popup size
+              (Figma source is 434×296; ~0.7 brings it to ~304×207
+              which matches the popup density Greg called for
+              2026-06-06). Transform-origin top-center so the rise
+              animation reads as a card landing at its anchor, not
+              a corner pivot. */}
+          <div style={{ transform: 'scale(0.7)', transformOrigin: 'center bottom' }}>
+            <InWorldPropertyCard
+              data={cardDataFromLead(selectedLead)}
+              onAction={(a) => {
+                if (a === 'close') setSelectedLead(null);
               }}
-            >
-              Close
-            </button>
+            />
           </div>
         </PropertyStickerCard>
       )}
@@ -1849,27 +1838,13 @@ export default function MapPage() {
           and crisp — we never tilt the readable layer (world-aware
           interface model, locked 2026-05-31). Only present when a real
           parcel is selected (selectedApn gate). */}
-      {/* ═══ IN-WORLD PROPERTY CARD (Figma 106:91, built 2026-06-06) ═══
-          The projected card: white-bordered dark-glass face + photo hero +
-          agent toolbar, with the light-cone + sonar-arc projection
-          broadcasting up from the parcel. Mounted as a SCREEN overlay (NOT
-          gmp-popover) so it can never re-trigger the camera auto-pan / zoom
-          (reference_gmp_3d_anchor_no_pan). World-anchoring + live parallax
-          re-angle come next; this lands the visual + data wiring first.
-          Gated on a real parcel selection (selectedApn). */}
-      {selectedApn && !walkMode && selectedLead?.latitude != null && selectedLead?.longitude != null && (
-        <AnchoredPropertyCard
-          mapElRef={map3DElRef}
-          lat={selectedLead.latitude}
-          lng={selectedLead.longitude}
-          altitudeM={18}
-        >
-          <InWorldPropertyCard
-            data={cardDataFromLead(selectedLead)}
-            onClose={() => setSelectedLead(null)}
-          />
-        </AnchoredPropertyCard>
-      )}
+      {/* Older AnchoredPropertyCard + InWorldPropertyCard mount REMOVED
+          2026-06-06. The PropertyStickerCard above is now the single
+          popup surface. AnchoredPropertyCard's manual lat/lng→screen
+          projection was the "card appears top-center / too big" bug;
+          superseded by the windshield-sticker model (anchor above the
+          reticle, slide on camera delta). InWorldPropertyCard the
+          component is now rendered INSIDE the sticker wrapper above. */}
 
 
       {/* ═══ EXPANDED FULL SIDEBAR — deep dive on selected property ═══ */}

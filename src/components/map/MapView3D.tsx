@@ -808,8 +808,6 @@ function Inner({
         .then((r) => r.ok ? r.json() : null)
         .then((parcelJson) => {
           if (!parcelJson || !parcelJson.apn) return;
-          const mlat = typeof parcelJson.monumentLat === 'number' ? parcelJson.monumentLat : lat;
-          const mlng = typeof parcelJson.monumentLng === 'number' ? parcelJson.monumentLng : lng;
           // Stash the polygon globally for PlotPropertyHighlight to pick
           // up on selection — avoids a second /api/parcels/by-apn round
           // trip. Keyed by APN so a stale stash from a previous click
@@ -819,7 +817,15 @@ function Inner({
             (window as unknown as { __plotParcelGeomCache: Map<string, unknown> }).__plotParcelGeomCache
               .set(parcelJson.apn as string, parcelJson.geometry);
           }
-          onParcelClickRef.current?.(parcelJson.apn as string, { lat: mlat, lng: mlng });
+          // Pass the CLICK position, NOT the monument anchor. The monument
+          // anchor (parcel-centroid offset toward longest edge) is the
+          // backyard spot the buried glb was meant for — but at close
+          // range that point sits BEHIND the camera frustum, and the
+          // popup doesn't render until the user backs up. The user
+          // clicked WHERE they're looking; anchor there. Greg flagged
+          // 2026-06-06: "if Im looking at the parcel on the screen, the
+          // popup should be right there too."
+          onParcelClickRef.current?.(parcelJson.apn as string, { lat, lng });
         })
         .catch((err) => {
           if ((err as Error).name !== 'AbortError') {

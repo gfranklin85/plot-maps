@@ -257,6 +257,7 @@ function Inner({
   onGooglePoiClick,
   onAddressClick,
   mapElForwardRef,
+  cameraForwardRef,
   ritualTetherForwardRef,
 }: {
   center?: { lat: number; lng: number } | null;
@@ -283,7 +284,26 @@ function Inner({
    *  side just renders Property­Popup on the click callback. */
   showParcelOverlay?: boolean;
   parcelColorMode?: ParcelColorMode;
-  onParcelClick?: (apn: string, latLng: { lat: number; lng: number }) => void;
+  onParcelClick?: (
+    apn: string,
+    latLng: { lat: number; lng: number },
+    /** Screen pixel where the click landed AND a snapshot of the camera's
+     *  eye state at the click frame. The page uses these to mount the
+     *  windshield-sticker PropertyStickerCard: the sticker starts at
+     *  this pixel and slides each frame by camera-delta-to-pixel-delta,
+     *  no projection math. */
+    clickContext?: {
+      screenX: number;
+      screenY: number;
+      camera: {
+        lat: number;
+        lng: number;
+        altitude: number;
+        heading: number;
+        pitch: number;
+      };
+    },
+  ) => void;
   onParcelHoverChange?: (apn: string | null, latLng: { lat: number; lng: number } | null) => void;
   parcelHitTesterRef?: React.MutableRefObject<ParcelHitTester | null>;
   /** Google POI selection (Breakthrough 1 — 2026-05-26). Fires when a
@@ -299,6 +319,18 @@ function Inner({
    *  page.tsx to mount Marker3D children (AnchoredPropertyCard, etc.)
    *  inside Google's world-space scene graph. */
   mapElForwardRef?: React.MutableRefObject<HTMLElement | null>;
+  /** Forward the live first-person camera state to the page so it can
+   *  pass it to the windshield-sticker popup (PropertyStickerCard).
+   *  Updated in lockstep with camRef.current every camera write — the
+   *  page just reads it; the page never writes. */
+  cameraForwardRef?: React.MutableRefObject<{
+    lat: number;
+    lng: number;
+    altitude: number;
+    heading: number;
+    pitch: number;
+    range: number;
+  } | null>;
   /** Forwarded ref to the RitualTether's imperative handle. Used by
    *  page.tsx to call retract() when the popup dismisses, so the
    *  vertical rebound beam collapses back into the property. */
@@ -792,6 +824,26 @@ function Inner({
       if (!pos || !Number.isFinite(pos.lat) || !Number.isFinite(pos.lng)) return;
       const lat = pos.lat;
       const lng = pos.lng;
+      // Capture the screen pixel of the click AND a camera snapshot
+      // RIGHT NOW. These are the "click frame" reference points for
+      // the windshield-sticker popup. The pixel is where the popup
+      // starts; the camera snapshot is the zero-point that every
+      // subsequent frame measures delta against.
+      // Mouse click → ev.clientX/Y. Synthesized A-press click also
+      // uses PointerEvent shape so clientX/Y are present there too.
+      // The gmp-click CustomEvent doesn't formally extend MouseEvent in
+      // its type, but the underlying DOM event surfaced by the browser
+      // does carry clientX/clientY on mouse clicks (and on the
+      // synthesized PointerEvent the gamepad A-press dispatches).
+      // Read via unknown cast to satisfy the strict-conversion lint.
+      const mouseEv = ev as unknown as { clientX?: number; clientY?: number };
+      const clickX = typeof mouseEv.clientX === 'number'
+        ? mouseEv.clientX
+        : window.innerWidth / 2;
+      const clickY = typeof mouseEv.clientY === 'number'
+        ? mouseEv.clientY
+        : window.innerHeight / 2;
+      const camAtClick = camRef.current ? { ...camRef.current } : null;
       const ac = new AbortController();
       lastParcelLookupAcRef.current?.abort();
       lastParcelLookupAcRef.current = ac;
@@ -817,15 +869,30 @@ function Inner({
             (window as unknown as { __plotParcelGeomCache: Map<string, unknown> }).__plotParcelGeomCache
               .set(parcelJson.apn as string, parcelJson.geometry);
           }
-          // Pass the CLICK position, NOT the monument anchor. The monument
-          // anchor (parcel-centroid offset toward longest edge) is the
-          // backyard spot the buried glb was meant for — but at close
-          // range that point sits BEHIND the camera frustum, and the
-          // popup doesn't render until the user backs up. The user
-          // clicked WHERE they're looking; anchor there. Greg flagged
-          // 2026-06-06: "if Im looking at the parcel on the screen, the
-          // popup should be right there too."
-          onParcelClickRef.current?.(parcelJson.apn as string, { lat, lng });
+          // Pass the click position, the screen pixel, and a camera
+          // snapshot so the page can mount the windshield-sticker
+          // popup at the exact pixel the user clicked. The lat/lng
+          // is still passed (used for the resolved lead's position
+          // field and for any future map-side wiring), but the
+          // sticker math doesn't use it — it just uses pixel + camera
+          // delta. Greg locked 2026-06-06.
+          onParcelClickRef.current?.(
+            parcelJson.apn as string,
+            { lat, lng },
+            camAtClick
+              ? {
+                  screenX: clickX,
+                  screenY: clickY,
+                  camera: {
+                    lat: camAtClick.lat,
+                    lng: camAtClick.lng,
+                    altitude: camAtClick.altitude,
+                    heading: camAtClick.heading,
+                    pitch: camAtClick.pitch,
+                  },
+                }
+              : undefined,
+          );
         })
         .catch((err) => {
           if ((err as Error).name !== 'AbortError') {
@@ -845,6 +912,11 @@ function Inner({
       lat: seed.lat, lng: seed.lng, altitude: 91,
       heading: 0, pitch: 0, range: 700,
     };
+    // Forward to the page if it asked for a live ref. Camera fields are
+    // mutated IN PLACE by the per-frame loop, so handing the same object
+    // back means the page reads always-current values without us
+    // mirroring writes. Locked 2026-06-06 (windshield sticker popup).
+    if (cameraForwardRef) cameraForwardRef.current = camRef.current;
     airRef.current = { throttle: 0, strafe: 0, yaw: 0 };
     velRef.current = { panX: 0, panY: 0, heading: 0, tilt: 0, climb: 0 };
     // Initial write to Map3D.
@@ -863,6 +935,7 @@ function Inner({
       el.remove();
       elRef.current = null;
       if (mapElForwardRef) mapElForwardRef.current = null;
+      if (cameraForwardRef) cameraForwardRef.current = null;
       camRef.current = null;
     };
     // poisVisible is intentionally excluded — seeding the initial
@@ -1192,6 +1265,7 @@ export default function MapView3D(props: MapViewProps) {
         onGooglePoiClick={props.onGooglePoiClick}
         onAddressClick={props.onAddressClick}
         mapElForwardRef={props.mapElForwardRef}
+        cameraForwardRef={props.cameraForwardRef}
         ritualTetherForwardRef={props.ritualTetherForwardRef}
       />
     </APIProvider>

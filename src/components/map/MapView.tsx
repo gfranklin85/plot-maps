@@ -50,7 +50,21 @@ export interface MapViewProps {
   /** Fires when the user clicks a parcel polygon. Carries the APN and the
    *  lat/lng of the click. The page uses this to look up / open the
    *  PropertyPopup against the resolver. */
-  onParcelClick?: (apn: string, latLng: { lat: number; lng: number }) => void;
+  onParcelClick?: (
+    apn: string,
+    latLng: { lat: number; lng: number },
+    clickContext?: {
+      screenX: number;
+      screenY: number;
+      camera: {
+        lat: number;
+        lng: number;
+        altitude: number;
+        heading: number;
+        pitch: number;
+      };
+    },
+  ) => void;
   /** Fires when the user picks a Google POI (address-number label or
    *  business icon) on the 3D photoreal surface. The page wires this
    *  to open PropertyPopup against the `gpoi:<placeId>` stub id —
@@ -65,6 +79,17 @@ export interface MapViewProps {
    *  mount Marker3D children (anchored PropertyCard etc.) inside
    *  Google's 3D scene graph. */
   mapElForwardRef?: React.MutableRefObject<HTMLElement | null>;
+  /** Forwarded live ref to the first-person camera state. The page
+   *  reads this each frame to drive the windshield-sticker popup
+   *  (PropertyStickerCard). Locked 2026-06-06. */
+  cameraForwardRef?: React.MutableRefObject<{
+    lat: number;
+    lng: number;
+    altitude: number;
+    heading: number;
+    pitch: number;
+    range: number;
+  } | null>;
   /** Forwarded ref to the RitualTether's imperative handle. Used by
    *  the page to call retract() when the popup dismisses so the
    *  vertical rebound beam collapses cleanly. */

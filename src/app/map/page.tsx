@@ -15,14 +15,19 @@ import MaterialIcon from "@/components/ui/MaterialIcon";
 import UpgradeGate from "@/components/ui/UpgradeGate";
 import PropertyPopup from "@/components/map/PropertyPopup";
 import { BuyerSettingsProvider } from "@/lib/buyer-settings/context";
-import BuyerSettingsPanel from "@/components/map/BuyerSettingsPanel";
+// BuyerSettingsPanel import removed 2026-06-06 — only callsite is
+// commented out at ~1144; restore the import alongside the mount when
+// the panel returns.
 import PlotPropertyHighlight from "@/components/map/PlotPropertyHighlight";
+import PropertyStickerCard from "@/components/map/PropertyStickerCard";
 // PlotSummonedMonument, PlotWorldPopover, PropertyCardBillboard were
 // unmounted 2026-06-04 during the world-aware-interface rebuild (HTML
 // easel direction + zoom isolation). Components remain on disk parked
 // for re-mount when the new card surface is wired. Re-add the imports
 // when those mounts come back.
 import GroundGlow from "@/components/map/GroundGlow";
+import InWorldPropertyCard, { cardDataFromLead } from "@/components/map/InWorldPropertyCard";
+import AnchoredPropertyCard from "@/components/map/AnchoredPropertyCard";
 import PlotPinMarker from "@/components/map/PlotPinMarker";
 import MarketRequestPrompt from "@/components/map/MarketRequestPrompt";
 import type { RitualTetherHandle } from "@/components/map/RitualTether";
@@ -145,6 +150,22 @@ export default function MapPage() {
   // mount the AnchoredPropertyCard inside Google's 3D world so the
   // card tracks the building at world coordinates, not screen pixels.
   const map3DElRef = useRef<HTMLElement | null>(null);
+  // Live first-person camera state forwarded from MapView3D. The
+  // windshield-sticker popup reads this each frame to slide the
+  // popup as the camera moves. Greg locked 2026-06-06.
+  const cameraStateRef = useRef<{
+    lat: number; lng: number; altitude: number;
+    heading: number; pitch: number; range: number;
+  } | null>(null);
+  // Click context for the sticker: the screen pixel the user clicked +
+  // the camera state at that frame. Set when a parcel click resolves;
+  // cleared when the selection clears. The sticker uses these as the
+  // zero-point for camera-delta-to-pixel-delta math.
+  const [stickerContext, setStickerContext] = useState<{
+    screenX: number;
+    screenY: number;
+    camera: { lat: number; lng: number; altitude: number; heading: number; pitch: number };
+  } | null>(null);
   // Ref to the RitualTether's imperative handle. We call retract()
   // when the popup dismisses so the vertical rebound beam collapses
   // cleanly. Greg locked 2026-05-28: dismiss reverses the ritual.
@@ -166,6 +187,7 @@ export default function MapPage() {
       if (resolved === null && prev !== null) {
         try { ritualTetherRef.current?.retract(); } catch { /* noop */ }
         setSelectedApn(null);
+        setStickerContext(null);
       } else if (resolved !== null) {
         // Extract APN from parcel:<APN> stub ids so the monument layer
         // knows which buried monument to rise. Non-parcel selections
@@ -1119,7 +1141,9 @@ export default function MapPage() {
           (down payment, rate, term) AND the headline mode (monthly vs price)
           for every visible property card on this page.
           Locked 2026-05-30 evening — Plot's "shop by monthly payment" wedge. */}
-      {!walkMode && <BuyerSettingsPanel />}
+      {/* Payment Settings button hidden 2026-06-06 — button design/placement
+          to be reworked later. Component kept; just unmounted. */}
+      {/* {!walkMode && <BuyerSettingsPanel />} */}
 
       {/* ═══ CONTROLS ═══ */}
       {walkMode ? (
@@ -1495,7 +1519,7 @@ export default function MapPage() {
             parcelColorMode={parcelColorMode}
             onParcelHoverChange={handleParcelHoverChange}
             parcelHitTesterRef={parcelHitTesterRef}
-            onParcelClick={(apn, latLng) => {
+            onParcelClick={(apn, latLng, clickContext) => {
               // Open the standard PropertyPopup against this parcel click.
               // PropertyPopup loads /api/parcel?lat&lng internally and the
               // resolver returns the full assessor stack. We pass a minimal
@@ -1519,6 +1543,9 @@ export default function MapPage() {
                 created_at: new Date().toISOString(),
               } as unknown as Lead;
               setSelectedLead(stub);
+              // Capture click pixel + camera snapshot for the
+              // windshield-sticker popup. Zero-point math reference.
+              if (clickContext) setStickerContext(clickContext);
             }}
             onGooglePoiClick={(placeId, latLng) => {
               // Google POI selection from the 3D photoreal surface
@@ -1564,6 +1591,7 @@ export default function MapPage() {
               setSelectedLead(stub);
             }}
             mapElForwardRef={map3DElRef}
+            cameraForwardRef={cameraStateRef}
             ritualTetherForwardRef={ritualTetherRef}
             view3D={view3D}
             flight={flight}
@@ -1746,6 +1774,64 @@ export default function MapPage() {
         </>
       )}
 
+      {/* ═══ WINDSHIELD-STICKER POPUP ═══
+          The Buster Keaton popup. At click time, anchored at the screen
+          pixel the user clicked + the camera's eye snapshot. Every
+          frame after that, the popup slides on screen by the camera's
+          delta since click. No 3D scene, no projection math, no Google
+          marker. Just a sticker on a sliding pane.
+          Greg locked 2026-06-06. */}
+      {selectedLead && stickerContext && !walkMode && (
+        <PropertyStickerCard
+          cameraRef={cameraStateRef}
+          anchorPxX={stickerContext.screenX}
+          anchorPxY={stickerContext.screenY}
+          cameraAtClick={{
+            ...stickerContext.camera,
+          }}
+        >
+          {/* First-pass minimal content so we can SEE the sticker stick
+              before pulling in the full PropertyPopup. Replace once
+              the sliding-anchor proves out in flight. */}
+          <div
+            style={{
+              minWidth: 260,
+              maxWidth: 320,
+              padding: '12px 14px',
+              borderRadius: 12,
+              background: 'rgba(20, 28, 46, 0.94)',
+              border: '1px solid rgba(115, 204, 224, 0.6)',
+              boxShadow: '0 10px 30px rgba(0,0,0,0.45)',
+              color: '#f7fafc',
+              fontSize: 13,
+              lineHeight: 1.4,
+              pointerEvents: 'auto',
+            }}
+          >
+            <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>
+              {selectedLead.property_address || selectedLead.name || selectedLead.id}
+            </div>
+            <div style={{ fontSize: 11, opacity: 0.7, marginBottom: 8 }}>
+              {selectedLead.id}
+            </div>
+            <button
+              onClick={() => setSelectedLead(null)}
+              style={{
+                fontSize: 11,
+                padding: '4px 10px',
+                borderRadius: 6,
+                background: 'rgba(115, 204, 224, 0.15)',
+                border: '1px solid rgba(115, 204, 224, 0.4)',
+                color: '#73cce0',
+                cursor: 'pointer',
+              }}
+            >
+              Close
+            </button>
+          </div>
+        </PropertyStickerCard>
+      )}
+
       {/* SUMMONED MONUMENT REMOVED 2026-06-04. The rising glb block is
           retired — moving to the HTML "easel" projection-card direction
           (no 3D-world block). The glb (gmp-model-3d-interactive) mounting
@@ -1763,29 +1849,27 @@ export default function MapPage() {
           and crisp — we never tilt the readable layer (world-aware
           interface model, locked 2026-05-31). Only present when a real
           parcel is selected (selectedApn gate). */}
-      {/* CARD POPOVER REMOVED 2026-06-04 — rebuilding the card (HTML easel
-          direction) from scratch, and removing it here doubles as the next
-          zoom isolation step: block is gone and zoom persists, so this
-          popover (or GroundGlow's) is the remaining suspect. If zoom STOPS
-          with this off → it's PlotWorldPopover. PlotWorldPopover.tsx +
-          PropertyCardBillboard.tsx kept on disk.
+      {/* ═══ IN-WORLD PROPERTY CARD (Figma 106:91, built 2026-06-06) ═══
+          The projected card: white-bordered dark-glass face + photo hero +
+          agent toolbar, with the light-cone + sonar-arc projection
+          broadcasting up from the parcel. Mounted as a SCREEN overlay (NOT
+          gmp-popover) so it can never re-trigger the camera auto-pan / zoom
+          (reference_gmp_3d_anchor_no_pan). World-anchoring + live parallax
+          re-angle come next; this lands the visual + data wiring first.
+          Gated on a real parcel selection (selectedApn). */}
       {selectedApn && !walkMode && selectedLead?.latitude != null && selectedLead?.longitude != null && (
-        <PlotWorldPopover
+        <AnchoredPropertyCard
           mapElRef={map3DElRef}
           lat={selectedLead.latitude}
           lng={selectedLead.longitude}
-          altitudeM={20}
+          altitudeM={18}
         >
-          <div style={{ pointerEvents: 'auto' }}>
-            <PropertyCardBillboard
-              lead={selectedLead}
-              audience="public"
-              onClose={() => setSelectedLead(null)}
-            />
-          </div>
-        </PlotWorldPopover>
+          <InWorldPropertyCard
+            data={cardDataFromLead(selectedLead)}
+            onClose={() => setSelectedLead(null)}
+          />
+        </AnchoredPropertyCard>
       )}
-      */}
 
 
       {/* ═══ EXPANDED FULL SIDEBAR — deep dive on selected property ═══ */}

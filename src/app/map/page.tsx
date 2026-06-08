@@ -47,11 +47,13 @@ import AltitudeGauge from "@/components/map/AltitudeGauge";
 import type { GamepadActions } from "@/components/map/GamepadFlightController";
 import { useReticlePosition } from "@/lib/useReticlePosition";
 import { playShotSound, type ShotChannel } from "@/lib/shotSounds";
-import ShotAnimation, { type Shot } from "@/components/map/ShotAnimation";
+import ShotProjectile, { type Shot, type ShotMechanism, SHOT_TOTAL_MS } from "@/components/map/ShotProjectile";
+import SimpleLaser from "@/components/map/SimpleLaser";
 import type { ParcelHitTester } from "@/components/map/ParcelOverlay";
 import { DESTINATIONS } from "@/lib/destinations";
 import { useInitialMapCenter } from "@/lib/useInitialMapCenter";
 import SplatHUDLayer from "@/components/splat/SplatHUDLayer";
+import MapCompanionLayer from "@/components/map/MapCompanionLayer";
 
 const FILTER_TABS: { label: string; key: string; statuses: LeadStatus[] }[] = [
   { label: "All", key: "all", statuses: [] },
@@ -294,6 +296,44 @@ export default function MapPage() {
   // Current shot animation; cleared after the visual finishes.
   const [shot, setShot] = useState<Shot | null>(null);
   const shotCounterRef = useRef<number>(0);
+  // The lead a shot was fired AT, if any, stashed at trigger time so the
+  // projectile's onImpact can burst the card against it the frame the
+  // round lands. Null = the shot flew over empty ground / a non-firable
+  // target; the projectile still flies but nothing springs out.
+  const shotTargetLeadRef = useRef<Lead | null>(null);
+  // Selectable firing mechanism. 'mounted' = bottom-left straight shot;
+  // 'highline' = bottom-center arc that lobs over the reticle and falls
+  // onto it (replenishment-line gun). Persisted so it survives reloads
+  // while tuning. Greg flips between them; default 'mounted'.
+  const [shotMechanism, setShotMechanism] = useState<ShotMechanism>('mounted');
+  const shotMechanismRef = useRef<ShotMechanism>('mounted');
+  shotMechanismRef.current = shotMechanism;
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem('plot:shotMechanism');
+      if (saved === 'mounted' || saved === 'highline') setShotMechanism(saved);
+    } catch { /* noop */ }
+  }, []);
+  const cycleShotMechanism = useCallback(() => {
+    setShotMechanism(curr => {
+      const next: ShotMechanism = curr === 'mounted' ? 'highline' : 'mounted';
+      try { window.localStorage.setItem('plot:shotMechanism', next); } catch { /* noop */ }
+      return next;
+    });
+  }, []);
+  // Press M to flip the firing mechanism mid-flight (tuning toggle).
+  // Ignored while typing in an input/textarea so search isn't hijacked.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'm' && e.key !== 'M') return;
+      const el = document.activeElement;
+      const tag = el?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || (el as HTMLElement)?.isContentEditable) return;
+      cycleShotMechanism();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [cycleShotMechanism]);
 
   // navigateTarget kept for compat with MapView's CenterController prop;
   // every flow now uses the camera choreographer's dispatchFlight() instead,
@@ -970,6 +1010,37 @@ export default function MapPage() {
 
   const [desktopSearchOpen, setDesktopSearchOpen] = useState(false);
 
+  // ── Shot impact → card burst ─────────────────────────────────────────
+  // Fired by ShotProjectile the frame the round lands on the reticle.
+  // If the shot was aimed at a firable lead (stashed at trigger time),
+  // burst the property card out ABOVE the reticle — it springs up out of
+  // the impact point and settles, which sells "you shot it out of the
+  // property." Mirrors the click→sticker path: anchor above the reticle,
+  // camera snapshot from the impact frame zero-points the delta math.
+  const onShotImpact = useCallback((firedShot: Shot) => {
+    const lead = shotTargetLeadRef.current;
+    if (!lead) return; // shot flew over empty/non-firable ground
+    const cam = cameraStateRef.current;
+    setSelectedLead(lead);
+    if (cam) {
+      const rx = firedShot.xFraction * window.innerWidth;
+      const ry = firedShot.yFraction * window.innerHeight;
+      const ABOVE_RETICLE_GAP = 32;
+      setStickerContext({
+        screenX: rx,
+        screenY: ry - ABOVE_RETICLE_GAP,
+        camera: {
+          lat: cam.lat,
+          lng: cam.lng,
+          altitude: cam.altitude,
+          heading: cam.heading,
+          pitch: cam.pitch,
+        },
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // ── Gamepad actions ─────────────────────────────────────────────────
   // Each action calls existing handlers — the controller is just a new
   // input device, not a new code path. Cycling logic sorts visible leads
@@ -1007,52 +1078,62 @@ export default function MapPage() {
 
     return {
       onShoot: () => {
-        // A — fire the armed channel at whatever's under the reticle.
-        // Lead wins over parcel on overlap. Parcels can't fire (no
-        // Lead row to send against yet) — toast suggests pinning.
-        const lead = reticleTargetRef.current;
-        const parcel = reticleParcelRef.current;
-        if (!lead && !parcel) return;  // empty reticle — silent no-op
-
+        // A — ALWAYS fire a projectile + sound the instant the button is
+        // pressed. The gun shoots whether or not anything's under the
+        // reticle (Greg 2026-06-06: "press A and it immediately fire").
+        // Whether the shot DOES anything — dispatch outreach + burst the
+        // property card — is gated below on a valid lead.
         const channel = armedChannelRef.current;
 
-        if (parcel && !lead) {
+        const fireProjectile = () => {
+          shotCounterRef.current += 1;
+          const newShot = {
+            id: shotCounterRef.current,
+            channel,
+            xFraction: reticlePosition.xFraction,
+            yFraction: reticlePosition.yFraction,
+            mechanism: shotMechanismRef.current,
+          };
+          setShot(newShot);
+          window.setTimeout(() => setShot(null), SHOT_TOTAL_MS + 40);
+          try { playShotSound(channel); } catch { /* ignore */ }
+        };
+
+        const lead = reticleTargetRef.current;
+        const parcel = reticleParcelRef.current;
+
+        // ── Decide whether this shot lands on a firable target ──
+        // A target that fails a check still gets the projectile (the gun
+        // fired), but no burst/dispatch — and a toast tells the user why.
+        let firableLead: Lead | null = null;
+        if (lead) {
+          if (channel === 'text_invite' && lead.text_declined) {
+            showReticleToast('Text declined here. Press X to switch channel.');
+          } else if (channel === 'phone_call' && !lead.phone && !lead.phone_2 && !lead.phone_3) {
+            showReticleToast('No phone on file. Press X to switch channel.');
+          } else {
+            firableLead = lead;
+          }
+        } else if (parcel) {
           showReticleToast('Pin this parcel to your list first to fire.');
-          return;
-        }
-        if (!lead) return;
-
-        // Channel-specific can-fire checks. If the target rejects the
-        // armed channel, toast and bail — user rotates with X and tries
-        // again.
-        if (channel === 'text_invite' && lead.text_declined) {
-          showReticleToast('Text declined here. Press X to switch channel.');
-          return;
-        }
-        if (channel === 'phone_call' && !lead.phone && !lead.phone_2 && !lead.phone_3) {
-          showReticleToast('No phone on file. Press X to switch channel.');
-          return;
         }
 
-        // Fire the shot — visual + sound run in parallel with the API
-        // dispatch so the user feels the trigger pull instantly.
-        shotCounterRef.current += 1;
-        setShot({
-          id: shotCounterRef.current,
-          channel,
-          xFraction: reticlePosition.xFraction,
-          yFraction: reticlePosition.yFraction,
-        });
-        window.setTimeout(() => setShot(null), 320);
-        try { playShotSound(channel); } catch { /* ignore */ }
+        // Stash the target so the projectile's onImpact knows whether to
+        // burst the card (and against which lead) the frame it lands.
+        shotTargetLeadRef.current = firableLead;
+        fireProjectile();
 
+        if (!firableLead) return;
+
+        // Dispatch the outreach in parallel — the user feels the trigger
+        // pull instantly; the card burst happens on impact (onShotImpact).
         void (async () => {
           try {
             await fetch('/api/inquiry/send', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                leadId: lead.id,
+                leadId: firableLead.id,
                 channel,
                 ...(channel === 'phone_call' ? { phase: 'primer' } : {}),
               }),
@@ -1113,6 +1194,27 @@ export default function MapPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedLead, mapCenter, filteredLeads, walkMode, dispatchFlight, reticlePosition]);
 
+  // Live ref to onShoot so the keyboard fire key (below) can trigger the
+  // exact same path as the gamepad A-press without re-creating handlers.
+  const onShootRef = useRef<(() => void) | undefined>(undefined);
+  onShootRef.current = gamepadActions.onShoot;
+  // Keyboard FIRE — F or Space. The gamepad A-press is the canonical
+  // trigger, but Steam Input can remap A at the OS layer so the browser
+  // never sees it, and not everyone has a controller plugged in. F/Space
+  // give a controller-free way to fire (esp. for tuning the projectile).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'f' && e.key !== 'F' && e.key !== ' ') return;
+      const el = document.activeElement;
+      const tag = el?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || (el as HTMLElement)?.isContentEditable) return;
+      e.preventDefault();
+      onShootRef.current?.();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   // Audience derivation for the property card.
   //   public   — anyone unauthenticated, OR authed but unsubscribed.
   //              Sees Schedule Tour / Save / Share. MLS-compliant.
@@ -1137,6 +1239,11 @@ export default function MapPage() {
         e.preventDefault();
       }}
     >
+      {/* Dead-simple laser: click anywhere → beam from bottom-center to
+          the cursor. Pure HTML/CSS, no gamepad, no canvas. Proves the
+          visual works on its own, decoupled from the firing machinery. */}
+      <SimpleLaser />
+
       {/* ═══ BUYER SETTINGS PANEL ═══
           Persistent knob strip at the top-center. Adjusts mortgage assumptions
           (down payment, rate, term) AND the headline mode (monthly vs price)
@@ -1674,9 +1781,13 @@ export default function MapPage() {
           />
         )}
 
-        {/* Shot animation — fires at the reticle position whenever A
-            successfully dispatches an outreach. Cleared after ~320ms. */}
-        <ShotAnimation shot={shot} />
+        {/* Shot projectile — fires a fast round from the bottom of the
+            screen to the reticle on every A-press (mounted = straight
+            from bottom-left, highline = arc over the reticle and fall
+            onto it). On impact it bursts the property card above the
+            reticle (onShotImpact), but only when the round was aimed at
+            a firable lead. Cleared after the visual finishes. */}
+        <ShotProjectile shot={shot} onImpact={onShotImpact} />
 
         {/* Empty state — bottom center.
             Only for AUTHED users with 0 leads (operator empty state).
@@ -1931,6 +2042,21 @@ export default function MapPage() {
         </div>
       )}
 
+      {/* Firing-mechanism chip — airplane mode only. Shows the active
+          shot mechanism and the M-key toggle. Click also flips it.
+          Tuning surface while Greg dials in the two mechanisms. */}
+      {flightMode === 'airplane' && !walkMode && (
+        <button
+          onClick={cycleShotMechanism}
+          className="fixed bottom-4 left-4 z-40 flex items-center gap-2 bg-surface-container/80 backdrop-blur border border-card-border rounded-lg px-3 py-2 text-xs text-on-surface-variant shadow-lg hover:text-on-surface active:scale-95 transition"
+          title="Press M to switch firing mechanism"
+        >
+          <MaterialIcon icon={shotMechanism === 'mounted' ? 'arrow_upward' : 'trending_up'} className="text-[16px]" />
+          <span className="font-bold">{shotMechanism === 'mounted' ? 'Mounted' : 'Highline'}</span>
+          <span className="opacity-60">· M</span>
+        </button>
+      )}
+
       {/* Compact prospect bar — single row at bottom */}
       {(prospectMode || prospectList.length > 0) && !walkMode && !showProspectPanel && (
         <div className="fixed bottom-16 md:bottom-4 left-2 right-2 md:left-auto md:right-4 md:w-auto z-40 flex items-center gap-2 bg-primary text-white px-4 py-2.5 rounded-xl shadow-2xl">
@@ -1969,6 +2095,13 @@ export default function MapPage() {
 
       <OnboardingTooltips />
       {gamepad.everConnected && <GamepadStatusChip connected={gamepad.connected} />}
+
+      {/* ═══ OTANIMUS — on-screen flight companion ═══
+          Gemini Live-powered character that watches the map + hears you
+          and rides along, turning to speak and walking the screen. The
+          moat. Summon button bottom-right; only connects on tap (mic +
+          screen-share permission). See [[project-otanimus-on-map-companion]]. */}
+      {!walkMode && <MapCompanionLayer />}
 
       {/* Debug panel — gated on ?debug=hover URL param. Intentionally ugly;
        *  this is a one-time diagnostic tool, not a real feature. Revert

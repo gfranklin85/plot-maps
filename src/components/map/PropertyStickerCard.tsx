@@ -68,17 +68,29 @@ function pxPerDegVertical(viewportPxTall: number, vFovDeg = 35): number {
 // so we don't pop at the literal edge.
 const OFFSCREEN_MARGIN_PX = 200;
 
-// Rise-in animation. The sticker begins this many pixels ABOVE its
-// anchor (further up the screen, already above the reticle) and 0
-// opacity, then over RISE_MS milliseconds settles down to the anchor
-// with full opacity. Greg locked 2026-06-06: "we want it to animate
-// up. But also, it cant animate up from behind, under, or cover the
-// reticle, it must begin rising already above the reticle." The
-// animation moves DOWN by RISE_FROM_OFFSET_PX to land at its anchor;
-// it never crosses the reticle line because the anchor is itself
-// already above the reticle.
-const RISE_FROM_OFFSET_PX = 36;
-const RISE_MS = 280;
+// Burst-in animation. The card springs OUT of the impact point and
+// settles — "you shot it out of the property" (Greg 2026-06-06). It
+// begins below its anchor + small (as if knocked loose at the reticle),
+// then springs UP past the anchor and settles back down onto it with an
+// overshoot. The overshoot/settle IS the data-reveal holdover: by the
+// time it settles, the card is sitting readable above the reticle.
+//
+// Anchor is already above the reticle, and the burst peaks ABOVE the
+// anchor, so the card never crosses or covers the reticle line.
+const RISE_FROM_OFFSET_PX = 36;  // how far below the anchor it starts
+const RISE_OVERSHOOT_PX = 18;    // how far ABOVE the anchor it peaks
+const RISE_FROM_SCALE = 0.62;    // starting scale (bursts up to 1)
+const RISE_MS = 340;
+
+// Spring overshoot easing: rises past 1 then settles back to 1. Tuned
+// to feel like a burst-and-settle, not a soft glide. Returns a value
+// that overshoots ~1.0 around t=0.55 then resolves to exactly 1 at t=1.
+function springOvershoot(t: number): number {
+  if (t >= 1) return 1;
+  // Damped-spring style: 1 - e^(-6t) * cos(spring) with a small swing.
+  const decay = Math.exp(-6 * t);
+  return 1 - decay * Math.cos(7.5 * t);
+}
 
 export default function PropertyStickerCard({
   cameraRef,
@@ -122,13 +134,26 @@ export default function PropertyStickerCard({
       }
       const riseElapsed = performance.now() - (riseStartRef.current ?? 0);
       const riseT = Math.min(1, riseElapsed / RISE_MS);
-      // ease-out cubic so it lands soft
-      const riseEased = 1 - Math.pow(1 - riseT, 3);
-      // Sticker starts RISE_FROM_OFFSET_PX higher than the anchor (so it
-      // begins ALREADY above the reticle, never crossing it) and
-      // animates DOWN to the anchor.
-      const riseOffsetY = -RISE_FROM_OFFSET_PX * (1 - riseEased);
-      const riseOpacity = riseEased;
+      // Spring burst: s goes 0 → overshoots above 1 → settles to 1.
+      // The amount it exceeds 1 (overshoot) drives the rise PAST the
+      // anchor; the settle back to 1 brings it to rest on the anchor.
+      const s = springOvershoot(riseT);
+      const overshoot = Math.max(0, s - 1);  // 0 except during the swing
+      // Position (negative = up on screen):
+      //   below the anchor by RISE_FROM_OFFSET_PX * (1 - s) at the start,
+      //   then carried ABOVE the anchor by the overshoot swing,
+      //   settling to 0 at the anchor as s → 1.
+      const riseOffsetY =
+        RISE_FROM_OFFSET_PX * Math.max(0, 1 - s)   // start below, climb to anchor
+        - RISE_OVERSHOOT_PX * (overshoot / 0.12);  // swing above, then settle
+      // Scale bursts from small toward 1, with a touch of extra pop on
+      // the overshoot so it visibly "springs."
+      const riseScale =
+        RISE_FROM_SCALE + (1 - RISE_FROM_SCALE) * Math.min(s, 1)
+        + overshoot * 0.5;
+      // Opacity snaps in fast — content is legible immediately (no
+      // fade-to-read; in-flight UI rule). Tracks the first third.
+      const riseOpacity = Math.min(1, riseT * 3);
 
       // ── Camera deltas since click ──
       // heading change → horizontal world slide. If the camera has
@@ -163,7 +188,8 @@ export default function PropertyStickerCard({
         y < -OFFSCREEN_MARGIN_PX ||
         y > vh + OFFSCREEN_MARGIN_PX;
 
-      wrapper.style.transform = `translate3d(${x}px, ${y}px, 0) translate(-50%, -100%)`;
+      wrapper.style.transform = `translate3d(${x}px, ${y}px, 0) translate(-50%, -100%) scale(${riseScale})`;
+      wrapper.style.transformOrigin = 'center bottom';
       wrapper.style.opacity = offscreen ? '0' : String(riseOpacity);
       wrapper.style.pointerEvents = offscreen ? 'none' : 'auto';
       if (visible && offscreen) setVisible(false);

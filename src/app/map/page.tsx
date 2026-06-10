@@ -52,6 +52,9 @@ import SimpleLaser from "@/components/map/SimpleLaser";
 import type { ParcelHitTester } from "@/components/map/ParcelOverlay";
 import { DESTINATIONS } from "@/lib/destinations";
 import { useInitialMapCenter } from "@/lib/useInitialMapCenter";
+import { useSpatialPrefetch } from "@/lib/useSpatialPrefetch";
+import { getCachedParcel, primeGeomCache } from "@/lib/parcelCache";
+import { cancelAutoPan } from "@/lib/cancelAutoPan";
 import SplatHUDLayer from "@/components/splat/SplatHUDLayer";
 import MapCompanionLayer from "@/components/map/MapCompanionLayer";
 
@@ -192,6 +195,13 @@ export default function MapPage() {
         setSelectedApn(null);
         setStickerContext(null);
       } else if (resolved !== null) {
+        // EVERY selection mounts gmp elements (popover/marker/polygon)
+        // that auto-pan the camera to frame themselves — brutal when the
+        // target is close/under the camera. Pin the user's pose here, the
+        // single chokepoint for all selection paths (parcel/POI/address/
+        // pin/shot/search), so the camera never moves on select. The
+        // camera belongs to the user. [[feedback-no-zoom-to-ui-messes-up-flight]]
+        cancelAutoPan(map3DElRef.current);
         // Extract APN from parcel:<APN> stub ids so the monument layer
         // knows which buried monument to rise. Non-parcel selections
         // (gpoi, addr, mock, real leads) leave the APN untouched and
@@ -933,6 +943,12 @@ export default function MapPage() {
   // and seeds the default. Both the visual MapReticle and the
   // controller's hit-test sample point read from this.
   const { position: reticlePosition } = useReticlePosition();
+
+  // Camera-driven parcel prefetch — silently caches parcels in view (and
+  // a margin ahead) into the in-memory parcelCache so clicks/shots resolve
+  // instantly with no spinner. Disabled in walk mode. THE primary latency
+  // win for the Google-native map. See useSpatialPrefetch / parcelCache.
+  useSpatialPrefetch({ mapElRef: map3DElRef, enabled: !walkMode });
   // Monument viewport mass-mount REMOVED 2026-05-31. Greg's call: pre-
   // mounting 1000 buried glbs per viewport is the wrong axis. The
   // monument spawns ON the selected parcel only (1, not 1000). When
@@ -1021,6 +1037,8 @@ export default function MapPage() {
     const lead = shotTargetLeadRef.current;
     if (!lead) return; // shot flew over empty/non-firable ground
     const cam = cameraStateRef.current;
+    // (camera auto-pan defense lives in the setSelectedLead wrapper now —
+    // single chokepoint covers every selection path)
     setSelectedLead(lead);
     if (cam) {
       const rx = firedShot.xFraction * window.innerWidth;
@@ -1148,10 +1166,21 @@ export default function MapPage() {
         // for the current session; we don't persist to /api/profile/
         // arm-channel here because rotation is a frequent gameplay
         // gesture and we don't want a network round-trip per press.
+        // NOTE 2026-06-10: X is now bound to onSummonCompanion. This
+        // handler is kept but UNBOUND from the controller until the
+        // outreach flow + channel-arming UI is finished. See
+        // [[project-outreach-flow-unfinished]].
         setArmedChannel(curr => {
           const idx = CHANNEL_ROTATION.indexOf(curr);
           return CHANNEL_ROTATION[(idx + 1) % CHANNEL_ROTATION.length];
         });
+      },
+      onSummonCompanion: () => {
+        // X — call / dismiss OT. The companion layer lives in a sibling
+        // subtree (no shared parent to prop-drill through), so we bridge
+        // via a window event it listens for. Low coupling, one line each
+        // side.
+        window.dispatchEvent(new CustomEvent('plot:summon-ot'));
       },
       onInspect: () => {
         // Y — open info card for the hovered target only. Empty reticle
@@ -1628,6 +1657,14 @@ export default function MapPage() {
             onParcelHoverChange={handleParcelHoverChange}
             parcelHitTesterRef={parcelHitTesterRef}
             onParcelClick={(apn, latLng, clickContext) => {
+              // Instant path: if the spatial prefetch already cached this
+              // parcel (flew over it), prime the geometry cache NOW so
+              // PlotPropertyHighlight draws the lot polygon with zero
+              // network — no spinner, no round trip. The popup data resolve
+              // still runs but the world responds on the click frame.
+              const cached = getCachedParcel(apn);
+              if (cached?.geometry) primeGeomCache(apn, cached.geometry);
+              // (camera auto-pan defense lives in setSelectedLead wrapper)
               // Open the standard PropertyPopup against this parcel click.
               // PropertyPopup loads /api/parcel?lat&lng internally and the
               // resolver returns the full assessor stack. We pass a minimal

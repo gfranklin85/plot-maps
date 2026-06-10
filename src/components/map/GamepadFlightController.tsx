@@ -10,8 +10,14 @@ export interface GamepadActions {
    *  reticle. Page checks for a target and dispatches; no-op if nothing
    *  is hovered. Decoupled from LT/RT so triggers can stay full-time zoom. */
   onShoot?: () => void;
-  /** X — Rotate armed channel (text → mail → call → text). */
+  /** X — Rotate armed channel (text → mail → call → text).
+   *  NOTE 2026-06-10: X is now bound to onSummonCompanion (call OT)
+   *  instead. onRotateChannel is kept (still fires the rotation) but is
+   *  unbound from the controller until the outreach flow + its in-flight
+   *  channel-arming UI is finished. See [[project-outreach-flow-unfinished]]. */
   onRotateChannel?: () => void;
+  /** X — Summon / dismiss Otanimus, the flight companion. */
+  onSummonCompanion?: () => void;
   /** Y — Inspect. Open the info card for the hovered target. */
   onInspect?: () => void;
   /** B — Cancel / close popup. */
@@ -470,7 +476,9 @@ export default function GamepadFlightController({
           if (justPressed.has(name) && fn) fn();
         };
         fire('a', actionsRef.current.onShoot);
-        fire('x', actionsRef.current.onRotateChannel);
+        // X now summons OT (was onRotateChannel — see type note +
+        // [[project-outreach-flow-unfinished]]).
+        fire('x', actionsRef.current.onSummonCompanion);
         fire('y', actionsRef.current.onInspect);
         fire('b', actionsRef.current.onCancel);
         if (justPressed.has('up') || justPressed.has('left')) actionsRef.current.onCyclePrev?.();

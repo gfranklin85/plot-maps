@@ -963,7 +963,16 @@ function Inner({
   }, [poisVisible]);
 
   useGamepad({
-    enabled: gamepadEnabled && !!elRef.current,
+    // Gate ONLY on gamepadEnabled — NOT on elRef.current. useGamepad's
+    // effect re-runs solely on `enabled`, and elRef.current is a ref
+    // (non-reactive). If the loop's enable was computed while the map
+    // element was still null, the RAF loop never started and never
+    // recovered → flight dead while OS-layer fire still worked. The
+    // per-frame body below already guards `if (!el || !cam) return`, so
+    // it safely no-ops until the element exists. (Regression surfaced
+    // after 64fe866 stopped the map from remounting on every click,
+    // which had been masking this by churning the ref + re-rendering.)
+    enabled: gamepadEnabled,
     onFrame: ({ dt, elapsedMs, leftStick, rightStick, triggers, justPressed }) => {
       const el = elRef.current;
       const cam = camRef.current;
@@ -1011,7 +1020,9 @@ function Inner({
         if (justPressed.has('rb')) {
           fireTetherRef.current();
         }
-        fire('x', actionsRef.current?.onRotateChannel);
+        // X now summons OT (was onRotateChannel — see
+        // [[project-outreach-flow-unfinished]]).
+        fire('x', actionsRef.current?.onSummonCompanion);
         fire('y', actionsRef.current?.onInspect);
         fire('b', actionsRef.current?.onCancel);
         if (justPressed.has('up') || justPressed.has('left')) actionsRef.current?.onCyclePrev?.();

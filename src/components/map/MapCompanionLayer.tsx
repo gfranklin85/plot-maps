@@ -85,6 +85,16 @@ export default function MapCompanionLayer() {
     }
   }, [active, onEvent]);
 
+  // Controller summon: the X button (and any other caller) dispatches
+  // 'plot:summon-ot' on window; we toggle the companion. Kept in a ref-
+  // free closure by depending on `summon`, which already closes over the
+  // latest `active`.
+  useEffect(() => {
+    const onSummon = () => { void summon(); };
+    window.addEventListener('plot:summon-ot', onSummon);
+    return () => window.removeEventListener('plot:summon-ot', onSummon);
+  }, [summon]);
+
   // Cleanup on unmount.
   useEffect(() => {
     return () => {

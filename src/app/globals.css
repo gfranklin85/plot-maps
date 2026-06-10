@@ -1052,3 +1052,13 @@ gmp-marker-3d-interactive[plot-property-anchor] {
   60%  { opacity: 1; }
   100% { opacity: 0.85; }
 }
+
+/* Parcel-pinned property card rise-in. The card comes UP into place as
+   it lands on the lot, alongside the parcel polygon's ballistic toss.
+   Position + opacity only — content stays legible the whole time
+   (in-flight UI rule). Combined with the card's scale(0.7) which the
+   inline transform on the element keeps via translate/scale here. */
+@keyframes plot-card-rise {
+  0%   { opacity: 0; transform: scale(0.7) translateY(26px); }
+  100% { opacity: 1; transform: scale(0.7) translateY(0); }
+}

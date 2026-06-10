@@ -19,7 +19,7 @@ import { BuyerSettingsProvider } from "@/lib/buyer-settings/context";
 // commented out at ~1144; restore the import alongside the mount when
 // the panel returns.
 import PlotPropertyHighlight from "@/components/map/PlotPropertyHighlight";
-import PropertyStickerCard from "@/components/map/PropertyStickerCard";
+import PlotCardMarker3D from "@/components/map/PlotCardMarker3D";
 import InWorldPropertyCard, { cardDataFromLead } from "@/components/map/InWorldPropertyCard";
 // PlotSummonedMonument, PlotWorldPopover, PropertyCardBillboard were
 // unmounted 2026-06-04 during the world-aware-interface rebuild (HTML
@@ -168,7 +168,12 @@ export default function MapPage() {
   // the camera state at that frame. Set when a parcel click resolves;
   // cleared when the selection clears. The sticker uses these as the
   // zero-point for camera-delta-to-pixel-delta math.
-  const [stickerContext, setStickerContext] = useState<{
+  // stickerContext is retained ONLY for its writes inside the click /
+  // shot-impact handlers (harmless no-ops now). The card no longer
+  // renders from it — it pins to the parcel centroid instead. The value
+  // binding is dropped (unused) to satisfy the prod build; the setter
+  // stays so those handlers don't need surgery. Locked 2026-06-10.
+  const [, setStickerContext] = useState<{
     screenX: number;
     screenY: number;
     camera: { lat: number; lng: number; altitude: number; heading: number; pitch: number };
@@ -244,6 +249,12 @@ export default function MapPage() {
   // so the actual lot polygon (from PostGIS) outlines under the card.
   // Locked 2026-05-30 evening per the in-world stack spec.
   const [selectedApn, setSelectedApn] = useState<string | null>(null);
+  // Parcel centroid (lat/lng) reported by PlotPropertyHighlight when the
+  // lot ring resolves. The property card pins HERE — to the parcel in
+  // world space, rising with the polygon — not to the reticle. Cleared
+  // when the highlight clears. Locked 2026-06-10 (stop the drift; card
+  // stays glued to the lot via gmp-marker-3d-interactive).
+  const [cardCentroid, setCardCentroid] = useState<{ lat: number; lng: number } | null>(null);
   // Every parcel near the camera has its monument pre-mounted (buried)
   // in its own backyard via PlotMonumentLayer. The hook re-fetches as
   // the camera flies; the layer mounts/unmounts glbs to match.
@@ -1939,31 +1950,42 @@ export default function MapPage() {
         <PlotPropertyHighlight
           mapElRef={map3DElRef}
           apn={selectedApn}
+          onCentroid={setCardCentroid}
         />
         </>
       )}
 
-      {/* ═══ WINDSHIELD-STICKER POPUP ═══
-          The Buster Keaton popup. At click time, anchored at the screen
-          pixel the user clicked + the camera's eye snapshot. Every
-          frame after that, the popup slides on screen by the camera's
-          delta since click. No 3D scene, no projection math, no Google
-          marker. Just a sticker on a sliding pane.
-          Greg locked 2026-06-06. */}
-      {selectedLead && stickerContext && !walkMode && (
-        <PropertyStickerCard
-          cameraRef={cameraStateRef}
-          anchorPxX={stickerContext.screenX}
-          anchorPxY={stickerContext.screenY}
-          cameraAtClick={{ ...stickerContext.camera }}
+      {/* ═══ PARCEL-PINNED PROPERTY CARD ═══
+          The card pins to the PARCEL in world space — anchored at the
+          lot centroid via gmp-marker-3d-interactive (PlotCardMarker3D),
+          so Google handles projection/depth/occlusion and it stays glued
+          to the lot as the camera moves. It rises WITH the polygon: both
+          are gated on the resolved parcel (selectedApn → centroid). No
+          reticle-tracking, no camera-delta drift. Fly far → it shrinks
+          and leaves with the lot (correct world behavior); deselect →
+          gone. Locked 2026-06-10 — supersedes the windshield-sticker
+          (PropertyStickerCard), which drifted because it tracked the
+          camera, not the place. */}
+      {selectedLead && cardCentroid && !walkMode && (
+        <PlotCardMarker3D
+          mapElRef={map3DElRef}
+          lat={cardCentroid.lat}
+          lng={cardCentroid.lng}
+          altitudeM={2}
         >
-          {/* Real InWorldPropertyCard, scaled down to card-popup size
-              (Figma source is 434×296; ~0.7 brings it to ~304×207
-              which matches the popup density Greg called for
-              2026-06-06). Transform-origin top-center so the rise
-              animation reads as a card landing at its anchor, not
-              a corner pivot. */}
-          <div style={{ transform: 'scale(0.7)', transformOrigin: 'center bottom' }}>
+          {/* Rise-in: the card comes up WITH the polygon (both fire on the
+              resolved parcel). Keyed on the centroid so a new selection
+              replays the rise. Rises + fades over ~520ms, easing into
+              place — sequenced to the lot's ballistic toss next to it.
+              Content is legible immediately (no blur-in) per the in-flight
+              UI rule; only position/opacity animate. */}
+          <div
+            key={`${cardCentroid.lat.toFixed(6)},${cardCentroid.lng.toFixed(6)}`}
+            style={{
+              transformOrigin: 'center bottom',
+              animation: 'plot-card-rise 520ms cubic-bezier(0.16, 1, 0.3, 1) both',
+            }}
+          >
             <InWorldPropertyCard
               data={cardDataFromLead(selectedLead)}
               onAction={(a) => {
@@ -1971,7 +1993,7 @@ export default function MapPage() {
               }}
             />
           </div>
-        </PropertyStickerCard>
+        </PlotCardMarker3D>
       )}
 
       {/* SUMMONED MONUMENT REMOVED 2026-06-04. The rising glb block is

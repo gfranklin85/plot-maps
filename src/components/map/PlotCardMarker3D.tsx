@@ -1,16 +1,17 @@
 "use client";
 
 // PlotCardMarker3D — mounts a React HTML element as the content of a
-// <gmp-marker> at a lat/lng/altitude inside <gmp-map-3d>.
+// 3D marker at a lat/lng/altitude inside <gmp-map-3d>.
 //
-// 2026-05-30 evening — simplified to a STATIC anchored card with NO
-// rise animation and NO clipping wrapper. The animation work was
-// removed because the previous wrapper broke the card's interaction
-// model (B-press opened OS context menu, contents looked wrong).
-// This version is the diagnostic for the far-side-anchor approach:
-// we mount the card at a coordinate that's behind the property from
-// the camera's POV and verify whether Google's photoreal building
-// mesh Z-occludes the card's bottom in screen space.
+// 2026-06-06 — wired for the photoreal 3D map. The correct primitive is
+// gmp-marker-3d-interactive (Marker3DInteractiveElement), which anchors
+// HTML content at {lat,lng,altitude} and — critically — does NOT auto-pan
+// the camera on mount (only gmp-popover does; that was the zoom-on-select
+// bug). Research-confirmed, see reference_gmp_3d_anchor_no_pan. Falls back
+// to the 2D marker tags if the 3D one isn't registered.
+//
+// The card portals into a host <div> appended as the marker's content.
+// Screen-facing + crisp — we never tilt the readable layer.
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
@@ -23,7 +24,10 @@ interface PlotCardMarker3DProps {
   children: ReactNode;
 }
 
+// 3D marker tags first (correct for gmp-map-3d photoreal); 2D as fallback.
 const CANDIDATE_MARKER_TAGS = [
+  'gmp-marker-3d-interactive',
+  'gmp-marker-3d',
   'gmp-marker',
   'gmp-advanced-marker',
 ] as const;
@@ -97,11 +101,6 @@ export default function PlotCardMarker3D({
       createdMarker = marker;
       markerRef.current = marker;
       setHost(div);
-
-      // eslint-disable-next-line no-console
-      console.log(
-        `[PlotCardMarker3D] mounted <${winnerTag}> at lat=${lat.toFixed(6)} lng=${lng.toFixed(6)} alt=${altitudeM}m`
-      );
     };
 
     tryMount();

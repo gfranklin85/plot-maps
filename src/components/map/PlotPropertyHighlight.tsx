@@ -29,6 +29,11 @@ interface Props {
   mapElRef: React.MutableRefObject<HTMLElement | null>;
   /** APN of the property whose parcel to outline. Null = no highlight. */
   apn: string | null;
+  /** Fired when the parcel ring resolves, with its centroid lat/lng —
+   *  the world point to pin the property card to. Fired null when the
+   *  highlight clears. Lets the card rise WITH the polygon, anchored to
+   *  the same parcel. */
+  onCentroid?: (centroid: { lat: number; lng: number } | null) => void;
 }
 
 interface Polygon3DElement extends HTMLElement {
@@ -139,9 +144,24 @@ function extractFirstRing(geom: GeoJSONGeometry): { lat: number; lng: number }[]
   return null;
 }
 
-export default function PlotPropertyHighlight({ mapElRef, apn }: Props) {
+export default function PlotPropertyHighlight({ mapElRef, apn, onCentroid }: Props) {
   const polyRef = useRef<Polygon3DElement | null>(null);
   const [ring, setRing] = useState<{ lat: number; lng: number }[] | null>(null);
+
+  // Keep the latest onCentroid in a ref so the resolve effect doesn't
+  // re-run when the parent passes a fresh closure each render.
+  const onCentroidRef = useRef(onCentroid);
+  onCentroidRef.current = onCentroid;
+
+  // Report centroid up whenever the ring changes (resolved → centroid,
+  // cleared → null), so the card pins to the same parcel point.
+  useEffect(() => {
+    if (ring && ring.length >= 3) {
+      onCentroidRef.current?.(ringCentroid(ring));
+    } else {
+      onCentroidRef.current?.(null);
+    }
+  }, [ring]);
 
   // Resolve the polygon when APN changes. /api/parcels/at-point now
   // returns the geometry inline on the click round trip and stashes

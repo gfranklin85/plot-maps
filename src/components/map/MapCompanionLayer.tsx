@@ -61,6 +61,14 @@ export default function MapCompanionLayer() {
     }
   }, []);
 
+  // Surface OT's live-session state for the PerfHUD. The Gemini session
+  // (mic PCM + 1fps screen-grab/JPEG + WS audio) is the big variable cost
+  // on the map; the perf overlay reads this flag.
+  const setGeminiPerfFlag = (on: boolean) => {
+    const w = window as unknown as { __plotPerf?: { geminiActive?: boolean } };
+    w.__plotPerf = { ...(w.__plotPerf ?? {}), geminiActive: on };
+  };
+
   const summon = useCallback(async () => {
     if (active) {
       sessionRef.current?.stop();
@@ -68,6 +76,7 @@ export default function MapCompanionLayer() {
       setActive(false);
       setState("idle");
       setCaption("");
+      setGeminiPerfFlag(false);
       return;
     }
     setConnecting(true);
@@ -76,6 +85,7 @@ export default function MapCompanionLayer() {
       sessionRef.current = s;
       await s.start();
       setActive(true);
+      setGeminiPerfFlag(true);
     } catch (err) {
       console.error("[companion] failed to start", err);
       sessionRef.current?.stop();
@@ -100,6 +110,8 @@ export default function MapCompanionLayer() {
     return () => {
       sessionRef.current?.stop();
       if (captionTimer.current) clearTimeout(captionTimer.current);
+      const w = window as unknown as { __plotPerf?: { geminiActive?: boolean } };
+      if (w.__plotPerf) w.__plotPerf.geminiActive = false;
     };
   }, []);
 

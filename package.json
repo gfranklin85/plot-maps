@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.81.0",
+    "@google/genai": "^2.8.0",
     "@googlemaps/markerclusterer": "^2.6.2",
     "@mkkellogg/gaussian-splats-3d": "^0.4.7",
     "@supabase/ssr": "^0.10.0",

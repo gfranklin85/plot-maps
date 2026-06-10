@@ -49,6 +49,7 @@ import { useReticlePosition } from "@/lib/useReticlePosition";
 import { playShotSound, type ShotChannel } from "@/lib/shotSounds";
 import ShotProjectile, { type Shot, type ShotMechanism, SHOT_TOTAL_MS } from "@/components/map/ShotProjectile";
 import SimpleLaser from "@/components/map/SimpleLaser";
+import PerfHUD from "@/components/map/PerfHUD";
 import type { ParcelHitTester } from "@/components/map/ParcelOverlay";
 import { DESTINATIONS } from "@/lib/destinations";
 import { useInitialMapCenter } from "@/lib/useInitialMapCenter";
@@ -1272,6 +1273,10 @@ export default function MapPage() {
           the cursor. Pure HTML/CSS, no gamepad, no canvas. Proves the
           visual works on its own, decoupled from the firing machinery. */}
       <SimpleLaser />
+
+      {/* Perf measurement overlay — press P to show FPS / frame time /
+          heap / OT-session state. Off by default, nearly free. */}
+      <PerfHUD />
 
       {/* ═══ BUYER SETTINGS PANEL ═══
           Persistent knob strip at the top-center. Adjusts mortgage assumptions

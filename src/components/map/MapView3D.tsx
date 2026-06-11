@@ -1037,13 +1037,13 @@ function Inner({
         const fire = (name: ButtonName, fn?: () => void) => {
           if (justPressed.has(name) && fn) fn();
         };
-        // A = FIRE LASER + OPEN PARCEL (no Steam needed, 2026-06-11).
-        // onShoot fires the projectile + sound; fireOpenParcel dispatches
-        // a synthetic click at the reticle → Google gmp-click → onMapClick
-        // resolves the address/parcel and opens the card. One press, both.
-        // Replaces the old Steam-Input "A → real OS click" approach.
+        // A = OPEN PARCEL (no Steam needed, 2026-06-11). fireOpenParcel
+        // dispatches a synthetic click at the reticle → Google gmp-click →
+        // onMapClick resolves the address/parcel and opens the card.
+        // NOTE: onShoot (the laser) is fired by GamepadFlightController's
+        // loop, NOT here — calling it here too double-fired the laser.
+        // This loop only adds the parcel-open.
         if (justPressed.has('a')) {
-          actionsRef.current?.onShoot?.();
           fireOpenParcelRef.current();
         }
         // RB-tap = tether. Forgiveness-zone target acquisition: cursor

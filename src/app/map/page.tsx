@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useState, useMemo, useRef } from "react";
 import { useSearchParams } from "next/navigation";
+import { gsap } from "gsap";
+import { EasePack } from "gsap/EasePack";
+gsap.registerPlugin(EasePack);
 import { supabase } from "@/lib/supabase";
 import { Lead, LeadStatus, Priority } from "@/types";
 import MapDynamic from "@/components/map/MapDynamic";
@@ -19,7 +22,6 @@ import { BuyerSettingsProvider } from "@/lib/buyer-settings/context";
 // commented out at ~1144; restore the import alongside the mount when
 // the panel returns.
 import PlotPropertyHighlight from "@/components/map/PlotPropertyHighlight";
-import PlotCardMarker3D from "@/components/map/PlotCardMarker3D";
 import InWorldPropertyCard, { cardDataFromLead } from "@/components/map/InWorldPropertyCard";
 // PlotSummonedMonument, PlotWorldPopover, PropertyCardBillboard were
 // unmounted 2026-06-04 during the world-aware-interface rebuild (HTML
@@ -249,12 +251,9 @@ export default function MapPage() {
   // so the actual lot polygon (from PostGIS) outlines under the card.
   // Locked 2026-05-30 evening per the in-world stack spec.
   const [selectedApn, setSelectedApn] = useState<string | null>(null);
-  // Parcel centroid (lat/lng) reported by PlotPropertyHighlight when the
-  // lot ring resolves. The property card pins HERE — to the parcel in
-  // world space, rising with the polygon — not to the reticle. Cleared
-  // when the highlight clears. Locked 2026-06-10 (stop the drift; card
-  // stays glued to the lot via gmp-marker-3d-interactive).
-  const [cardCentroid, setCardCentroid] = useState<{ lat: number; lng: number } | null>(null);
+  // SPIKE (temp): zoom-out test — see backtick hotkey effect below.
+  const [spikeZoom, setSpikeZoom] = useState(false);
+  const mapWrapRef = useRef<HTMLDivElement | null>(null);
   // Every parcel near the camera has its monument pre-mounted (buried)
   // in its own backyard via PlotMonumentLayer. The hook re-fetches as
   // the camera flies; the layer mounts/unmounts glbs to match.
@@ -1256,6 +1255,40 @@ export default function MapPage() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
+  // SPIKE (temp): press backtick ` to toggle a CSS scale on the map
+  // wrapper — testing whether Google's WebGL map survives being shrunk
+  // (the "back out to a computer screen" trick). Remove after the test.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== '`') return;
+      const el = document.activeElement;
+      const tag = el?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || (el as HTMLElement)?.isContentEditable) return;
+      e.preventDefault();
+      setSpikeZoom(v => !v);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  // GSAP-driven back-out. expoScale() makes the zoom read as a uniform,
+  // continuous lens-pull (a plain ease looks like it speeds up/slows down
+  // when scaling — wrong, breaks the freefall). 1↔0.55, with a small
+  // upward translate so the map settles in the upper-center.
+  useEffect(() => {
+    const el = mapWrapRef.current;
+    if (!el) return;
+    const toScale = spikeZoom ? 0.55 : 1;
+    const fromScale = spikeZoom ? 1 : 0.55;
+    const tween = gsap.to(el, {
+      scale: toScale,
+      yPercent: spikeZoom ? -6 : 0,
+      duration: 0.85,
+      ease: `expoScale(${fromScale}, ${toScale}, power2.inOut)`,
+    });
+    return () => { tween.kill(); };
+  }, [spikeZoom]);
+
   // Audience derivation for the property card.
   //   public   — anyone unauthenticated, OR authed but unsubscribed.
   //              Sees Schedule Tour / Save / Share. MLS-compliant.
@@ -1647,8 +1680,77 @@ export default function MapPage() {
         </div>
       )}
 
-      {/* Map or Walk Mode */}
-      <div className="relative h-full w-full">
+      {/* SPIKE backdrop: the void you back out INTO. The familiar bezel
+          made your brain expect a desk/room — there is none. Just nowhere,
+          with your gathered cards floating in it. Deliberately unreal: no
+          desk, no surface, no logic. Cards suspended in the dark. The
+          missing reality IS the point (the freefall). Behind the map. */}
+      {spikeZoom && (
+        <div
+          className="fixed inset-0 z-0"
+          style={{ background: 'radial-gradient(circle at 50% 35%, #161618 0%, #08080a 100%)' }}
+        >
+          {/* Gathered intel — the prospects you collected this session,
+              floating in the void below the shrunk map. No container, no
+              desk. They just sit there. */}
+          {prospectList.slice(0, 8).map((p, i) => {
+            // Scatter them across the lower void, lightly tilted — present,
+            // not arranged. Pseudo-random but stable per index.
+            const cols = 4;
+            const col = i % cols;
+            const row = Math.floor(i / cols);
+            const left = 18 + col * 21 + ((i * 7) % 5);   // %
+            const top = 62 + row * 17 + ((i * 5) % 4);     // %
+            const tilt = ((i * 13) % 9) - 4;               // -4..4 deg
+            return (
+              <div
+                key={`${p.lat},${p.lng}`}
+                className="absolute"
+                style={{
+                  left: `${left}%`,
+                  top: `${top}%`,
+                  transform: `rotate(${tilt}deg)`,
+                  width: 230,
+                }}
+              >
+                <div
+                  className="rounded-xl border border-white/10 bg-[#14161b]/90 px-4 py-3 shadow-2xl backdrop-blur-sm"
+                  style={{ boxShadow: '0 18px 50px rgba(0,0,0,0.6)' }}
+                >
+                  <div className="text-[13px] font-bold text-[#E3E2E5] leading-tight">
+                    {p.address || 'Unknown address'}
+                  </div>
+                  <div className="mt-0.5 text-[11px] text-[#8a8f99]">
+                    {[p.city, p.state].filter(Boolean).join(', ')}{p.zip ? ` ${p.zip}` : ''}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+          {prospectList.length === 0 && (
+            <div className="absolute left-1/2 top-[70%] -translate-x-1/2 text-[13px] text-[#5a5f69]">
+              nothing gathered yet
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Map or Walk Mode — the back-out. GSAP drives the SCALE with
+          expoScale() so the zoom looks perceptually uniform (a normal ease
+          appears to change speed when scaling — expoScale bends the curve
+          to compensate). That clean, continuous lens-pull is the freefall;
+          a stutter or speed-warp breaks it. Border/shadow stay CSS. */}
+      <div
+        ref={mapWrapRef}
+        className="relative h-full w-full"
+        style={{
+          transformOrigin: 'center center',
+          borderRadius: spikeZoom ? 18 : 0,
+          overflow: spikeZoom ? 'hidden' : 'visible',
+          boxShadow: spikeZoom ? '0 30px 90px rgba(0,0,0,0.7), 0 0 0 3px rgba(40,46,56,1)' : 'none',
+          transition: 'border-radius 300ms ease, box-shadow 300ms ease',
+        }}
+      >
         {loading ? (
           <div className="h-full w-full bg-surface-container animate-pulse rounded-2xl" />
         ) : walkMode ? (
@@ -1950,42 +2052,30 @@ export default function MapPage() {
         <PlotPropertyHighlight
           mapElRef={map3DElRef}
           apn={selectedApn}
-          onCentroid={setCardCentroid}
         />
         </>
       )}
 
-      {/* ═══ PARCEL-PINNED PROPERTY CARD ═══
-          The card pins to the PARCEL in world space — anchored at the
-          lot centroid via gmp-marker-3d-interactive (PlotCardMarker3D),
-          so Google handles projection/depth/occlusion and it stays glued
-          to the lot as the camera moves. It rises WITH the polygon: both
-          are gated on the resolved parcel (selectedApn → centroid). No
-          reticle-tracking, no camera-delta drift. Fly far → it shrinks
-          and leaves with the lot (correct world behavior); deselect →
-          gone. Locked 2026-06-10 — supersedes the windshield-sticker
-          (PropertyStickerCard), which drifted because it tracked the
-          camera, not the place. */}
-      {selectedLead && cardCentroid && !walkMode && (
-        <PlotCardMarker3D
-          mapElRef={map3DElRef}
-          lat={cardCentroid.lat}
-          lng={cardCentroid.lng}
-          altitudeM={2}
+      {/* ═══ PROPERTY CARD — CORNER POP (v1) ═══
+          Select a property → the card pops to the top-RIGHT corner of the
+          screen. NOT a sidebar, NOT pinned in the world (that popup was
+          retired — bubble box, scrollbar, camera jerk). Just a clean card
+          docked in the corner, out of the flight path. Slides in from the
+          right; content legible immediately (in-flight UI rule — no
+          blur-in, only transform/opacity animate). Keyed on the lead so a
+          new selection replays the entrance. (Free push-to-slide card
+          physics + the elusive back-out come later — see
+          [[project-desk-surface-backout-ui]].) */}
+      {selectedLead && !walkMode && (
+        <div
+          key={selectedLead.id}
+          className="pointer-events-auto fixed right-5 top-20 z-40"
+          style={{
+            transformOrigin: 'top right',
+            animation: 'plot-card-corner-in 360ms cubic-bezier(0.16, 1, 0.3, 1) both',
+          }}
         >
-          {/* Rise-in: the card comes up WITH the polygon (both fire on the
-              resolved parcel). Keyed on the centroid so a new selection
-              replays the rise. Rises + fades over ~520ms, easing into
-              place — sequenced to the lot's ballistic toss next to it.
-              Content is legible immediately (no blur-in) per the in-flight
-              UI rule; only position/opacity animate. */}
-          <div
-            key={`${cardCentroid.lat.toFixed(6)},${cardCentroid.lng.toFixed(6)}`}
-            style={{
-              transformOrigin: 'center bottom',
-              animation: 'plot-card-rise 520ms cubic-bezier(0.16, 1, 0.3, 1) both',
-            }}
-          >
+          <div style={{ transform: 'scale(0.7)', transformOrigin: 'top right' }}>
             <InWorldPropertyCard
               data={cardDataFromLead(selectedLead)}
               onAction={(a) => {
@@ -1993,7 +2083,7 @@ export default function MapPage() {
               }}
             />
           </div>
-        </PlotCardMarker3D>
+        </div>
       )}
 
       {/* SUMMONED MONUMENT REMOVED 2026-06-04. The rising glb block is

@@ -97,9 +97,36 @@ export function useIdleDetection(): boolean {
       if (activity) markActive();
     }, GAMEPAD_POLL_MS);
 
+    // ── Window/tab not focused → idle IMMEDIATELY ───────────────────
+    // The strongest idle signal isn't "no input for 8s" — it's "the user
+    // isn't even looking at this window." When you tab to VS Code, the
+    // map tab blurs/hides; there's zero reason to keep flying. Flip idle
+    // at once (don't wait out the threshold) so the flight loop quiets
+    // the instant you leave. Returning focus flips it back via markActive.
+    function forceIdle() {
+      if (!isIdleRef.current) {
+        isIdleRef.current = true;
+        setIsIdle(true);
+      }
+    }
+    function onVisibility() {
+      if (document.hidden) forceIdle();
+      else markActive();
+    }
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('blur', forceIdle);
+    window.addEventListener('focus', markActive);
+    // If we mount already-hidden/blurred, reflect it now.
+    if (typeof document !== 'undefined' && document.hidden) forceIdle();
+
     // ── Idle timer ──────────────────────────────────────────────────
-    // Check once a second whether we've crossed the threshold.
+    // Check once a second whether we've crossed the threshold. (Only
+    // flips TO idle on time; the visibility/blur path above handles the
+    // immediate case. Returning-from-idle is driven by markActive.)
     const tickId = window.setInterval(() => {
+      // Don't override a focus-forced idle with a "recent activity" read
+      // while the window is still hidden.
+      if (typeof document !== 'undefined' && document.hidden) return;
       const elapsed = performance.now() - lastActivityRef.current;
       const shouldBeIdle = elapsed > IDLE_THRESHOLD_MS;
       if (shouldBeIdle !== isIdleRef.current) {
@@ -115,6 +142,9 @@ export function useIdleDetection(): boolean {
       window.removeEventListener('keydown', markActive);
       window.removeEventListener('touchstart', markActive);
       window.removeEventListener('touchmove', markActive);
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('blur', forceIdle);
+      window.removeEventListener('focus', markActive);
       window.clearInterval(pollId);
       window.clearInterval(tickId);
     };

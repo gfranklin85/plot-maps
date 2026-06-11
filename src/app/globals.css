@@ -1062,3 +1062,36 @@ gmp-marker-3d-interactive[plot-property-anchor] {
   0%   { opacity: 0; transform: scale(0.7) translateY(26px); }
   100% { opacity: 1; transform: scale(0.7) translateY(0); }
 }
+
+/* Strip Google PopoverElement bubble chrome for the parcel-pinned card.
+   The popover renders a white translucent bubble + tail in its shadow
+   DOM, reachable via ::part(). We want ONLY our dark card to show.
+   Part names per Google 3D Maps PopoverElement. */
+gmp-popover-3d-element[plot-card-popover],
+[plot-card-popover] {
+  --gmp-popover-background: transparent;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+[plot-card-popover]::part(container),
+[plot-card-popover]::part(content),
+[plot-card-popover]::part(bubble) {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+[plot-card-popover]::part(arrow),
+[plot-card-popover]::part(tail),
+[plot-card-popover]::part(pointer) {
+  display: none !important;
+}
+
+/* Property card corner-pop (v1) — slides in from the right edge into the
+   top-right corner. Content is legible immediately; only transform +
+   opacity animate (in-flight UI rule). */
+@keyframes plot-card-corner-in {
+  0%   { opacity: 0; transform: translateX(40px) scale(0.98); }
+  100% { opacity: 1; transform: translateX(0) scale(1); }
+}

@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createLiveSession, type CompanionEvent, type CompanionState, type LiveSessionHandle } from "@/lib/gemini-live";
-import OtanimusCharacter, { type Facing } from "./OtanimusCharacter";
+import { type Facing } from "./OtanimusCharacter";
+import OtanimusRive from "./OtanimusRive";
 import MaterialIcon from "@/components/ui/MaterialIcon";
 
 // ── Map Companion Layer — Otanimus's "brain" on the map ──────────────
@@ -29,6 +30,8 @@ export default function MapCompanionLayer() {
   const [facing, setFacing] = useState<Facing>("away");
   const [x, setX] = useState(0.82);              // start: bottom-right corner
   const [caption, setCaption] = useState("");
+  const [level, setLevel] = useState(0);          // 0..1 voice loudness → mouthOpen
+  const [look, setLook] = useState({ x: 0, y: 0 }); // autonomous gaze target
   const sessionRef = useRef<LiveSessionHandle | null>(null);
   const captionTimer = useRef<number | null>(null);
 
@@ -54,6 +57,10 @@ export default function MapCompanionLayer() {
         if (captionTimer.current) clearTimeout(captionTimer.current);
         captionTimer.current = window.setTimeout(() => setCaption(""), 4000);
         break;
+      case "amplitude":
+        // Live voice loudness → drives OT's mouth open/closed.
+        setLevel(e.level ?? 0);
+        break;
       case "close":
       case "error":
         if (e.type === "error") console.warn("[companion] error", e.error);
@@ -76,6 +83,7 @@ export default function MapCompanionLayer() {
       setActive(false);
       setState("idle");
       setCaption("");
+      setLevel(0);
       setGeminiPerfFlag(false);
       return;
     }
@@ -105,6 +113,30 @@ export default function MapCompanionLayer() {
     return () => window.removeEventListener('plot:summon-ot', onSummon);
   }, [summon]);
 
+  // Autonomous gaze — his "aware and doing something" tic. While not
+  // speaking, his eyes wander the world on their own every couple
+  // seconds; while speaking he looks toward you (center, slightly up).
+  // This is unprovoked life, independent of the conversation.
+  useEffect(() => {
+    if (!active) return;
+    let timer: number;
+    const wander = () => {
+      if (state === "speaking") {
+        setLook({ x: 0, y: -0.15 });          // address you
+      } else {
+        // glance somewhere in the world — biased toward where he'd be
+        // reading the map (down and around).
+        setLook({
+          x: (Math.random() * 2 - 1) * 0.7,
+          y: Math.random() * 0.5,             // 0..0.5, tends to look down at the map
+        });
+      }
+      timer = window.setTimeout(wander, 1400 + Math.random() * 2200);
+    };
+    wander();
+    return () => clearTimeout(timer);
+  }, [active, state]);
+
   // Cleanup on unmount.
   useEffect(() => {
     return () => {
@@ -117,8 +149,18 @@ export default function MapCompanionLayer() {
 
   return (
     <>
-      {/* The character himself — only on screen once summoned. */}
-      {active && <OtanimusCharacter state={state} facing={facing} x={x} />}
+      {/* The character himself — only on screen once summoned. Rive rig
+          when otanimus.riv is present, PNG fallback until then. */}
+      {active && (
+        <OtanimusRive
+          state={state}
+          facing={facing}
+          x={x}
+          level={level}
+          lookX={look.x}
+          lookY={look.y}
+        />
+      )}
 
       {/* Live caption (his subtitle) — sits just above center-bottom,
           legible instantly, no entrance animation (in-flight UI rule). */}

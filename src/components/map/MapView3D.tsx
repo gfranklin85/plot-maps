@@ -1109,10 +1109,35 @@ function Inner({
       vel.panY = -air.throttle;
       vel.heading = air.yaw;
 
-      // ── Idle hover wave (camera always feels alive) ───────────────
-      // Identical math to the 2D path. Tiny constant sinusoids on
-      // heading, tilt, and screen-pan so even with no stick input the
-      // camera breathes. Drowned out during active piloting.
+      // ── AT REST → stop writing the camera (quiet the PC) ──────────
+      // Greg 2026-06-10: kill the soft idle hover. When there's no live
+      // stick/trigger input AND all velocities have settled to zero, the
+      // craft is parked — there is nothing to render. We skip the hover
+      // wave, the camera write, and the cursor poke entirely so Google's
+      // photoreal renderer goes quiet instead of repainting a perpetually
+      // breathing camera every frame. Resumes the instant any input
+      // arrives. The barely-perceptible "breathing" wasn't worth a hot,
+      // loud PC (and there's no surrounding flight fiction to sell it).
+      const STICK_DEAD = 0.02;
+      const hasLiveInput =
+        Math.abs(lx) > STICK_DEAD || Math.abs(ly) > STICK_DEAD ||
+        Math.abs(rx) > STICK_DEAD || Math.abs(ry) > STICK_DEAD ||
+        rt > 0 || lt > 0 || justPressed.size > 0;
+      const atRest =
+        air.throttle === 0 && air.strafe === 0 && air.yaw === 0 &&
+        vel.tilt === 0 && vel.climb === 0;
+      if (!hasLiveInput && atRest) {
+        // Parked: nothing changed, nothing to write. Skip the rest of the
+        // frame so Google stops re-rendering. (rafId is rescheduled by the
+        // outer loop; we just don't touch the camera.)
+        return;
+      }
+
+      // ── Active-flight hover wave ───────────────────────────────────
+      // A tiny sinusoid layered on heading/tilt/pan WHILE flying so the
+      // camera feels alive in motion. Only runs when there IS input or
+      // motion (gated above) — never on a parked craft, so it can't keep
+      // the renderer hot at rest.
       const tSec = elapsedMs / 1000;
       const hoverHeading = Math.sin(tSec * 2 * Math.PI * HOVER_HEADING_FREQ) * HOVER_HEADING_AMPL;
       const hoverTilt    = Math.sin(tSec * 2 * Math.PI * HOVER_TILT_FREQ)    * HOVER_TILT_AMPL;

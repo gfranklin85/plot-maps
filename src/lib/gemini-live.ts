@@ -42,10 +42,12 @@ Speak naturally, low and even. Keep it short.`;
 export type CompanionState = 'idle' | 'listening' | 'thinking' | 'speaking';
 
 export interface CompanionEvent {
-  type: 'state' | 'userTranscript' | 'modelTranscript' | 'open' | 'close' | 'error';
+  type: 'state' | 'userTranscript' | 'modelTranscript' | 'amplitude' | 'open' | 'close' | 'error';
   state?: CompanionState;
   text?: string;
   error?: string;
+  /** 0..1 voice loudness, emitted ~each frame while OT speaks. Drives mouthOpen. */
+  level?: number;
 }
 
 export interface LiveSessionHandle {
@@ -96,8 +98,20 @@ class AudioPlayer {
   private ctx: AudioContext;
   private queueTime = 0;
   private active = 0;
-  constructor(private onDrain: () => void) {
+  private analyser: AnalyserNode;
+  private buf: Uint8Array<ArrayBuffer>;
+  private rafId = 0;
+  private running = false;
+  constructor(private onDrain: () => void, private onLevel: (level: number) => void) {
     this.ctx = new AudioContext({ sampleRate: 24000 });
+    // Shared analyser: every voice chunk routes through here on its way
+    // to the speakers, so we can read OT's real output loudness and drive
+    // his mouth from it. Cheap — one node, one RMS read per frame.
+    this.analyser = this.ctx.createAnalyser();
+    this.analyser.fftSize = 256;
+    this.analyser.smoothingTimeConstant = 0.55;
+    this.analyser.connect(this.ctx.destination);
+    this.buf = new Uint8Array(new ArrayBuffer(this.analyser.fftSize));
   }
   play(pcm: ArrayBuffer) {
     const int16 = new Int16Array(pcm);
@@ -107,22 +121,52 @@ class AudioPlayer {
     audioBuf.copyToChannel(float, 0);
     const src = this.ctx.createBufferSource();
     src.buffer = audioBuf;
-    src.connect(this.ctx.destination);
+    src.connect(this.analyser);
     const now = this.ctx.currentTime;
     const startAt = Math.max(now, this.queueTime);
     src.start(startAt);
     this.queueTime = startAt + audioBuf.duration;
     this.active++;
+    this.startMeter();
     src.onended = () => {
       this.active--;
-      if (this.active === 0) this.onDrain();
+      if (this.active === 0) { this.onDrain(); this.stopMeter(); }
     };
+  }
+  // RMS meter loop — emits 0..1 loudness while audio is playing. Stops
+  // when the queue drains so the mouth closes and we stop burning a RAF.
+  private startMeter() {
+    if (this.running) return;
+    this.running = true;
+    const tick = () => {
+      if (!this.running) return;
+      this.analyser.getByteTimeDomainData(this.buf);
+      let sum = 0;
+      for (let i = 0; i < this.buf.length; i++) {
+        const v = (this.buf[i] - 128) / 128;
+        sum += v * v;
+      }
+      const rms = Math.sqrt(sum / this.buf.length);
+      // Normalize: speech RMS ~0.05..0.35. Map to a lively 0..1 with a
+      // little gain and a soft ceiling so mid-volume already opens wide.
+      const level = Math.max(0, Math.min(1, (rms - 0.02) * 4.5));
+      this.onLevel(level);
+      this.rafId = requestAnimationFrame(tick);
+    };
+    this.rafId = requestAnimationFrame(tick);
+  }
+  private stopMeter() {
+    this.running = false;
+    if (this.rafId) cancelAnimationFrame(this.rafId);
+    this.onLevel(0);
   }
   /** Drop anything queued (barge-in). */
   flush() {
     this.queueTime = this.ctx.currentTime;
+    this.stopMeter();
   }
   close() {
+    this.stopMeter();
     this.ctx.close().catch(() => {});
   }
 }
@@ -152,7 +196,10 @@ export function createLiveSession({ onEvent }: StartOpts): LiveSessionHandle {
     const token = await mintToken();
     const ai = new GoogleGenAI({ apiKey: token, httpOptions: { apiVersion: 'v1alpha' } });
 
-    player = new AudioPlayer(() => onEvent({ type: 'state', state: 'listening' }));
+    player = new AudioPlayer(
+      () => onEvent({ type: 'state', state: 'listening' }),
+      (level) => onEvent({ type: 'amplitude', level }),
+    );
 
     session = await ai.live.connect({
       model: MODEL,

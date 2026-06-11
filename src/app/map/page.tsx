@@ -1187,11 +1187,14 @@ export default function MapPage() {
         });
       },
       onSummonCompanion: () => {
-        // X — call / dismiss OT. The companion layer lives in a sibling
-        // subtree (no shared parent to prop-drill through), so we bridge
-        // via a window event it listens for. Low coupling, one line each
-        // side.
+        // X / LB — call / dismiss OT. The companion layer lives in a
+        // sibling subtree (no shared parent to prop-drill through), so we
+        // bridge via a window event it listens for. Low coupling.
         window.dispatchEvent(new CustomEvent('plot:summon-ot'));
+      },
+      onBackOut: () => {
+        // Back/Select — toggle the back-out (zoom-out to the void).
+        setSpikeZoom(v => !v);
       },
       onInspect: () => {
         // Y — open info card for the hovered target only. Empty reticle

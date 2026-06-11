@@ -16,8 +16,10 @@ export interface GamepadActions {
    *  unbound from the controller until the outreach flow + its in-flight
    *  channel-arming UI is finished. See [[project-outreach-flow-unfinished]]. */
   onRotateChannel?: () => void;
-  /** X — Summon / dismiss Otanimus, the flight companion. */
+  /** X / LB — Summon / dismiss Otanimus, the flight companion. */
   onSummonCompanion?: () => void;
+  /** Back/Select — back out (zoom-out to the dashboard/void). */
+  onBackOut?: () => void;
   /** Y — Inspect. Open the info card for the hovered target. */
   onInspect?: () => void;
   /** B — Cancel / close popup. */
@@ -478,9 +480,11 @@ export default function GamepadFlightController({
         fire('a', actionsRef.current.onShoot);
         // X now summons OT (was onRotateChannel — see type note +
         // [[project-outreach-flow-unfinished]]).
+        fire('lb', actionsRef.current.onSummonCompanion);  // LB also = OT
         fire('x', actionsRef.current.onSummonCompanion);
         fire('y', actionsRef.current.onInspect);
         fire('b', actionsRef.current.onCancel);
+        fire('back', actionsRef.current.onBackOut);        // Back/Select = back out
         if (justPressed.has('up') || justPressed.has('left')) actionsRef.current.onCyclePrev?.();
         if (justPressed.has('down') || justPressed.has('right')) actionsRef.current.onCycleNext?.();
       }

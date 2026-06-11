@@ -577,6 +577,38 @@ function Inner({
   }, []);
   const fireTetherRef = useRef(fireTether);
   fireTetherRef.current = fireTether;
+
+  // OPEN PARCEL via synthetic click at the reticle — NO Steam / OS click
+  // needed. We dispatch a synthetic pointerdown/up/click at the reticle
+  // pixel; Google's gmp-click fires its own surface ray-cast and our
+  // onMapClick handler resolves the address/parcel and opens the card —
+  // exactly as a real mouse click would. Same proven mechanism fireTether
+  // uses, but we let onMapClick do the parcel work (don't query Places).
+  // This is what lets the A-button open a parcel with no Steam Input.
+  const fireOpenParcel = useCallback(() => {
+    const mapEl = elRef.current;
+    if (!mapEl) return;
+    const cx = cursorXRef.current;
+    const cy = cursorYRef.current;
+    const x = cx >= 0 ? cx : window.innerWidth / 2;
+    const y = cy >= 0 ? cy : window.innerHeight / 2;
+    try {
+      mapEl.dispatchEvent(new PointerEvent('pointerdown', {
+        clientX: x, clientY: y, bubbles: true, cancelable: true,
+        button: 0, pointerType: 'mouse',
+      }));
+      mapEl.dispatchEvent(new PointerEvent('pointerup', {
+        clientX: x, clientY: y, bubbles: true, cancelable: true,
+        button: 0, pointerType: 'mouse',
+      }));
+      mapEl.dispatchEvent(new MouseEvent('click', {
+        clientX: x, clientY: y, bubbles: true, cancelable: true,
+        button: 0,
+      }));
+    } catch { /* PointerEvent may not be constructable here */ }
+  }, []);
+  const fireOpenParcelRef = useRef(fireOpenParcel);
+  fireOpenParcelRef.current = fireOpenParcel;
   // Cursor move → drop the candidate cache so the next RB tap fires a
   // fresh query against the new aim point. Without this, RB-tap after
   // moving the cursor would just cycle through stale candidates from
@@ -1005,14 +1037,15 @@ function Inner({
         const fire = (name: ButtonName, fn?: () => void) => {
           if (justPressed.has(name) && fn) fn();
         };
-        // A-press is intentionally NOT handled here. Steam Input (or
-        // equivalent OS-layer mapper) translates controller A → real
-        // OS left-click at the cursor position. Plot's existing mouse
-        // handlers (gmp-click → POI/parcel routing) do the work, same
-        // as a physical mouse click. The reticle is purely a visual
-        // sight; the click itself is a real OS click on whatever the
-        // cursor is hovering. Greg locked this 2026-05-26.
-        //
+        // A = FIRE LASER + OPEN PARCEL (no Steam needed, 2026-06-11).
+        // onShoot fires the projectile + sound; fireOpenParcel dispatches
+        // a synthetic click at the reticle → Google gmp-click → onMapClick
+        // resolves the address/parcel and opens the card. One press, both.
+        // Replaces the old Steam-Input "A → real OS click" approach.
+        if (justPressed.has('a')) {
+          actionsRef.current?.onShoot?.();
+          fireOpenParcelRef.current();
+        }
         // RB-tap = tether. Forgiveness-zone target acquisition: cursor
         // aim doesn't need pixel precision; Plot queries nearby Places
         // and opens the closest. Subsequent RB taps cycle. Greg locked
@@ -1020,11 +1053,16 @@ function Inner({
         if (justPressed.has('rb')) {
           fireTetherRef.current();
         }
-        // X now summons OT (was onRotateChannel — see
+        // LB = summon OT (dedicated shoulder button, freed up now that
+        // Steam Input isn't using it for cursor-move). X also summons OT.
+        fire('lb', actionsRef.current?.onSummonCompanion);
+        // X also summons OT (was onRotateChannel — see
         // [[project-outreach-flow-unfinished]]).
         fire('x', actionsRef.current?.onSummonCompanion);
         fire('y', actionsRef.current?.onInspect);
         fire('b', actionsRef.current?.onCancel);
+        // Back/Select = BACK OUT (the zoom-out). Semantically "back."
+        fire('back', actionsRef.current?.onBackOut);
         if (justPressed.has('up') || justPressed.has('left')) actionsRef.current?.onCyclePrev?.();
         if (justPressed.has('down') || justPressed.has('right')) actionsRef.current?.onCycleNext?.();
       }

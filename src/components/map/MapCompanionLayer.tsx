@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createLiveSession, type CompanionEvent, type CompanionState, type LiveSessionHandle } from "@/lib/gemini-live";
 import { type Facing } from "./OtanimusCharacter";
 import OtanimusRive from "./OtanimusRive";
-import MaterialIcon from "@/components/ui/MaterialIcon";
 
 // ── Map Companion Layer — Otanimus's "brain" on the map ──────────────
 //
@@ -87,17 +86,27 @@ export default function MapCompanionLayer() {
       setGeminiPerfFlag(false);
       return;
     }
+    // Show OT FIRST, then start the session (which triggers the mic +
+    // screen-share permission prompts). Greg 2026-06-12: the prompts used
+    // to fire before OT was even visible — a cold dialog from nowhere.
+    // Now the lion arrives on screen, then asks, so the permission request
+    // reads as HIM wanting to see/hear, not the OS interrupting.
+    setActive(true);
+    setState("thinking");
     setConnecting(true);
+    // Brief beat so the arrival registers before the browser dialog.
+    await new Promise((r) => setTimeout(r, 450));
     try {
       const s = createLiveSession({ onEvent });
       sessionRef.current = s;
       await s.start();
-      setActive(true);
       setGeminiPerfFlag(true);
     } catch (err) {
       console.error("[companion] failed to start", err);
       sessionRef.current?.stop();
       sessionRef.current = null;
+      setActive(false);
+      setState("idle");
     } finally {
       setConnecting(false);
     }
@@ -172,22 +181,31 @@ export default function MapCompanionLayer() {
         </div>
       )}
 
-      {/* Summon / dismiss button — bottom-right, clear of Google's
-          native controls. Mint when active. */}
+      {/* Summon / dismiss OT — bottom-LEFT, genuinely clear of Google's
+          bottom-right compass/zoom controls. Gradient depth, labeled "OT"
+          so it reads as the lion co-pilot, not a mystery robot icon.
+          Greg 2026-06-12: the old flat bottom-right button covered Google's
+          controls and was "the cheapest excuse for a button ever." */}
       <button
         onClick={summon}
         disabled={connecting}
-        title={active ? "Dismiss Otanimus" : "Summon Otanimus"}
-        className={`absolute bottom-6 right-6 z-50 flex h-12 w-12 items-center justify-center rounded-2xl shadow-lg backdrop-blur-md transition-all ${
-          active
-            ? "bg-[#00F2FF]/90 text-[#0D0E10]"
-            : "bg-[#1F2022]/55 text-[#E3E2E5] hover:bg-[#1F2022]/75"
-        } ${connecting ? "opacity-60" : ""}`}
+        title={active ? "Dismiss OT" : "Call OT — your flight co-pilot"}
+        className="group absolute bottom-6 left-6 z-50 flex h-14 items-center gap-2.5 rounded-2xl pl-2.5 pr-4 text-[14px] font-bold text-white backdrop-blur-md transition-transform hover:scale-[1.04] active:scale-95"
+        style={{
+          background: active
+            ? 'linear-gradient(160deg, #00e0c8, #008fb0)'
+            : 'linear-gradient(160deg, rgba(58,68,92,0.94), rgba(20,27,44,0.94))',
+          boxShadow: '0 10px 24px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.2)',
+          opacity: connecting ? 0.7 : 1,
+        }}
       >
-        <MaterialIcon
-          icon={connecting ? "more_horiz" : active ? "graphic_eq" : "smart_toy"}
-          className="text-[22px]"
-        />
+        <span
+          className="flex h-10 w-10 items-center justify-center rounded-xl text-[20px]"
+          style={{ background: 'rgba(255,255,255,0.12)' }}
+        >
+          {connecting ? '…' : '🦁'}
+        </span>
+        <span>{connecting ? 'Waking OT' : active ? 'OT is here' : 'Call OT'}</span>
       </button>
     </>
   );

@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import MaterialIcon from "@/components/ui/MaterialIcon";
 import ProspectSearch from "@/components/dashboard/ProspectSearch";
 import {
@@ -37,8 +36,6 @@ interface Props {
  * controller-config platform sprint.
  */
 export default function DestinationsPanel({ visible, home, onFlyTo, onClose }: Props) {
-  const [searchOpen, setSearchOpen] = useState(false);
-
   if (!visible) return null;
 
   function flyToDestination(d: Destination) {
@@ -54,20 +51,49 @@ export default function DestinationsPanel({ visible, home, onFlyTo, onClose }: P
   }
 
   return (
-    <div className="absolute inset-4 md:top-4 md:right-16 md:left-auto md:bottom-auto z-20 md:w-[28rem] max-h-[calc(100vh-2rem)] rounded-2xl bg-surface/95 backdrop-blur-md shadow-2xl border border-card-border flex flex-col overflow-hidden">
+    <div
+      className="absolute inset-4 md:top-4 md:right-16 md:left-auto md:bottom-auto z-20 md:w-[28rem] max-h-[calc(100vh-2rem)] rounded-2xl backdrop-blur-md flex flex-col overflow-visible text-white"
+      style={{
+        background: 'linear-gradient(160deg, rgba(40,49,70,0.96), rgba(16,22,38,0.97))',
+        boxShadow: '0 20px 50px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.12)',
+        border: '1px solid rgba(255,255,255,0.08)',
+      }}
+    >
       {/* Header */}
-      <div className="flex items-center justify-between px-5 py-4 border-b border-card-border">
+      <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
         <div>
-          <h3 className="text-base font-bold text-on-surface">Fly somewhere</h3>
-          <p className="text-[10px] text-on-surface-variant mt-0.5">Pick a city or search anywhere on Earth.</p>
+          <h3 className="text-base font-bold text-white">Fly somewhere</h3>
+          <p className="text-[10px] text-white/55 mt-0.5">Search any address or pick a city — then fly there.</p>
         </div>
         <button
           onClick={onClose}
-          className="text-on-surface-variant hover:text-on-surface"
+          className="text-white/55 hover:text-white"
           title="Close"
         >
           <MaterialIcon icon="close" className="text-[18px]" />
         </button>
+      </div>
+
+      {/* SEARCH — moved to the TOP so its autocomplete dropdown has the
+          whole panel height to open into instead of being clipped by the
+          scroll container. Greg 2026-06-12: the search had no room to show
+          suggestions. */}
+      <div className="px-5 pt-4 pb-2">
+        <ProspectSearch
+          compact
+          placeholder="Type a city, landmark, or address…"
+          onSelect={(payload) => {
+            onFlyTo({
+              lat: payload.lat,
+              lng: payload.lng,
+              altitude: DEFAULT_ARRIVAL_POSE.altitude,
+              heading: DEFAULT_ARRIVAL_POSE.heading,
+              pitch: DEFAULT_ARRIVAL_POSE.pitch,
+              range: DEFAULT_ARRIVAL_POSE.range,
+            });
+            onClose();
+          }}
+        />
       </div>
 
       {/* Scrollable content */}
@@ -75,7 +101,7 @@ export default function DestinationsPanel({ visible, home, onFlyTo, onClose }: P
         {/* Home — pinned top, personal hook before global cities */}
         {home && (
           <div>
-            <p className="text-[9px] font-bold text-on-surface-variant uppercase tracking-wider mb-2">Home</p>
+            <p className="text-[9px] font-bold text-white/60 uppercase tracking-wider mb-2">Home</p>
             <button
               onClick={() => onFlyTo({
                 lat: home.lat,
@@ -101,53 +127,23 @@ export default function DestinationsPanel({ visible, home, onFlyTo, onClose }: P
 
         {/* Curated cities — 9 hand-tuned cinematic arrivals */}
         <div>
-          <p className="text-[9px] font-bold text-on-surface-variant uppercase tracking-wider mb-2">Iconic destinations</p>
+          <p className="text-[9px] font-bold text-white/60 uppercase tracking-wider mb-2">Iconic destinations</p>
           <div className="grid grid-cols-2 gap-2">
             {PANEL_DESTINATIONS.map((d) => (
               <button
                 key={d.slug}
                 onClick={() => flyToDestination(d)}
-                className="flex flex-col items-start gap-0.5 p-3 rounded-xl bg-surface-container hover:bg-surface-container-high transition-all text-left hover:scale-[1.02]"
+                className="flex flex-col items-start gap-0.5 p-3 rounded-xl bg-white/10 hover:bg-white/15 transition-all text-left hover:scale-[1.02]"
               >
-                <div className="text-sm font-bold text-on-surface">{d.name}</div>
-                <div className="text-[10px] text-on-surface-variant">{d.region}</div>
+                <div className="text-sm font-bold text-white">{d.name}</div>
+                <div className="text-[10px] text-white/60">{d.region}</div>
               </button>
             ))}
           </div>
         </div>
 
-        {/* Search anywhere — Places autocomplete */}
-        <div>
-          <p className="text-[9px] font-bold text-on-surface-variant uppercase tracking-wider mb-2">Search anywhere</p>
-          {searchOpen ? (
-            <ProspectSearch
-              compact
-              placeholder="Type a city, landmark, or address..."
-              onSelect={(payload) => {
-                onFlyTo({
-                  lat: payload.lat,
-                  lng: payload.lng,
-                  altitude: DEFAULT_ARRIVAL_POSE.altitude,
-                  heading: DEFAULT_ARRIVAL_POSE.heading,
-                  pitch: DEFAULT_ARRIVAL_POSE.pitch,
-                  range: DEFAULT_ARRIVAL_POSE.range,
-                });
-                setSearchOpen(false);
-                onClose();
-              }}
-            />
-          ) : (
-            <button
-              onClick={() => setSearchOpen(true)}
-              className="w-full flex items-center gap-2 p-3 rounded-xl bg-surface-container hover:bg-surface-container-high transition-all text-left"
-            >
-              <MaterialIcon icon="search" className="text-[18px] text-on-surface-variant" />
-              <span className="text-sm text-on-surface-variant">Anywhere on Earth...</span>
-            </button>
-          )}
-        </div>
 
-        <p className="text-[9px] text-on-surface-variant italic">
+        <p className="text-[9px] text-white/60 italic">
           Photorealistic 3D tile coverage varies by region.
         </p>
       </div>

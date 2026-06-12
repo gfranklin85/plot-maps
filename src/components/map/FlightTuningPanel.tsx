@@ -48,15 +48,22 @@ export default function FlightTuningPanel({
   const eff = effectiveFlightValues(tuning);
 
   return (
-    <div className="absolute top-4 right-16 z-20 w-[22rem] rounded-2xl bg-surface/90 backdrop-blur-md shadow-2xl border border-card-border p-4 space-y-4">
+    <div
+      className="absolute top-4 right-16 z-20 w-[22rem] rounded-2xl p-4 space-y-4 text-white backdrop-blur-md"
+      style={{
+        background: 'linear-gradient(160deg, rgba(40,49,70,0.95), rgba(16,22,38,0.96))',
+        boxShadow: '0 16px 40px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.14)',
+        border: '1px solid rgba(255,255,255,0.08)',
+      }}
+    >
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-sm font-bold text-on-surface">Flight feel</h3>
-          <p className="text-[10px] text-on-surface-variant mt-0.5">LY fly · LX strafe · RX turn · RY look · LT↓ RT↑ climb.</p>
+          <h3 className="text-sm font-bold text-white">Flight feel</h3>
+          <p className="text-[10px] text-white/55 mt-0.5">LY fly · LX strafe · RX turn · RY look · LT↓ RT↑ climb.</p>
         </div>
         <button
           onClick={onClose}
-          className="text-on-surface-variant hover:text-on-surface"
+          className="text-white/55 hover:text-white"
           title="Close"
         >
           <MaterialIcon icon="close" className="text-[16px]" />
@@ -107,12 +114,12 @@ export default function FlightTuningPanel({
       />
 
       <div className="flex items-center justify-between pt-1">
-        <p className="text-[9px] text-on-surface-variant italic">
+        <p className="text-[9px] text-white/60 italic">
           Live preview — fly while you adjust.
         </p>
         <button
           onClick={onReset}
-          className="text-[10px] font-semibold text-on-surface-variant hover:text-on-surface transition-colors"
+          className="text-[10px] font-semibold text-white/60 hover:text-white transition-colors"
           title="Reset all sliders to default"
         >
           Reset
@@ -169,10 +176,10 @@ function Slider({ label, value, min, max, leftEnd, rightEnd, pivot, readout, onC
   return (
     <div>
       <div className="flex items-center justify-between mb-1">
-        <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">
+        <label className="text-[10px] font-bold text-white/60 uppercase tracking-wider">
           {label}
         </label>
-        <span className="text-[10px] font-mono text-on-surface tabular-nums">
+        <span className="text-[10px] font-mono text-white tabular-nums">
           {value.toFixed(2)}×
         </span>
       </div>
@@ -185,7 +192,7 @@ function Slider({ label, value, min, max, leftEnd, rightEnd, pivot, readout, onC
         onChange={(e) => onChange(posToValue(parseFloat(e.target.value)))}
         className="w-full accent-primary"
       />
-      <div className="flex items-center justify-between mt-0.5 text-[9px] text-on-surface-variant">
+      <div className="flex items-center justify-between mt-0.5 text-[9px] text-white/60">
         <span>{leftEnd}</span>
         {oneInRange && (
           <>
@@ -196,7 +203,7 @@ function Slider({ label, value, min, max, leftEnd, rightEnd, pivot, readout, onC
         <span className="opacity-50">·</span>
         <span>{rightEnd}</span>
       </div>
-      <div className="mt-1 text-[9.5px] font-mono text-on-surface-variant tabular-nums leading-tight">
+      <div className="mt-1 text-[9.5px] font-mono text-white/60 tabular-nums leading-tight">
         {readout}
       </div>
     </div>

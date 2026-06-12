@@ -422,6 +422,37 @@ function StreetViewInner({ leads, startPosition, onDataChanged, onPositionChange
     <div className="relative h-full w-full overflow-hidden" style={{ touchAction: 'none' }}>
       <div ref={containerRef} className="h-full w-full" />
 
+      {/* ── WALK MODE banner + EXIT — top-left, mouse/keyboard friendly ──
+          Greg 2026-06-12: walk mode had no on-screen way out (controller B
+          only) and no indication of where you are. This says "you're on
+          the street" and gives a clear Back-to-map button. */}
+      <div className="absolute left-4 top-4 z-50 flex items-center gap-3">
+        <button
+          onClick={() => onExitWalk?.()}
+          title="Back to the map (Esc)"
+          className="flex h-12 items-center gap-2 rounded-2xl pl-3 pr-4 text-[13px] font-semibold text-white backdrop-blur-md transition-transform hover:scale-[1.03] active:scale-95"
+          style={{
+            background: 'linear-gradient(160deg, rgba(58,68,92,0.92), rgba(20,27,44,0.92))',
+            boxShadow: '0 8px 20px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.18)',
+          }}
+        >
+          <span className="flex h-8 w-8 items-center justify-center rounded-xl" style={{ background: 'rgba(255,255,255,0.10)' }}>
+            <span className="material-symbols-outlined text-[20px]">arrow_back</span>
+          </span>
+          Back to map
+        </button>
+        <div
+          className="flex h-12 items-center gap-2 rounded-2xl px-4 text-[13px] font-semibold text-white backdrop-blur-md"
+          style={{
+            background: 'linear-gradient(160deg, rgba(0,180,160,0.85), rgba(0,90,120,0.85))',
+            boxShadow: '0 8px 20px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.18)',
+          }}
+        >
+          <span className="material-symbols-outlined text-[18px]">directions_walk</span>
+          On the street
+        </div>
+      </div>
+
       {/* ── LEAD / PROSPECT — top of screen (call workflow) ── */}
       {walkActiveLead && (
         <div className="absolute top-4 right-4 z-50 w-[340px] max-h-[45vh] overflow-y-auto rounded-2xl shadow-2xl border border-card-border bg-card">

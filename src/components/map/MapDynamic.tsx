@@ -3,13 +3,24 @@
 import dynamic from "next/dynamic";
 import type { MapViewProps } from "./MapView";
 
-// Photorealistic 3D Tiles renderer (Map3DElement / gmp-map-3d). This
-// is THE Plot experience. The 3D world is the product. Locked
-// 2026-05-30 evening — the prior profile.enable3DTilesAdmin gate is
-// gone. Plot was created to give people the spatial experience; the
-// 2D Mercator fallback only fires for devices that genuinely cannot
-// render 3D tiles (see has3DSupport in the map page).
+// Routes between the two real map surfaces based on `view3D`:
+//   • 3D (view3D=true)  → MapView3D — the photoreal flight map
+//     (gmp-map-3d / Map3DElement). THE flight experience.
+//   • 2D (view3D=false) → MapView — the lightweight flat map
+//     (@vis.gl/react-google-maps <Map>). The 2D Work Mode surface,
+//     where the rich 2D-only Maps features live (DDS boundaries, etc).
+//
+// FIXED 2026-06-12: this used to ALWAYS render MapView3D and ignore the
+// toggle, so clicking "2D" only flattened the 3D camera tilt — the user
+// could never actually reach the 2D map. The ModeSwitch now genuinely
+// swaps surfaces. (2D Work Mode = [[project-2d-work-mode]].)
 const MapView3D = dynamic(() => import("./MapView3D"), {
+  ssr: false,
+  loading: () => (
+    <div className="h-full w-full bg-surface-container animate-pulse rounded-2xl" />
+  ),
+});
+const MapView2D = dynamic(() => import("./MapView"), {
   ssr: false,
   loading: () => (
     <div className="h-full w-full bg-surface-container animate-pulse rounded-2xl" />
@@ -17,5 +28,5 @@ const MapView3D = dynamic(() => import("./MapView3D"), {
 });
 
 export default function MapDynamic(props: MapViewProps) {
-  return <MapView3D {...props} />;
+  return props.view3D ? <MapView3D {...props} /> : <MapView2D {...props} />;
 }

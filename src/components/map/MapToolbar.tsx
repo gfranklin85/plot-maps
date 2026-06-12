@@ -68,61 +68,62 @@ export default function MapToolbar({ items, searchSlot }: Props) {
 
   const visibleItems = items.filter(i => i.visible !== false);
 
+  // Shared button surface: a soft top-lit gradient (light → dark) with a
+  // hairline top highlight + drop shadow for depth. Never a flat color.
+  // Greg 2026-06-12: every button gets gradient depth + pleasing light/
+  // shadow, and the expanded items show LABELS so their meaning is clear.
+  const restGrad = 'linear-gradient(160deg, rgba(58,68,92,0.92), rgba(20,27,44,0.92))';
+  const activeGrad = 'linear-gradient(160deg, #3d7bff, #1c49c9)';
+
   return (
     <div
       ref={wrapperRef}
       className="absolute top-4 right-4 z-10 flex flex-col items-end gap-2"
     >
-      {/* Search slot — sits above the anchor only when explicitly
-          rendered. Caller controls its expansion. */}
       {searchSlot}
 
-      {/* Anchor — the only thing always visible. Translucent so the
-          world reads through it. Click to expand the column. */}
+      {/* Anchor — always visible. Gradient + depth. */}
       <button
         onClick={() => setExpanded(v => !v)}
         title={expanded ? 'Close' : 'Map tools'}
-        className={`relative w-10 h-10 flex items-center justify-center rounded-xl shadow-lg transition-all backdrop-blur-md ${
-          expanded
-            ? 'bg-primary/85 text-white'
-            : 'bg-surface/45 text-on-surface hover:bg-surface/65'
-        }`}
+        className="relative flex h-12 w-12 items-center justify-center rounded-2xl text-white backdrop-blur-md transition-transform hover:scale-105 active:scale-95"
+        style={{
+          background: expanded ? activeGrad : restGrad,
+          boxShadow: '0 8px 20px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.18)',
+        }}
       >
-        <MaterialIcon
-          icon={expanded ? 'close' : 'tune'}
-          className="text-[20px]"
-        />
+        <MaterialIcon icon={expanded ? 'close' : 'tune'} className="text-[22px]" />
       </button>
 
-      {/* Expanded column — vertical strip of contextual controls.
-          Anchored just below the anchor button. */}
+      {/* Expanded column — each control is now a full pill: icon + LABEL,
+          so the user knows what every button does. Gradient depth. */}
       {expanded && (
-        <div className="flex flex-col gap-2 animate-in fade-in slide-in-from-top-2 duration-150">
-          {visibleItems.map(item => (
-            <button
-              key={item.key}
-              onClick={() => {
-                item.onClick();
-                // Keep the panel open after action so the user can
-                // adjust multiple things without re-tapping the anchor.
-              }}
-              title={item.label}
-              className={`relative w-10 h-10 flex items-center justify-center rounded-xl shadow-lg transition-all backdrop-blur-md ${
-                item.accentClassName
-                  ? item.accentClassName
-                  : item.active
-                    ? 'bg-primary/85 text-white'
-                    : 'bg-surface/45 text-on-surface hover:bg-surface/65'
-              }`}
-            >
-              <MaterialIcon icon={item.icon} className="text-[20px]" />
-              {item.badge && (
-                <span className="absolute -top-1 -right-1 px-1 rounded-full bg-amber-500 text-white text-[8px] font-bold tracking-wider">
-                  {item.badge}
+        <div className="flex flex-col items-end gap-2 animate-in fade-in slide-in-from-top-2 duration-150">
+          {visibleItems.map(item => {
+            const bg = item.accentClassName ? undefined : (item.active ? activeGrad : restGrad);
+            return (
+              <button
+                key={item.key}
+                onClick={() => item.onClick()}
+                title={item.label}
+                className={`relative flex h-12 items-center gap-3 rounded-2xl pl-3 pr-4 text-[13px] font-semibold text-white backdrop-blur-md transition-transform hover:scale-[1.03] active:scale-95 ${item.accentClassName ?? ''}`}
+                style={bg ? {
+                  background: bg,
+                  boxShadow: '0 8px 20px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.18)',
+                } : { boxShadow: '0 8px 20px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.18)' }}
+              >
+                <span className="flex h-8 w-8 items-center justify-center rounded-xl" style={{ background: 'rgba(255,255,255,0.10)' }}>
+                  <MaterialIcon icon={item.icon} className="text-[20px]" />
                 </span>
-              )}
-            </button>
-          ))}
+                <span className="whitespace-nowrap">{item.label}</span>
+                {item.badge && (
+                  <span className="rounded-full bg-amber-500 px-1.5 py-0.5 text-[8px] font-bold tracking-wider text-white">
+                    {item.badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
       )}
     </div>

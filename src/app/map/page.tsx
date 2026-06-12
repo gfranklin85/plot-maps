@@ -40,6 +40,8 @@ import ProspectCoachOverlay from "@/components/map/ProspectCoachOverlay";
 import Mobile3DCoachOverlay from "@/components/map/Mobile3DCoachOverlay";
 import GamepadStatusChip from "@/components/map/GamepadStatusChip";
 import MapToolbar from "@/components/map/MapToolbar";
+import ModeSwitch from "@/components/map/ModeSwitch";
+import { useMapMode } from "@/lib/useMapMode";
 import FlightTuningPanel from "@/components/map/FlightTuningPanel";
 import { useFlightTuning } from "@/lib/useFlightTuning";
 import { useIdleDetection } from "@/lib/useIdleDetection";
@@ -101,31 +103,33 @@ export default function MapPage() {
   // 05-17); we default to 'land_use' until we redesign that surface.
   const [showParcels, setShowParcels] = useState(false);
   const parcelColorMode: import('@/components/map/ParcelOverlay').ParcelColorMode = 'land_use';
-  const [view3D, setView3D] = useState(true);
   const has3DSupport = !!process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID;
   const [show3DCoach, setShow3DCoach] = useState(false);
-  // Two flight models for the gamepad. 'overhead' = free pan + rotate
-  // (everyday work). 'airplane' = game-feel cockpit (throttle on left Y,
-  // yaw on left X, climb/dive on right Y, bank on right X). Toggle with
-  // the airplane button in the toolbar — only meaningful with a controller
-  // plugged in. Airplane mode auto-engages 3D since steep tilt is the feel.
-  const [flightMode, setFlightMode] = useState<'overhead' | 'airplane'>('overhead');
+  // view3D / flightMode / walkMode are now DERIVED from the single mapMode
+  // state machine (declared below, after dispatchFlight). They used to be
+  // three independent booleans that desynced and trapped the user in 3D.
+
+  // Pending "enter 3D" intents raised before the mapMode machine is
+  // declared (mobile default, URL/destination arrivals). A single effect
+  // after the machine applies them. Bumping the counter requests ENTER_3D.
+  const [request3DCount, setRequest3DCount] = useState(0);
+  const requestEnter3D = useCallback(() => setRequest3DCount((c) => c + 1), []);
 
   // On mobile, default to tilted 3D view — that's where the magic is and
   // touch users can rotate freely to flatten it. Coach overlay teaches the
-  // gestures on first visit. Desktop keeps view3D=false; cursor users
-  // toggle the desktop 3D button explicitly.
+  // gestures on first visit. Desktop keeps 2D; cursor users tap 3D
+  // explicitly via the Mode Switch.
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const isMobile = window.matchMedia('(max-width: 767px)').matches;
     if (!isMobile || !has3DSupport) return;
-    setView3D(true);
+    requestEnter3D();
     const dismissed = window.localStorage.getItem('plotmaps.coachDismissed.mobile3D') === '1';
     if (!dismissed) {
       const t = setTimeout(() => setShow3DCoach(true), 600);
       return () => clearTimeout(t);
     }
-  }, [has3DSupport]);
+  }, [has3DSupport, requestEnter3D]);
 
   function dismiss3DCoach() {
     setShow3DCoach(false);
@@ -133,7 +137,6 @@ export default function MapPage() {
       window.localStorage.setItem('plotmaps.coachDismissed.mobile3D', '1');
     }
   }
-  const [walkMode, setWalkMode] = useState(false);
   // Initial map center prefers a URL-resolved destination over the
   // profile default. This is what prevents the "flash of Lemoore"
   // when a visitor arrives via /map?destination=acapulco — the map
@@ -382,6 +385,37 @@ export default function MapPage() {
   const firstProspectClickRef = useRef(false);
   const isSubscribed = profile.subscriptionStatus === 'active';
 
+  // ── Map mode: the single source of truth ──────────────────────────
+  // WORK_2D / FLY_3D / WALK. view3D, walkMode, and flightMode are all
+  // DERIVED from this — they can no longer desync (the old "stuck in 3D"
+  // bug). Transitions fly the camera (tilt flatten/re-tilt) via onFlight;
+  // a blocked 3D request (no map-id) shows a toast.
+  const {
+    mode: mapMode,
+    view3D,
+    walkMode,
+    flightMode,
+    dispatch: mapModeDispatch,
+  } = useMapMode({
+    has3DSupport,
+    onFlight: (intent) => dispatchFlight({
+      tilt: intent.tilt,
+      ...(intent.zoom != null ? { zoom: intent.zoom } : {}),
+      duration: 700,
+      easing: 'easeInOutCubic',
+    }),
+    onBlocked: () => {
+      alert('3D flight requires NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID with Photorealistic 3D Tiles enabled.');
+    },
+  });
+
+  // Apply pending "enter 3D" intents raised before the machine existed
+  // (mobile default, URL/destination arrivals).
+  useEffect(() => {
+    if (request3DCount > 0) mapModeDispatch({ type: 'ENTER_3D' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [request3DCount]);
+
   // Import-prompt dismiss state — seeded from localStorage so a user
   // who already X-ed the empty-state card doesn't see it again every
   // time they reload. Public visitors don't see the card at all
@@ -408,6 +442,15 @@ export default function MapPage() {
   // the auto-switch into airplane mode below — user shouldn't have
   // to dig into a menu to "select controller mode."
   const [pageGamepadConnected, setPageGamepadConnected] = useState(false);
+
+  // Gamepad presence drives mode: connecting from the flat work map
+  // auto-selects flight; disconnecting just drops the cockpit feel (no
+  // forced return to 2D — that was the old mid-flight jolt).
+  useEffect(() => {
+    mapModeDispatch({ type: pageGamepadConnected ? 'GAMEPAD_CONNECTED' : 'GAMEPAD_DISCONNECTED' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pageGamepadConnected]);
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -504,21 +547,7 @@ export default function MapPage() {
     };
   }, []);
 
-  // Auto-switch to airplane mode + 3D when a controller is detected.
-  // No menu, no toggle to find — plug a controller in and the world
-  // becomes flyable. Disconnect drops back to overhead mode so 2D
-  // mouse + keyboard work isn't trapped in airplane mode. The
-  // toolbar airplane button stays available as a manual override.
-  useEffect(() => {
-    if (pageGamepadConnected) {
-      if (has3DSupport) {
-        setFlightMode('airplane');
-        setView3D(true);
-      }
-    } else {
-      setFlightMode('overhead');
-    }
-  }, [pageGamepadConnected, has3DSupport]);
+  // (Gamepad → mode is now handled by the mapMode machine effect above.)
 
   const searchParams = useSearchParams();
   const urlInitDone = useRef(false);
@@ -582,7 +611,7 @@ export default function MapPage() {
           // Greg flew Lemoore from the landing card and got dropped
           // into the flat 2D map. Mobile + 3D-unsupported devices
           // fall back to 2D via the has3DSupport check in MapDynamic.
-          setView3D(true);
+          requestEnter3D();
         }
       }
     }
@@ -594,7 +623,7 @@ export default function MapPage() {
       (queryParam || destinationParam) &&
       !Number.isNaN(lat) && !Number.isNaN(lng)
     ) {
-      setView3D(true);
+      requestEnter3D();
     }
     const hasCoords = !Number.isNaN(lat) && !Number.isNaN(lng);
 
@@ -1225,7 +1254,7 @@ export default function MapPage() {
         }
       },
       onCancel: () => {
-        if (walkMode) { setWalkMode(false); return; }
+        if (walkMode) { mapModeDispatch({ type: 'EXIT_WALK' }); return; }
         if (selectedLead) setSelectedLead(null);
       },
       onCyclePrev: () => cycleLead(-1),
@@ -1257,6 +1286,22 @@ export default function MapPage() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
+
+  // Escape closes the property card (and exits walk mode) — mouse/keyboard
+  // users shouldn't need a controller's B button to dismiss.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      const el = document.activeElement;
+      const tag = el?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || (el as HTMLElement)?.isContentEditable) return;
+      if (walkMode) { mapModeDispatch({ type: 'EXIT_WALK' }); return; }
+      setSelectedLead(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [walkMode]);
 
   // SPIKE (temp): press backtick ` to toggle a CSS scale on the map
   // wrapper — testing whether Google's WebGL map survives being shrunk
@@ -1335,15 +1380,25 @@ export default function MapPage() {
       {/* {!walkMode && <BuyerSettingsPanel />} */}
 
       {/* ═══ CONTROLS ═══ */}
-      {walkMode ? (
-        <button
-          onClick={() => { setWalkMode(false); setMapZoom(18); }}
-          className="absolute top-1/2 -translate-y-1/2 right-4 z-10 w-10 h-10 flex items-center justify-center rounded-xl bg-surface/90 backdrop-blur-sm text-primary shadow-lg hover:bg-primary hover:text-white transition-all"
-          title="Back to Map"
-        >
-          <MaterialIcon icon="map" className="text-[20px]" />
-        </button>
-      ) : (
+      {/* Mode Switch — the always-visible primary control (2D/3D/Walk).
+          Shown in every mode so the way out is always one tap; this is
+          the fix for the old "stuck in 3D, no button back" trap. Sits
+          top-left of the toolbar anchor. */}
+      <div className="absolute top-4 right-16 z-10">
+        <ModeSwitch
+          active={mapMode}
+          onSelect={(m) => {
+            if (m === 'WORK_2D') mapModeDispatch({ type: 'ENTER_2D' });
+            else if (m === 'FLY_3D') mapModeDispatch({ type: 'ENTER_3D' });
+            else if (isSubscribed) mapModeDispatch({ type: 'ENTER_WALK' });
+            else setShowGate(true);
+          }}
+          has3DSupport={has3DSupport}
+          isSubscribed={isSubscribed}
+        />
+      </div>
+
+      {walkMode ? null : (
         <>
           {/* ── Translucent expandable toolbar ──
               Replaces the previous SaaS-style horizontal toolbar (search +
@@ -1417,7 +1472,7 @@ export default function MapPage() {
                 key: 'walk',
                 icon: 'directions_walk',
                 label: 'Walk Mode',
-                onClick: () => isSubscribed ? setWalkMode(true) : setShowGate(true),
+                onClick: () => isSubscribed ? mapModeDispatch({ type: 'ENTER_WALK' }) : setShowGate(true),
               },
               {
                 key: 'prospect',
@@ -1452,38 +1507,15 @@ export default function MapPage() {
                 active: poisVisible,
               },
               {
-                key: 'airplane',
-                icon: 'flight',
-                label: flightMode === 'airplane' ? 'Exit airplane mode' : 'Airplane mode (gamepad flight feel)',
-                onClick: () => {
-                  if (flightMode === 'overhead') {
-                    if (!has3DSupport) {
-                      alert('Airplane mode requires NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID with Photorealistic 3D Tiles enabled.');
-                      return;
-                    }
-                    setFlightMode('airplane');
-                    if (!view3D) setView3D(true);
-                    dispatchFlight({
-                      zoom: 18,
-                      tilt: 65,
-                      duration: 700,
-                      easing: 'easeInOutCubic',
-                    });
-                  } else {
-                    setFlightMode('overhead');
-                  }
-                },
-                active: flightMode === 'airplane',
-                accentClassName: flightMode === 'airplane'
-                  ? 'bg-emerald-500 text-white shadow-lg'
-                  : undefined,
-              },
-              {
+                // Mode (2D/3D/Walk) now lives in the always-visible
+                // ModeSwitch, not a toolbar item — the old airplane button
+                // was a one-way trap into 3D. Flight feel only matters in 3D.
                 key: 'tune',
                 icon: 'tune',
                 label: 'Flight feel',
                 onClick: () => setFlightTuningOpen(v => !v),
                 active: flightTuningOpen,
+                visible: view3D,
               },
               {
                 key: 'destinations',
@@ -1762,7 +1794,7 @@ export default function MapPage() {
             startPosition={mapCenter || undefined}
             onPositionChanged={setMapCenter}
             pinMode={pinMode}
-            onExitWalk={() => setWalkMode(false)}
+            onExitWalk={() => mapModeDispatch({ type: 'EXIT_WALK' })}
           />
         ) : (
           <MapDynamic
@@ -1886,7 +1918,7 @@ export default function MapPage() {
               if (!isSubscribed) { setShowGate(true); return; }
               if (lead.latitude && lead.longitude) {
                 setMapCenter({ lat: lead.latitude, lng: lead.longitude });
-                setWalkMode(true);
+                mapModeDispatch({ type: 'ENTER_WALK' });
               }
             }}
             gamepadEnabled={flightMode === 'airplane' && !debugUnmountController}
@@ -2005,7 +2037,7 @@ export default function MapPage() {
                 if (!isSubscribed) { setShowGate(true); return; }
                 if (lead.latitude && lead.longitude) {
                   setMapCenter({ lat: lead.latitude, lng: lead.longitude });
-                  setWalkMode(true);
+                  mapModeDispatch({ type: 'ENTER_WALK' });
                 }
               }}
             />
@@ -2072,13 +2104,24 @@ export default function MapPage() {
       {selectedLead && !walkMode && (
         <div
           key={selectedLead.id}
-          className="pointer-events-auto fixed right-5 top-20 z-40"
+          className="pointer-events-auto fixed left-4 bottom-6 z-40"
           style={{
-            transformOrigin: 'top right',
+            transformOrigin: 'bottom left',
             animation: 'plot-card-corner-in 360ms cubic-bezier(0.16, 1, 0.3, 1) both',
           }}
         >
-          <div style={{ transform: 'scale(0.7)', transformOrigin: 'top right' }}>
+          <div className="relative" style={{ transform: 'scale(0.7)', transformOrigin: 'bottom left' }}>
+            {/* Visible close — works with mouse/keyboard (no controller B
+                needed). Sits on the card's top-right corner. */}
+            <button
+              onClick={() => setSelectedLead(null)}
+              title="Close (Esc)"
+              aria-label="Close property card"
+              className="absolute -right-3 -top-3 z-10 flex h-11 w-11 items-center justify-center rounded-full border border-white/15 text-white shadow-xl transition-transform hover:scale-105 active:scale-95"
+              style={{ background: 'linear-gradient(145deg, #2a3550, #141b2c)' }}
+            >
+              <MaterialIcon icon="close" className="text-[22px]" />
+            </button>
             <InWorldPropertyCard
               data={cardDataFromLead(selectedLead)}
               onAction={(a) => {
@@ -2145,7 +2188,7 @@ export default function MapPage() {
                 if (!isSubscribed) { setShowGate(true); return; }
                 if (lead.latitude && lead.longitude) {
                   setMapCenter({ lat: lead.latitude, lng: lead.longitude });
-                  setWalkMode(true);
+                  mapModeDispatch({ type: 'ENTER_WALK' });
                   setExpandedLead(null);
                 }
               }}

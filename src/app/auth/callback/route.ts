@@ -101,12 +101,13 @@ export async function GET(request: Request) {
         } catch {
           destination = '/map';
         }
-      } else if (arrivalFlag) {
-        destination = '/landing?resumeArrival=1';
       } else if (nextFromQuery) {
         destination = nextFromQuery;
       } else {
-        destination = '/map';
+        // Default post-login home = the dashboard launcher ("Choose what
+        // you want to do"), NOT the map. The old arrival/landing flow is
+        // scrapped, so a fresh sign-in always lands on the dashboard.
+        destination = '/dashboard';
       }
 
       const response = NextResponse.redirect(`${origin}${destination}`);

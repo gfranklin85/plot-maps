@@ -12,8 +12,11 @@
 //   'app'     — in-app nav for a signed-in user (Dashboard / Map / ...)
 
 import { NAV_ITEMS } from '@/lib/constants';
+import { useAuth } from '@/lib/auth-context';
+import MaterialIcon from '@/components/ui/MaterialIcon';
 
 export default function AppHeader({ variant = 'public' }: { variant?: 'public' | 'app' }) {
+  const { signOut } = useAuth();
   return (
     <header className="fp-header">
       <div className="fp__wrap">
@@ -54,6 +57,15 @@ export default function AppHeader({ variant = 'public' }: { variant?: 'public' |
           ) : (
             <>
               <a className="fp-login" href="/settings">Settings</a>
+              <button
+                type="button"
+                className="fp-login fp-signout"
+                onClick={() => { signOut(); window.location.href = '/'; }}
+                title="Sign out"
+              >
+                <MaterialIcon icon="logout" className="text-[16px]" />
+                <span>Sign out</span>
+              </button>
               <a className="fp-get" href="/map?view=3d">Open the Map</a>
             </>
           )}

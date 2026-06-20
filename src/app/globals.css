@@ -1712,3 +1712,7 @@ gmp-popover-3d-element[plot-card-popover],
   .dash-card__assemble-piece { opacity: 1 !important; transform: none !important; }
   .dash-card__assemble-full { opacity: 0 !important; }
 }
+
+/* sign-out button in the app header — matches the ghost (fp-login) look */
+.fp-signout { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; background: #fff; }
+.fp-signout:hover { background: rgba(12,19,34,0.04); }

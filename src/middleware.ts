@@ -104,6 +104,17 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(homeUrl);
   }
 
+  // /dashboard is RETIRED (2026-06-19) — the tool grid lives on / now.
+  // Redirect SERVER-SIDE here so the old (cream Material) AppShell never
+  // renders + flashes before a client redirect. (memory/
+  // project_one_page_tools_on_landing)
+  if (pathname === '/dashboard') {
+    const homeUrl = request.nextUrl.clone();
+    homeUrl.pathname = '/';
+    homeUrl.search = '';
+    return NextResponse.redirect(homeUrl);
+  }
+
   // Not logged in on a protected page → send to the new front page (/),
   // where the Get Started / Log in buttons kick off Google OAuth.
   if (!user && !isPublicPath) {

@@ -91,7 +91,10 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(cleanUrl);
   }
 
-  const isPublicPath = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
+  // The root / is PUBLIC — it's the new FrontPage marketing door, must be
+  // reachable logged-out. (2026-06-19: was being caught by the protected-
+  // page redirect below and bounced to the old /landing.)
+  const isPublicPath = pathname === '/' || PUBLIC_PATHS.some((p) => pathname.startsWith(p));
 
   // Root path: logged-OUT visitors see the new FrontPage (rendered by
   // app/page.tsx itself — no rewrite). Logged-IN users fall through to the
@@ -99,9 +102,6 @@ export async function middleware(request: NextRequest) {
   // 2026-06-19: the old search-first /landing no longer fronts the root;
   // the new FrontPage is the marketing door. /landing survives ONLY as the
   // OAuth sign-in cinematic host (ArrivalSequence), reached via CTAs.
-  if (pathname === '/') {
-    // no rewrite — let app/page.tsx render the new FrontPage / redirect.
-  }
 
   // Not logged in on a protected page → send to /landing, the sign-in
   // cinematic (Flight Manifest → Google OAuth → ?resumeArrival=1 → authed).
@@ -120,13 +120,9 @@ export async function middleware(request: NextRequest) {
   // URL need to land on /landing so the carousel can re-mount the
   // ArrivalSequence in resume mode. Without this exception, the OAuth
   // flow bounces to '/' and the user never sees their destination land.
-  const isResumingArrival =
-    pathname === '/landing' && request.nextUrl.searchParams.get('resumeArrival') === '1';
-  if (
-    user &&
-    !isResumingArrival &&
-    (pathname === '/login' || pathname === '/signup' || pathname === '/landing')
-  ) {
+  // Logged in on /login or /signup (dead redirect pages) → go home.
+  // /landing stays reachable for logged-in users (preview / OAuth resume).
+  if (user && (pathname === '/login' || pathname === '/signup')) {
     const homeUrl = request.nextUrl.clone();
     homeUrl.pathname = '/';
     return NextResponse.redirect(homeUrl);

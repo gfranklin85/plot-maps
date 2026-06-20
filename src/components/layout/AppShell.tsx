@@ -51,16 +51,13 @@ export default function AppShell({ children }: { children: ReactNode }) {
   }
 
   // Pages that own their full chrome (front page, forms, marketing) render
-  // raw — they bring their own header (or intentionally have none).
+  // raw — they bring their own header (or intentionally have none). NO
+  // CallBar here: the marketing/home surface shouldn't mint a Twilio token
+  // (it was spamming /api/twilio/token 500s on the front page).
   const selfHeadered = SELF_HEADERED.some((p) => pathname.startsWith(p));
   const ownSurface = OWN_SURFACE.includes(pathname) || pathname === '/';
   if (selfHeadered || ownSurface) {
-    return (
-      <>
-        {children}
-        {user && <CallBar />}
-      </>
-    );
+    return <>{children}</>;
   }
 
   // Everything else: a SIGNED-IN user on an old inner page (Leads, Imports,

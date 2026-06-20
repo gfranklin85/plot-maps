@@ -1,6 +1,7 @@
 'use client';
 
 import AppHeader from '@/components/layout/AppHeader';
+import ToolGrid from '@/components/dashboard/ToolGrid';
 import { signInWithGoogle } from '@/lib/signIn';
 
 // ── FrontPage ─────────────────────────────────────────────────────────
@@ -114,6 +115,21 @@ export default function FrontPage() {
                     Nothing obstructs the floating world. */}
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ════ THE TOOL GRID — the dashboard, right on the front page ════
+          Everything is gated at the action (try-before-buy), so the full
+          toolset is shown up front. memory/project_one_page_tools_on_landing */}
+      <section className="fp-section app-surface" style={{ paddingTop: 8 }}>
+        <div className="dash">
+          <div className="dash__wrap" style={{ paddingTop: 0 }}>
+            <div className="fp-eyebrow" style={{ textAlign: 'left' }}>Choose what you want to do</div>
+            <h2 className="fp-h2" style={{ textAlign: 'left', marginTop: 6, marginBottom: 24 }}>
+              Powerful tools for every neighborhood.
+            </h2>
+            <ToolGrid />
           </div>
         </div>
       </section>

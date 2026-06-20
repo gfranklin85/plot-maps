@@ -1703,6 +1703,7 @@ gmp-popover-3d-element[plot-card-popover],
 .fly-pop   { transform: translate(-30%,40%) scale(0.4); }
 .fly-arrow { transform: translate(-12%,-30%) scale(0.6); }   /* the geocode connector draws in */
 .fly-pin   { transform: translate(0,-45%) scale(0.3); }      /* the dropped pin pops down last */
+.fly-ring  { transform: scale(0.55) rotate(-40deg); }        /* the orbit ring spins/scales in */
 /* stagger the fly-in so it assembles, not all-at-once */
 .dash-card:hover .fly-up    { transition-delay: 0.00s, 0s; }
 .dash-card:hover .fly-left  { transition-delay: 0.06s, 0.04s; }
@@ -1711,6 +1712,7 @@ gmp-popover-3d-element[plot-card-popover],
 .dash-card:hover .fly-pop   { transition-delay: 0.24s, 0.22s; }
 .dash-card:hover .fly-arrow { transition-delay: 0.20s, 0.18s; }
 .dash-card:hover .fly-pin   { transition-delay: 0.30s, 0.28s; }
+.dash-card:hover .fly-ring  { transition-delay: 0.28s, 0.26s; }
 
 @media (prefers-reduced-motion: reduce) {
   .dash-card__assemble-piece { opacity: 1 !important; transform: none !important; }
@@ -1804,4 +1806,42 @@ gmp-popover-3d-element[plot-card-popover],
      hover, show the assembled pieces (full visible) at rest so the rich
      icon always reads. */
   .dash-card__assemble-full { opacity: 1; }
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   MOBILE / TOUCH — fly-in on scroll-into-view + fast press reaction
+   No hover on touch. The IntersectionObserver adds .in-view to each card
+   as it scrolls into view; we reuse the SAME assembled state the hover
+   produces. A tap gives a fast tactile press (scale-down).
+   ════════════════════════════════════════════════════════════════════ */
+
+/* fast press reaction on tap (all devices — feels tactile) */
+.dash-card { transition: transform 0.12s ease, box-shadow 0.18s ease, border-color 0.18s ease, background 0.18s ease; }
+.dash-card:active { transform: scale(0.975); transition-duration: 0.06s; }
+
+@media (hover: none), (max-width: 640px) {
+  /* On touch there's no hover — drive the assembly from .in-view instead.
+     At rest the full image shows + pieces parked; when .in-view, the full
+     fades and the pieces fly to their assembled positions (mirror of the
+     desktop :hover rules). */
+  .dash-card.in-view .dash-card__assemble-full { opacity: 0; transition-delay: 0s; }
+  .dash-card.in-view .dash-card__assemble-piece {
+    opacity: 1;
+    transform: translate(0,0) scale(1) rotate(0deg);
+    transition: transform 0.5s cubic-bezier(0.22,1,0.36,1), opacity 0.28s ease;
+  }
+  .dash-card.in-view .fly-up    { transition-delay: 0.00s, 0s; }
+  .dash-card.in-view .fly-left  { transition-delay: 0.06s, 0.04s; }
+  .dash-card.in-view .fly-right { transition-delay: 0.10s, 0.08s; }
+  .dash-card.in-view .fly-pen   { transition-delay: 0.16s, 0.14s; }
+  .dash-card.in-view .fly-pop   { transition-delay: 0.24s, 0.22s; }
+  .dash-card.in-view .fly-arrow { transition-delay: 0.20s, 0.18s; }
+  .dash-card.in-view .fly-pin   { transition-delay: 0.30s, 0.28s; }
+  .dash-card.in-view .fly-ring  { transition-delay: 0.28s, 0.26s; }
+  /* the bobbing-pin layered icon (2D map) just shows assembled at rest */
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dash-card.in-view .dash-card__assemble-piece { transition: none !important; transform: none !important; }
+  .dash-card.in-view .dash-card__assemble-full { opacity: 0 !important; }
 }

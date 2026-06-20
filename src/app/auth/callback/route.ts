@@ -104,10 +104,9 @@ export async function GET(request: Request) {
       } else if (nextFromQuery) {
         destination = nextFromQuery;
       } else {
-        // Default post-login home = the dashboard launcher ("Choose what
-        // you want to do"), NOT the map. The old arrival/landing flow is
-        // scrapped, so a fresh sign-in always lands on the dashboard.
-        destination = '/dashboard';
+        // Default post-login home = / (the front page IS the home now; the
+        // tool grid lives there). The separate dashboard is retired.
+        destination = '/';
       }
 
       const response = NextResponse.redirect(`${origin}${destination}`);

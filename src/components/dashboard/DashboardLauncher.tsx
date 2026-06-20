@@ -68,13 +68,12 @@ const TOOLS: Tool[] = [
       { src: '/dashboard/icons/map-2d_pin.png', anim: 'ic-bob' },
     ],
   },
-  // The CAR/NAR sidestep MOAT — author offers & disclosures in plain
-  // English (Plot's own language, not CAR's copyrighted forms).
-  // Hover-assemble icon: full clipboard at rest; on hover the base, back
-  // stack, papers, pen + check badge fly in from offsets and assemble.
+  // The CAR/NAR sidestep MOAT — author offers, disclosures AND make an
+  // offer (the money cockpit) in plain English. Make-an-Offer folded in
+  // here (it's one instrument inside the builder). Hover-assemble icon.
   {
     href: '/forms', icon: 'description', art: 'forms', title: 'Build Contracts & Forms',
-    sub: 'Draft offers and disclosures in plain English — no legalese.', flagship: true,
+    sub: 'Draft offers, disclosures & make an offer — plain English, no legalese.', flagship: true,
     assemble: {
       full: '/dashboard/icons/forms_full.png',
       pieces: [
@@ -86,30 +85,11 @@ const TOOLS: Tool[] = [
       ],
     },
   },
-  // The Offer Cost Cockpit — the live, fully-editable money breakdown a
-  // buyer makes a real offer from. Deep-links straight to the money lens.
-  // Hover-assemble icon: full at rest; on hover the dollar-shield cloud,
-  // the offer-sheet cloud, the button, its label + the click cursor fly in.
+  // Contacts & Lists — now INCLUDES import & geocode (one contacts hub).
+  // Uses the rich import-and-geocode hover-assemble icon.
   {
-    href: '/forms/rpa?lens=money', icon: 'payments', art: 'offer', title: 'Make an Offer',
-    sub: 'See and edit every cost — down payment, rate, insurance — your live offer.',
-    flagship: true,
-    assemble: {
-      full: '/dashboard/icons/offer_full.png',
-      pieces: [
-        { src: '/dashboard/icons/offer_shield.png',  fly: 'fly-left'  },
-        { src: '/dashboard/icons/offer_sheet.png',   fly: 'fly-right' },
-        { src: '/dashboard/icons/offer_btn.png',     fly: 'fly-up'    },
-        { src: '/dashboard/icons/offer_btntext.png', fly: 'fly-pop'   },
-        { src: '/dashboard/icons/offer_cursor.png',  fly: 'fly-pen'   },
-      ],
-    },
-  },
-  // Hover-assemble: full at rest; on hover the tray, contact-cards stack,
-  // map tile, geocode arrow, upload badge + dropped pin fly in and assemble.
-  {
-    href: '/imports', icon: 'upload_file', art: 'import', title: 'Import & Geocode Contacts',
-    sub: 'Upload contacts and map them instantly.',
+    href: '/imports', icon: 'groups', art: 'import', title: 'Contacts & Lists',
+    sub: 'Import, geocode, and build lists to target the right people.',
     assemble: {
       full: '/dashboard/icons/import_full.png',
       pieces: [
@@ -122,12 +102,11 @@ const TOOLS: Tool[] = [
       ],
     },
   },
-  { href: '/leads', icon: 'groups', art: 'lists', title: 'Contacts & Lists', sub: 'Build lists and segments to target the right people.' },
   { href: '/campaigns/commercials', icon: 'smart_display', art: 'orbit-video', title: 'Orbit Listing Video', sub: 'Create stunning listing videos with Orbit Property View.' },
   { href: '/leads', icon: 'travel_explore', art: 'skip-trace', title: 'Prospect with Skip Trace', sub: 'Find phone numbers, emails, and addresses with ease.' },
   { href: '/campaigns', icon: 'mail', art: 'mail', title: 'Direct Mail Campaigns', sub: 'Design, target, and send high-impact mailers.' },
-  { href: '/campaigns', icon: 'call', art: 'call', title: 'Call & Outreach Tools', sub: 'Call prospects, track conversations, and stay organized.' },
-  { href: '/leads', icon: 'forum', art: 'dialer', title: 'Call Prospects', sub: 'Connect with leads faster using integrated dialer tools.' },
+  // Call & Outreach + Call Prospects merged → one dialer card.
+  { href: '/campaigns', icon: 'call', art: 'call', title: 'Call Prospects', sub: 'Dial from any property, track conversations, stay organized.' },
 ];
 
 // Until Greg exports the real illustration set, every card falls back to

@@ -1765,3 +1765,43 @@ gmp-popover-3d-element[plot-card-popover],
   /* trust row wraps cleanly */
   .fp-trust { margin-top: 22px; }
 }
+
+/* ════════════════════════════════════════════════════════════════════
+   MOBILE — dashboard launcher: big hero illustrated icons + layout
+   On phones the grid is 1-column (full-width cards), so the illustrated
+   icons get HERO-sized (near full card width) to show off the fly-in.
+   ════════════════════════════════════════════════════════════════════ */
+@media (max-width: 640px) {
+  .dash__wrap { padding: 16px 16px 36px; }
+
+  /* intro + fly card stack cleanly */
+  .dash-intro__h { font-size: clamp(30px, 9vw, 42px); }
+  .dash-fly { min-height: auto; padding: 26px 22px; }
+  .dash-fly__scene { width: 56%; top: -2%; right: 0; }
+
+  /* tool grid: 1 column, roomy cards */
+  .dash-grid { gap: 16px; }
+  .dash-card { padding: 24px 22px 56px; }
+
+  /* HERO icons: big, centered, near full width — the fly-in becomes the
+     star of each card on mobile. Only for illustrated/animated icons. */
+  .dash-card__icon[data-illustrated] {
+    width: 62%;
+    max-width: 230px;
+    height: auto;
+    aspect-ratio: 1 / 1;
+    margin: 4px auto 14px;       /* centered */
+  }
+  /* flat-glyph cards: keep a normal-sized centered tile */
+  .dash-card__icon:not([data-illustrated]) {
+    width: 64px; height: 64px; margin: 0 auto 14px;
+  }
+  /* center the card text under the big icon for the hero feel */
+  .dash-card__h, .dash-card__p { text-align: center; }
+  .dash-card__arrow { left: 50%; transform: translateX(-50%); right: auto; }
+
+  /* the hover-assemble works on tap/hold too; on mobile, since there's no
+     hover, show the assembled pieces (full visible) at rest so the rich
+     icon always reads. */
+  .dash-card__assemble-full { opacity: 1; }
+}

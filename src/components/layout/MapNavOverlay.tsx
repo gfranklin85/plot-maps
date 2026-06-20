@@ -81,9 +81,7 @@ export default function MapNavOverlay() {
               visitors so they can return here from /landing /position */}
           {user
             ? NAV_ITEMS.map((item) => {
-                const isActive = item.href === '/'
-                  ? pathname === '/'
-                  : pathname.startsWith(item.href);
+                const isActive = pathname.startsWith(item.href);
                 return (
                   <Link
                     key={item.href}

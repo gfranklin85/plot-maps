@@ -10,7 +10,7 @@ import { use, useState } from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import MaterialIcon from '@/components/ui/MaterialIcon';
-import DeskSurface from '@/components/dashboard/DeskSurface';
+import AppHeader from '@/components/layout/AppHeader';
 import { findForm } from '@/lib/forms/formCatalog';
 import RpaFlow from '@/components/forms/RpaFlow';
 import CostCockpit from '@/components/offer/CostCockpit';
@@ -31,8 +31,8 @@ export default function FormFlowPage({
   const wide = isRpa && lens === 'money';
 
   return (
-    <div className="relative min-h-[calc(100vh-3.5rem)] -mt-14 md:-mt-16 pt-14 md:pt-16">
-      <DeskSurface />
+    <div className="fp app-surface min-h-screen">
+      <AppHeader variant="app" />
 
       <div
         className={`relative z-10 p-4 md:p-8 mx-auto transition-[max-width] duration-300 ${

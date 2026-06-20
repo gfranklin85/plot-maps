@@ -575,6 +575,16 @@ export default function MapPage() {
       setMarketRequest({ query: queryParam, mode: 'miss' });
     }
 
+    // ?view=3d / ?view=2d — the office "Fly the market" vs "2D work map"
+    // doors set this. The map otherwise always boots WORK_2D, so without
+    // this both doors landed on the flat 2D map. (3D falls back to 2D on
+    // unsupported devices via the has3DSupport guard in requestEnter3D.)
+    const viewParam = searchParams.get('view');
+    if (viewParam === '3d') {
+      requestEnter3D();
+    }
+    // (2d is the default boot mode, so ?view=2d needs no action.)
+
     // Resolve ?destination=<slug> to lat/lng + full camera pose via the
     // destinations catalog (shared with the landing carousel). When
     // matched, the visitor's camera lands at the exact authored framing

@@ -7,11 +7,12 @@
 // (our RPA), then the disclosures. Plot's OWN instruments, authored from
 // scratch — not CAR's forms.
 //
-// Palette: the locked dark desk set (project_plot_palette_locked).
+// Palette: the new LIGHT app theme (project_front_page_locked) — blue
+// accent, white surface, consistent with the front page + dashboard.
 
 import Link from 'next/link';
 import MaterialIcon from '@/components/ui/MaterialIcon';
-import DeskSurface from '@/components/dashboard/DeskSurface';
+import AppHeader from '@/components/layout/AppHeader';
 import { PLOT_FORMS, type FormStatus } from '@/lib/forms/formCatalog';
 
 const STATUS_LABEL: Record<FormStatus, string> = {
@@ -22,19 +23,19 @@ const STATUS_LABEL: Record<FormStatus, string> = {
 
 export default function FormBuilderPage() {
   return (
-    <div className="relative min-h-[calc(100vh-3.5rem)] -mt-14 md:-mt-16 pt-14 md:pt-16">
-      <DeskSurface />
+    <div className="fp app-surface min-h-screen">
+      <AppHeader variant="app" />
 
       <div className="relative z-10 p-4 md:p-8 max-w-6xl mx-auto space-y-10">
         {/* Header */}
-        <div className="max-w-2xl pt-10 md:pt-16">
-          <div className="text-[10px] uppercase tracking-[0.4em] text-[rgba(0,242,255,0.7)] font-bold">
+        <div className="max-w-2xl pt-6 md:pt-12">
+          <div className="text-[11px] uppercase tracking-[0.3em] font-bold" style={{ color: 'var(--plot-brand)' }}>
             Form Builder
           </div>
-          <h1 className="font-headline text-3xl md:text-5xl font-extrabold tracking-tight text-white mt-2 [text-shadow:0_2px_24px_rgba(0,242,255,0.18)]">
+          <h1 className="font-headline text-3xl md:text-5xl font-extrabold tracking-tight mt-2" style={{ color: 'var(--plot-ink)' }}>
             The whole deal, in plain English.
           </h1>
-          <p className="text-sm md:text-base text-[rgba(200,215,255,0.7)] mt-3 leading-relaxed">
+          <p className="text-sm md:text-base mt-3 leading-relaxed" style={{ color: '#4a5568' }}>
             Every contract and disclosure a transaction needs — rebuilt as a
             guided flow that actually teaches you what you&apos;re agreeing to.
             Each line is a card; we show you which ones to play. Built to

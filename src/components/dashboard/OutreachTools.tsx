@@ -26,66 +26,79 @@ function minutesBadge(usage: Usage | null): { label: string; lowAlert: boolean }
 interface CardProps {
   href: string;
   icon: string;
-  iconTint: string;
-  hoverBorder: string;
-  hoverText: string;
+  /** The card's identity color (hex) — drives the icon, glow, accents. */
+  accent: string;
   title: string;
   subtitle: string;
   bullets: string[];
   badge?: { label: string; lowAlert: boolean };
-  image?: string;
 }
 
-function ToolCard({ href, icon, iconTint, hoverBorder, hoverText, title, subtitle, bullets, badge, image, index = 0 }: CardProps & { index?: number }) {
+function ToolCard({ href, icon, accent, title, subtitle, bullets, badge, index = 0 }: CardProps & { index?: number }) {
   return (
     <motion.a
       href={href}
-      initial={{ opacity: 0, y: 12 }}
+      initial={{ opacity: 0, y: 14 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.45, delay: index * 0.08, ease: [0.2, 0.7, 0.2, 1] }}
-      whileHover={{ y: -3 }}
-      className={`paper-texture blueprint-grid relative flex flex-col rounded-2xl border border-card-border bg-card shadow-paper-md hover:shadow-paper-lg transition-shadow group p-5 overflow-hidden ${hoverBorder}`}
-      style={{ ['--grid-opacity' as string]: '0.035' }}
+      whileHover={{ y: -4 }}
+      className="group relative flex flex-col rounded-2xl p-5 overflow-hidden transition-all duration-300"
+      style={{
+        // A glass object sitting ON the desk: dark gradient body, inset
+        // top highlight (light catching the upper edge), and a drop shadow
+        // that grounds it on the surface. No flat fill.
+        background:
+          'linear-gradient(160deg, rgba(34,44,68,0.92), rgba(13,20,36,0.96))',
+        border: '1px solid rgba(125,168,255,0.16)',
+        boxShadow:
+          '0 18px 40px -14px rgba(0,0,0,0.7), inset 0 1px 0 rgba(180,210,255,0.14)',
+      }}
     >
-      {image && (
-        <>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={image}
-            alt=""
-            className="absolute inset-0 w-full h-full object-cover opacity-[0.06] group-hover:opacity-[0.12] transition-opacity"
-            loading="lazy"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-card via-card/90 to-card/60" />
-        </>
-      )}
+      {/* accent glow that warms on hover — the card's identity light */}
+      <div
+        className="absolute -inset-px rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
+        style={{
+          background: `radial-gradient(80% 60% at 50% 0%, ${accent}22, transparent 70%)`,
+        }}
+      />
 
       {badge && (
         <span
-          className={`absolute top-3 right-3 z-10 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider border ${
+          className="absolute top-3 right-3 z-10 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider border"
+          style={
             badge.lowAlert
-              ? 'bg-amber-500/15 border-amber-500/40 text-amber-400'
-              : 'bg-surface-container-high/80 border-card-border text-on-surface-variant'
-          }`}
+              ? { background: 'rgba(255,178,74,0.15)', borderColor: 'rgba(255,178,74,0.4)', color: '#ffd24a' }
+              : { background: 'rgba(125,168,255,0.1)', borderColor: 'rgba(125,168,255,0.25)', color: 'rgba(180,200,255,0.8)' }
+          }
         >
           {badge.label}
         </span>
       )}
 
       <div className="relative flex flex-col">
-        <div className={`w-11 h-11 rounded-xl flex items-center justify-center mb-3 transition-transform group-hover:scale-110 ${iconTint}`}>
-          <MaterialIcon icon={icon} className="text-[24px]" />
+        {/* icon chip — lit, raised */}
+        <div
+          className="w-11 h-11 rounded-xl flex items-center justify-center mb-3 transition-transform group-hover:scale-110"
+          style={{
+            background: `linear-gradient(160deg, ${accent}33, ${accent}14)`,
+            border: `1px solid ${accent}44`,
+            boxShadow: `0 6px 16px -6px ${accent}66, inset 0 1px 0 rgba(255,255,255,0.12)`,
+          }}
+        >
+          <span style={{ color: accent }}>
+            <MaterialIcon icon={icon} className="text-[24px]" />
+          </span>
         </div>
 
-        <h4 className={`font-headline text-base font-bold text-on-surface transition-colors ${hoverText}`}>
-          {title}
-        </h4>
-        <p className="text-xs text-secondary mt-1">{subtitle}</p>
+        <h4 className="font-headline text-base font-bold text-white">{title}</h4>
+        <p className="text-xs text-[rgba(190,205,240,0.6)] mt-1">{subtitle}</p>
 
-        <ul className="mt-3 space-y-1.5 text-[11px] text-on-surface-variant leading-snug">
+        <ul className="mt-3 space-y-1.5 text-[11px] text-[rgba(200,215,255,0.62)] leading-snug">
           {bullets.map((b, i) => (
             <li key={i} className="flex items-start gap-1.5">
-              <MaterialIcon icon="check" className="text-[13px] text-on-surface-variant/70 mt-0.5 shrink-0" />
+              <span style={{ color: `${accent}cc` }} className="mt-0.5 shrink-0">
+                <MaterialIcon icon="check" className="text-[13px]" />
+              </span>
               <span>{b}</span>
             </li>
           ))}
@@ -100,18 +113,15 @@ export default function OutreachTools({ usage }: Props) {
 
   return (
     <div>
-      <h3 className="font-headline text-lg font-bold text-on-surface mb-3">What do you want to do?</h3>
+      <h3 className="font-headline text-lg font-bold text-white mb-4">What do you want to do?</h3>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <ToolCard
           index={0}
           href="/imports"
           icon="upload_file"
-          iconTint="bg-status-cold/20 text-status-cold/90 group-hover:bg-status-cold/30"
-          hoverBorder="hover:border-status-cold/50"
-          hoverText="group-hover:text-status-cold"
+          accent="#4ab6ff"
           title="Import Inventory"
           subtitle="Load listings, leads, and reference data"
-          image="/card-mls.png"
           bullets={[
             'Drop a CSV or paste from MLS',
             'Auto-detects addresses, owners, phones',
@@ -122,12 +132,9 @@ export default function OutreachTools({ usage }: Props) {
           index={1}
           href="/map"
           icon="map"
-          iconTint="bg-primary/15 text-primary group-hover:bg-primary/25"
-          hoverBorder="hover:border-primary/40"
-          hoverText="group-hover:text-primary"
+          accent="#3d7bff"
           title="Open the Map"
           subtitle="Walk your market from overhead"
-          image="/card-map.png"
           bullets={[
             'See every listing, sale, and prospect',
             'Click homes to select and skiptrace',
@@ -138,12 +145,9 @@ export default function OutreachTools({ usage }: Props) {
           index={2}
           href="/setup-number"
           icon="phone_in_talk"
-          iconTint="bg-stake/15 text-stake group-hover:bg-stake/25"
-          hoverBorder="hover:border-stake/40"
-          hoverText="group-hover:text-stake"
+          accent="#5ed6a8"
           title="Dialer"
           subtitle="Call directly from the map"
-          image="/card-dialer.png"
           bullets={[
             'Get a local phone number',
             'One-click dial from any property',
@@ -155,12 +159,9 @@ export default function OutreachTools({ usage }: Props) {
           index={3}
           href="/ai-assistant"
           icon="smart_toy"
-          iconTint="bg-blueprint/15 text-blueprint group-hover:bg-blueprint/25"
-          hoverBorder="hover:border-blueprint/40"
-          hoverText="group-hover:text-blueprint"
+          accent="#b69dff"
           title="AI Receptionist"
           subtitle="Answers inbound calls — never cold outbound"
-          image="/card-leads.png"
           bullets={[
             'Answers calls on your number when you miss them',
             'Qualifies and captures seller intent',

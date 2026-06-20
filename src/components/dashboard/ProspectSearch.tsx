@@ -225,7 +225,7 @@ export default function ProspectSearch({ compact = false, onSelect, placeholder 
       <div className="relative">
         <MaterialIcon
           icon="search"
-          className={`absolute top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none ${compact ? 'left-4 text-[18px]' : 'left-5 text-[22px]'}`}
+          className={`absolute top-1/2 -translate-y-1/2 pointer-events-none ${compact ? 'left-4 text-[18px] text-on-surface-variant' : 'left-5 text-[22px] text-[#9fd0ff]'}`}
         />
         <input
           type="text"
@@ -237,7 +237,17 @@ export default function ProspectSearch({ compact = false, onSelect, placeholder 
           className={
             compact
               ? 'w-full pl-11 pr-4 py-2.5 rounded-full bg-card border border-card-border text-sm text-on-surface placeholder:text-on-surface-variant/70 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary shadow-sm'
-              : 'w-full pl-14 pr-5 py-4 md:py-5 rounded-2xl bg-card border border-card-border text-base md:text-lg text-on-surface placeholder:text-on-surface-variant/70 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary shadow-lg'
+              : 'w-full pl-14 pr-5 py-4 md:py-5 rounded-2xl text-base md:text-lg text-white placeholder:text-[rgba(180,200,255,0.45)] focus:outline-none focus:ring-2 focus:ring-[rgba(61,123,255,0.35)] transition-all'
+          }
+          style={
+            compact
+              ? undefined
+              : {
+                  background: 'linear-gradient(160deg, rgba(34,44,68,0.92), rgba(11,16,32,0.96))',
+                  border: '1px solid rgba(125,168,255,0.28)',
+                  boxShadow:
+                    '0 16px 40px -16px rgba(0,0,0,0.7), 0 0 40px -16px rgba(61,123,255,0.5), inset 0 1px 0 rgba(180,210,255,0.16)',
+                }
           }
         />
       </div>

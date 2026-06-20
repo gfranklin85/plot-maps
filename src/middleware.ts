@@ -69,12 +69,11 @@ export async function middleware(request: NextRequest) {
     !pathname.startsWith('/auth/callback')
   ) {
     if (user) {
-      // Session already established — code is stale. Send the user
-      // to the arrival-resume page; if no arrival was in flight, the
-      // atlas just renders normally.
+      // Session already established — code is stale. Just send the user
+      // home (the old arrival-resume landing is scrapped).
       const cleanUrl = request.nextUrl.clone();
-      cleanUrl.pathname = '/landing';
-      cleanUrl.search = '?resumeArrival=1';
+      cleanUrl.pathname = '/';
+      cleanUrl.search = '';
       return NextResponse.redirect(cleanUrl);
     }
     // No session yet — the code is fresh, hand it to the callback.
@@ -91,37 +90,30 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(cleanUrl);
   }
 
-  // The root / is PUBLIC — it's the new FrontPage marketing door, must be
-  // reachable logged-out. (2026-06-19: was being caught by the protected-
-  // page redirect below and bounced to the old /landing.)
+  // The root / is PUBLIC — the new FrontPage marketing door, reachable
+  // logged-out. Sign-in happens from the front page's buttons (Google OAuth
+  // → /auth/callback), so the old /landing is no longer needed.
   const isPublicPath = pathname === '/' || PUBLIC_PATHS.some((p) => pathname.startsWith(p));
 
-  // Root path: logged-OUT visitors see the new FrontPage (rendered by
-  // app/page.tsx itself — no rewrite). Logged-IN users fall through to the
-  // beta-gate check below (and app/page.tsx redirects them to /dashboard).
-  // 2026-06-19: the old search-first /landing no longer fronts the root;
-  // the new FrontPage is the marketing door. /landing survives ONLY as the
-  // OAuth sign-in cinematic host (ArrivalSequence), reached via CTAs.
-
-  // Not logged in on a protected page → send to /landing, the sign-in
-  // cinematic (Flight Manifest → Google OAuth → ?resumeArrival=1 → authed).
-  // Locked 2026-05-31: universal Google OAuth, no boring /login wall.
-  if (!user && !isPublicPath) {
-    const landingUrl = request.nextUrl.clone();
-    landingUrl.pathname = '/landing';
-    landingUrl.search = '';
-    return NextResponse.redirect(landingUrl);
+  // The old search-first /landing is SCRAPPED (2026-06-19) → redirect to the
+  // new front page. (Keep /auth/callback etc. untouched — those run above.)
+  if (pathname === '/landing') {
+    const homeUrl = request.nextUrl.clone();
+    homeUrl.pathname = '/';
+    homeUrl.search = '';
+    return NextResponse.redirect(homeUrl);
   }
 
-  // Logged in on auth pages → redirect home.
-  // Exception: /landing?resumeArrival=1 — the OAuth round-trip from
-  // ArrivalSequence sends users back here so the destination flow can
-  // pick up where it left off. Authenticated users hitting this exact
-  // URL need to land on /landing so the carousel can re-mount the
-  // ArrivalSequence in resume mode. Without this exception, the OAuth
-  // flow bounces to '/' and the user never sees their destination land.
+  // Not logged in on a protected page → send to the new front page (/),
+  // where the Get Started / Log in buttons kick off Google OAuth.
+  if (!user && !isPublicPath) {
+    const homeUrl = request.nextUrl.clone();
+    homeUrl.pathname = '/';
+    homeUrl.search = '';
+    return NextResponse.redirect(homeUrl);
+  }
+
   // Logged in on /login or /signup (dead redirect pages) → go home.
-  // /landing stays reachable for logged-in users (preview / OAuth resume).
   if (user && (pathname === '/login' || pathname === '/signup')) {
     const homeUrl = request.nextUrl.clone();
     homeUrl.pathname = '/';

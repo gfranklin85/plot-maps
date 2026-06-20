@@ -1,12 +1,8 @@
 import { redirect } from 'next/navigation';
 
-// /login is dead. Greg locked 2026-05-31: the only sign-in surface is
-// the Flight Manifest beat inside ArrivalSequence. Any hit on /login
-// bounces back to /landing so the visitor enters the cinematic.
-//
-// Existing inbound links (/login?next=, OAuth callback fallback,
-// emails, deep links) all bounce here. The ?error=auth_failed flag
-// is dropped — auth failures show up in the manifest's own UI.
+// /login is dead. The only sign-in surface is now the new front page (/),
+// whose Get Started / Log in buttons kick off Google OAuth directly. Any
+// hit on /login (old inbound links, emails, deep links) bounces home.
 export default function LoginRedirect() {
-  redirect('/landing');
+  redirect('/');
 }

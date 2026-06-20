@@ -1,6 +1,7 @@
 'use client';
 
 import AppHeader from '@/components/layout/AppHeader';
+import { signInWithGoogle } from '@/lib/signIn';
 
 // ── FrontPage ─────────────────────────────────────────────────────────
 //
@@ -77,12 +78,12 @@ export default function FrontPage() {
                 you act.
               </p>
               <div className="fp-cta-row">
-                <a className="fp-cta fp-cta--primary" href="/map?view=3d">
+                <button type="button" className="fp-cta fp-cta--primary" onClick={() => signInWithGoogle()}>
                   Explore the map <span aria-hidden>→</span>
-                </a>
-                <a className="fp-cta fp-cta--ghost" href="/map">
+                </button>
+                <button type="button" className="fp-cta fp-cta--ghost" onClick={() => signInWithGoogle()}>
                   Browse listings
-                </a>
+                </button>
               </div>
               <div className="fp-trust">
                 <div className="fp-trust__avatars" aria-hidden>
@@ -218,7 +219,7 @@ export default function FrontPage() {
             <div className="fp-bigcta">
               <div className="fp-bigcta__h">Your next opportunity is out there.</div>
               <div className="fp-bigcta__p">Start flying the map — it’s free to explore.</div>
-              <a className="fp-bigcta__btn" href="/landing">Get started free <span aria-hidden>→</span></a>
+              <button type="button" className="fp-bigcta__btn" onClick={() => signInWithGoogle()}>Get started free <span aria-hidden>→</span></button>
             </div>
             <div className="fp-talk">
               <div className="fp-talk__h">Let’s talk.</div>

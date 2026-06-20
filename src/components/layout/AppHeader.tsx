@@ -13,6 +13,7 @@
 
 import { NAV_ITEMS } from '@/lib/constants';
 import { useAuth } from '@/lib/auth-context';
+import { signInWithGoogle } from '@/lib/signIn';
 import MaterialIcon from '@/components/ui/MaterialIcon';
 
 export default function AppHeader({ variant = 'public' }: { variant?: 'public' | 'app' }) {
@@ -50,9 +51,9 @@ export default function AppHeader({ variant = 'public' }: { variant?: 'public' |
 
           {variant === 'public' ? (
             <>
-              {/* both enter the sign-in cinematic (/landing → Google OAuth) */}
-              <a className="fp-login" href="/landing">Log in</a>
-              <a className="fp-get" href="/landing">Get Started</a>
+              {/* both kick off Google sign-in directly (no old landing) */}
+              <button type="button" className="fp-login" onClick={() => signInWithGoogle()}>Log in</button>
+              <button type="button" className="fp-get" onClick={() => signInWithGoogle()}>Get Started</button>
             </>
           ) : (
             <>

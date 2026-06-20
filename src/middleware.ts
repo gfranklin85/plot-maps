@@ -93,20 +93,18 @@ export async function middleware(request: NextRequest) {
 
   const isPublicPath = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
 
-  // Root path: show landing page if not logged in, dashboard if logged in
+  // Root path: logged-OUT visitors see the new FrontPage (rendered by
+  // app/page.tsx itself — no rewrite). Logged-IN users fall through to the
+  // beta-gate check below (and app/page.tsx redirects them to /dashboard).
+  // 2026-06-19: the old search-first /landing no longer fronts the root;
+  // the new FrontPage is the marketing door. /landing survives ONLY as the
+  // OAuth sign-in cinematic host (ArrivalSequence), reached via CTAs.
   if (pathname === '/') {
-    if (!user) {
-      const landingUrl = request.nextUrl.clone();
-      landingUrl.pathname = '/landing';
-      return NextResponse.rewrite(landingUrl);
-    }
-    // Logged-in root falls through to beta-gate check below.
+    // no rewrite — let app/page.tsx render the new FrontPage / redirect.
   }
 
-  // Not logged in on protected page → redirect to /landing so the only
-  // forward path is pick a destination → ArrivalSequence → mid-flight
-  // Google OAuth → ?resumeArrival=1 → land here authed. Direct URLs
-  // (bookmarks, refresh) all take this same cinematic entrance.
+  // Not logged in on a protected page → send to /landing, the sign-in
+  // cinematic (Flight Manifest → Google OAuth → ?resumeArrival=1 → authed).
   // Locked 2026-05-31: universal Google OAuth, no boring /login wall.
   if (!user && !isPublicPath) {
     const landingUrl = request.nextUrl.clone();

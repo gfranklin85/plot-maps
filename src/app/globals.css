@@ -27,8 +27,198 @@ html, body {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* ─── OT lives in the painting — alive-in-there sway, hover lean, jump-out ─── */
+.ot-still { animation: ot-sway 6s ease-in-out infinite; transform-origin: 50% 100%; }
+.ot-still > * { transition: transform 0.3s ease; }
+.group:hover .ot-still > * { transform: translateY(-6%) scale(1.06); } /* leans forward, notices you */
+@keyframes ot-sway {
+  0%, 100% { transform: rotate(-1.2deg) translateY(0); }
+  50%      { transform: rotate(1.2deg) translateY(-1.5%); }
+}
+/* the jump-out: he leaps from the frame into the room */
+.ot-out { animation: ot-jump 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+@keyframes ot-jump {
+  0%   { transform: translateY(40px) scale(0.4); opacity: 0; }
+  60%  { transform: translateY(-10px) scale(1.08); opacity: 1; }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ot-still, .ot-out { animation: none; }
+}
+
+/* ─── Office "where do you want to fly?" search — the hero invitation ───
+   A gentle amber breath so the eye is drawn to it without it being loud. */
+/* Restrained: the search is the invitation, but quiet — a subtle neutral
+   lift on focus, no colored glow. Color comes from content, not chrome. */
+.fly-search { transition: border-color 0.25s ease, box-shadow 0.25s ease; }
+.fly-search:focus-within {
+  border-color: rgba(244,246,248,0.55) !important;
+  box-shadow:
+    0 18px 44px -18px rgba(0,0,0,0.7),
+    0 0 0 1px rgba(244,246,248,0.18),
+    inset 0 1px 0 rgba(255,255,255,0.1) !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fly-search { animation: none; }
+}
+
+/* ─── Office app cards — distinct, lit, POP off the screen surface ───
+   Crisp surface + border so they read as real buttons (not blended), with
+   a clear hover lift. Flagship (3D fly) gets a warmer lit treatment. */
+/* On the SCREEN (a restrained neutral display) — cards are QUIET surfaces
+   defined by subtle borders + weight, not glowing tints. Color comes from
+   real content, not the UI. */
+.office-card {
+  background: linear-gradient(160deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
+  border: 1px solid rgba(201,212,223,0.12);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+}
+.office-card .office-card__icon {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(201,212,223,0.16);
+  color: var(--scr-text);
+}
+.office-card:hover {
+  background: linear-gradient(160deg, rgba(255,255,255,0.09), rgba(255,255,255,0.04));
+  border-color: rgba(201,212,223,0.3);
+  box-shadow: 0 10px 24px -14px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.06);
+  transform: translateY(-1px);
+}
+.office-card__arrow { color: var(--scr-text-2); }
+/* Flagship — the 3D fly card: distinguished by a slightly brighter
+   surface + a crisp white border, NOT a colored glow. */
+.office-card[data-flagship] {
+  background: linear-gradient(160deg, rgba(255,255,255,0.1), rgba(255,255,255,0.045));
+  border-color: rgba(244,246,248,0.35);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
+}
+.office-card[data-flagship] .office-card__icon {
+  background: rgba(255,255,255,0.1);
+  border-color: rgba(244,246,248,0.4);
+}
+.office-card[data-flagship]:hover {
+  background: linear-gradient(160deg, rgba(255,255,255,0.14), rgba(255,255,255,0.06));
+  transform: translateY(-1px);
+}
+
+/* ─── Dashboard room depth: floating light-form blobs ───
+   Slow, gentle drift at different depths so the room feels deep + alive. */
+.room-blob {
+  display: block;
+  animation-name: room-drift;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+  will-change: transform;
+}
+.room-blob--far  { animation-name: room-drift-far; }
+.room-blob--mid  { animation-name: room-drift-mid; }
+.room-blob--near { animation-name: room-drift-near; }
+
+@keyframes room-drift-far {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to   { transform: translate3d(28px, -22px, 0) scale(1.06); }
+}
+@keyframes room-drift-mid {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to   { transform: translate3d(-34px, 26px, 0) scale(1.08); }
+}
+@keyframes room-drift-near {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to   { transform: translate3d(40px, 30px, 0) scale(1.12); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .room-blob { animation: none !important; }
+}
+
+/* ─── Dashboard: the PAUSED WORLD behind the desk ───
+   The /dashboard back-out mounts the map as a frozen, non-interactive
+   backdrop. Kill all pointer events + hide Google's own UI chrome so it
+   reads as a paused snapshot, not a live map. */
+.dashboard-paused-map,
+.dashboard-paused-map * {
+  pointer-events: none !important;
+}
+.dashboard-paused-map .gm-style-cc,
+.dashboard-paused-map .gmnoprint,
+.dashboard-paused-map gmp-map-3d::part(navigation),
+.dashboard-paused-map a[href^="https://maps.google"],
+.dashboard-paused-map .gm-bundled-control {
+  display: none !important;
+}
+
 :root {
   --app-height: 100dvh;
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+   PLOT PALETTE — the locked, universal token set.
+   RE-DERIVED 2026-06-17 from the brokerage-lounge ROOM image
+   (public/dashboard/room.png) by sampling its actual tones, so the UI
+   FLOWS WITH the room instead of shouting neon over it. The room is warm
+   + muted: bronze-wood ceiling (#332215), warm amber downlight glow
+   (#554232 — the signature light), warm-grey concrete (#323134), near-
+   black warm walls (#201E1D), dim warm-charcoal glass (#252424).
+   So: accent = a SOFT WARM AMBER/BRONZE (not cyan), surfaces = warm
+   charcoals (not blue-charcoals), and the loud fluorescent colors are
+   gone. Tokens kept SEPARATE from the legacy Material --color-* set.
+   See memory/project_plot_palette_locked.md.
+   ───────────────────────────────────────────────────────────────────── */
+:root {
+  /* base / surface — warm charcoal depth ladder (from the room) */
+  --plot-room:      #14110d;   /* deepest bg — warm near-black */
+  --plot-surface:   #1c1916;   /* dominant surface body (warm) */
+  --plot-raised:    #2a2620;   /* raised panel — lifts toward the wood */
+  --plot-map:       #100e0c;   /* the screen/map surface itself */
+  --plot-edge:      #2e2820;   /* warm edge stroke */
+
+  /* text — warm muted ramp (no cool blue) */
+  --plot-text:        #f4efe7;   /* warm off-white */
+  --plot-text-2:      #9a9183;   /* warm grey */
+  --plot-text-3:      #6c655a;
+  --plot-text-accent: #d8bd95;   /* soft warm-amber readable accent */
+
+  /* accent — the signature is now WARM AMBER/BRONZE (the downlight glow),
+     desaturated so it flows with the room, not a fluorescent shout */
+  --plot-cyan:      #c79a63;   /* (name kept for compat) soft amber accent */
+  --plot-cyan-deep: #8a6c45;   /* deep bronze — glow pools at low alpha */
+  --plot-blue:      #7a8597;   /* muted slate — secondary, cool but quiet */
+
+  /* status / signal — desaturated so they sit in the warm room */
+  --plot-active:  #7fc59a;   /* muted sage green */
+  --plot-sold:    #cf7e72;   /* muted terracotta */
+  --plot-pending: #d9b066;   /* warm gold */
+  --plot-offmkt:  #a9a59c;   /* warm grey */
+
+  /* ── PlotMaps brand BLUE — the single public-facing accent (front page,
+     CTAs, the headline's 2nd line, checkmarks, the map pin). Clean +
+     confident, the Position/PlotMaps through-line. From Greg's locked
+     swatches (#122d8d / #1349d4 / #133ed4 / #173ec6). Sparingly used
+     against a white/neutral base (the reference language). ── */
+  --plot-brand:       #1349d4;   /* primary blue */
+  --plot-brand-deep:  #122d8d;   /* darker — gradients, hovers */
+  --plot-brand-soft:  #e0e7fb;   /* tint — pills, soft fills */
+  --plot-ink:         #0c1322;   /* near-black headline ink */
+  --plot-ink-2:       #44506280; /* muted body (alpha) */
+
+  /* warm paper — notes */
+  --plot-paper:   #ece3cf;
+
+  /* hairline — warm low-opacity border */
+  --plot-line:    #c79a63;
+
+  /* ── SCREEN tokens — the on-wall display. RESTRAINED + NEUTRAL (Intercom/
+     Vercel language): a near-neutral graphite display with only the
+     FAINTEST cool hue, text defined by WEIGHT not color, quiet borders
+     instead of glowing tints. Still self-lit enough to read as "on," but
+     calm — color comes from real content, not UI. ── */
+  --scr-bg-top:    #1a1e24;   /* neutral graphite display (top), faint cool */
+  --scr-bg-bot:    #12151a;   /* neutral graphite display (bottom) */
+  --scr-glow:      #c9d4df;   /* the screen's own light — neutral, not blue */
+  --scr-accent:    #e8edf2;   /* on-screen accent = near-white (weight, not color) */
+  --scr-text:      #f4f6f8;   /* crisp white on-screen text */
+  --scr-text-2:    #9aa3ad;   /* quiet neutral-grey secondary text */
+  --scr-line:      #4a5560;   /* neutral on-screen hairline */
 }
 
 /* ─── Plot Maps canonical palette (locked 2026-05-30) ────────────
@@ -1094,4 +1284,431 @@ gmp-popover-3d-element[plot-card-popover],
 @keyframes plot-card-corner-in {
   0%   { opacity: 0; transform: translateX(40px) scale(0.98); }
   100% { opacity: 1; transform: translateX(0) scale(1); }
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   PLOTMAPS FRONT PAGE  (see every home like never before)
+   The unified public door — PlotMaps (the world) + Position (the hand
+   that helps you act). Light, white, generous whitespace; GREEN is the
+   single accent (CTAs, the headline's 2nd line, checks, the pin). Depth
+   comes from ONE floating sky-platform scene, not a heavy room. Built to
+   the reference language (Linear/Intercom restraint + the green SaaS land
+   look). memory/feedback_screen_is_always_2d, project_plot_vision.
+   ════════════════════════════════════════════════════════════════════ */
+
+.fp {
+  --fp-green: var(--plot-brand);
+  --fp-green-deep: var(--plot-brand-deep);
+  --fp-green-soft: var(--plot-brand-soft);
+  --fp-ink: #0c1322;
+  --fp-body: #4a5568;
+  background: #ffffff;
+  color: var(--fp-ink);
+  font-family: var(--font-geist-sans), Inter, sans-serif;
+}
+.fp__wrap { max-width: 1180px; margin: 0 auto; padding-left: 24px; padding-right: 24px; }
+
+/* ── header ── */
+.fp-header {
+  position: sticky; top: 0; z-index: 50;
+  background: rgba(255,255,255,0.82);
+  backdrop-filter: saturate(140%) blur(12px);
+  border-bottom: 1px solid rgba(12,19,34,0.06);
+}
+.fp-nav { display: flex; align-items: center; gap: 28px; height: 68px; }
+.fp-logo { display: flex; align-items: center; gap: 9px; font-weight: 800; font-size: 20px; letter-spacing: -0.02em; }
+.fp-logo b { color: var(--fp-ink); }
+.fp-logo span { color: var(--fp-green); }
+.fp-logo__by { font-size: 12px; font-weight: 600; color: #9aa3b2; display: inline-flex; align-items: center; gap: 5px; padding-left: 12px; margin-left: 4px; border-left: 1px solid rgba(12,19,34,0.1); }
+.fp-navlinks { display: none; gap: 26px; margin-left: 8px; }
+@media (min-width: 980px) { .fp-navlinks { display: flex; } }
+.fp-navlink { font-size: 14.5px; font-weight: 500; color: #3c4658; transition: color .15s; }
+.fp-navlink:hover { color: var(--fp-green); }
+.fp-nav__spacer { flex: 1; }
+.fp-login { font-size: 14.5px; font-weight: 600; color: var(--fp-ink); padding: 9px 16px; border-radius: 10px; border: 1px solid rgba(12,19,34,0.14); transition: background .15s; }
+.fp-login:hover { background: rgba(12,19,34,0.04); }
+.fp-get { font-size: 14.5px; font-weight: 600; color: #fff; padding: 10px 18px; border-radius: 10px; background: var(--fp-green); box-shadow: 0 8px 18px -8px rgba(19,73,212,0.6); transition: transform .15s, box-shadow .15s; }
+.fp-get:hover { transform: translateY(-1px); box-shadow: 0 12px 24px -8px rgba(19,73,212,0.7); }
+
+/* ── hero ── */
+.fp-hero { position: relative; overflow: hidden; }
+.fp-hero__bg {
+  position: absolute; inset: 0; z-index: 0;
+  background:
+    radial-gradient(120% 80% at 80% 0%, rgba(214,236,255,0.7), rgba(255,255,255,0) 55%),
+    radial-gradient(90% 70% at 12% 4%, rgba(255,255,255,0.9), rgba(255,255,255,0) 60%),
+    linear-gradient(180deg, #f3f8ff 0%, #ffffff 70%);
+}
+.fp-hero__grid { position: relative; z-index: 2; display: flex; flex-direction: column; gap: 8px; padding-top: 40px; padding-bottom: 16px; }
+@media (min-width: 980px) { .fp-hero__grid { flex-direction: row; align-items: center; min-height: 76vh; gap: 24px; } }
+
+.fp-pill {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 12px; font-weight: 700; letter-spacing: 0.06em;
+  color: var(--fp-green-deep); background: var(--fp-green-soft);
+  padding: 6px 13px; border-radius: 999px; margin-bottom: 22px;
+}
+.fp-head {
+  font-weight: 800; letter-spacing: -0.025em; line-height: 1.0;
+  font-size: clamp(40px, 5.4vw, 68px); color: var(--fp-ink);
+}
+.fp-head .accent { color: var(--fp-green); display: block; }
+.fp-sub { margin-top: 22px; max-width: 30em; font-size: clamp(15px, 1.4vw, 18px); line-height: 1.55; color: var(--fp-body); }
+.fp-sub b { color: var(--fp-ink); font-weight: 700; }
+.fp-cta-row { margin-top: 30px; display: flex; flex-wrap: wrap; gap: 12px; }
+.fp-cta { display: inline-flex; align-items: center; gap: 9px; border-radius: 12px; padding: 13px 24px; font-size: 15px; font-weight: 600; transition: transform .16s, box-shadow .16s, background .16s; }
+.fp-cta--primary { background: var(--fp-green); color: #fff; box-shadow: 0 10px 22px -10px rgba(19,73,212,0.6); }
+.fp-cta--primary:hover { transform: translateY(-1px); background: var(--fp-green-deep); }
+.fp-cta--ghost { background: #fff; color: var(--fp-ink); border: 1px solid rgba(12,19,34,0.16); }
+.fp-cta--ghost:hover { transform: translateY(-1px); border-color: rgba(12,19,34,0.3); }
+.fp-trust { margin-top: 30px; display: flex; align-items: center; gap: 13px; }
+.fp-trust__avatars { display: flex; }
+.fp-trust__avatars span { width: 34px; height: 34px; border-radius: 999px; border: 2px solid #fff; margin-left: -9px; background: linear-gradient(135deg,#dbe3f2,#aab9d6); display: inline-block; }
+.fp-trust__avatars :first-child { margin-left: 0; }
+.fp-trust__text { font-size: 13.5px; color: var(--fp-body); line-height: 1.35; }
+
+/* the floating scene */
+.fp-hero__scene-col { position: relative; z-index: 1; flex: 1.05; }
+.fp-scene { position: relative; width: 100%; margin: 0 auto; aspect-ratio: 2560 / 1440; }
+.fp-scene__layer { pointer-events: none; position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.fp-scene::after {
+  content: ''; position: absolute; left: 16%; right: 16%; bottom: 6%; height: 9%;
+  background: radial-gradient(60% 100% at 50% 50%, rgba(30,60,40,0.18), rgba(30,60,40,0) 70%);
+  filter: blur(7px); z-index: 0; animation: fp-shadow 6s ease-in-out infinite;
+}
+.fp-featured {
+  position: absolute; z-index: 5; top: 8%; right: -2%; width: min(300px, 42%);
+  background: #fff; border-radius: 16px; overflow: hidden;
+  box-shadow: 0 30px 60px -24px rgba(20,40,30,0.4), 0 2px 0 rgba(255,255,255,0.6) inset;
+  border: 1px solid rgba(12,19,34,0.06);
+  animation: fp-card-float 7s ease-in-out infinite;
+}
+@media (max-width: 640px) { .fp-featured { position: relative; right: 0; top: 0; width: 100%; margin-top: 12px; animation: none; } }
+.fp-featured__tag { font-size: 10.5px; font-weight: 700; letter-spacing: 0.05em; color: var(--fp-green-deep); background: var(--fp-green-soft); padding: 4px 9px; border-radius: 6px; position: absolute; top: 12px; left: 12px; z-index: 2; }
+.fp-featured__img { height: 116px; background: linear-gradient(135deg,#bcd6c4,#7fae8e); width: 100%; display: block; }
+.fp-featured__body { padding: 14px 16px 16px; }
+.fp-featured__addr { font-weight: 700; font-size: 15px; color: var(--fp-ink); }
+.fp-featured__city { font-size: 13px; color: #7a8494; margin-top: 1px; }
+.fp-featured__meta { font-size: 12px; color: #5d6675; margin-top: 9px; display: flex; gap: 6px; flex-wrap: wrap; }
+.fp-featured__row { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(12,19,34,0.08); font-size: 13px; }
+.fp-featured__price { font-weight: 800; color: var(--fp-ink); }
+.fp-featured__link { color: var(--fp-green); font-weight: 600; font-size: 13px; display: inline-flex; align-items: center; gap: 5px; margin-top: 12px; }
+
+/* ── floats — out of sync ── */
+@keyframes float-island { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-1.4%)} }
+.float-island { animation: float-island 6s ease-in-out infinite; }
+@keyframes float-card-a { 0%,100%{transform:translate(0,0)} 50%{transform:translate(0.4%,-2.4%)} }
+.float-card-a { animation: float-card-a 5s ease-in-out infinite; }
+@keyframes float-card-b { 0%,100%{transform:translate(0,0)} 50%{transform:translate(-0.3%,-2%)} }
+.float-card-b { animation: float-card-b 5.6s ease-in-out infinite .4s; }
+@keyframes float-cloud-a { 0%{transform:translateX(0)} 50%{transform:translateX(2.2%)} 100%{transform:translateX(0)} }
+.float-cloud-a { animation: float-cloud-a 14s ease-in-out infinite; }
+@keyframes float-cloud-b { 0%{transform:translateX(0)} 50%{transform:translateX(-1.8%)} 100%{transform:translateX(0)} }
+.float-cloud-b { animation: float-cloud-b 17s ease-in-out infinite 1s; }
+@keyframes float-cloud-c { 0%{transform:translateX(0)} 50%{transform:translateX(1.4%)} 100%{transform:translateX(0)} }
+.float-cloud-c { animation: float-cloud-c 20s ease-in-out infinite .5s; }
+@keyframes fp-shadow { 0%,100%{transform:scaleX(1);opacity:.85} 50%{transform:scaleX(.94);opacity:1} }
+@keyframes fp-card-float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
+
+/* ── section scaffolding ── */
+.fp-section { padding: 64px 0; }
+.fp-eyebrow { text-align: center; font-size: 12.5px; font-weight: 700; letter-spacing: 0.12em; color: var(--fp-green); text-transform: uppercase; }
+.fp-h2 { text-align: center; font-weight: 800; letter-spacing: -0.02em; font-size: clamp(26px, 3.2vw, 38px); margin-top: 10px; color: var(--fp-ink); }
+
+/* two feature cards */
+.fp-features { display: grid; gap: 20px; grid-template-columns: 1fr; margin-top: 8px; }
+@media (min-width: 880px) { .fp-features { grid-template-columns: 1fr 1fr; } }
+.fp-fcard { border-radius: 20px; padding: 30px; border: 1px solid rgba(12,19,34,0.07); background: #fafdfb; }
+.fp-fcard--pos { background: #f6faff; }
+.fp-fcard__kicker { font-size: 12px; font-weight: 700; letter-spacing: 0.05em; display: inline-flex; align-items: center; gap: 7px; }
+.fp-fcard--maps .fp-fcard__kicker { color: var(--fp-green); }
+.fp-fcard--pos  .fp-fcard__kicker { color: #334155; }
+.fp-fcard__h { font-weight: 800; font-size: 22px; letter-spacing: -0.015em; margin-top: 14px; line-height: 1.15; }
+.fp-fcard__p { color: var(--fp-body); font-size: 14.5px; line-height: 1.55; margin-top: 12px; }
+.fp-flist { margin-top: 18px; display: grid; gap: 10px; }
+.fp-flist li { display: flex; align-items: flex-start; gap: 9px; font-size: 14px; color: #2c3646; }
+.fp-flist .chk { color: var(--fp-green); flex: none; margin-top: 1px; }
+.fp-fcard--pos .fp-flist .chk { color: #334155; }
+.fp-fcard__cta { margin-top: 22px; display: inline-flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14.5px; padding: 11px 20px; border-radius: 11px; border: 1px solid; }
+.fp-fcard--maps .fp-fcard__cta { color: var(--fp-green); border-color: rgba(19,73,212,0.3); }
+.fp-fcard--maps .fp-fcard__cta:hover { background: var(--fp-green); color:#fff; }
+.fp-fcard--pos .fp-fcard__cta { color: #334155; border-color: rgba(51,65,85,0.3); }
+.fp-fcard--pos .fp-fcard__cta:hover { background:#334155; color:#fff; }
+
+/* stats strip */
+.fp-stats { display: grid; grid-template-columns: repeat(2,1fr); gap: 18px; border-radius: 20px; padding: 28px; background: linear-gradient(180deg,#f7faf8,#f1f7f3); border: 1px solid rgba(12,19,34,0.06); }
+@media (min-width: 760px) { .fp-stats { grid-template-columns: repeat(4,1fr); } }
+.fp-stat { text-align: center; }
+.fp-stat__n { font-weight: 800; font-size: clamp(24px,3vw,32px); color: var(--fp-ink); }
+.fp-stat__l { font-size: 13px; color: #6b7585; margin-top: 4px; }
+
+/* how it works */
+.fp-steps { display: grid; gap: 24px; grid-template-columns: 1fr; margin-top: 36px; }
+@media (min-width: 820px) { .fp-steps { grid-template-columns: repeat(4,1fr); } }
+.fp-step { text-align: center; }
+.fp-step__n { width: 32px; height: 32px; border-radius: 999px; background: var(--fp-green); color: #fff; font-weight: 700; font-size: 14px; display: inline-flex; align-items: center; justify-content: center; }
+.fp-step__h { font-weight: 700; font-size: 16.5px; margin-top: 14px; }
+.fp-step__p { font-size: 13.5px; color: var(--fp-body); margin-top: 7px; line-height: 1.5; }
+
+/* closing bands */
+.fp-close { display: grid; gap: 18px; grid-template-columns: 1fr; }
+@media (min-width: 920px) { .fp-close { grid-template-columns: 1.1fr 1.2fr 1fr; } }
+.fp-quote { border-radius: 18px; padding: 26px; background: #fafdfb; border: 1px solid rgba(12,19,34,0.07); }
+.fp-quote__q { font-size: 14.5px; line-height: 1.55; color: #2c3646; }
+.fp-quote__by { margin-top: 16px; display: flex; align-items: center; gap: 10px; }
+.fp-quote__av { width: 34px; height: 34px; border-radius: 999px; background: linear-gradient(135deg,#dbe3f2,#aab9d6); }
+.fp-quote__name { font-weight: 700; font-size: 13.5px; }
+.fp-quote__role { font-size: 12px; color: #7a8494; }
+.fp-bigcta { border-radius: 18px; padding: 30px; background: linear-gradient(150deg,var(--fp-green-deep),#0a1f63); color: #fff; display: flex; flex-direction: column; justify-content: center; }
+.fp-bigcta__h { font-weight: 800; font-size: 23px; letter-spacing: -0.015em; line-height: 1.15; }
+.fp-bigcta__p { color: rgba(255,255,255,0.82); font-size: 14.5px; margin-top: 8px; }
+.fp-bigcta__btn { margin-top: 20px; align-self: flex-start; background: #fff; color: var(--fp-green-deep); font-weight: 700; font-size: 14.5px; padding: 12px 22px; border-radius: 11px; display: inline-flex; align-items: center; gap: 8px; }
+.fp-talk { border-radius: 18px; padding: 26px; background: #f6faff; border: 1px solid rgba(12,19,34,0.07); }
+.fp-talk__h { font-weight: 800; font-size: 20px; }
+.fp-talk__p { color: var(--fp-body); font-size: 14px; margin-top: 8px; line-height: 1.5; }
+.fp-talk__link { color: #334155; font-weight: 600; font-size: 14px; margin-top: 16px; display: inline-flex; align-items: center; gap: 6px; }
+
+/* footer / compliance */
+.fp-foot { border-top: 1px solid rgba(12,19,34,0.08); padding: 30px 0 40px; margin-top: 8px; }
+.fp-foot__compliance { font-size: 12px; color: #8a94a3; line-height: 1.6; max-width: 60em; }
+.fp-foot__compliance b { color: #5d6675; font-weight: 600; }
+
+@media (prefers-reduced-motion: reduce) {
+  .float-island,.float-card-a,.float-card-b,.float-cloud-a,.float-cloud-b,.float-cloud-c,
+  .fp-scene::after,.fp-featured { animation: none !important; }
+}
+
+/* ── front-page logo + bigger hero scene (post-asset tuning) ── */
+.fp-logo__img { height: 30px; width: auto; display: block; }
+@media (min-width: 980px) { .fp-logo__img { height: 34px; } }
+
+/* the land plate is the star — make the scene column bigger and let it
+   bleed past its box so the floating world reads large + unobstructed. */
+.fp-hero__scene-col { flex: 1.25; }
+@media (min-width: 980px) {
+  .fp-scene {
+    width: 132%;            /* overscan — plate reads bigger than its column */
+    margin-left: -16%;      /* pull it back toward center/left so it doesn't clip the right edge */
+    transform: scale(1.06);
+    transform-origin: center;
+  }
+}
+/* sky layer is the BACKDROP of the scene — it should fill (cover), while
+   the platform/clouds/cards stay 'contain' so they keep their geometry. */
+.fp-scene__layer.fp-scene__sky { object-fit: cover; border-radius: 18px; opacity: 0.96; }
+
+/* ── real sky as the full hero band (edge to edge), melting into white ── */
+.fp-hero__sky {
+  position: absolute; inset: 0; z-index: 0;
+  width: 100%; height: 100%; object-fit: cover; object-position: center top;
+}
+.fp-hero__fade {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 42%; z-index: 1;
+  background: linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.4) 55%, #ffffff 100%);
+  pointer-events: none;
+}
+/* headline ink stays dark + readable on the light-blue sky; add a faint
+   white glow behind the text block for legibility on the busier areas. */
+.fp-hero__grid { position: relative; z-index: 2; }
+
+/* ── inline Position wordmark (dotless-i brand signature, real SVG) ── */
+.fp-logo__by { display: inline-flex; align-items: center; gap: 5px; }
+.fp-logo__position { height: 13px; width: auto; display: inline-block; position: relative; top: 1px; }
+@media (min-width: 980px) { .fp-logo__position { height: 14px; } }
+
+.fp-foot__brand { display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 600; color: #5d6675; margin-bottom: 10px; }
+.fp-foot__position { height: 15px; width: auto; display: inline-block; }
+
+/* ════════════════════════════════════════════════════════════════════
+   APP SURFACE — shared light background across landing + dashboard +
+   chrome pages, so moving between them feels like ONE continuous place.
+   The same calm sky-blue field as the front page hero. memory/
+   project_front_page_locked (consistent background across the app).
+   ════════════════════════════════════════════════════════════════════ */
+.app-surface {
+  position: relative;
+  min-height: 100vh;
+  background:
+    radial-gradient(120% 80% at 82% 0%, rgba(206,228,252,0.85), rgba(233,242,253,0) 55%),
+    radial-gradient(90% 70% at 10% 2%, rgba(255,255,255,0.7), rgba(233,242,253,0) 60%),
+    linear-gradient(180deg, #e9f2fd 0%, #eef4fc 60%, #e8f0fb 100%);
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   DASHBOARD LAUNCHER — the logged-in home. "Choose what you want to do."
+   Same light language as the front page (NOT the dark room). A featured
+   "Fly the 3D Map" hero card + a grid of tool cards that FLY IN on load
+   (staggered rise + settle), then a trust strip. memory/
+   project_desk_surface_backout_ui (back-out reimagined in light).
+   ════════════════════════════════════════════════════════════════════ */
+.dash { --d-blue: var(--plot-brand); --d-blue-deep: var(--plot-brand-deep); --d-ink:#0c1322; --d-body:#4a5568; }
+.dash__wrap { max-width: 1320px; margin: 0 auto; padding: 28px 28px 48px; }
+
+/* top band: intro (left) + featured fly card (right) */
+.dash-top { display: grid; gap: 22px; grid-template-columns: 1fr; align-items: stretch; }
+@media (min-width: 940px) { .dash-top { grid-template-columns: 0.85fr 1.25fr; } }
+.dash-intro__eyebrow { font-size: 12.5px; font-weight: 700; letter-spacing: 0.1em; color: var(--d-blue); text-transform: uppercase; }
+.dash-intro__h { font-weight: 800; letter-spacing: -0.025em; line-height: 1.0; font-size: clamp(34px, 4vw, 52px); color: var(--d-ink); margin-top: 14px; }
+.dash-intro__p { color: var(--d-body); font-size: clamp(15px,1.3vw,17px); line-height: 1.5; margin-top: 18px; max-width: 26em; }
+
+/* featured fly-the-3D-map card.
+   NOTE: overflow VISIBLE so the floating scene can PROTRUDE past the card
+   edge (next-level button design — the world breaks the frame). The
+   rounded background is a separate ::before layer that DOES clip, so the
+   card surface stays crisp while the art escapes it. */
+.dash-fly { position: relative; overflow: visible; border-radius: 22px; padding: 34px 36px; display: flex; flex-direction: column; justify-content: center; min-height: 300px; }
+.dash-fly::before {
+  content: ''; position: absolute; inset: 0; border-radius: 22px; z-index: 0;
+  background: linear-gradient(160deg,#eef5fe,#e3eefc);
+  border: 1px solid rgba(19,73,212,0.1);
+  box-shadow: 0 20px 50px -28px rgba(20,50,120,0.35);
+}
+.dash-fly__h { font-weight: 800; font-size: clamp(24px,2.4vw,32px); letter-spacing: -0.02em; color: var(--d-ink); position: relative; z-index: 2; }
+.dash-fly__p { color: var(--d-body); font-size: 15px; line-height: 1.5; margin-top: 10px; max-width: 20em; position: relative; z-index: 2; }
+.dash-fly__btn { margin-top: 22px; align-self: flex-start; display: inline-flex; align-items: center; gap: 9px; background: var(--d-blue); color: #fff; font-weight: 600; font-size: 15px; padding: 13px 24px; border-radius: 12px; box-shadow: 0 10px 22px -10px rgba(19,73,212,0.6); position: relative; z-index: 2; transition: transform .16s, background .16s; }
+.dash-fly__btn:hover { transform: translateY(-1px); background: var(--d-blue-deep); }
+/* the mini floating scene — PROTRUDES past the top-right corner of the
+   card (negative offsets pull it beyond the edge; z-index above the card
+   bg + a soft drop-shadow so it reads as lifting OUT of the frame). */
+.dash-fly__scene { position: absolute; right: -7%; top: -4%; width: 66%; aspect-ratio: 2560/1440; z-index: 3; pointer-events: none; filter: drop-shadow(0 18px 26px rgba(20,50,120,0.22)); }
+.dash-fly__scene img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+@media (max-width: 640px) { .dash-fly__scene { position: relative; right: 0; top: 0; width: 100%; margin-top: 18px; } }
+
+/* tool grid */
+.dash-grid { display: grid; gap: 18px; grid-template-columns: 1fr; margin-top: 22px; }
+@media (min-width: 600px) { .dash-grid { grid-template-columns: 1fr 1fr; } }
+@media (min-width: 1040px) { .dash-grid { grid-template-columns: repeat(4,1fr); } }
+
+.dash-card { position: relative; border-radius: 18px; padding: 22px 22px 54px; background: rgba(255,255,255,0.72); border: 1px solid rgba(19,73,212,0.08); box-shadow: 0 12px 30px -22px rgba(20,50,120,0.4); transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; cursor: pointer; display: block; }
+.dash-card:hover { transform: translateY(-3px); box-shadow: 0 22px 44px -22px rgba(20,50,120,0.5); border-color: rgba(19,73,212,0.22); background: rgba(255,255,255,0.9); }
+.dash-card__icon { width: 64px; height: 64px; border-radius: 16px; display: flex; align-items: center; justify-content: center; margin-bottom: 16px; background: linear-gradient(160deg,#eaf1fe,#dde9fc); border: 1px solid rgba(19,73,212,0.12); }
+.dash-card__icon .material-symbols-rounded, .dash-card__icon span { color: var(--d-blue); font-size: 30px; }
+.dash-card__h { font-weight: 700; font-size: 17px; letter-spacing: -0.01em; color: var(--d-ink); line-height: 1.2; }
+.dash-card__p { color: var(--d-body); font-size: 13.5px; line-height: 1.5; margin-top: 8px; }
+.dash-card__arrow { position: absolute; right: 18px; bottom: 16px; width: 32px; height: 32px; border-radius: 999px; background: #fff; border: 1px solid rgba(19,73,212,0.14); display: flex; align-items: center; justify-content: center; color: var(--d-blue); box-shadow: 0 4px 10px -4px rgba(20,50,120,0.3); transition: background .16s, color .16s; }
+.dash-card:hover .dash-card__arrow { background: var(--d-blue); color: #fff; }
+
+/* ── FLY-IN: staggered rise + settle ── */
+@keyframes dash-rise {
+  0%   { opacity: 0; transform: translateY(26px) scale(0.985); }
+  60%  { opacity: 1; transform: translateY(-4px) scale(1.004); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+.dash-card, .dash-fly { animation: dash-rise 0.62s cubic-bezier(0.22,1,0.36,1) both; }
+.dash-fly { animation-delay: 0.02s; }
+/* per-card stagger (top-left → bottom-right) */
+.dash-card:nth-child(1){animation-delay:.10s} .dash-card:nth-child(2){animation-delay:.15s}
+.dash-card:nth-child(3){animation-delay:.20s} .dash-card:nth-child(4){animation-delay:.25s}
+.dash-card:nth-child(5){animation-delay:.30s} .dash-card:nth-child(6){animation-delay:.35s}
+.dash-card:nth-child(7){animation-delay:.40s} .dash-card:nth-child(8){animation-delay:.45s}
+.dash-card:nth-child(9){animation-delay:.50s} .dash-card:nth-child(10){animation-delay:.55s}
+.dash-card:nth-child(11){animation-delay:.60s} .dash-card:nth-child(12){animation-delay:.65s}
+
+/* trust strip */
+.dash-trust { margin-top: 26px; border-radius: 18px; padding: 20px 26px; background: rgba(255,255,255,0.6); border: 1px solid rgba(19,73,212,0.08); display: grid; gap: 18px; grid-template-columns: 1fr; align-items: center; animation: dash-rise 0.62s cubic-bezier(0.22,1,0.36,1) both; animation-delay: .58s; }
+@media (min-width: 820px) { .dash-trust { grid-template-columns: 1.6fr 1fr 1fr 1fr; } }
+.dash-trust__lead { display: flex; align-items: center; gap: 11px; }
+.dash-trust__lead b { color: var(--d-ink); font-size: 14.5px; display: block; }
+.dash-trust__lead span { color: var(--d-body); font-size: 13px; }
+.dash-trust__item { display: flex; align-items: center; gap: 9px; font-size: 13px; color: var(--d-body); }
+.dash-trust__item span.ic { color: var(--d-blue); }
+
+@media (prefers-reduced-motion: reduce) {
+  .dash-card, .dash-fly, .dash-trust { animation: none !important; }
+}
+
+/* ── tool-card icon: real illustration (img) over Material glyph fallback ──
+   The <img> sits on top; if its file is missing it hides itself (onError)
+   and the glyph beneath shows. When Greg drops the real PNGs into
+   /public/dashboard/icons/, the cards upgrade automatically. */
+.dash-card__icon { position: relative; }
+.dash-card__art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; padding: 8px; }
+.dash-card__glyph { color: var(--d-blue); font-size: 30px; }
+/* when the art image is present + loaded, it covers the glyph (glyph stays
+   behind it). When absent, onError hides the img and only the glyph shows. */
+
+/* ── FLAGSHIP: the Build Contracts & Forms card (CAR/NAR sidestep moat) ──
+   Distinguished from the grid: brighter surface, crisp accent border, a
+   soft blue lift + a tiny "moat" ribbon feel. The special one. */
+.dash-card[data-flagship] {
+  background: linear-gradient(160deg, #ffffff, #eef4ff);
+  border: 1px solid rgba(19,73,212,0.28);
+  box-shadow: 0 16px 38px -20px rgba(19,73,212,0.5);
+}
+.dash-card[data-flagship] .dash-card__icon {
+  background: linear-gradient(160deg, var(--d-blue), var(--d-blue-deep));
+  border-color: transparent;
+}
+.dash-card[data-flagship] .dash-card__glyph { color: #fff; }
+.dash-card[data-flagship]:hover {
+  border-color: rgba(19,73,212,0.45);
+  box-shadow: 0 26px 50px -22px rgba(19,73,212,0.6);
+}
+.dash-card[data-flagship] .dash-card__arrow { background: var(--d-blue); color: #fff; border-color: transparent; }
+
+/* ── layered animated tool icon (base + bobbing pin + drifting cloud) ──
+   An illustrated icon tile is bigger + transparent (no glyph box), and its
+   layers stack full-size. Each layer is the full icon canvas so they
+   self-align; the pin bobs, the cloud drifts. */
+.dash-card__icon[data-illustrated] {
+  width: 72px; height: 72px;
+  background: transparent;
+  border: none;
+  overflow: visible;
+  position: relative;
+}
+.dash-card__icon[data-illustrated] .dash-card__art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 0;
+}
+@keyframes ic-bob   { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6%); } }
+@keyframes ic-drift { 0%,100% { transform: translateX(0); } 50% { transform: translateX(8%); } }
+.dash-card__art.ic-bob   { animation: ic-bob 3.2s ease-in-out infinite; }
+.dash-card__art.ic-drift { animation: ic-drift 6s ease-in-out infinite; }
+.dash-card:hover .dash-card__art.ic-bob { animation-duration: 2.4s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ic-bob, .ic-drift { animation: none !important; }
+}
+
+/* ── hover-assemble icon (Build Contracts & Forms moat card) ──
+   At REST: the full composed image shows, pieces sit parked off-position
+   (invisible). On HOVER: the full fades out and each piece flies to its
+   assembled position (inset 0) with a spring settle — the icon builds
+   itself in front of you. */
+.dash-card__assemble { position: absolute; inset: 0; }
+.dash-card__assemble-full,
+.dash-card__assemble-piece { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+
+/* full = visible at rest, fades on hover */
+.dash-card__assemble-full { opacity: 1; transition: opacity 0.18s ease 0.05s; }
+.dash-card:hover .dash-card__assemble-full { opacity: 0; transition-delay: 0s; }
+
+/* pieces = parked off-position + invisible at rest; fly to inset:0 on hover */
+.dash-card__assemble-piece { opacity: 0; }
+.dash-card:hover .dash-card__assemble-piece {
+  opacity: 1;
+  transform: translate(0,0) scale(1) rotate(0deg);
+  transition: transform 0.5s cubic-bezier(0.22,1,0.36,1), opacity 0.28s ease;
+}
+/* each piece's resting (parked) transform = where it flies IN from. */
+.fly-up    { transform: translateY(40%)  scale(0.9); }
+.fly-left  { transform: translate(-45%,-10%) rotate(-8deg) scale(0.92); }
+.fly-right { transform: translate(45%,8%)   rotate(8deg)  scale(0.92); }
+.fly-pen   { transform: translate(60%,55%)  rotate(22deg) scale(0.85); }
+.fly-pop   { transform: translate(-30%,40%) scale(0.4); }
+/* stagger the fly-in so it assembles, not all-at-once */
+.dash-card:hover .fly-up    { transition-delay: 0.00s, 0s; }
+.dash-card:hover .fly-left  { transition-delay: 0.06s, 0.04s; }
+.dash-card:hover .fly-right { transition-delay: 0.10s, 0.08s; }
+.dash-card:hover .fly-pen   { transition-delay: 0.16s, 0.14s; }
+.dash-card:hover .fly-pop   { transition-delay: 0.24s, 0.22s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .dash-card__assemble-piece { opacity: 1 !important; transform: none !important; }
+  .dash-card__assemble-full { opacity: 0 !important; }
 }

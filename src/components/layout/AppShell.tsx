@@ -17,7 +17,12 @@ const AUTH_PAGES = ['/login', '/signup', '/auth', '/subscribe', '/landing', '/se
 // chrome competes with the "world is the canvas" framing. A compact
 // MapNavOverlay (translucent logo top-left, expandable nav drawer)
 // replaces the global chrome on these routes.
-const IMMERSIVE_PAGES = ['/map'];
+//
+// /dashboard is immersive too: it's the map's BACK-OUT / pause screen —
+// the world is still behind it. It must NOT wear the cream agency chrome;
+// it surfaces over the (frozen) world like a pause menu. So it shares the
+// map's immersive treatment + the in-world nav overlay.
+const IMMERSIVE_PAGES = ['/map', '/dashboard', '/forms'];
 
 export default function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -34,10 +39,15 @@ export default function AppShell({ children }: { children: ReactNode }) {
   // authed and public visitors — public users still need to navigate
   // to /landing, /position, etc. The overlay surfaces a different
   // menu for unauthenticated users (no Dashboard / Leads).
+  //
+  // EXCEPTION: /dashboard is the back-out ROOM — it carries NO app chrome
+  // on the photoreal scene. Its navigation lives ON the center screen
+  // (see the room menu in app/dashboard/page.tsx). So no overlay here.
   if (isImmersivePage) {
+    const isRoom = pathname.startsWith('/dashboard');
     return (
       <>
-        <MapNavOverlay />
+        {!isRoom && <MapNavOverlay />}
         <main className="min-h-screen">{children}</main>
         {user && <CallBar />}
       </>

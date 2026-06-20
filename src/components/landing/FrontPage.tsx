@@ -1,0 +1,258 @@
+'use client';
+
+import AppHeader from '@/components/layout/AppHeader';
+
+// ── FrontPage ─────────────────────────────────────────────────────────
+//
+// The unified public front door for PlotMaps + Position Realty.
+// "See every home like never before. / Move when you're ready."
+//
+// PlotMaps is the world/experience (universal — explore, prospect,
+// relocate, scout a new city, fly your own backyard, the coming social
+// layer); Position is the licensed brokerage that helps you ACT. PlotMaps
+// is the headline voice; Position stays quiet (the green-vs-blue split in
+// the feature cards + the footer compliance). See:
+//   memory/project_plot_vision, project_plot_maps_position_hierarchy,
+//   project_two_layer_audience_strategy, project_communication_layer_thesis.
+//
+// DESIGN: light/white, generous space, BLUE (#1349d4) as the single accent
+// (the reference language). Depth comes from ONE floating sky-platform scene —
+// the isometric land island bobbing in the sky with data cards + drifting
+// clouds. Layers are Greg's Canva exports (same 2560×1440 canvas → they
+// self-align). The SKY is its own swappable layer: today it's the hero
+// gradient background; drop a sky PNG into SKY_SRC and it becomes a real
+// layer with zero other changes. memory/feedback_screen_is_always_2d.
+
+const HERO = '/dashboard/hero';
+
+// Sky layer — Greg's real sky (same 2560×1440 canvas) sits behind the
+// platform. Set to null to fall back to the CSS gradient sky.
+const SKY_SRC: string | null = `${HERO}/sky.svg`;
+
+// Floating land-platform scene — each layer is the full 2560×1440 canvas
+// with one piece in place, so stacking at inset-0 reproduces the exact
+// composition. `anim` is its gentle loop.
+const SCENE_LAYERS: { src: string; anim: string; alt: string }[] = [
+  { src: `${HERO}/cloud-3.svg`,   anim: 'float-cloud-c', alt: '' },
+  { src: `${HERO}/cloud-2.svg`,   anim: 'float-cloud-b', alt: '' },
+  { src: `${HERO}/cloud-1.svg`,   anim: 'float-cloud-a', alt: '' },
+  { src: `${HERO}/island.svg`,    anim: 'float-island',  alt: 'Map of the market floating in the sky' },
+  { src: `${HERO}/card-line.svg`, anim: 'float-card-b',  alt: '' },
+  { src: `${HERO}/cards.svg`,     anim: 'float-card-a',  alt: '' },
+];
+
+export default function FrontPage() {
+  return (
+    <div className="fp">
+      {/* ════ HEADER (shared with the dashboard for one consistent chrome) ════ */}
+      <AppHeader variant="public" />
+
+      {/* ════ HERO ════ */}
+      <section className="fp-hero">
+        {/* real sky fills the whole hero band (edge to edge) so it reads as
+            open sky, not a boxed blue card. Falls back to the gradient. */}
+        {SKY_SRC ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={SKY_SRC} alt="" aria-hidden className="fp-hero__sky" draggable={false} />
+        ) : (
+          <div className="fp-hero__bg" />
+        )}
+        {/* soft white fade at the bottom so the sky melts into the page */}
+        <div className="fp-hero__fade" />
+        <div className="fp__wrap">
+          <div className="fp-hero__grid">
+            {/* left — the live headline */}
+            <div style={{ flex: 1, position: 'relative', zIndex: 2 }}>
+              <span className="fp-pill">EXPLORE · PROSPECT · MOVE</span>
+              <h1 className="fp-head font-headline">
+                See every home
+                <br />
+                like never before.
+                <span className="accent">Move when you&apos;re ready.</span>
+              </h1>
+              <p className="fp-sub">
+                <b>PlotMaps</b> lets you fly any neighborhood in the country —
+                explore the land, read the market, and find your next move.
+                When it&apos;s time, <b>Position</b> is the brokerage that helps
+                you act.
+              </p>
+              <div className="fp-cta-row">
+                <a className="fp-cta fp-cta--primary" href="/map?view=3d">
+                  Explore the map <span aria-hidden>→</span>
+                </a>
+                <a className="fp-cta fp-cta--ghost" href="/map">
+                  Browse listings
+                </a>
+              </div>
+              <div className="fp-trust">
+                <div className="fp-trust__avatars" aria-hidden>
+                  <span /><span /><span /><span />
+                </div>
+                <p className="fp-trust__text">
+                  Trusted by buyers, owners, investors &amp; agents
+                  <br />exploring land across the country.
+                </p>
+              </div>
+            </div>
+
+            {/* right — the floating sky-platform scene */}
+            <div className="fp-hero__scene-col">
+              <div className="fp-scene">
+                {SCENE_LAYERS.map((l) => (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    key={l.src}
+                    src={l.src}
+                    alt={l.alt}
+                    aria-hidden={l.alt ? undefined : true}
+                    className={`fp-scene__layer ${l.anim}`}
+                    draggable={false}
+                  />
+                ))}
+                {/* The land plate IS the hero — no listing card over it.
+                    Nothing obstructs the floating world. */}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ════ TWO FEATURE CARDS ════ */}
+      <section className="fp-section">
+        <div className="fp__wrap">
+          <div className="fp-eyebrow">Powerful tools. Real advantage.</div>
+          <h2 className="fp-h2">Explore, analyze, and understand land like never before.</h2>
+          <div className="fp-features" style={{ marginTop: 32 }}>
+            {/* PlotMaps — green */}
+            <div className="fp-fcard fp-fcard--maps">
+              <div className="fp-fcard__kicker"><span aria-hidden>◆</span> PLOT MAPS</div>
+              <h3 className="fp-fcard__h">Explore land.<br />See every opportunity.</h3>
+              <p className="fp-fcard__p">
+                Fly any neighborhood in 3D or grind in the 2D work map. Real-time
+                data, zoning, comps, and ownership help you read a property from
+                every angle — whether you&apos;re buying, selling, or just scouting.
+              </p>
+              <ul className="fp-flist">
+                <li><span className="chk" aria-hidden>✓</span> Interactive 3D flight + 2D work map</li>
+                <li><span className="chk" aria-hidden>✓</span> Zoning, flood &amp; topography layers</li>
+                <li><span className="chk" aria-hidden>✓</span> Ownership &amp; parcel data</li>
+                <li><span className="chk" aria-hidden>✓</span> AI-powered insights &amp; comparables</li>
+                <li><span className="chk" aria-hidden>✓</span> Export reports &amp; share with your team</li>
+              </ul>
+              <a className="fp-fcard__cta" href="/map">Launch Plot Maps <span aria-hidden>→</span></a>
+            </div>
+
+            {/* Position — blue (quiet brokerage voice) */}
+            <div className="fp-fcard fp-fcard--pos">
+              <div className="fp-fcard__kicker"><span aria-hidden>⬡</span> POSITION BROKERAGE</div>
+              <h3 className="fp-fcard__h">Our network.<br />Your advantage.</h3>
+              <p className="fp-fcard__p">
+                From off-market opportunities to full-service representation,
+                Position&apos;s licensed brokerage team helps you acquire and sell
+                land and homes with confidence.
+              </p>
+              <ul className="fp-flist">
+                <li><span className="chk" aria-hidden>✓</span> Buyer &amp; seller representation</li>
+                <li><span className="chk" aria-hidden>✓</span> Off-market &amp; exclusive listings</li>
+                <li><span className="chk" aria-hidden>✓</span> Acquisitions &amp; dispositions</li>
+                <li><span className="chk" aria-hidden>✓</span> Local market expertise you can trust</li>
+                <li><span className="chk" aria-hidden>✓</span> End-to-end transaction support</li>
+              </ul>
+              <a className="fp-fcard__cta" href="/position">Meet Position <span aria-hidden>→</span></a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ════ STATS STRIP ════ */}
+      <section className="fp-section" style={{ paddingTop: 0 }}>
+        <div className="fp__wrap">
+          <div className="fp-stats">
+            <div className="fp-stat"><div className="fp-stat__n">50,000+</div><div className="fp-stat__l">Parcels mapped</div></div>
+            <div className="fp-stat"><div className="fp-stat__n">3D + 2D</div><div className="fp-stat__l">Fly it or work it</div></div>
+            <div className="fp-stat"><div className="fp-stat__n">Live</div><div className="fp-stat__l">MLS &amp; public-record data</div></div>
+            <div className="fp-stat"><div className="fp-stat__n">CA DRE</div><div className="fp-stat__l">Licensed brokerage</div></div>
+          </div>
+        </div>
+      </section>
+
+      {/* ════ HOW IT WORKS ════ */}
+      <section className="fp-section" style={{ background: '#fafdfb' }}>
+        <div className="fp__wrap">
+          <div className="fp-eyebrow">How it works</div>
+          <h2 className="fp-h2">From a flyover to your next address.</h2>
+          <div className="fp-steps">
+            {[
+              { n: 1, h: 'Explore', p: 'Fly any neighborhood and discover land with real-time data and layers.' },
+              { n: 2, h: 'Analyze', p: 'Evaluate the potential with comps, zoning, ownership, and AI insights.' },
+              { n: 3, h: 'Connect', p: 'Reach owners and work with Position to line up the right opportunity.' },
+              { n: 4, h: 'Move', p: 'Position handles the details so you can focus on what’s next.' },
+            ].map((s) => (
+              <div className="fp-step" key={s.n}>
+                <div className="fp-step__n">{s.n}</div>
+                <div className="fp-step__h">{s.h}</div>
+                <div className="fp-step__p">{s.p}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ════ CLOSING BANDS ════ */}
+      <section className="fp-section">
+        <div className="fp__wrap">
+          <div className="fp-close">
+            <div className="fp-quote">
+              <div className="fp-quote__q">
+                “PlotMaps changed the way I find and evaluate land. The data is
+                accurate, and the Position team is top-notch.”
+              </div>
+              <div className="fp-quote__by">
+                <div className="fp-quote__av" aria-hidden />
+                <div>
+                  <div className="fp-quote__name">A. Reyes</div>
+                  <div className="fp-quote__role">Land investor</div>
+                </div>
+              </div>
+            </div>
+            <div className="fp-bigcta">
+              <div className="fp-bigcta__h">Your next opportunity is out there.</div>
+              <div className="fp-bigcta__p">Start flying the map — it’s free to explore.</div>
+              <a className="fp-bigcta__btn" href="/landing">Get started free <span aria-hidden>→</span></a>
+            </div>
+            <div className="fp-talk">
+              <div className="fp-talk__h">Let’s talk.</div>
+              <div className="fp-talk__p">
+                Questions about a property, or about Position&apos;s brokerage
+                services? We&apos;re here.
+              </div>
+              <a className="fp-talk__link" href="/contact">Contact us <span aria-hidden>→</span></a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ════ FOOTER / COMPLIANCE ════ */}
+      <footer className="fp-foot">
+        <div className="fp__wrap">
+          {/* the Position MARK (dotless-i signature) for the operated-by
+              attribution; the rest is running compliance text. */}
+          <div className="fp-foot__brand">
+            <span>Operated by</span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/brand/position-logo.svg" alt="Position" className="fp-foot__position" />
+            <span>Realty</span>
+          </div>
+          <p className="fp-foot__compliance">
+            Gregory M. Franklin, Broker · CA DRE #02090737. Equal Housing
+            Opportunity. Listing data provided by participating MLSs and used
+            under license; PlotMaps is a product of Plot Solutions LLC.
+            Public-record and third-party data shown for informational purposes.
+            © {''}
+            <span suppressHydrationWarning>{new Date().getFullYear()}</span> Plot Solutions LLC.
+          </p>
+        </div>
+      </footer>
+    </div>
+  );
+}

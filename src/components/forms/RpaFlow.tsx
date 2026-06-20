@@ -20,10 +20,9 @@ type Objective = 'win-certainty' | 'keep-room' | null;
 const PANEL =
   'rounded-2xl p-5 md:p-6 relative overflow-hidden';
 const PANEL_STYLE: React.CSSProperties = {
-  background: 'linear-gradient(160deg, rgba(34,44,68,0.92), rgba(13,20,36,0.96))',
-  border: '1px solid rgba(125,168,255,0.16)',
-  boxShadow:
-    '0 18px 40px -14px rgba(0,0,0,0.7), inset 0 1px 0 rgba(180,210,255,0.14)',
+  background: 'rgba(255,255,255,0.78)',
+  border: '1px solid rgba(19,73,212,0.10)',
+  boxShadow: '0 12px 30px -22px rgba(20,50,120,0.4)',
 };
 
 export default function RpaFlow() {
@@ -34,13 +33,13 @@ export default function RpaFlow() {
     <div className="space-y-6">
       {/* title */}
       <div>
-        <div className="text-[10px] uppercase tracking-[0.4em] text-[rgba(0,242,255,0.7)] font-bold">
+        <div className="text-[10px] uppercase tracking-[0.4em] font-bold text-[#1349d4]">
           Purchase Offer · the negotiation
         </div>
-        <h1 className="font-headline text-3xl md:text-4xl font-extrabold text-white mt-1.5 [text-shadow:0_2px_24px_rgba(0,242,255,0.18)]">
+        <h1 className="font-headline text-3xl md:text-4xl font-extrabold mt-1.5 text-[#0c1322]">
           Let&apos;s build your offer.
         </h1>
-        <p className="text-sm text-[rgba(200,215,255,0.65)] mt-2">
+        <p className="text-sm mt-2 text-[#4a5568]">
           This isn&apos;t a form. Every line is a card. We&apos;ll show you
           which ones to play.
         </p>
@@ -54,7 +53,7 @@ export default function RpaFlow() {
               className="h-1.5 rounded-full transition-all"
               style={{
                 width: i === step ? 28 : 16,
-                background: i <= step ? '#00f2ff' : 'rgba(125,168,255,0.25)',
+                background: i <= step ? '#1349d4' : 'rgba(19,73,212,0.18)',
               }}
             />
           </div>
@@ -64,12 +63,12 @@ export default function RpaFlow() {
       {/* ── STEP 0 — objective first ── */}
       {step === 0 && (
         <div className={PANEL} style={PANEL_STYLE}>
-          <h2 className="font-headline text-xl font-bold text-white">
+          <h2 className="font-headline text-xl font-bold text-[#0c1322]">
             First — what are you trying to win here?
           </h2>
-          <p className="text-sm text-[rgba(200,215,255,0.7)] mt-2 leading-relaxed">
+          <p className="text-sm mt-2 leading-relaxed text-[#4a5568]">
             Before a single number goes down, decide your goal. The{' '}
-            <span className="text-white font-semibold">same</span> finances get
+            <span className="text-[#0c1322] font-semibold">same</span> finances get
             presented differently depending on what you want. This choice
             quietly shapes every disclosure ahead.
           </p>
@@ -113,10 +112,10 @@ export default function RpaFlow() {
                 className="text-[22px] mt-0.5"
               />
               <div>
-                <h2 className="font-headline text-xl font-bold text-white">
+                <h2 className="font-headline text-xl font-bold text-[#0c1322]">
                   The money — and what it tells them
                 </h2>
-                <p className="text-sm text-[rgba(200,215,255,0.7)] mt-1.5 leading-relaxed">
+                <p className="text-sm mt-1.5 leading-relaxed text-[#4a5568]">
                   {objective === 'win-certainty'
                     ? "You're going for certainty — so we'll let you show strength on purpose. But you still choose each card."
                     : "You're keeping your room — so we'll fill only what makes the contract real, and flag every extra that sends a message."}
@@ -179,20 +178,20 @@ export default function RpaFlow() {
       {/* ── STEP 2 — placeholder for the rest ── */}
       {step === 2 && (
         <div className={PANEL} style={PANEL_STYLE}>
-          <h2 className="font-headline text-xl font-bold text-white">
+          <h2 className="font-headline text-xl font-bold text-[#0c1322]">
             More pages, same lens.
           </h2>
-          <p className="text-sm text-[rgba(200,215,255,0.7)] mt-2 leading-relaxed">
+          <p className="text-sm mt-2 leading-relaxed text-[#4a5568]">
             Next we tear down the contingencies — inspection, loan, appraisal —
             where the real outs live. Every one is an exit you keep or hand
             over. We&apos;ll build those the same way: your objective, then the
             cards, in plain English.
           </p>
-          <div className="mt-4 rounded-xl p-4" style={{ background: 'rgba(0,242,255,0.06)', border: '1px solid rgba(0,242,255,0.2)' }}>
-            <p className="text-xs text-[rgba(0,242,255,0.85)] uppercase tracking-[0.2em] font-bold">
+          <div className="mt-4 rounded-xl p-4" style={{ background: 'rgba(19,73,212,0.05)', border: '1px solid rgba(19,73,212,0.18)' }}>
+            <p className="text-xs uppercase tracking-[0.2em] font-bold text-[#1349d4]">
               In progress
             </p>
-            <p className="text-sm text-[rgba(200,215,255,0.7)] mt-1.5">
+            <p className="text-sm mt-1.5 text-[#4a5568]">
               Page 1 is wired. We continue page by page from the teardown — then
               e-signature wraps the whole instrument.
             </p>
@@ -227,17 +226,17 @@ function ObjectiveCard({
       className="text-left rounded-xl p-4 transition-all duration-200"
       style={{
         background: active
-          ? `linear-gradient(160deg, ${accent}26, ${accent}10)`
-          : 'rgba(11,16,32,0.6)',
-        border: `1px solid ${active ? accent + '88' : 'rgba(125,168,255,0.18)'}`,
-        boxShadow: active ? `0 0 24px -8px ${accent}99` : 'none',
+          ? `linear-gradient(160deg, ${accent}1f, ${accent}0a)`
+          : '#ffffff',
+        border: `1px solid ${active ? accent + '88' : 'rgba(19,73,212,0.12)'}`,
+        boxShadow: active ? `0 12px 26px -16px ${accent}` : '0 8px 20px -18px rgba(20,50,120,0.4)',
       }}
     >
       <span style={{ color: accent }}>
         <MaterialIcon icon={icon} className="text-[22px]" />
       </span>
-      <div className="font-bold text-white mt-2">{title}</div>
-      <div className="text-xs text-[rgba(200,215,255,0.65)] mt-1 leading-snug">
+      <div className="font-bold mt-2 text-[#0c1322]">{title}</div>
+      <div className="text-xs mt-1 leading-snug text-[#4a5568]">
         {body}
       </div>
     </button>
@@ -255,23 +254,23 @@ function FieldGroup({
   note: string;
   children: React.ReactNode;
 }) {
-  const tint = kind === 'required' ? '#5ed6a8' : '#fbc64f';
+  const tint = kind === 'required' ? '#1b9e6a' : '#b8860b';
   return (
     <div className={PANEL} style={PANEL_STYLE}>
       <div className="flex items-center gap-2">
         <span
           className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider"
           style={{
-            background: `${tint}1f`,
-            border: `1px solid ${tint}55`,
+            background: `${tint}16`,
+            border: `1px solid ${tint}40`,
             color: tint,
           }}
         >
           {kind === 'required' ? 'Backbone' : 'Your cards'}
         </span>
-        <h3 className="text-sm font-bold text-white">{heading}</h3>
+        <h3 className="text-sm font-bold text-[#0c1322]">{heading}</h3>
       </div>
-      <p className="text-xs text-[rgba(200,215,255,0.55)] mt-1.5 mb-4 leading-snug">
+      <p className="text-xs mt-1.5 mb-4 leading-snug text-[#6b7689]">
         {note}
       </p>
       <div className="space-y-3">{children}</div>
@@ -282,15 +281,15 @@ function FieldGroup({
 function FieldRow({ label, placeholder }: { label: string; placeholder: string }) {
   return (
     <div>
-      <label className="text-xs font-semibold text-[rgba(220,230,255,0.8)]">
+      <label className="text-xs font-semibold text-[#0c1322]">
         {label}
       </label>
       <input
         placeholder={placeholder}
-        className="w-full mt-1 px-3 py-2.5 rounded-lg text-sm text-white placeholder:text-[rgba(180,200,255,0.35)] focus:outline-none focus:ring-2 focus:ring-[rgba(0,242,255,0.3)]"
+        className="w-full mt-1 px-3 py-2.5 rounded-lg text-sm placeholder:text-[#aab2c0] focus:outline-none focus:ring-2 focus:ring-[rgba(19,73,212,0.25)] text-[#0c1322]"
         style={{
-          background: 'rgba(11,16,32,0.7)',
-          border: '1px solid rgba(125,168,255,0.22)',
+          background: '#ffffff',
+          border: '1px solid rgba(19,73,212,0.18)',
         }}
       />
     </div>
@@ -311,14 +310,14 @@ function CardField({
     <div
       className="rounded-xl p-3.5"
       style={{
-        background: 'rgba(11,16,32,0.5)',
-        border: '1px solid rgba(125,168,255,0.14)',
+        background: 'rgba(19,73,212,0.03)',
+        border: '1px solid rgba(19,73,212,0.10)',
       }}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1">
-          <div className="text-sm font-semibold text-white">{label}</div>
-          <div className="text-xs text-[rgba(255,210,140,0.85)] mt-1 leading-snug">
+          <div className="text-sm font-semibold text-[#0c1322]">{label}</div>
+          <div className="text-xs mt-1 leading-snug text-[#b8860b]">
             <MaterialIcon icon="info" className="text-[12px] mr-1 align-middle" />
             {tell}
           </div>
@@ -327,16 +326,16 @@ function CardField({
           onClick={() => setShow((s) => !s)}
           className="shrink-0 px-3 py-1.5 rounded-full text-[11px] font-bold transition-colors"
           style={{
-            background: show ? 'rgba(0,242,255,0.15)' : 'rgba(125,168,255,0.08)',
-            border: `1px solid ${show ? 'rgba(0,242,255,0.45)' : 'rgba(125,168,255,0.2)'}`,
-            color: show ? '#00f2ff' : 'rgba(180,200,255,0.7)',
+            background: show ? 'rgba(19,73,212,0.12)' : 'rgba(19,73,212,0.05)',
+            border: `1px solid ${show ? 'rgba(19,73,212,0.40)' : 'rgba(19,73,212,0.16)'}`,
+            color: show ? '#1349d4' : '#6b7689',
           }}
         >
           {show ? 'Showing' : 'Hidden'}
         </button>
       </div>
       {recommend && (
-        <div className="text-[10px] text-[rgba(94,214,168,0.9)] uppercase tracking-wider font-bold mt-2">
+        <div className="text-[10px] uppercase tracking-wider font-bold mt-2 text-[#1b9e6a]">
           Recommended for your objective
         </div>
       )}
@@ -359,9 +358,9 @@ function NextButton({
       disabled={disabled}
       className="px-5 py-2.5 rounded-full text-sm font-bold transition-all disabled:opacity-40"
       style={{
-        background: 'linear-gradient(160deg, #00d8e6, #0095c9)',
-        color: '#04121a',
-        boxShadow: disabled ? 'none' : '0 8px 24px -8px rgba(0,242,255,0.6)',
+        background: 'linear-gradient(160deg, #1349d4, #122d8d)',
+        color: '#ffffff',
+        boxShadow: disabled ? 'none' : '0 10px 24px -10px rgba(19,73,212,0.7)',
       }}
     >
       {label}
@@ -373,7 +372,7 @@ function BackButton({ onClick }: { onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className="px-4 py-2.5 rounded-full text-sm font-semibold text-[rgba(180,200,255,0.7)] hover:text-white transition-colors"
+      className="px-4 py-2.5 rounded-full text-sm font-semibold transition-colors text-[#6b7689]"
     >
       ← Back
     </button>

@@ -86,6 +86,14 @@ const TOOLS: Tool[] = [
       ],
     },
   },
+  // The Offer Cost Cockpit — the live, fully-editable money breakdown a
+  // buyer makes a real offer from. Deep-links straight to the money lens.
+  // Another CAR/lender sidestep, so it gets the flagship treatment too.
+  {
+    href: '/forms/rpa?lens=money', icon: 'payments', art: 'offer', title: 'Make an Offer',
+    sub: 'See and edit every cost — down payment, rate, insurance — your live offer.',
+    flagship: true,
+  },
   { href: '/imports', icon: 'upload_file', art: 'import', title: 'Import & Geocode Contacts', sub: 'Upload contacts and map them instantly.' },
   { href: '/leads', icon: 'groups', art: 'lists', title: 'Contacts & Lists', sub: 'Build lists and segments to target the right people.' },
   { href: '/campaigns/commercials', icon: 'smart_display', art: 'orbit-video', title: 'Orbit Listing Video', sub: 'Create stunning listing videos with Orbit Property View.' },

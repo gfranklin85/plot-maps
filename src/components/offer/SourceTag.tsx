@@ -1,12 +1,13 @@
 'use client';
 
-// ── SourceTag — the honesty layer, made visible ──────────────────────
+// ── SourceTag — the honesty layer, made visible (light theme) ─────────
 //
 // Every dollar on the breakdown wears one of these. This is THE thing that
 // makes Plot's offer cockpit different from every "calculator": the buyer
 // always knows whether a number is real (a licensed provider wrote it),
 // theirs (they entered what they were quoted), or a stand-in waiting on
-// their application. No hidden guesses on a surface you buy a house from.
+// their application. Brand-blue light language (project_front_page_locked,
+// project_plot_palette_locked).
 
 import MaterialIcon from '@/components/ui/MaterialIcon';
 import type { Provenance } from '@/lib/offer/types';
@@ -18,23 +19,23 @@ const META: Record<
   'live-provider': {
     label: 'Live quote',
     icon: 'verified',
-    color: '#5ed6a8',
-    bg: 'rgba(94,214,168,0.14)',
-    border: 'rgba(94,214,168,0.4)',
+    color: '#1b9e6a',
+    bg: 'rgba(27,158,106,0.10)',
+    border: 'rgba(27,158,106,0.34)',
   },
   'buyer-entered': {
     label: 'Your number',
     icon: 'edit',
-    color: '#4ab6ff',
-    bg: 'rgba(74,182,255,0.12)',
-    border: 'rgba(74,182,255,0.38)',
+    color: '#1349d4',
+    bg: 'rgba(19,73,212,0.08)',
+    border: 'rgba(19,73,212,0.30)',
   },
   'pending-application': {
     label: 'Estimate',
     icon: 'pending',
-    color: '#fbc64f',
-    bg: 'rgba(251,198,79,0.12)',
-    border: 'rgba(251,198,79,0.38)',
+    color: '#b8860b',
+    bg: 'rgba(217,176,102,0.14)',
+    border: 'rgba(184,134,11,0.34)',
   },
 };
 

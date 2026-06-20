@@ -9,8 +9,9 @@
 // the buyer always knows what's real vs. their own number vs. a stand-in
 // waiting on their loan/insurance application.
 //
-// Built to drop into the buyer portal AND sit beside RpaFlow (the money
-// lens next to the negotiation lens). Same locked desk palette.
+// Light brand-blue language to match the launcher / front page
+// (project_front_page_locked, project_plot_palette_locked: brand #1349d4).
+// Built to drop into the buyer portal AND sit beside RpaFlow.
 
 import { useMemo, useState } from 'react';
 import MaterialIcon from '@/components/ui/MaterialIcon';
@@ -20,10 +21,20 @@ import InsuranceQuoteCard from './InsuranceQuoteCard';
 import { computeBreakdown } from '@/lib/offer/costEngine';
 import { DEFAULT_INPUTS, type OfferInputs, type CostLine } from '@/lib/offer/types';
 
+const BRAND = '#1349d4';
+const INK = '#0c1322';
+const BODY = '#4a5568';
+const MUTED = '#8a93a4';
+
 const PANEL_STYLE: React.CSSProperties = {
-  background: 'linear-gradient(160deg, rgba(34,44,68,0.92), rgba(13,20,36,0.96))',
-  border: '1px solid rgba(125,168,255,0.16)',
-  boxShadow: '0 18px 40px -14px rgba(0,0,0,0.7), inset 0 1px 0 rgba(180,210,255,0.14)',
+  background: 'rgba(255,255,255,0.78)',
+  border: '1px solid rgba(19,73,212,0.10)',
+  boxShadow: '0 12px 30px -22px rgba(20,50,120,0.4)',
+};
+const INPUT_STYLE: React.CSSProperties = {
+  background: '#ffffff',
+  border: '1px solid rgba(19,73,212,0.18)',
+  color: INK,
 };
 
 const usd = (n: number) =>
@@ -53,13 +64,13 @@ export default function CostCockpit({
     <div className="space-y-5">
       {/* header */}
       <div>
-        <div className="text-[10px] uppercase tracking-[0.4em] text-[rgba(0,242,255,0.7)] font-bold">
+        <div className="text-[11px] uppercase tracking-[0.3em] font-bold" style={{ color: BRAND }}>
           Offer Cost Cockpit · the live numbers
         </div>
-        <h2 className="font-headline text-2xl md:text-3xl font-extrabold text-white mt-1.5 [text-shadow:0_2px_24px_rgba(0,242,255,0.18)]">
+        <h2 className="font-headline text-2xl md:text-3xl font-extrabold mt-1.5" style={{ color: INK }}>
           Every dollar. You drive it.
         </h2>
-        <p className="text-sm text-[rgba(200,215,255,0.65)] mt-2 max-w-2xl leading-relaxed">
+        <p className="text-sm mt-2 max-w-2xl leading-relaxed" style={{ color: BODY }}>
           This is the breakdown your lender wouldn&apos;t build you. Move any
           number. Each line shows where it came from — a real quote, your own
           figure, or a stand-in waiting on your application.
@@ -70,8 +81,8 @@ export default function CostCockpit({
         {/* ── LEFT: the drivers ── */}
         <div className="space-y-4">
           <div className="rounded-2xl p-5 relative overflow-hidden" style={PANEL_STYLE}>
-            <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
-              <MaterialIcon icon="tune" className="text-[18px] text-[#00f2ff]" />
+            <h3 className="text-sm font-bold mb-4 flex items-center gap-2" style={{ color: INK }}>
+              <MaterialIcon icon="tune" className="text-[18px]" />
               What you control
             </h3>
 
@@ -118,7 +129,7 @@ export default function CostCockpit({
             {/* rate — provider-maintained or buyer-entered */}
             <div className="mt-4">
               <div className="flex items-center justify-between mb-1">
-                <label className="text-xs font-semibold text-[rgba(220,230,255,0.8)]">
+                <label className="text-xs font-semibold" style={{ color: INK }}>
                   Interest rate
                 </label>
                 <SourceTag source={inputs.interestRate.source} />
@@ -135,12 +146,12 @@ export default function CostCockpit({
                       source: 'buyer-entered',
                     })
                   }
-                  className="w-full px-3 py-2.5 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-[rgba(0,242,255,0.3)] disabled:opacity-40"
-                  style={{ background: 'rgba(11,16,32,0.7)', border: '1px solid rgba(125,168,255,0.22)' }}
+                  className="w-full px-3 py-2.5 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[rgba(19,73,212,0.25)] disabled:opacity-40"
+                  style={INPUT_STYLE}
                 />
-                <span className="text-sm text-[rgba(180,200,255,0.6)] font-semibold">%</span>
+                <span className="text-sm font-semibold" style={{ color: MUTED }}>%</span>
               </div>
-              <p className="text-[11px] text-[rgba(200,215,255,0.5)] mt-1.5 leading-snug">
+              <p className="text-[11px] mt-1.5 leading-snug" style={{ color: MUTED }}>
                 {inputs.interestRate.source === 'pending-application'
                   ? "This is a stand-in. Submit a loan application below — a lender picks it up and writes your real rate here."
                   : inputs.interestRate.source === 'live-provider'
@@ -182,12 +193,12 @@ export default function CostCockpit({
         <div className="space-y-4">
           {/* the three big numbers */}
           <div className="grid grid-cols-3 gap-3">
-            <BigNumber label="Monthly" value={usd(b.monthly.total)} accent="#00f2ff" />
-            <BigNumber label="Cash to close" value={usd(b.cashToClose.total)} accent="#5ed6a8" />
+            <BigNumber label="Monthly" value={usd(b.monthly.total)} accent={BRAND} />
+            <BigNumber label="Cash to close" value={usd(b.cashToClose.total)} accent="#1b9e6a" />
             <BigNumber
               label={inputs.loanType === 'cash' ? 'Loan' : 'Total interest'}
               value={inputs.loanType === 'cash' ? '$0' : usd(b.totalInterest)}
-              accent="#fbc64f"
+              accent="#b8860b"
             />
           </div>
 
@@ -217,8 +228,8 @@ export default function CostCockpit({
             ))}
           </Section>
 
-          <p className="text-[11px] text-[rgba(180,200,255,0.45)] leading-relaxed px-1">
-            Lines marked <span className="text-[#fbc64f] font-semibold">Estimate</span> are
+          <p className="text-[11px] leading-relaxed px-1" style={{ color: MUTED }}>
+            Lines marked <span className="font-semibold" style={{ color: '#b8860b' }}>Estimate</span> are
             stand-ins until a licensed lender or insurer writes the real number in. Nothing here
             is a binding quote — it&apos;s your live working offer, and you control every figure.
           </p>
@@ -256,14 +267,14 @@ function LineItem({ line, indented }: { line: CostLine; indented?: boolean }) {
     <div className={`flex items-start justify-between gap-3 py-2 ${indented ? 'pl-3' : ''}`}>
       <div className="min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-sm text-[rgba(225,235,255,0.92)] font-medium">{line.label}</span>
+          <span className="text-sm font-medium" style={{ color: INK }}>{line.label}</span>
           <SourceTag source={line.source} />
         </div>
         {line.note && (
-          <p className="text-[11px] text-[rgba(180,200,255,0.5)] mt-0.5 leading-snug">{line.note}</p>
+          <p className="text-[11px] mt-0.5 leading-snug" style={{ color: MUTED }}>{line.note}</p>
         )}
       </div>
-      <span className="text-sm font-bold text-white tabular-nums shrink-0">
+      <span className="text-sm font-bold tabular-nums shrink-0" style={{ color: INK }}>
         {line.amount.toLocaleString('en-US', {
           style: 'currency',
           currency: 'USD',
@@ -286,10 +297,10 @@ function Section({
   return (
     <div className="rounded-2xl p-5 relative overflow-hidden" style={PANEL_STYLE}>
       <div className="flex items-center justify-between mb-2">
-        <h3 className="text-sm font-bold text-white">{title}</h3>
-        <span className="text-base font-extrabold text-[#00f2ff] tabular-nums">{total}</span>
+        <h3 className="text-sm font-bold" style={{ color: INK }}>{title}</h3>
+        <span className="text-base font-extrabold tabular-nums" style={{ color: BRAND }}>{total}</span>
       </div>
-      <div className="divide-y divide-[rgba(125,168,255,0.1)]">{children}</div>
+      <div className="divide-y divide-[rgba(19,73,212,0.08)]">{children}</div>
     </div>
   );
 }
@@ -297,10 +308,10 @@ function Section({
 function SubHead({ label, total }: { label: string; total: string }) {
   return (
     <div className="flex items-center justify-between pt-3 pb-1">
-      <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-[rgba(180,200,255,0.55)]">
+      <span className="text-[10px] uppercase tracking-[0.2em] font-bold" style={{ color: MUTED }}>
         {label}
       </span>
-      <span className="text-xs font-semibold text-[rgba(180,200,255,0.6)] tabular-nums">{total}</span>
+      <span className="text-xs font-semibold tabular-nums" style={{ color: BODY }}>{total}</span>
     </div>
   );
 }
@@ -310,14 +321,15 @@ function BigNumber({ label, value, accent }: { label: string; value: string; acc
     <div
       className="rounded-2xl p-3.5 text-center relative overflow-hidden"
       style={{
-        ...PANEL_STYLE,
-        boxShadow: `0 14px 32px -14px rgba(0,0,0,0.7), inset 0 1px 0 rgba(180,210,255,0.14), 0 0 32px -16px ${accent}`,
+        background: '#ffffff',
+        border: `1px solid ${accent}26`,
+        boxShadow: `0 12px 28px -20px ${accent}, inset 0 1px 0 rgba(255,255,255,0.6)`,
       }}
     >
       <div className="text-[9px] uppercase tracking-[0.2em] font-bold" style={{ color: accent }}>
         {label}
       </div>
-      <div className="text-lg md:text-xl font-extrabold text-white mt-1 tabular-nums">{value}</div>
+      <div className="text-lg md:text-xl font-extrabold mt-1 tabular-nums" style={{ color: INK }}>{value}</div>
     </div>
   );
 }
@@ -333,15 +345,15 @@ function MoneyInput({
 }) {
   return (
     <div className="mt-1">
-      <label className="text-xs font-semibold text-[rgba(220,230,255,0.8)]">{label}</label>
+      <label className="text-xs font-semibold" style={{ color: INK }}>{label}</label>
       <div className="flex items-center gap-2 mt-1">
-        <span className="text-sm text-[rgba(180,200,255,0.6)] font-semibold">$</span>
+        <span className="text-sm font-semibold" style={{ color: MUTED }}>$</span>
         <input
           type="number"
           value={value}
           onChange={(e) => onChange(Math.max(0, Number(e.target.value)))}
-          className="w-full px-3 py-2.5 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-[rgba(0,242,255,0.3)]"
-          style={{ background: 'rgba(11,16,32,0.7)', border: '1px solid rgba(125,168,255,0.22)' }}
+          className="w-full px-3 py-2.5 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[rgba(19,73,212,0.25)]"
+          style={INPUT_STYLE}
         />
       </div>
     </div>
@@ -370,8 +382,8 @@ function Slider({
   return (
     <div className={`mt-4 ${disabled ? 'opacity-40' : ''}`}>
       <div className="flex items-center justify-between mb-1.5">
-        <label className="text-xs font-semibold text-[rgba(220,230,255,0.8)]">{label}</label>
-        <span className="text-xs font-bold text-[#00f2ff] tabular-nums">{suffix}</span>
+        <label className="text-xs font-semibold" style={{ color: INK }}>{label}</label>
+        <span className="text-xs font-bold tabular-nums" style={{ color: BRAND }}>{suffix}</span>
       </div>
       <input
         type="range"
@@ -381,7 +393,8 @@ function Slider({
         value={value}
         disabled={disabled}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full accent-[#00d8e6] cursor-pointer"
+        className="w-full cursor-pointer"
+        style={{ accentColor: BRAND }}
       />
     </div>
   );
@@ -400,15 +413,15 @@ function SelectField({
 }) {
   return (
     <div>
-      <label className="text-xs font-semibold text-[rgba(220,230,255,0.8)]">{label}</label>
+      <label className="text-xs font-semibold" style={{ color: INK }}>{label}</label>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full mt-1 px-3 py-2.5 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-[rgba(0,242,255,0.3)]"
-        style={{ background: 'rgba(11,16,32,0.7)', border: '1px solid rgba(125,168,255,0.22)' }}
+        className="w-full mt-1 px-3 py-2.5 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[rgba(19,73,212,0.25)]"
+        style={INPUT_STYLE}
       >
         {options.map(([v, l]) => (
-          <option key={v} value={v} style={{ background: '#0b1020' }}>
+          <option key={v} value={v}>
             {l}
           </option>
         ))}
@@ -434,35 +447,35 @@ function ClaimRow({
   return (
     <button
       onClick={onOpen}
-      className="w-full text-left rounded-2xl p-4 relative overflow-hidden transition-all hover:brightness-110"
+      className="w-full text-left rounded-2xl p-4 relative overflow-hidden transition-all hover:-translate-y-0.5"
       style={PANEL_STYLE}
     >
       <div className="flex items-start gap-3">
         <div
           className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
           style={{
-            background: 'linear-gradient(160deg, rgba(0,242,255,0.22), rgba(0,242,255,0.08))',
-            border: '1px solid rgba(0,242,255,0.35)',
+            background: 'linear-gradient(160deg, rgba(19,73,212,0.14), rgba(19,73,212,0.06))',
+            border: '1px solid rgba(19,73,212,0.22)',
           }}
         >
-          <MaterialIcon icon={icon} className="text-[20px] text-[#00f2ff]" />
+          <span style={{ color: BRAND }}><MaterialIcon icon={icon} className="text-[20px]" /></span>
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-bold text-white">{title}</span>
+            <span className="text-sm font-bold" style={{ color: INK }}>{title}</span>
             {submitted ? (
-              <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(94,214,168,0.14)', border: '1px solid rgba(94,214,168,0.4)', color: '#5ed6a8' }}>
+              <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(27,158,106,0.10)', border: '1px solid rgba(27,158,106,0.34)', color: '#1b9e6a' }}>
                 Submitted
               </span>
             ) : (
-              <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(251,198,79,0.12)', border: '1px solid rgba(251,198,79,0.38)', color: '#fbc64f' }}>
+              <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(217,176,102,0.14)', border: '1px solid rgba(184,134,11,0.34)', color: '#b8860b' }}>
                 Necessary card
               </span>
             )}
           </div>
-          <p className="text-[11px] text-[rgba(200,215,255,0.6)] mt-1 leading-snug">{blurb}</p>
+          <p className="text-[11px] mt-1 leading-snug" style={{ color: BODY }}>{blurb}</p>
         </div>
-        <MaterialIcon icon="arrow_forward" className="text-[18px] text-[rgba(0,242,255,0.7)] mt-1" />
+        <span style={{ color: BRAND }}><MaterialIcon icon="arrow_forward" className="text-[18px] mt-1" /></span>
       </div>
     </button>
   );

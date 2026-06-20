@@ -18,9 +18,9 @@ import type { OfferInputs } from '@/lib/offer/types';
 
 const OVERLAY = 'fixed inset-0 z-[120] flex items-center justify-center p-4';
 const PANEL_STYLE: React.CSSProperties = {
-  background: 'linear-gradient(160deg, rgba(34,44,68,0.97), rgba(13,20,36,0.98))',
-  border: '1px solid rgba(125,168,255,0.2)',
-  boxShadow: '0 40px 90px -20px rgba(0,0,0,0.85), inset 0 1px 0 rgba(180,210,255,0.16)',
+  background: '#ffffff',
+  border: '1px solid rgba(19,73,212,0.12)',
+  boxShadow: '0 40px 90px -24px rgba(20,40,90,0.45)',
 };
 
 export default function LoanApplicationCard({
@@ -45,25 +45,26 @@ export default function LoanApplicationCard({
 
   return (
     <div className={OVERLAY}>
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-[rgba(12,19,34,0.45)] backdrop-blur-sm" onClick={onClose} />
       <div className="relative w-full max-w-lg rounded-2xl p-6 max-h-[90vh] overflow-y-auto" style={PANEL_STYLE}>
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 text-[rgba(180,200,255,0.6)] hover:text-white transition-colors"
+          className="absolute top-4 right-4 transition-colors"
+          style={{ color: '#8a93a4' }}
         >
           <MaterialIcon icon="close" className="text-[20px]" />
         </button>
 
         <div className="flex items-center gap-3 mb-1">
-          <MaterialIcon icon="account_balance" className="text-[24px] text-[#00f2ff]" />
-          <div className="text-[10px] uppercase tracking-[0.3em] text-[rgba(0,242,255,0.7)] font-bold">
+          <span style={{ color: '#1349d4' }}><MaterialIcon icon="account_balance" className="text-[24px]" /></span>
+          <div className="text-[10px] uppercase tracking-[0.3em] font-bold" style={{ color: '#1349d4' }}>
             Loan Application
           </div>
         </div>
-        <h3 className="font-headline text-2xl font-extrabold text-white">
+        <h3 className="font-headline text-2xl font-extrabold" style={{ color: '#0c1322' }}>
           Get your real rate.
         </h3>
-        <p className="text-sm text-[rgba(200,215,255,0.65)] mt-2 leading-relaxed">
+        <p className="text-sm mt-2 leading-relaxed" style={{ color: '#4a5568' }}>
           Fill this once. A licensed lender picks up your file and writes your
           actual rate, points, and fees straight into your breakdown. No more
           &quot;rates change daily&quot; — they&apos;ll quote you and stand behind it.
@@ -71,8 +72,8 @@ export default function LoanApplicationCard({
 
         {/* what we already know — pre-filled from the cockpit */}
         <div
-          className="mt-4 rounded-xl p-3 text-xs text-[rgba(200,215,255,0.7)] grid grid-cols-3 gap-2"
-          style={{ background: 'rgba(0,242,255,0.06)', border: '1px solid rgba(0,242,255,0.18)' }}
+          className="mt-4 rounded-xl p-3 text-xs grid grid-cols-3 gap-2"
+          style={{ background: 'rgba(19,73,212,0.05)', border: '1px solid rgba(19,73,212,0.14)', color: '#4a5568' }}
         >
           <Known label="Price" value={`$${inputs.purchasePrice.toLocaleString()}`} />
           <Known label="Down" value={`${inputs.downPaymentPct}%`} />
@@ -95,9 +96,10 @@ export default function LoanApplicationCard({
               type="checkbox"
               checked={form.consent}
               onChange={(e) => setForm((f) => ({ ...f, consent: e.target.checked }))}
-              className="mt-0.5 accent-[#00d8e6]"
+              className="mt-0.5"
+              style={{ accentColor: '#1349d4' }}
             />
-            <span className="text-[11px] text-[rgba(200,215,255,0.6)] leading-snug">
+            <span className="text-[11px] leading-snug" style={{ color: '#6b7689' }}>
               I authorize Plot to share this application with licensed lenders so they can prepare a
               real quote. I understand a lender — not Plot — originates the loan.
             </span>
@@ -109,9 +111,9 @@ export default function LoanApplicationCard({
           onClick={onSubmitted}
           className="w-full mt-5 px-5 py-3 rounded-full text-sm font-bold transition-all disabled:opacity-40"
           style={{
-            background: 'linear-gradient(160deg, #00d8e6, #0095c9)',
-            color: '#04121a',
-            boxShadow: ready ? '0 8px 24px -8px rgba(0,242,255,0.6)' : 'none',
+            background: 'linear-gradient(160deg, #1349d4, #122d8d)',
+            color: '#ffffff',
+            boxShadow: ready ? '0 10px 24px -10px rgba(19,73,212,0.7)' : 'none',
           }}
         >
           Submit — get matched with a lender
@@ -124,8 +126,8 @@ export default function LoanApplicationCard({
 function Known({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <div className="text-[9px] uppercase tracking-wider text-[rgba(180,200,255,0.5)] font-bold">{label}</div>
-      <div className="text-xs font-bold text-white capitalize">{value}</div>
+      <div className="text-[9px] uppercase tracking-wider font-bold" style={{ color: '#8a93a4' }}>{label}</div>
+      <div className="text-xs font-bold capitalize" style={{ color: '#0c1322' }}>{value}</div>
     </div>
   );
 }
@@ -133,13 +135,13 @@ function Known({ label, value }: { label: string; value: string }) {
 function Field({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string }) {
   return (
     <div>
-      <label className="text-xs font-semibold text-[rgba(220,230,255,0.8)]">{label}</label>
+      <label className="text-xs font-semibold" style={{ color: '#0c1322' }}>{label}</label>
       <input
         value={value}
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full mt-1 px-3 py-2.5 rounded-lg text-sm text-white placeholder:text-[rgba(180,200,255,0.35)] focus:outline-none focus:ring-2 focus:ring-[rgba(0,242,255,0.3)]"
-        style={{ background: 'rgba(11,16,32,0.7)', border: '1px solid rgba(125,168,255,0.22)' }}
+        className="w-full mt-1 px-3 py-2.5 rounded-lg text-sm placeholder:text-[#aab2c0] focus:outline-none focus:ring-2 focus:ring-[rgba(19,73,212,0.25)]"
+        style={{ background: '#ffffff', border: '1px solid rgba(19,73,212,0.18)', color: '#0c1322' }}
       />
     </div>
   );
@@ -148,15 +150,15 @@ function Field({ label, value, onChange, placeholder }: { label: string; value: 
 function Select({ label, value, onChange, options }: { label: string; value: string; onChange: (v: string) => void; options: [string, string][] }) {
   return (
     <div>
-      <label className="text-xs font-semibold text-[rgba(220,230,255,0.8)]">{label}</label>
+      <label className="text-xs font-semibold" style={{ color: '#0c1322' }}>{label}</label>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full mt-1 px-3 py-2.5 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-[rgba(0,242,255,0.3)]"
-        style={{ background: 'rgba(11,16,32,0.7)', border: '1px solid rgba(125,168,255,0.22)' }}
+        className="w-full mt-1 px-3 py-2.5 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[rgba(19,73,212,0.25)]"
+        style={{ background: '#ffffff', border: '1px solid rgba(19,73,212,0.18)', color: '#0c1322' }}
       >
         {options.map(([v, l]) => (
-          <option key={v} value={v} style={{ background: '#0b1020' }}>{l}</option>
+          <option key={v} value={v}>{l}</option>
         ))}
       </select>
     </div>

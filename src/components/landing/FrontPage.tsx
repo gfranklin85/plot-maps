@@ -2,6 +2,7 @@
 
 import AppHeader from '@/components/layout/AppHeader';
 import ToolGrid from '@/components/dashboard/ToolGrid';
+import MaterialIcon from '@/components/ui/MaterialIcon';
 import { signInWithGoogle } from '@/lib/signIn';
 
 // ── FrontPage ─────────────────────────────────────────────────────────
@@ -78,13 +79,16 @@ export default function FrontPage() {
                 When it&apos;s time, <b>Position</b> is the brokerage that helps
                 you act.
               </p>
+              {/* Buttons = the exact thing visitors came to DO. Explore (the
+                  hook) + the dreamer action (tell us your move — we store +
+                  search to fulfill it). memory/project_dreamer_funnel_buttons */}
               <div className="fp-cta-row">
                 <button type="button" className="fp-cta fp-cta--primary" onClick={() => signInWithGoogle()}>
                   Explore the map <span aria-hidden>→</span>
                 </button>
-                <button type="button" className="fp-cta fp-cta--ghost" onClick={() => signInWithGoogle()}>
-                  Browse listings
-                </button>
+                <a className="fp-cta fp-cta--ghost" href="#tell-us">
+                  Tell us where you&apos;d go
+                </a>
               </div>
               <div className="fp-trust">
                 <div className="fp-trust__avatars" aria-hidden>
@@ -119,6 +123,39 @@ export default function FrontPage() {
         </div>
       </section>
 
+      {/* ════ TELL US WHERE YOU'D GO — the dreamer capture ════
+          Everyone is a wanter: a buyer wants a house, an owner wants their
+          retirement spot, a renter wants to move. This is where they SAY it
+          (where + scenario + what they want) and Plot stores it + searches
+          to fulfill. The self-score reimagined. memory/project_dreamer_funnel_buttons */}
+      <section id="tell-us" className="fp-section fp-dreamer">
+        <div className="fp__wrap">
+          <div className="fp-dreamer__card">
+            <div className="fp-dreamer__eyebrow">For everyone with a place in mind</div>
+            <h2 className="fp-dreamer__h">Tell us where you&apos;d go.</h2>
+            <p className="fp-dreamer__p">
+              A first home, a bigger one, your retirement town, the city you
+              keep dreaming about. Tell us where — and your scenario — and we
+              go to work finding the way there. The right place, the real
+              numbers, the people who can help.
+            </p>
+            <div className="fp-dreamer__row">
+              <input
+                className="fp-dreamer__input"
+                placeholder="Where would you go? A city, a town, a neighborhood…"
+                onFocus={() => {}}
+              />
+              <button type="button" className="fp-cta fp-cta--primary fp-dreamer__btn" onClick={() => signInWithGoogle()}>
+                Start <span aria-hidden>→</span>
+              </button>
+            </div>
+            <p className="fp-dreamer__note">
+              Free. No pressure. Your dream, stored and worked on — not just browsed.
+            </p>
+          </div>
+        </div>
+      </section>
+
       {/* ════ THE TOOL GRID — the dashboard, right on the front page ════
           Everything is gated at the action (try-before-buy), so the full
           toolset is shown up front. memory/project_one_page_tools_on_landing */}
@@ -130,6 +167,34 @@ export default function FrontPage() {
               Powerful tools for every neighborhood.
             </h2>
             <ToolGrid />
+          </div>
+        </div>
+      </section>
+
+      {/* ════ FOR AGENTS & BROKERS — the operator doors ════
+          The minority who came for the tools. memory/project_dreamer_funnel_buttons */}
+      <section className="fp-section fp-agents">
+        <div className="fp__wrap">
+          <div className="fp-eyebrow" style={{ color: '#334155' }}>For agents &amp; brokers</div>
+          <h2 className="fp-h2">The operator&apos;s toolkit.</h2>
+          <div className="fp-agents__grid">
+            {[
+              { href: '/forms', icon: 'history_edu', title: 'Prepare your own contracts', sub: 'Offers & disclosures in plain English — your instruments, not borrowed forms.' },
+              { href: '/campaigns/commercials', icon: 'sell', title: 'Post your listing', sub: 'Put a property on the map with an Orbit video and reach real buyers.' },
+              { href: '/join-position', icon: 'workspace_premium', title: 'Join Position', sub: 'A brokerage built for operators — the tools others pay for, free.' },
+              { href: '/position', icon: 'lan', title: 'See our tech solutions', sub: 'The infrastructure behind Plot — data, prospecting, and the platform.' },
+            ].map((a) => (
+              <a key={a.title} href={a.href} className="fp-agent-card">
+                <span className="fp-agent-card__icon">
+                  <MaterialIcon icon={a.icon} />
+                </span>
+                <div>
+                  <div className="fp-agent-card__h">{a.title}</div>
+                  <p className="fp-agent-card__p">{a.sub}</p>
+                </div>
+                <MaterialIcon icon="arrow_forward" className="fp-agent-card__arrow text-[18px]" />
+              </a>
+            ))}
           </div>
         </div>
       </section>

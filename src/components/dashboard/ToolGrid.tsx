@@ -37,8 +37,8 @@ export interface Tool {
 
 export const TOOLS: Tool[] = [
   {
-    href: '/map?view=2d', icon: 'map', art: 'map-2d', title: 'Explore the 2D Map',
-    sub: 'Zoom in, search, and explore neighborhoods in 2D.', view: '2d',
+    href: '/map?view=2d', icon: 'map', art: 'map-2d', title: 'Walk the map from above',
+    sub: 'Zoom into any neighborhood in 2D — search, scan, and find what stands out.', view: '2d',
     layers: [
       { src: '/dashboard/icons/map-2d_base.png' },
       { src: '/dashboard/icons/map-2d_pin.png', anim: 'ic-bob' },
@@ -46,8 +46,8 @@ export const TOOLS: Tool[] = [
   },
   // CAR/NAR sidestep MOAT — contracts, disclosures + make an offer.
   {
-    href: '/forms', icon: 'description', art: 'forms', title: 'Build Contracts & Forms',
-    sub: 'Draft offers, disclosures & make an offer — plain English, no legalese.', flagship: true,
+    href: '/forms', icon: 'description', art: 'forms', title: 'Write your own offer',
+    sub: 'Draft offers, disclosures & contracts in plain English — no legalese, no borrowed forms.', flagship: true,
     assemble: {
       full: '/dashboard/icons/forms_full.png',
       pieces: [
@@ -61,8 +61,8 @@ export const TOOLS: Tool[] = [
   },
   // Contacts & Lists — includes import & geocode (one contacts hub).
   {
-    href: '/imports', icon: 'groups', art: 'import', title: 'Contacts & Lists',
-    sub: 'Import, geocode, and build lists to target the right people.',
+    href: '/imports', icon: 'groups', art: 'import', title: 'Bring your people onto the map',
+    sub: 'Import your contacts, pin them by address, and build lists to work.',
     assemble: {
       full: '/dashboard/icons/import_full.png',
       pieces: [
@@ -76,21 +76,24 @@ export const TOOLS: Tool[] = [
     },
   },
   {
-    href: '/campaigns/commercials', icon: 'smart_display', art: 'orbit-video', title: 'Orbit Listing Video',
-    sub: 'Create stunning listing videos with Orbit Property View.',
+    href: '/campaigns/commercials', icon: 'smart_display', art: 'orbit-video', title: 'Spin a 3D video of any property',
+    sub: 'A cinematic 3D orbit around the house — order it and it renders in a couple of hours.',
     assemble: {
       full: '/dashboard/icons/orbit_full.png',
+      // ring FIRST so it stacks BEHIND the house (the camera orbits around
+      // it). Later pieces render on top.
       pieces: [
+        { src: '/dashboard/icons/orbit_ring.png',   fly: 'fly-ring' },
         { src: '/dashboard/icons/orbit_house.png',  fly: 'fly-up'   },
         { src: '/dashboard/icons/orbit_player.png', fly: 'fly-left' },
         { src: '/dashboard/icons/orbit_cam.png',    fly: 'fly-pen'  },
-        { src: '/dashboard/icons/orbit_ring.png',   fly: 'fly-ring' },
       ],
     },
   },
-  { href: '/leads', icon: 'travel_explore', art: 'skip-trace', title: 'Prospect with Skip Trace', sub: 'Find phone numbers, emails, and addresses with ease.' },
-  { href: '/campaigns', icon: 'mail', art: 'mail', title: 'Direct Mail Campaigns', sub: 'Design, target, and send high-impact mailers.' },
-  { href: '/campaigns', icon: 'call', art: 'call', title: 'Call Prospects', sub: 'Dial from any property, track conversations, stay organized.' },
+  // Plain-language titles = the action; the industry term lives in the sub.
+  { href: '/leads', icon: 'travel_explore', art: 'skip-trace', title: 'See a house, call the owner', sub: "Get any owner's number and reach out — instant skip trace, no MLS needed." },
+  { href: '/campaigns', icon: 'mail', art: 'mail', title: 'Mail any house — even off-market', sub: "Find owners who aren't on Zillow or the MLS and send a real letter. Buyers, investors, agents." },
+  { href: '/campaigns', icon: 'call', art: 'call', title: 'Call from the map', sub: 'Dial any property right from the screen — conversations tracked, nothing lost.' },
 ];
 
 export default function ToolGrid() {

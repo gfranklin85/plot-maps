@@ -53,10 +53,11 @@ export default function AppHeader({ variant = 'public' }: { variant?: 'public' |
 
           {variant === 'public' ? (
             <>
-              {/* both kick off Google sign-in directly. "Log in" hides on
-                  mobile (fp-public-login); Get Started stays. */}
-              <button type="button" className="fp-login fp-public-login" onClick={() => signInWithGoogle()}>Log in</button>
-              <button type="button" className="fp-get" onClick={() => signInWithGoogle()}>Get Started</button>
+              {/* Header is for RETURNING users (Log in). The real "come do
+                  the thing" actions are the hero buttons (Explore the map /
+                  Tell us where you'd go). No vague "Get Started".
+                  memory/project_dreamer_funnel_buttons */}
+              <button type="button" className="fp-get" onClick={() => signInWithGoogle()}>Log in</button>
             </>
           ) : (
             <>

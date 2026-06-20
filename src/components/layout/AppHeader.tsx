@@ -51,13 +51,14 @@ export default function AppHeader({ variant = 'public' }: { variant?: 'public' |
 
           {variant === 'public' ? (
             <>
-              {/* both kick off Google sign-in directly (no old landing) */}
-              <button type="button" className="fp-login" onClick={() => signInWithGoogle()}>Log in</button>
+              {/* both kick off Google sign-in directly (no old landing).
+                  "Log in" hides on mobile (fp-public-login); Get Started stays. */}
+              <button type="button" className="fp-login fp-public-login" onClick={() => signInWithGoogle()}>Log in</button>
               <button type="button" className="fp-get" onClick={() => signInWithGoogle()}>Get Started</button>
             </>
           ) : (
             <>
-              <a className="fp-login" href="/settings">Settings</a>
+              <a className="fp-login fp-app-settings" href="/settings">Settings</a>
               <button
                 type="button"
                 className="fp-login fp-signout"

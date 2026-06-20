@@ -1701,12 +1701,16 @@ gmp-popover-3d-element[plot-card-popover],
 .fly-right { transform: translate(45%,8%)   rotate(8deg)  scale(0.92); }
 .fly-pen   { transform: translate(60%,55%)  rotate(22deg) scale(0.85); }
 .fly-pop   { transform: translate(-30%,40%) scale(0.4); }
+.fly-arrow { transform: translate(-12%,-30%) scale(0.6); }   /* the geocode connector draws in */
+.fly-pin   { transform: translate(0,-45%) scale(0.3); }      /* the dropped pin pops down last */
 /* stagger the fly-in so it assembles, not all-at-once */
 .dash-card:hover .fly-up    { transition-delay: 0.00s, 0s; }
 .dash-card:hover .fly-left  { transition-delay: 0.06s, 0.04s; }
 .dash-card:hover .fly-right { transition-delay: 0.10s, 0.08s; }
 .dash-card:hover .fly-pen   { transition-delay: 0.16s, 0.14s; }
 .dash-card:hover .fly-pop   { transition-delay: 0.24s, 0.22s; }
+.dash-card:hover .fly-arrow { transition-delay: 0.20s, 0.18s; }
+.dash-card:hover .fly-pin   { transition-delay: 0.30s, 0.28s; }
 
 @media (prefers-reduced-motion: reduce) {
   .dash-card__assemble-piece { opacity: 1 !important; transform: none !important; }
@@ -1716,3 +1720,48 @@ gmp-popover-3d-element[plot-card-popover],
 /* sign-out button in the app header — matches the ghost (fp-login) look */
 .fp-signout { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; background: #fff; }
 .fp-signout:hover { background: rgba(12,19,34,0.04); }
+
+/* ════════════════════════════════════════════════════════════════════
+   MOBILE — front page fixes (header overflow + hero layout on narrow)
+   ════════════════════════════════════════════════════════════════════ */
+@media (max-width: 640px) {
+  /* tighter wrap padding */
+  .fp__wrap { padding-left: 16px; padding-right: 16px; }
+
+  /* header: one line. The logo wordmark + two buttons won't fit a phone, so
+     keep only the primary "Get Started" (both just trigger sign-in anyway). */
+  .fp-nav { gap: 8px; height: 58px; }
+  .fp-logo__img { height: 24px; }
+  .fp-logo__by { display: none; }                 /* hide "by position" on tiny screens */
+  /* PUBLIC header (front page): drop "Log in", keep "Get Started". */
+  .fp-public-login { display: none; }
+  /* APP header (signed in): keep Sign out reachable, collapse its label to
+     just the icon so it fits; drop Settings + "Open the Map" label text. */
+  .fp-signout { display: inline-flex; padding: 7px 9px; }
+  .fp-signout span { display: none; }             /* icon-only sign out on mobile */
+  .fp-app-settings { display: none; }             /* settings via the app menu later */
+  .fp-get { padding: 8px 13px; font-size: 12.5px; white-space: nowrap; }
+  /* headline must never clip the right edge */
+  .fp-head { overflow-wrap: break-word; }
+
+  /* hero: headline first, scene below, everything full-width */
+  .fp-hero__grid { padding-top: 24px; gap: 4px; min-height: auto; }
+  .fp-head { font-size: clamp(34px, 11vw, 46px); }
+  .fp-sub { font-size: 15px; margin-top: 16px; }
+  .fp-pill { margin-bottom: 16px; }
+
+  /* CTAs stack full-width, easy thumb targets */
+  .fp-cta-row { flex-direction: column; gap: 10px; margin-top: 22px; }
+  .fp-cta { width: 100%; justify-content: center; padding: 14px 20px; }
+
+  /* the floating scene: give it real room, center it, let it breathe */
+  .fp-hero__scene-col { flex: none; width: 100%; margin-top: 18px; }
+  .fp-scene { width: 100%; margin-left: 0; transform: none; max-width: 420px; }
+
+  /* sections: less padding, single column already handled by their grids */
+  .fp-section { padding: 40px 0; }
+  .fp-h2 { font-size: clamp(22px, 6vw, 30px); }
+
+  /* trust row wraps cleanly */
+  .fp-trust { margin-top: 22px; }
+}

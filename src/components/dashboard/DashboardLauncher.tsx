@@ -88,13 +88,40 @@ const TOOLS: Tool[] = [
   },
   // The Offer Cost Cockpit — the live, fully-editable money breakdown a
   // buyer makes a real offer from. Deep-links straight to the money lens.
-  // Another CAR/lender sidestep, so it gets the flagship treatment too.
+  // Hover-assemble icon: full at rest; on hover the dollar-shield cloud,
+  // the offer-sheet cloud, the button, its label + the click cursor fly in.
   {
     href: '/forms/rpa?lens=money', icon: 'payments', art: 'offer', title: 'Make an Offer',
     sub: 'See and edit every cost — down payment, rate, insurance — your live offer.',
     flagship: true,
+    assemble: {
+      full: '/dashboard/icons/offer_full.png',
+      pieces: [
+        { src: '/dashboard/icons/offer_shield.png',  fly: 'fly-left'  },
+        { src: '/dashboard/icons/offer_sheet.png',   fly: 'fly-right' },
+        { src: '/dashboard/icons/offer_btn.png',     fly: 'fly-up'    },
+        { src: '/dashboard/icons/offer_btntext.png', fly: 'fly-pop'   },
+        { src: '/dashboard/icons/offer_cursor.png',  fly: 'fly-pen'   },
+      ],
+    },
   },
-  { href: '/imports', icon: 'upload_file', art: 'import', title: 'Import & Geocode Contacts', sub: 'Upload contacts and map them instantly.' },
+  // Hover-assemble: full at rest; on hover the tray, contact-cards stack,
+  // map tile, geocode arrow, upload badge + dropped pin fly in and assemble.
+  {
+    href: '/imports', icon: 'upload_file', art: 'import', title: 'Import & Geocode Contacts',
+    sub: 'Upload contacts and map them instantly.',
+    assemble: {
+      full: '/dashboard/icons/import_full.png',
+      pieces: [
+        { src: '/dashboard/icons/import_base.png',   fly: 'fly-up'    },
+        { src: '/dashboard/icons/import_cards.png',  fly: 'fly-left'  },
+        { src: '/dashboard/icons/import_map.png',    fly: 'fly-right' },
+        { src: '/dashboard/icons/import_upload.png', fly: 'fly-pen'   },
+        { src: '/dashboard/icons/import_arrow.png',  fly: 'fly-arrow' },
+        { src: '/dashboard/icons/import_pin.png',    fly: 'fly-pin'   },
+      ],
+    },
+  },
   { href: '/leads', icon: 'groups', art: 'lists', title: 'Contacts & Lists', sub: 'Build lists and segments to target the right people.' },
   { href: '/campaigns/commercials', icon: 'smart_display', art: 'orbit-video', title: 'Orbit Listing Video', sub: 'Create stunning listing videos with Orbit Property View.' },
   { href: '/leads', icon: 'travel_explore', art: 'skip-trace', title: 'Prospect with Skip Trace', sub: 'Find phone numbers, emails, and addresses with ease.' },

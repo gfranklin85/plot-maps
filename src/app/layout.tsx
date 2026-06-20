@@ -23,7 +23,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#F4EAD5",
+  themeColor: "#ffffff",
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
@@ -58,7 +58,10 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="font-body antialiased bg-surface text-on-surface">
+      {/* Neutral WHITE base (2026-06-19) — was the old cream `bg-surface`,
+          which flashed through on loads. New-theme pages set their own
+          light/blue surface; the body underneath is plain white. */}
+      <body className="font-body antialiased bg-white text-[#0c1322]">
         <ThemeProvider>
           <ClientProviders>
             <AppShell>

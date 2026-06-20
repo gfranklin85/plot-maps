@@ -371,49 +371,51 @@ html, body {
      memory/project_design_roadmap_spatial_product_world.md
    ─────────────────────────────────────────────────────────────── */
 :root {
-  /* Primary action — zoning coral / oxide red */
-  --color-primary: 200 85 61;            /* #C8553D */
-  --color-primary-container: 168 67 47;  /* #A8432F — hover/pressed */
-  --color-primary-fixed: 245 222 213;
-  --color-primary-fixed-dim: 232 195 180;
+  /* Primary action — PlotMaps BLUE (2026-06-19: coral KILLED). */
+  --color-primary: 19 73 212;            /* #1349d4 */
+  --color-primary-container: 18 45 141;  /* #122d8d — hover/pressed */
+  --color-primary-fixed: 224 231 251;
+  --color-primary-fixed-dim: 188 203 240;
   --color-on-primary: 255 255 255;
-  --color-on-primary-container: 60 18 8;
+  --color-on-primary-container: 8 24 70;
 
-  /* Surfaces — parchment cream family */
-  --color-surface: 244 234 213;             /* #F4EAD5 canvas */
-  --color-surface-dim: 232 220 196;
-  --color-surface-bright: 251 245 230;      /* #FBF5E6 */
-  --color-surface-container: 248 240 222;
+  /* Surfaces — LIGHT WHITE family (2026-06-19: cream KILLED everywhere).
+     White/near-white surfaces + faint cool tints so old pages using
+     bg-surface/bg-card de-cream at the source, on the new light theme. */
+  --color-surface: 255 255 255;             /* #FFFFFF */
+  --color-surface-dim: 240 244 250;
+  --color-surface-bright: 255 255 255;
+  --color-surface-container: 247 250 253;   /* faint cool */
   --color-surface-container-lowest: 255 255 255;
-  --color-surface-container-low: 251 245 230;  /* #FBF5E6 */
-  --color-surface-container-high: 240 228 205;
-  --color-surface-container-highest: 232 220 196;
-  --color-surface-variant: 240 228 205;
-  --color-surface-tint: 200 85 61;
+  --color-surface-container-low: 250 252 255;
+  --color-surface-container-high: 240 244 250;
+  --color-surface-container-highest: 233 240 250;
+  --color-surface-variant: 240 244 250;
+  --color-surface-tint: 19 73 212;          /* PlotMaps blue */
 
-  /* Ink — blueprint navy for primary text */
-  --color-on-surface: 26 31 46;            /* #1A1F2E */
-  --color-on-surface-variant: 74 66 54;    /* #4A4236 — warm sepia muted, deeper for cream contrast */
+  /* Ink — near-black headline ink */
+  --color-on-surface: 12 19 34;            /* #0C1322 */
+  --color-on-surface-variant: 74 85 104;   /* #4A5568 muted body */
 
-  /* Secondary — warm grey-brown family */
-  --color-secondary: 92 80 64;            /* deeper warm grey for cream contrast */
-  --color-secondary-container: 232 220 196;
+  /* Secondary — cool slate */
+  --color-secondary: 51 65 85;             /* slate */
+  --color-secondary-container: 224 231 251; /* soft blue tint */
   --color-on-secondary: 255 255 255;
-  --color-on-secondary-container: 60 50 35;
+  --color-on-secondary-container: 18 45 141;
 
-  /* Hairlines — aged paper rule lines */
-  --color-outline: 155 146 130;            /* #9B9282 */
-  --color-outline-variant: 217 204 174;    /* #D9CCAE */
+  /* Hairlines — light cool rules */
+  --color-outline: 154 163 173;
+  --color-outline-variant: 226 232 240;
 
-  --color-inverse-surface: 26 31 46;
-  --color-inverse-on-surface: 244 234 213;
+  --color-inverse-surface: 12 19 34;
+  --color-inverse-on-surface: 255 255 255;
 
-  --color-background: 244 234 213;         /* #F4EAD5 */
-  --color-on-background: 26 31 46;
+  --color-background: 255 255 255;         /* #FFFFFF */
+  --color-on-background: 12 19 34;
 
-  --color-card: 251 245 230;               /* #FBF5E6 */
+  --color-card: 255 255 255;               /* white cards */
   --color-card-border: 217 204 174;        /* #D9CCAE */
-  --color-card-border-hover: 200 85 61;    /* coral on hover */
+  --color-card-border-hover: 19 73 212;    /* blue on hover */
   --color-input-bg: 255 255 255;
   --color-input-border: 217 204 174;
 
@@ -1844,4 +1846,21 @@ gmp-popover-3d-element[plot-card-popover],
 @media (prefers-reduced-motion: reduce) {
   .dash-card.in-view .dash-card__assemble-piece { transition: none !important; transform: none !important; }
   .dash-card.in-view .dash-card__assemble-full { opacity: 0 !important; }
+}
+
+/* ── account menu (signed-in app header) ── */
+.fp-account { position: relative; }
+.fp-account__btn { display: inline-flex; align-items: center; gap: 4px; padding: 4px 6px 4px 4px; border-radius: 999px; border: 1px solid rgba(12,19,34,0.12); background: #fff; cursor: pointer; transition: background .15s, border-color .15s; }
+.fp-account__btn:hover { background: rgba(12,19,34,0.04); border-color: rgba(12,19,34,0.22); }
+.fp-account__avatar { width: 30px; height: 30px; border-radius: 999px; background: linear-gradient(150deg, var(--plot-brand), var(--plot-brand-deep)); color: #fff; font-weight: 700; font-size: 12px; display: inline-flex; align-items: center; justify-content: center; letter-spacing: 0.02em; }
+.fp-account__caret { color: #6b7585; }
+.fp-account__menu { position: absolute; right: 0; top: calc(100% + 8px); min-width: 180px; background: #fff; border: 1px solid rgba(12,19,34,0.1); border-radius: 12px; box-shadow: 0 16px 40px -16px rgba(20,40,80,0.4); padding: 6px; z-index: 60; }
+.fp-account__name { font-size: 12.5px; font-weight: 700; color: var(--plot-ink); padding: 8px 10px 6px; border-bottom: 1px solid rgba(12,19,34,0.07); margin-bottom: 4px; }
+.fp-account__item { display: flex; align-items: center; gap: 9px; width: 100%; text-align: left; padding: 9px 10px; border-radius: 8px; font-size: 14px; color: #2c3646; background: none; border: none; cursor: pointer; transition: background .12s; }
+.fp-account__item:hover { background: rgba(19,73,212,0.07); color: var(--plot-brand); }
+
+/* on mobile, keep the account menu; hide the "Open the Map" label text to
+   save room (the Map nav link covers it). */
+@media (max-width: 640px) {
+  .fp-app-map { display: none; }
 }

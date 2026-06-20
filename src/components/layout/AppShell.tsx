@@ -1,83 +1,85 @@
 'use client';
 
+// ── AppShell ──────────────────────────────────────────────────────────
+//
+// 2026-06-19: the OLD cream "Visual Prospecting CRM" shell (Sidebar +
+// TopBar + BottomNav, Material cream/dark theme) is REMOVED. It wrapped
+// ~30 logged-in routes and was the last of the old design. Every route now
+// renders SELF-CONTAINED — new-theme pages (the front page, tool grid)
+// bring their own light/blue chrome (AppHeader); the map keeps its
+// immersive MapNavOverlay; old pages render raw (they'll be rebuilt one at
+// a time, each graduating to the new theme).
+//
+// The only thing AppShell still does: keep the map's overlay + the CallBar
+// for signed-in users. Otherwise it's a pass-through.
+// See memory/project_one_page_tools_on_landing + the front-page lock.
+
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
-import { useSidebar } from '@/lib/sidebar-context';
-import Sidebar from './Sidebar';
-import TopBar from './TopBar';
-import BottomNav from './BottomNav';
 import MapNavOverlay from './MapNavOverlay';
+import AppHeader from './AppHeader';
 import CallBar from '@/components/call/CallBar';
 import type { ReactNode } from 'react';
 
-const AUTH_PAGES = ['/login', '/signup', '/auth', '/subscribe', '/landing', '/setup-number'];
+// The map gets the immersive nav overlay (its own translucent in-world nav).
+const MAP_PAGES = ['/map'];
 
-// Immersive pages render WITHOUT the global Sidebar/TopBar/BottomNav.
-// The map is Plot's primary product surface; wrapping it in agency-app
-// chrome competes with the "world is the canvas" framing. A compact
-// MapNavOverlay (translucent logo top-left, expandable nav drawer)
-// replaces the global chrome on these routes.
-//
-// /dashboard is immersive too: it's the map's BACK-OUT / pause screen —
-// the world is still behind it. It must NOT wear the cream agency chrome;
-// it surfaces over the (frozen) world like a pause menu. So it shares the
-// map's immersive treatment + the in-world nav overlay.
-const IMMERSIVE_PAGES = ['/map', '/dashboard', '/forms'];
+// Routes that render their OWN AppHeader (self-contained new-theme pages) —
+// AppShell must NOT add a second header for these. The front page (/) and
+// the forms surface bring their own. As old pages are rebuilt to the new
+// theme + their own header, add them here.
+const SELF_HEADERED = ['/forms'];
+
+// Public marketing pages that should NOT get the app header for logged-out
+// visitors (they're their own surfaces). The front page handles its own
+// header for everyone.
+const OWN_SURFACE = ['/', '/position', '/contact', '/privacy', '/terms', '/cookies', '/support', '/join-position'];
 
 export default function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const { user, loading } = useAuth();
-  const { collapsed } = useSidebar();
-  const isAuthPage = AUTH_PAGES.some((p) => pathname.startsWith(p));
-  const isImmersivePage = IMMERSIVE_PAGES.some((p) => pathname.startsWith(p));
+  const { user } = useAuth();
 
-  if (isAuthPage) {
-    return <>{children}</>;
-  }
-
-  // Immersive pages (the map) render the MapNavOverlay for BOTH
-  // authed and public visitors — public users still need to navigate
-  // to /landing, /position, etc. The overlay surfaces a different
-  // menu for unauthenticated users (no Dashboard / Leads).
-  //
-  // EXCEPTION: /dashboard is the back-out ROOM — it carries NO app chrome
-  // on the photoreal scene. Its navigation lives ON the center screen
-  // (see the room menu in app/dashboard/page.tsx). So no overlay here.
-  if (isImmersivePage) {
-    const isRoom = pathname.startsWith('/dashboard');
+  // Map: immersive overlay, no header.
+  if (MAP_PAGES.some((p) => pathname.startsWith(p))) {
     return (
       <>
-        {!isRoom && <MapNavOverlay />}
+        <MapNavOverlay />
         <main className="min-h-screen">{children}</main>
         {user && <CallBar />}
       </>
     );
   }
 
-  // Non-immersive routes: public visitors get the raw page (no
-  // sidebar/topbar/bottomnav). Auth-gated chrome only renders for
-  // signed-in users.
-  if (!loading && !user) {
-    return <>{children}</>;
-  }
-
-  if (loading) {
+  // Pages that own their full chrome (front page, forms, marketing) render
+  // raw — they bring their own header (or intentionally have none).
+  const selfHeadered = SELF_HEADERED.some((p) => pathname.startsWith(p));
+  const ownSurface = OWN_SURFACE.includes(pathname) || pathname === '/';
+  if (selfHeadered || ownSurface) {
     return (
-      <div className="min-h-screen bg-surface flex items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
-      </div>
+      <>
+        {children}
+        {user && <CallBar />}
+      </>
     );
   }
 
-  return (
-    <>
-      <Sidebar />
-      <TopBar />
-      <main className={`pt-14 md:pt-16 pb-14 md:pb-0 min-h-screen transition-all duration-300 ml-0 ${collapsed ? 'md:ml-16' : 'md:ml-64'}`}>
-        {children}
-      </main>
-      <BottomNav />
-      <CallBar />
-    </>
-  );
+  // Everything else: a SIGNED-IN user on an old inner page (Leads, Imports,
+  // Settings, Campaigns, Admin…) gets the new app header so they always have
+  // nav (Home · Map · account) — no more stranded, nav-less old pages. The
+  // page body still renders its own (old) content until it's rebuilt. A
+  // logged-OUT visitor on these gets redirected by middleware anyway.
+  if (user) {
+    return (
+      <>
+        <div className="fp">
+          <AppHeader variant="app" />
+        </div>
+        <main className="min-h-screen">{children}</main>
+        <CallBar />
+      </>
+    );
+  }
+
+  // Logged-out fallback (shouldn't normally hit — middleware gates these).
+  return <>{children}</>;
 }

@@ -39,6 +39,13 @@ const MapView3D = dynamic(() => import('@/components/map/MapView3D'), {
   loading: () => <div className="h-full w-full bg-black" />,
 });
 
+// On-screen flight controls for flying the map straight on the phone's web
+// view (no second screen / native app). Self-gates on touch devices.
+const TouchFlightControls = dynamic(
+  () => import('@/components/map/TouchFlightControls'),
+  { ssr: false },
+);
+
 function readOrMakeCode(): string {
   if (typeof window === 'undefined') return 'PLOT';
   const url = new URL(window.location.href);
@@ -61,13 +68,33 @@ export default function FlyPage() {
   const [state, setState] = useState<LinkState>('idle');
   const linkRef = useRef<FlyLinkReceiver | null>(null);
 
+  // SOLO mode: fly straight on this device with on-screen touch controls,
+  // instead of pairing a second phone. Auto-on for touch devices; can be
+  // forced on/off with ?solo=1 / ?solo=0 (or ?touch=1 to test on desktop).
+  const [solo, setSolo] = useState(false);
+  const [forceTouch, setForceTouch] = useState(false);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const forced = params.get('solo');
+    const touch = params.get('touch') === '1';
+    setForceTouch(touch);
+    if (forced === '1' || touch) { setSolo(true); return; }
+    if (forced === '0') { setSolo(false); return; }
+    const coarse =
+      window.matchMedia?.('(pointer: coarse)').matches || 'ontouchstart' in window;
+    setSolo(!!coarse);
+  }, []);
+
   // Install the synthetic pad once, before the flight loop polls.
   useEffect(() => {
     installFlyPad();
   }, []);
 
-  // Open the link and wire phone frames → the synthetic pad.
+  // Open the network link (paired-phone path) and wire its frames → the
+  // synthetic pad. Skipped in solo mode — the on-screen controls drive the
+  // same pad directly, so there's no second device to listen for.
   useEffect(() => {
+    if (solo) return;
     const link = new FlyLinkReceiver(code, {
       onFrame: (f) => applyPadFrame(f),
       onState: (s) => {
@@ -78,7 +105,7 @@ export default function FlyPage() {
     linkRef.current = link;
     link.start().catch(() => {});
     return () => link.close();
-  }, [code]);
+  }, [code, solo]);
 
   const connected = state === 'p2p' || state === 'relay';
 
@@ -103,8 +130,11 @@ export default function FlyPage() {
         />
       </div>
 
-      {/* Pairing overlay — shown until a phone connects. */}
-      {!connected && (
+      {/* Solo mode: on-screen flight controls live on this device. */}
+      {solo && <TouchFlightControls forceShow={forceTouch} />}
+
+      {/* Pairing overlay — shown until a phone connects (paired-phone mode). */}
+      {!solo && !connected && (
         <div style={styles.overlay}>
           <div style={styles.card}>
             <div style={styles.brand}>Plot · Fly</div>

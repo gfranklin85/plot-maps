@@ -19,7 +19,7 @@ import { signInWithGoogle } from '@/lib/signIn';
 import MaterialIcon from '@/components/ui/MaterialIcon';
 
 export default function AppHeader({ variant = 'public' }: { variant?: 'public' | 'app' }) {
-  const { signOut } = useAuth();
+  const { user, signOut } = useAuth();
 
   return (
     <header className="fp-header">
@@ -52,13 +52,15 @@ export default function AppHeader({ variant = 'public' }: { variant?: 'public' |
           <div className="fp-nav__spacer" />
 
           {variant === 'public' ? (
-            <>
-              {/* Header is for RETURNING users (Log in). The real "come do
-                  the thing" actions are the hero buttons (Explore the map /
-                  Tell us where you'd go). No vague "Get Started".
-                  memory/project_dreamer_funnel_buttons */}
+            // Auth-aware: logged OUT → "Log in" (the only header action; the
+            // real CTAs are the hero buttons). Logged IN → the account menu
+            // (avatar → Settings / Sign out). Nothing forced into the gap.
+            // memory/project_dreamer_funnel_buttons
+            user ? (
+              <AccountMenu onSignOut={() => { signOut(); window.location.href = '/'; }} />
+            ) : (
               <button type="button" className="fp-get" onClick={() => signInWithGoogle()}>Log in</button>
-            </>
+            )
           ) : (
             <>
               <a className="fp-get fp-app-map" href="/map?view=3d">Open the Map</a>

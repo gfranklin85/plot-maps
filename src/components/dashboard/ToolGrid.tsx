@@ -37,7 +37,7 @@ export interface Tool {
 
 export const TOOLS: Tool[] = [
   {
-    href: '/map?view=2d', icon: 'map', art: 'map-2d', title: 'Walk the map from above',
+    href: '/map?view=2d', icon: 'map', art: 'map-2d', title: 'Search the 2D map',
     sub: 'Zoom into any neighborhood in 2D — search, scan, and find what stands out.', view: '2d',
     layers: [
       { src: '/dashboard/icons/map-2d_base.png' },

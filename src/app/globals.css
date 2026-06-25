@@ -1968,3 +1968,44 @@ gmp-popover-3d-element[plot-card-popover],
 }
 .gp-cursor--press .gp-cursor__ring { transform: scale(0.6); border-color: var(--plot-brand, #1349d4); }
 @media (prefers-reduced-motion: reduce) { .gp-cursor, .gp-cursor__ring { transition: none; } }
+
+/* ════════════════════════════════════════════════════════════════════
+   INTENT NETWORK — "Claim your home. Name your next one."
+   Two-path section (owner / buyer) = the two-sided moat.
+   memory/project_intent_network_two_sided
+   ════════════════════════════════════════════════════════════════════ */
+.fp-intent { background: linear-gradient(180deg, #ffffff, #eef4fd); }
+.fp-intent__head { text-align: center; max-width: 760px; margin: 0 auto 36px; }
+.fp-intent__eyebrow { font-size: 12.5px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--plot-brand); }
+.fp-intent__h { font-weight: 800; letter-spacing: -0.025em; font-size: clamp(28px, 4vw, 46px); color: var(--plot-ink); margin-top: 10px; }
+.fp-intent__lede { color: #4a5568; font-size: clamp(15px,1.4vw,18px); line-height: 1.55; margin-top: 14px; }
+
+.fp-intent__paths { display: grid; gap: 20px; grid-template-columns: 1fr; max-width: 980px; margin: 0 auto; }
+@media (min-width: 820px) { .fp-intent__paths { grid-template-columns: 1fr 1fr; } }
+
+.fp-intent__card {
+  background: #fff; border-radius: 22px; padding: 32px;
+  border: 1px solid rgba(19,73,212,0.1);
+  box-shadow: 0 24px 56px -30px rgba(20,50,120,0.4);
+  display: flex; flex-direction: column;
+}
+.fp-intent__card--owner { background: linear-gradient(165deg,#ffffff,#f3f8ff); }
+.fp-intent__icon {
+  width: 56px; height: 56px; border-radius: 16px; margin-bottom: 16px;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(160deg, var(--plot-brand), var(--plot-brand-deep)); color: #fff;
+}
+.fp-intent__icon .material-symbols-outlined { font-size: 28px; }
+.fp-intent__kicker { font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--plot-brand); }
+.fp-intent__card-h { font-weight: 800; font-size: clamp(20px,2vw,24px); letter-spacing: -0.015em; color: var(--plot-ink); margin-top: 6px; line-height: 1.15; }
+.fp-intent__card-p { color: #4a5568; font-size: 14.5px; line-height: 1.55; margin-top: 12px; }
+.fp-intent__list { margin-top: 16px; display: grid; gap: 10px; flex: 1; }
+.fp-intent__list li { display: flex; align-items: flex-start; gap: 9px; font-size: 14px; color: #2c3646; line-height: 1.45; }
+.fp-intent__list .chk { color: var(--plot-brand); font-weight: 800; flex: none; }
+.fp-intent__btn { margin-top: 22px; align-self: flex-start; }
+.fp-intent__note { text-align: center; font-size: 13px; color: #7a8494; margin-top: 26px; }
+
+@media (max-width: 640px) {
+  .fp-intent__card { padding: 24px; border-radius: 18px; }
+  .fp-intent__btn { width: 100%; justify-content: center; }
+}

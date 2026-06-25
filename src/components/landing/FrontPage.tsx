@@ -4,6 +4,7 @@ import AppHeader from '@/components/layout/AppHeader';
 import ToolGrid from '@/components/dashboard/ToolGrid';
 import MaterialIcon from '@/components/ui/MaterialIcon';
 import { signInWithGoogle } from '@/lib/signIn';
+import { useAuth } from '@/lib/auth-context';
 
 // ── FrontPage ─────────────────────────────────────────────────────────
 //
@@ -45,6 +46,14 @@ const SCENE_LAYERS: { src: string; anim: string; alt: string }[] = [
 ];
 
 export default function FrontPage() {
+  const { user } = useAuth();
+  // CTAs are auth-aware: a signed-in user goes straight to the action;
+  // a logged-out user goes through Google sign-in first.
+  const goMap = (view: '2d' | '3d') => {
+    if (user) window.location.href = `/map?view=${view}`;
+    else signInWithGoogle();
+  };
+
   return (
     <div className="fp">
       {/* ════ HEADER (shared with the dashboard for one consistent chrome) ════ */}
@@ -79,16 +88,13 @@ export default function FrontPage() {
                 When it&apos;s time, <b>Position</b> is the brokerage that helps
                 you act.
               </p>
-              {/* Buttons = the exact thing visitors came to DO. Explore (the
-                  hook) + the dreamer action (tell us your move — we store +
-                  search to fulfill it). memory/project_dreamer_funnel_buttons */}
+              {/* ONE hero button — the universal hook (fly the map). The
+                  intent-network story (claim your home / find your next) lives
+                  in its own section below. memory/project_intent_network_two_sided */}
               <div className="fp-cta-row">
-                <button type="button" className="fp-cta fp-cta--primary" onClick={() => signInWithGoogle()}>
+                <button type="button" className="fp-cta fp-cta--primary" onClick={() => goMap('3d')}>
                   Explore the map <span aria-hidden>→</span>
                 </button>
-                <a className="fp-cta fp-cta--ghost" href="#tell-us">
-                  Tell us where you&apos;d go
-                </a>
               </div>
               <div className="fp-trust">
                 <div className="fp-trust__avatars" aria-hidden>
@@ -123,36 +129,67 @@ export default function FrontPage() {
         </div>
       </section>
 
-      {/* ════ TELL US WHERE YOU'D GO — the dreamer capture ════
-          Everyone is a wanter: a buyer wants a house, an owner wants their
-          retirement spot, a renter wants to move. This is where they SAY it
-          (where + scenario + what they want) and Plot stores it + searches
-          to fulfill. The self-score reimagined. memory/project_dreamer_funnel_buttons */}
-      <section id="tell-us" className="fp-section fp-dreamer">
+      {/* ════ THE INTENT NETWORK — "Claim your home. Name your next one." ════
+          The two-sided moat: owners claim their house + post status/sell
+          criteria (kills cold calls, feeds the right agents); buyers post
+          buy-box + destination; Plot matches them nationwide. Two paths.
+          memory/project_intent_network_two_sided */}
+      <section id="intent" className="fp-section fp-intent">
         <div className="fp__wrap">
-          <div className="fp-dreamer__card">
-            <div className="fp-dreamer__eyebrow">For everyone with a place in mind</div>
-            <h2 className="fp-dreamer__h">Tell us where you&apos;d go.</h2>
-            <p className="fp-dreamer__p">
-              A first home, a bigger one, your retirement town, the city you
-              keep dreaming about. Tell us where — and your scenario — and we
-              go to work finding the way there. The right place, the real
-              numbers, the people who can help.
-            </p>
-            <div className="fp-dreamer__row">
-              <input
-                className="fp-dreamer__input"
-                placeholder="Where would you go? A city, a town, a neighborhood…"
-                onFocus={() => {}}
-              />
-              <button type="button" className="fp-cta fp-cta--primary fp-dreamer__btn" onClick={() => signInWithGoogle()}>
-                Start <span aria-hidden>→</span>
-              </button>
-            </div>
-            <p className="fp-dreamer__note">
-              Free. No pressure. Your dream, stored and worked on — not just browsed.
+          <div className="fp-intent__head">
+            <div className="fp-intent__eyebrow">The PlotMaps owner + buyer network</div>
+            <h2 className="fp-intent__h">Claim your home. Name your next one.</h2>
+            <p className="fp-intent__lede">
+              Owners and buyers post what they actually want — and Plot&apos;s
+              growing nationwide network turns that into real matches. No cold
+              calls. No guessing. Your terms.
             </p>
           </div>
+
+          <div className="fp-intent__paths">
+            {/* OWNER side */}
+            <div className="fp-intent__card fp-intent__card--owner">
+              <span className="fp-intent__icon"><MaterialIcon icon="home" /></span>
+              <div className="fp-intent__kicker">I own a home</div>
+              <h3 className="fp-intent__card-h">Claim your house. Set your status.</h3>
+              <p className="fp-intent__card-p">
+                Put your home on the map and tell agents your real plan —
+                staying for good, heading to Florida after retirement, leaving
+                it to the kids. Two things happen at once:
+              </p>
+              <ul className="fp-intent__list">
+                <li><span className="chk" aria-hidden>✓</span> The pesky cold calls stop — agents stop guessing.</li>
+                <li><span className="chk" aria-hidden>✓</span> The right agents bring you your ideal next place, at your price.</li>
+                <li><span className="chk" aria-hidden>✓</span> Fly your own neighborhood — and anywhere in the world.</li>
+              </ul>
+              <button type="button" className="fp-cta fp-cta--primary fp-intent__btn" onClick={() => signInWithGoogle()}>
+                Claim your home <span aria-hidden>→</span>
+              </button>
+            </div>
+
+            {/* BUYER side */}
+            <div className="fp-intent__card fp-intent__card--buyer">
+              <span className="fp-intent__icon"><MaterialIcon icon="travel_explore" /></span>
+              <div className="fp-intent__kicker">I&apos;m looking to buy</div>
+              <h3 className="fp-intent__card-h">Put the whole map to work.</h3>
+              <p className="fp-intent__card-p">
+                State your buy-box and the city you want — Plot puts a nationwide
+                network of agents and self-posting owners to work finding it.
+              </p>
+              <ul className="fp-intent__list">
+                <li><span className="chk" aria-hidden>✓</span> Your criteria + destination, matched to real owners.</li>
+                <li><span className="chk" aria-hidden>✓</span> Reach homes that aren&apos;t even listed yet.</li>
+                <li><span className="chk" aria-hidden>✓</span> Make your next home a reality.</li>
+              </ul>
+              <button type="button" className="fp-cta fp-cta--primary fp-intent__btn" onClick={() => signInWithGoogle()}>
+                Find your next place <span aria-hidden>→</span>
+              </button>
+            </div>
+          </div>
+
+          <p className="fp-intent__note">
+            Free to post. Your plan is stored and worked on — not just browsed.
+          </p>
         </div>
       </section>
 

@@ -96,13 +96,14 @@ export default function FrontPage() {
                   Explore the map <span aria-hidden>→</span>
                 </button>
               </div>
-              <div className="fp-trust">
-                <div className="fp-trust__avatars" aria-hidden>
-                  <span /><span /><span /><span />
-                </div>
-                <p className="fp-trust__text">
-                  Trusted by buyers, owners, investors &amp; agents
-                  <br />exploring land across the country.
+              {/* Honest credibility, not fake faces: the broker credential —
+                  built by someone who actually does the job, not a tech
+                  tourist. memory/project_credibility_markers_honest */}
+              <div className="fp-cred">
+                <span className="fp-cred__seal"><MaterialIcon icon="verified" /></span>
+                <p className="fp-cred__text">
+                  <b>Built by a licensed California broker.</b>
+                  <br />Gregory M. Franklin · CA DRE #02090737 · Position Realty.
                 </p>
               </div>
             </div>
@@ -332,16 +333,22 @@ export default function FrontPage() {
       <section className="fp-section">
         <div className="fp__wrap">
           <div className="fp-close">
-            <div className="fp-quote">
+            {/* HONEST social proof: no fake testimonials. This is a real
+                "be one of the first" invite; real users' faces + words drop
+                in here as the network grows.
+                memory/project_credibility_markers_honest */}
+            <div className="fp-quote fp-quote--founding">
+              <div className="fp-quote__badge">Founding members</div>
               <div className="fp-quote__q">
-                “PlotMaps changed the way I find and evaluate land. The data is
-                accurate, and the Position team is top-notch.”
+                Plot is brand new — built by a working California broker, not a
+                tech tourist. The first owners and buyers on the map shape what
+                it becomes. Be one of them.
               </div>
               <div className="fp-quote__by">
-                <div className="fp-quote__av" aria-hidden />
+                <span className="fp-quote__seal"><MaterialIcon icon="verified" /></span>
                 <div>
-                  <div className="fp-quote__name">A. Reyes</div>
-                  <div className="fp-quote__role">Land investor</div>
+                  <div className="fp-quote__name">Gregory M. Franklin</div>
+                  <div className="fp-quote__role">Broker · CA DRE #02090737 · Position Realty</div>
                 </div>
               </div>
             </div>

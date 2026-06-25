@@ -24,6 +24,10 @@ import OtanimusRive from "./OtanimusRive";
 
 export default function MapCompanionLayer() {
   const [active, setActive] = useState(false);
+  // `connecting` is tracked (setConnecting) but its only reader was the
+  // removed "Call OT" button. Keep the setter; the value isn't displayed
+  // until the OT makeover lands a new summon UI.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [connecting, setConnecting] = useState(false);
   const [state, setState] = useState<CompanionState>("idle");
   const [facing, setFacing] = useState<Facing>("away");
@@ -181,32 +185,12 @@ export default function MapCompanionLayer() {
         </div>
       )}
 
-      {/* Summon / dismiss OT — bottom-LEFT, genuinely clear of Google's
-          bottom-right compass/zoom controls. Gradient depth, labeled "OT"
-          so it reads as the lion co-pilot, not a mystery robot icon.
-          Greg 2026-06-12: the old flat bottom-right button covered Google's
-          controls and was "the cheapest excuse for a button ever." */}
-      <button
-        onClick={summon}
-        disabled={connecting}
-        title={active ? "Dismiss OT" : "Call OT — your flight co-pilot"}
-        className="group absolute bottom-6 left-6 z-50 flex h-14 items-center gap-2.5 rounded-2xl pl-2.5 pr-4 text-[14px] font-bold text-white backdrop-blur-md transition-transform hover:scale-[1.04] active:scale-95"
-        style={{
-          background: active
-            ? 'linear-gradient(160deg, #00e0c8, #008fb0)'
-            : 'linear-gradient(160deg, rgba(58,68,92,0.94), rgba(20,27,44,0.94))',
-          boxShadow: '0 10px 24px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.2)',
-          opacity: connecting ? 0.7 : 1,
-        }}
-      >
-        <span
-          className="flex h-10 w-10 items-center justify-center rounded-xl text-[20px]"
-          style={{ background: 'rgba(255,255,255,0.12)' }}
-        >
-          {connecting ? '…' : '🦁'}
-        </span>
-        <span>{connecting ? 'Waking OT' : active ? 'OT is here' : 'Call OT'}</span>
-      </button>
+      {/* The "Call OT" summon button is REMOVED (2026-06-24). The lion
+          character is being scrubbed + rebuilt as a lightweight Gemini Live
+          assistant ([[project_sprint_roadmap_2026_06]]). OT's engine (the
+          summon() + Gemini Live session) stays intact — it's still reachable
+          via the `plot:summon-ot` window event (gamepad X/LB) — only the
+          old lion-pill UI is gone. The new summon UI lands with the makeover. */}
     </>
   );
 }

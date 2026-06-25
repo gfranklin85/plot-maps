@@ -2263,20 +2263,10 @@ export default function MapPage() {
         </div>
       )}
 
-      {/* Firing-mechanism chip — airplane mode only. Shows the active
-          shot mechanism and the M-key toggle. Click also flips it.
-          Tuning surface while Greg dials in the two mechanisms. */}
-      {flightMode === 'airplane' && !walkMode && (
-        <button
-          onClick={cycleShotMechanism}
-          className="fixed bottom-4 left-4 z-40 flex items-center gap-2 bg-surface-container/80 backdrop-blur border border-card-border rounded-lg px-3 py-2 text-xs text-on-surface-variant shadow-lg hover:text-on-surface active:scale-95 transition"
-          title="Press M to switch firing mechanism"
-        >
-          <MaterialIcon icon={shotMechanism === 'mounted' ? 'arrow_upward' : 'trending_up'} className="text-[16px]" />
-          <span className="font-bold">{shotMechanism === 'mounted' ? 'Mounted' : 'Highline'}</span>
-          <span className="opacity-60">· M</span>
-        </button>
-      )}
+      {/* Firing-mechanism chip REMOVED (2026-06-24) — it was a dev/tuning
+          surface (the "Mounted/Highline · M" toggle) cluttering the bottom-
+          left corner. The M-key toggle + cycleShotMechanism still work for
+          tuning; just no visible button. */}
 
       {/* Compact prospect bar — single row at bottom */}
       {(prospectMode || prospectList.length > 0) && !walkMode && !showProspectPanel && (

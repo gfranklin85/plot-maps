@@ -1165,6 +1165,17 @@ export default function MapPage() {
           setShot(newShot);
           window.setTimeout(() => setShot(null), SHOT_TOTAL_MS + 40);
           try { playShotSound(channel); } catch { /* ignore */ }
+          // Fire the laser BEAM at the reticle too (the flight fire action —
+          // gamepad/phone trigger. SimpleLaser no longer keys off mouse
+          // clicks; it listens for this event). Aim = the reticle pixel.
+          try {
+            window.dispatchEvent(new CustomEvent('plot:fire-laser', {
+              detail: {
+                x: reticlePosition.xFraction * window.innerWidth,
+                y: reticlePosition.yFraction * window.innerHeight,
+              },
+            }));
+          } catch { /* ignore */ }
         };
 
         const lead = reticleTargetRef.current;

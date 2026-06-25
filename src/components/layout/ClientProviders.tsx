@@ -13,6 +13,7 @@ import AnalyticsProvider from '@/components/providers/AnalyticsProvider';
 import MetaPixelProvider from '@/components/providers/MetaPixelProvider';
 import GoogleAdsProvider from '@/components/providers/GoogleAdsProvider';
 import CookieBanner from '@/components/ui/CookieBanner';
+import GamepadCursor from '@/components/gamepad/GamepadCursor';
 import type { ReactNode } from 'react';
 
 export default function ClientProviders({ children }: { children: ReactNode }) {
@@ -31,6 +32,9 @@ export default function ClientProviders({ children }: { children: ReactNode }) {
                       <CesiumViewerProvider>
                         {children}
                         <CookieBanner />
+                        {/* No-Steam gamepad UI navigation (suppresses itself
+                            on the map, which has its own flight controls). */}
+                        <GamepadCursor />
                       </CesiumViewerProvider>
                     </PhoneProvider>
                   </SidebarProvider>

@@ -1,23 +1,27 @@
 'use client';
 
-// SimpleLaser — a laser to the cursor. It's just HTML + CSS.
+// SimpleLaser — the flight FIRE beam. HTML + CSS, mounted once on the map.
 //
-// Mount this once. It listens for clicks anywhere, and on each click
-// draws a beam from the bottom-center of the screen to the click point,
-// then fades it out. No canvas, no rAF, no gamepad, no refs into the
-// rest of the app. The whole thing is a rotated <div> (the beam) plus a
-// little burst <div> at the impact point, animated with CSS keyframes.
+// FIXED 2026-06-24: the laser is a FLIGHT ACTION, not a mouse-click thing.
+// It NO LONGER listens to window clicks (which sprayed lasers across the
+// whole page, hitting UI chrome). It fires only when the flight fire action
+// fires — the gamepad/phone trigger via `onShoot` — by dispatching the
+// `plot:fire-laser` window event. The beam travels from bottom-center to
+// the RETICLE (screen center, the aim point), instantly, zero latency.
+//
+// Mouse users never trigger the laser; they navigate + select normally
+// (Google's native map click resolves parcels). memory/
+// project_sprint_roadmap_2026_06.
+//
+// Dispatch a shot:  window.dispatchEvent(new CustomEvent('plot:fire-laser',
+//                     { detail: { x, y } }))   // x,y optional; defaults to reticle
 
 import { useEffect, useState } from 'react';
 
 interface Beam {
   id: number;
-  // launch point (bottom of screen)
-  x0: number;
-  y0: number;
-  // impact point (where you clicked)
-  x1: number;
-  y1: number;
+  x0: number; y0: number;     // launch point (bottom-center)
+  x1: number; y1: number;     // impact point (reticle / passed point)
   length: number;
   angleDeg: number;
 }
@@ -27,27 +31,32 @@ export default function SimpleLaser() {
 
   useEffect(() => {
     let counter = 0;
-    function onClick(e: MouseEvent) {
-      const x1 = e.clientX;
-      const y1 = e.clientY;
+    function fireAt(x1: number, y1: number) {
       const x0 = window.innerWidth * 0.5; // fire from bottom-center
       const y0 = window.innerHeight;
       const dx = x1 - x0;
       const dy = y1 - y0;
       const length = Math.hypot(dx, dy);
-      // angle of the beam from the launch point, in screen space.
       const angleDeg = (Math.atan2(dy, dx) * 180) / Math.PI;
 
       counter += 1;
       const beam: Beam = { id: counter, x0, y0, x1, y1, length, angleDeg };
       setBeams((prev) => [...prev, beam]);
-      // self-remove after the animation finishes
       window.setTimeout(() => {
         setBeams((prev) => prev.filter((b) => b.id !== beam.id));
       }, 450);
     }
-    window.addEventListener('click', onClick);
-    return () => window.removeEventListener('click', onClick);
+
+    // The flight fire action (gamepad/phone trigger → onShoot) dispatches
+    // this event. Default aim = the reticle (screen center).
+    function onFire(e: Event) {
+      const detail = (e as CustomEvent).detail as { x?: number; y?: number } | undefined;
+      const x = typeof detail?.x === 'number' ? detail.x : window.innerWidth / 2;
+      const y = typeof detail?.y === 'number' ? detail.y : window.innerHeight / 2;
+      fireAt(x, y);
+    }
+    window.addEventListener('plot:fire-laser', onFire);
+    return () => window.removeEventListener('plot:fire-laser', onFire);
   }, []);
 
   return (

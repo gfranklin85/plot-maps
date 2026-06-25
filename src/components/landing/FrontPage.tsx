@@ -158,9 +158,20 @@ export default function FrontPage() {
 
       {/* ════ THE TOOL GRID — the dashboard, right on the front page ════
           Everything is gated at the action (try-before-buy), so the full
-          toolset is shown up front. memory/project_one_page_tools_on_landing */}
-      <section className="fp-section app-surface" style={{ paddingTop: 8 }}>
-        <div className="dash">
+          toolset is shown up front. The cards float over a sky backdrop with
+          drifting clouds — the floating-in-sky depth carries through here.
+          memory/project_one_page_tools_on_landing */}
+      <section className="fp-section fp-tools" style={{ paddingTop: 8 }}>
+        {/* sky backdrop + drifting clouds (behind the cards) */}
+        <div className="fp-tools__sky" aria-hidden>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={`${HERO}/cloud-1.svg`} alt="" className="fp-tools__cloud fp-tools__cloud--1 float-cloud-a" draggable={false} />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={`${HERO}/cloud-2.svg`} alt="" className="fp-tools__cloud fp-tools__cloud--2 float-cloud-b" draggable={false} />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={`${HERO}/cloud-3.svg`} alt="" className="fp-tools__cloud fp-tools__cloud--3 float-cloud-c" draggable={false} />
+        </div>
+        <div className="dash" style={{ position: 'relative', zIndex: 2 }}>
           <div className="dash__wrap" style={{ paddingTop: 0 }}>
             <div className="fp-eyebrow" style={{ textAlign: 'left' }}>Choose what you want to do</div>
             <h2 className="fp-h2" style={{ textAlign: 'left', marginTop: 6, marginBottom: 24 }}>

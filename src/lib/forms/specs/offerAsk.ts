@@ -118,6 +118,29 @@ export const OFFER_ASK: AskFlow = {
             { id: 'keep', label: 'items.c.keep', note: 'items.c.keep.note' },
           ],
         },
+        // Buyer-conditional contingency — the human-life OPEN SPACE. A real
+        // milestone the deal honestly rides on (not a property condition, not
+        // a flaky out): "when this lands, I'm all in." Conditional-state
+        // thesis as a contract term. Optional; composer shows only if "yes".
+        {
+          id: 'lifeContingency',
+          question: 'q.lifeContingency.question',
+          help: 'q.lifeContingency.help',
+          kind: 'choice',
+          choices: [
+            { id: 'none', label: 'lifeContingency.c.none', note: 'lifeContingency.c.none.note' },
+            { id: 'have', label: 'lifeContingency.c.have', note: 'lifeContingency.c.have.note' },
+          ],
+        },
+        {
+          id: 'lifeContingencyText',
+          question: 'q.lifeContingencyText.question',
+          help: 'q.lifeContingencyText.help',
+          kind: 'text',
+          placeholder: 'q.lifeContingencyText.placeholder',
+          showWhen: (a) => a.lifeContingency === 'have',
+        },
+
         // Loan type — SHARE (RPA E(1)). The listing agent needs the terms
         // that come with the loan path. Not a vulnerability; useful info.
         {

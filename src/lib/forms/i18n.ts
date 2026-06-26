@@ -145,6 +145,34 @@ const STRINGS: Record<string, Entry> = {
   'items.c.keep': { en: 'There’s something I’d like to stay', es: 'Hay algo que me gustaría que se quede' },
   'items.c.keep.note': { en: 'We’ll note it — keep it reasonable.', es: 'Lo anotamos — manténlo razonable.' },
 
+  // buyer-conditional contingency — the human-life "open space." A real
+  // milestone the deal honestly rides on, stated plainly + dated.
+  'q.lifeContingency.question': {
+    en: 'Is there something real in your life this deal is waiting on?',
+    es: '¿Hay algo real en tu vida de lo que dependa este trato?',
+  },
+  'q.lifeContingency.help': {
+    en: 'Most contracts only ask about the house. But real life has its own timing — a retirement finalizing, terminal leave approved, a kid’s college decision, a VA rating coming through. If there’s a true milestone you’re standing on, say it plainly and put a date on it. It’s not a way out — it’s you saying “the moment this lands, I’m all in.”',
+    es: 'La mayoría de los contratos solo preguntan por la casa. Pero la vida real tiene su propio tiempo — una jubilación que se finaliza, un permiso aprobado, la decisión universitaria de un hijo, una calificación del VA. Si hay un hito real del que dependes, dilo con claridad y ponle fecha. No es una salida — es decir “en cuanto esto suceda, voy con todo”.',
+  },
+  'lifeContingency.c.none': { en: 'No — I’m clear to go', es: 'No — estoy listo para avanzar' },
+  'lifeContingency.c.none.note': { en: 'Nothing holding you back.', es: 'Nada que te detenga.' },
+  'lifeContingency.c.have': { en: 'Yes — there’s something I’m waiting on', es: 'Sí — hay algo que estoy esperando' },
+  'lifeContingency.c.have.note': { en: 'Let’s state it plainly.', es: 'Vamos a decirlo con claridad.' },
+
+  'q.lifeContingencyText.question': {
+    en: 'In your own words — what are you waiting on, and by when?',
+    es: 'En tus propias palabras — ¿qué estás esperando, y para cuándo?',
+  },
+  'q.lifeContingencyText.help': {
+    en: 'Say it like you’d say it to a friend. “If my VA disability comes through by March 1, it’s on.” The clearer and more specific, the more the seller can trust it. OT can help you word it.',
+    es: 'Dilo como se lo dirías a un amigo. “Si mi discapacidad del VA se aprueba para el 1 de marzo, va.” Entre más claro y específico, más puede confiar el vendedor. OT puede ayudarte a redactarlo.',
+  },
+  'q.lifeContingencyText.placeholder': {
+    en: 'If Johnny gets into Cal Poly at his meeting on the 15th, we continue.',
+    es: 'Si Johnny entra a Cal Poly en su reunión del día 15, continuamos.',
+  },
+
   // ── 3. THE NUMBER — what I'll pay FOR this property ──
   'money.section.title': { en: 'Your number', es: 'Tu número' },
 

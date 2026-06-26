@@ -55,7 +55,8 @@ export default function AppShell({ children }: { children: ReactNode }) {
   // CallBar here: the marketing/home surface shouldn't mint a Twilio token
   // (it was spamming /api/twilio/token 500s on the front page).
   const selfHeadered = SELF_HEADERED.some((p) => pathname.startsWith(p));
-  const ownSurface = OWN_SURFACE.includes(pathname) || pathname === '/';
+  const ownSurface =
+    OWN_SURFACE.includes(pathname) || pathname === '/' || pathname.startsWith('/essays');
   if (selfHeadered || ownSurface) {
     return <>{children}</>;
   }

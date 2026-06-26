@@ -25,6 +25,7 @@ const PUBLIC_PATHS = [
   '/position',
   '/join-position',
   '/contact',
+  '/essays',
 ];
 
 // Logged-in pages reachable even for users without beta access. The

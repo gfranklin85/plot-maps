@@ -16,7 +16,6 @@
 
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
-import MapNavOverlay from './MapNavOverlay';
 import AppHeader from './AppHeader';
 import CallBar from '@/components/call/CallBar';
 import type { ReactNode } from 'react';
@@ -39,11 +38,12 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { user } = useAuth();
 
-  // Map: immersive overlay, no header.
+  // Map: the new left sidebar (in the page) IS the chrome + carries the
+  // brand/home link, so MapNavOverlay is retired here (it sat top-left,
+  // which the sidebar now occupies). memory/project_map_page_finished_sidebar
   if (MAP_PAGES.some((p) => pathname.startsWith(p))) {
     return (
       <>
-        <MapNavOverlay />
         <main className="min-h-screen">{children}</main>
         {user && <CallBar />}
       </>

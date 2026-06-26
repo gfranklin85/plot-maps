@@ -1441,6 +1441,77 @@ gmp-popover-3d-element[plot-card-popover],
   filter: drop-shadow(0 24px 40px rgba(40,70,130,0.16));
 }
 
+/* ════ FINISHED MAP UI — light left sidebar + tabbed property card ════ */
+.map-sidebar {
+  position: fixed; top: 0; left: 0; bottom: 0; z-index: 30;
+  width: 360px; overflow-y: auto;
+  background: #ffffff; border-right: 1px solid rgba(19,73,212,0.10);
+  padding: 16px; display: flex; flex-direction: column; gap: 14px;
+  color: #0c1322;
+}
+@media (max-width: 768px) {
+  .map-sidebar { width: 86%; max-width: 360px; box-shadow: 0 0 40px -10px rgba(20,50,120,0.5); }
+}
+.map-sidebar__brand { display: flex; align-items: center; gap: 8px; padding-bottom: 4px; }
+.map-sidebar__by { font-size: 12px; color: #6b7689; }
+.map-sidebar__by b { color: #1349d4; }
+.map-sidebar__search { /* ProspectSearch lives here */ }
+.map-sidebar__pager { display: flex; align-items: center; justify-content: space-between; font-size: 12.5px; color: #6b7689; }
+.map-sidebar__pagerbtns { display: flex; gap: 4px; }
+.map-sidebar__pagerbtns button { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; border: 1px solid rgba(19,73,212,0.16); color: #1349d4; background: #fff; }
+.map-sidebar__pagerbtns button:hover { background: rgba(19,73,212,0.06); }
+
+/* 2D/3D/Walk segmented */
+.map-sidebar__modes { display: flex; gap: 6px; background: rgba(19,73,212,0.05); border: 1px solid rgba(19,73,212,0.10); border-radius: 12px; padding: 4px; }
+.map-sidebar__mode { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 38px; border-radius: 9px; font-size: 13px; font-weight: 700; color: #4a5568; transition: all .15s; }
+.map-sidebar__mode.is-active { background: linear-gradient(160deg,#1349d4,#122d8d); color: #fff; box-shadow: 0 6px 16px -8px rgba(19,73,212,0.7); }
+.map-sidebar__mode:disabled { opacity: .38; cursor: not-allowed; }
+
+/* tool toggles — two columns */
+.map-sidebar__tools { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.map-sidebar__tool { display: flex; align-items: center; gap: 8px; padding: 11px 12px; border-radius: 11px; background: #fff; border: 1px solid rgba(19,73,212,0.12); font-size: 12.5px; font-weight: 600; color: #2c3646; text-align: left; transition: all .15s; }
+.map-sidebar__tool:hover { border-color: rgba(19,73,212,0.3); }
+.map-sidebar__tool.is-active { background: rgba(19,73,212,0.07); border-color: rgba(19,73,212,0.4); color: #1349d4; }
+.map-sidebar__tool .material-symbols-outlined,
+.map-sidebar__tool .material-symbols-rounded { color: #1349d4; flex: none; }
+.map-sidebar__tool-label { flex: 1; line-height: 1.15; }
+.map-sidebar__pill { font-size: 9px; font-weight: 800; letter-spacing: .04em; padding: 2px 6px; border-radius: 999px; background: rgba(12,19,34,0.08); color: #6b7689; }
+.map-sidebar__pill.on { background: #1349d4; color: #fff; }
+
+/* the docked property card */
+.map-sidebar__card { margin-top: 2px; }
+.sb-card { border: 1px solid rgba(19,73,212,0.12); border-radius: 16px; overflow: hidden; background: #fff; box-shadow: 0 12px 30px -22px rgba(20,50,120,0.4); }
+.sb-card__hero { position: relative; aspect-ratio: 16 / 10; background: linear-gradient(180deg,#dbe6f8,#eef3fc); }
+.sb-card__photo { width: 100%; height: 100%; object-fit: cover; display: block; }
+.sb-card__photo--empty { display: grid; place-items: center; color: #9fb2d8; }
+.sb-card__photo--empty .material-symbols-outlined,
+.sb-card__photo--empty .material-symbols-rounded { font-size: 40px; }
+.sb-card__badge { position: absolute; top: 10px; left: 10px; font-size: 10px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; padding: 4px 9px; border-radius: 999px; background: rgba(12,19,34,0.78); color: #fff; }
+.sb-card__close { position: absolute; top: 8px; right: 8px; width: 28px; height: 28px; display: grid; place-items: center; border-radius: 999px; background: rgba(255,255,255,0.9); color: #0c1322; }
+.sb-card__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 14px 14px 10px; }
+.sb-card__street { font-weight: 800; font-size: 16px; letter-spacing: -0.01em; color: #0c1322; }
+.sb-card__city { font-size: 12.5px; color: #6b7689; margin-top: 2px; }
+.sb-card__type { display: inline-flex; align-items: center; gap: 4px; font-size: 10.5px; font-weight: 700; color: #1349d4; background: rgba(19,73,212,0.08); padding: 4px 8px; border-radius: 999px; white-space: nowrap; }
+.sb-card__facts { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; padding: 0 14px 12px; }
+.sb-card__factk { font-size: 10px; text-transform: uppercase; letter-spacing: .04em; color: #8a93a4; font-weight: 700; }
+.sb-card__factv { font-size: 13px; font-weight: 700; color: #0c1322; margin-top: 2px; }
+.sb-card__tabs { display: flex; gap: 2px; padding: 0 8px; border-bottom: 1px solid rgba(19,73,212,0.1); }
+.sb-card__tab { padding: 9px 12px; font-size: 12.5px; font-weight: 700; color: #6b7689; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.sb-card__tab.is-active { color: #1349d4; border-bottom-color: #1349d4; }
+.sb-card__body { padding: 12px 14px; }
+.sb-card__rows { display: grid; gap: 9px; }
+.sb-card__row { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 12.5px; }
+.sb-card__row span { color: #6b7689; }
+.sb-card__row b { color: #0c1322; font-weight: 700; text-align: right; }
+.sb-card__empty { font-size: 12.5px; color: #8a93a4; line-height: 1.5; }
+.sb-card__actions { display: grid; grid-template-columns: repeat(4,1fr); gap: 4px; padding: 6px 8px; border-top: 1px solid rgba(19,73,212,0.1); }
+.sb-card__act { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 8px 2px; border-radius: 9px; font-size: 10px; font-weight: 600; color: #4a5568; }
+.sb-card__act:hover { background: rgba(19,73,212,0.05); color: #1349d4; }
+.sb-card__act .material-symbols-outlined,
+.sb-card__act .material-symbols-rounded { color: #1349d4; }
+.sb-card__full { width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 12px; font-size: 13.5px; font-weight: 700; color: #1349d4; border-top: 1px solid rgba(19,73,212,0.1); }
+.sb-card__full:hover { background: rgba(19,73,212,0.05); }
+
 /* ── Orbit Property — a contained SIDE-BY-SIDE section (text+tool | image) ── */
 .fp-orbit__layout { display: grid; grid-template-columns: 1fr; gap: 32px; align-items: center; }
 @media (min-width: 920px) { .fp-orbit__layout { grid-template-columns: 1fr 1fr; gap: 44px; } }

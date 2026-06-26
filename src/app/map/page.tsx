@@ -39,8 +39,7 @@ import OnboardingTooltips from "@/components/ui/OnboardingTooltips";
 import ProspectCoachOverlay from "@/components/map/ProspectCoachOverlay";
 import Mobile3DCoachOverlay from "@/components/map/Mobile3DCoachOverlay";
 import GamepadStatusChip from "@/components/map/GamepadStatusChip";
-import MapToolbar from "@/components/map/MapToolbar";
-import ModeSwitch from "@/components/map/ModeSwitch";
+import MapSidebar from "@/components/map/MapSidebar";
 import { useMapMode } from "@/lib/useMapMode";
 import FlightTuningPanel from "@/components/map/FlightTuningPanel";
 import { useFlightTuning } from "@/lib/useFlightTuning";
@@ -1074,7 +1073,6 @@ export default function MapPage() {
     [],
   );
 
-  const [desktopSearchOpen, setDesktopSearchOpen] = useState(false);
 
   // ── Shot impact → card burst ─────────────────────────────────────────
   // Fired by ShotProjectile the frame the round lands on the reticle.
@@ -1372,7 +1370,7 @@ export default function MapPage() {
   return (
     <BuyerSettingsProvider>
     <div
-      className="relative h-screen w-full overflow-hidden"
+      className="relative h-screen w-full overflow-hidden md:pl-[360px]"
       onContextMenu={(e) => {
         // Prevent the browser/OS right-click menu. Steam Input on the
         // gamepad maps B to right-click; without this, pressing B opens
@@ -1400,15 +1398,53 @@ export default function MapPage() {
           to be reworked later. Component kept; just unmounted. */}
       {/* {!walkMode && <BuyerSettingsPanel />} */}
 
-      {/* ═══ CONTROLS ═══ */}
-      {/* Mode Switch — the always-visible primary control (2D/3D/Walk).
-          Shown in every mode so the way out is always one tap; this is
-          the fix for the old "stuck in 3D, no button back" trap. Sits
-          top-left of the toolbar anchor. */}
-      <div className="absolute top-4 right-16 z-10">
-        <ModeSwitch
-          active={mapMode}
-          onSelect={(m) => {
+      {/* ═══ THE FINISHED MAP UI — one clean LEFT SIDEBAR ═══
+          All chrome (search, 2D/3D/Walk, tool toggles, property card)
+          consolidated into MapSidebar. Replaces the old dark floating
+          MapToolbar + ModeSwitch + search overlays. The page still owns
+          all state; the sidebar is pure presentation + callbacks.
+          memory/project_map_page_finished_sidebar */}
+      {!walkMode && (
+        <MapSidebar
+          searchSlot={
+            <ProspectSearch
+              compact
+              placeholder="Search address, APN, owner, or lead"
+              onSelect={(payload) => {
+                setMapCenter({ lat: payload.lat, lng: payload.lng });
+                setHasUserPanned(true);
+                dispatchFlight({
+                  center: { lat: payload.lat, lng: payload.lng },
+                  zoom: 19, duration: 900, easing: 'easeInOutCubic',
+                });
+                setFlyToTarget({
+                  lat: payload.lat, lng: payload.lng,
+                  altitude: 280, heading: 0, pitch: -45, range: 600, durationMs: 1200,
+                });
+                if (payload.leadId && user) {
+                  supabase.from('leads').select('*')
+                    .eq('id', payload.leadId).eq('user_id', user.id).single()
+                    .then(({ data }) => { if (data) setPinnedRef(data as Lead); });
+                }
+              }}
+            />
+          }
+          resultIndex={selectedLead ? filteredLeads.findIndex(l => l.id === selectedLead.id) : null}
+          resultTotal={filteredLeads.length}
+          onPrevResult={() => {
+            if (!filteredLeads.length) return;
+            const i = selectedLead ? filteredLeads.findIndex(l => l.id === selectedLead.id) : 0;
+            const prev = filteredLeads[(i - 1 + filteredLeads.length) % filteredLeads.length];
+            if (prev) setSelectedLead(prev);
+          }}
+          onNextResult={() => {
+            if (!filteredLeads.length) return;
+            const i = selectedLead ? filteredLeads.findIndex(l => l.id === selectedLead.id) : -1;
+            const next = filteredLeads[(i + 1) % filteredLeads.length];
+            if (next) setSelectedLead(next);
+          }}
+          mapMode={mapMode}
+          onMode={(m) => {
             if (m === 'WORK_2D') mapModeDispatch({ type: 'ENTER_2D' });
             else if (m === 'FLY_3D') mapModeDispatch({ type: 'ENTER_3D' });
             else if (isSubscribed) mapModeDispatch({ type: 'ENTER_WALK' });
@@ -1416,141 +1452,30 @@ export default function MapPage() {
           }}
           has3DSupport={has3DSupport}
           isSubscribed={isSubscribed}
+          onFlySomewhere={() => setDestinationsOpen(v => !v)}
+          destinationsOpen={destinationsOpen}
+          onFlightFeel={() => setFlightTuningOpen(v => !v)}
+          flightFeelOpen={flightTuningOpen}
+          view3D={view3D}
+          onSelectProspects={() => handleToggleProspectMode()}
+          prospectMode={prospectMode}
+          onToggleParcels={() => setShowParcels(v => !v)}
+          showParcels={showParcels}
+          onTogglePois={() => togglePois()}
+          poisVisible={poisVisible}
+          photoreal={profile.isAdmin ? {
+            visible: true,
+            on: !!profile.enable3DTilesAdmin,
+            onToggle: () => updateProfile({ enable3DTilesAdmin: !profile.enable3DTilesAdmin }),
+          } : undefined}
+          selectedLead={selectedLead}
+          onCloseCard={() => setSelectedLead(null)}
         />
-      </div>
+      )}
 
-      {walkMode ? null : (
+      {/* Flight tuning + destinations panels — triggered from the sidebar. */}
+      {!walkMode && (
         <>
-          {/* ── Translucent expandable toolbar ──
-              Replaces the previous SaaS-style horizontal toolbar (search +
-              listing-filter pills + pin-style pills + buttons strung
-              across the top). Now: one anchor button top-right; tap to
-              expand a vertical column of contextual controls. Translucent
-              so the world reads through. Search lives as an inline slot
-              above the anchor; click the search icon there to expand the
-              full search field.
-
-              Removed: listing-filter pills (Prospects/Active/Sold/Pending)
-              and pin-style pills (Dots/Labels/Cards). Both were pure
-              chrome that didn't earn the screen real-estate. The pin
-              mode defaults to 'dots' for everyone; filters revisit when
-              we know what filter UX wants to be on a flight surface. */}
-          <MapToolbar
-            searchSlot={
-              desktopSearchOpen ? (
-                <div className="w-[24rem] hidden md:block">
-                  <ProspectSearch
-                    compact
-                    placeholder="Search your leads or any address..."
-                    onSelect={(payload) => {
-                      setMapCenter({ lat: payload.lat, lng: payload.lng });
-                      setHasUserPanned(true);
-                      // 2D path: animated zoom via the choreographer.
-                      dispatchFlight({
-                        center: { lat: payload.lat, lng: payload.lng },
-                        zoom: 19,
-                        duration: 900,
-                        easing: 'easeInOutCubic',
-                      });
-                      // 3D path: drop the camera at a prospecting-comfortable
-                      // altitude over the target. Without this, the 3D map
-                      // would land at zoom-19 → ground level → camera buried
-                      // inside the photoreal mesh (search-to-ground bug).
-                      // Locked 2026-05-27.
-                      setFlyToTarget({
-                        lat: payload.lat,
-                        lng: payload.lng,
-                        altitude: 280,
-                        heading: 0,
-                        pitch: -45,
-                        range: 600,
-                        durationMs: 1200,
-                      });
-                      if (payload.leadId && user) {
-                        supabase
-                          .from('leads')
-                          .select('*')
-                          .eq('id', payload.leadId)
-                          .eq('user_id', user.id)
-                          .single()
-                          .then(({ data }) => { if (data) setPinnedRef(data as Lead); });
-                      }
-                      setDesktopSearchOpen(false);
-                    }}
-                  />
-                </div>
-              ) : null
-            }
-            items={[
-              {
-                key: 'search',
-                icon: 'search',
-                label: 'Search address or lead',
-                onClick: () => setDesktopSearchOpen(true),
-                visible: !desktopSearchOpen,
-              },
-              {
-                key: 'walk',
-                icon: 'directions_walk',
-                label: 'Walk Mode',
-                onClick: () => isSubscribed ? mapModeDispatch({ type: 'ENTER_WALK' }) : setShowGate(true),
-              },
-              {
-                key: 'prospect',
-                icon: 'ads_click',
-                label: prospectMode ? 'Exit prospect selection' : 'Select prospects',
-                onClick: () => handleToggleProspectMode(),
-                active: prospectMode,
-              },
-              {
-                key: 'layers',
-                icon: 'layers',
-                label: 'Parcel layer',
-                onClick: () => setShowParcels(v => !v),
-                active: showParcels,
-              },
-              {
-                key: 'photoreal',
-                icon: 'terrain',
-                label: profile.enable3DTilesAdmin ? 'Exit Photorealistic 3D Tiles' : 'Photorealistic 3D Tiles (admin)',
-                onClick: () => updateProfile({ enable3DTilesAdmin: !profile.enable3DTilesAdmin }),
-                visible: profile.isAdmin,
-                badge: 'ADM',
-                accentClassName: profile.enable3DTilesAdmin
-                  ? 'bg-gradient-to-br from-amber-500 to-rose-500 text-white shadow-lg'
-                  : undefined,
-              },
-              {
-                key: 'pois',
-                icon: poisVisible ? 'visibility' : 'visibility_off',
-                label: poisVisible ? 'Hide POI labels (Google businesses)' : 'Show POI labels (Google businesses)',
-                onClick: () => togglePois(),
-                active: poisVisible,
-              },
-              {
-                // Mode (2D/3D/Walk) now lives in the always-visible
-                // ModeSwitch, not a toolbar item — the old airplane button
-                // was a one-way trap into 3D. Flight feel only matters in 3D.
-                key: 'tune',
-                icon: 'tune',
-                label: 'Flight feel',
-                onClick: () => setFlightTuningOpen(v => !v),
-                active: flightTuningOpen,
-                visible: view3D,
-              },
-              {
-                key: 'destinations',
-                icon: 'public',
-                label: 'Fly somewhere',
-                onClick: () => setDestinationsOpen(v => !v),
-                active: destinationsOpen,
-              },
-            ]}
-          />
-
-          {/* Flight tuning panel — anchored to the toolbar. Live-preview
-              while open. Mouse-only for v1; full controller-navigable
-              UI is its own design sprint. */}
           <FlightTuningPanel
             visible={flightTuningOpen}
             tuning={flightTuning}
@@ -1561,10 +1486,6 @@ export default function MapPage() {
             onReset={resetFlightTuning}
             onClose={() => setFlightTuningOpen(false)}
           />
-
-          {/* Destinations overlay — curated cities, search, Home.
-              Sets flyToTarget which MapView3D animates toward
-              with cinematic ease + arc-altitude lift. */}
           <DestinationsPanel
             visible={destinationsOpen}
             home={profile.defaultMapCenter ? {
@@ -1572,54 +1493,9 @@ export default function MapPage() {
               lng: profile.defaultMapCenter.lng,
               label: profile.company || profile.fullName || undefined,
             } : null}
-            onFlyTo={(target) => {
-              // Brand-new object identity each call so MapView3D's
-              // effect fires even if user re-picks the same destination.
-              setFlyToTarget({ ...target });
-            }}
+            onFlyTo={(target) => { setFlyToTarget({ ...target }); }}
             onClose={() => setDestinationsOpen(false)}
           />
-
-          {/* Mobile search — sits inline at top of screen on small
-              displays since the right-anchored desktop toolbar isn't
-              thumb-friendly. The MapToolbar above is the only thing
-              that renders on desktop. */}
-          <div className="absolute top-2 left-2 right-14 z-10 md:hidden">
-            <ProspectSearch
-              compact
-              placeholder="Search leads or addresses..."
-              onSelect={(payload) => {
-                setMapCenter({ lat: payload.lat, lng: payload.lng });
-                setHasUserPanned(true);
-                // 2D path
-                dispatchFlight({
-                  center: { lat: payload.lat, lng: payload.lng },
-                  zoom: 19,
-                  duration: 900,
-                  easing: 'easeInOutCubic',
-                });
-                // 3D path — prospecting-comfortable altitude over target.
-                setFlyToTarget({
-                  lat: payload.lat,
-                  lng: payload.lng,
-                  altitude: 280,
-                  heading: 0,
-                  pitch: -45,
-                  range: 600,
-                  durationMs: 1200,
-                });
-                if (payload.leadId && user) {
-                  supabase
-                    .from('leads')
-                    .select('*')
-                    .eq('id', payload.leadId)
-                    .eq('user_id', user.id)
-                    .single()
-                    .then(({ data }) => { if (data) setPinnedRef(data as Lead); });
-                }
-              }}
-            />
-          </div>
         </>
       )}
 

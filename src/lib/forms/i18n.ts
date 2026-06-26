@@ -74,8 +74,48 @@ const STRINGS: Record<string, Entry> = {
   'inspection.c.change': { en: 'I want to adjust the timing', es: 'Quiero ajustar el tiempo' },
   'inspection.c.change.note': { en: 'You’re the captain — change it if you like.', es: 'Tú eres el capitán — cámbialo si quieres.' },
 
+  // representation comp — surfaced to the buyer as a settled fact (no ask).
+  // The seller sees it inside their NET in the OfferHouse, never as a line item.
+  'q.repCost.question': {
+    en: 'Your representation is already taken care of.',
+    es: 'Tu representación ya está cubierta.',
+  },
+  'q.repCost.help': {
+    en: 'You don’t pay us, and you don’t have to ask the seller to. It’s settled before your offer is ever seen — built into the deal, not begged for at the table. The seller sees their real take-home with this already counted. You just bring the offer.',
+    es: 'Tú no nos pagas, y no tienes que pedirle al vendedor que lo haga. Está resuelto antes de que se vea tu oferta — incluido en el trato, no mendigado en la mesa. El vendedor ve lo que realmente se lleva con esto ya contado. Tú solo traes la oferta.',
+  },
+  'q.repCost.fact': {
+    en: 'Representation secured · costs you nothing',
+    es: 'Representación asegurada · no te cuesta nada',
+  },
+  'q.repCost.factSource': {
+    en: 'Settled before this offer · part of the deal, not an ask',
+    es: 'Resuelto antes de esta oferta · parte del trato, no una petición',
+  },
+  'q.repCost.confirm': { en: 'Good — let’s keep going', es: 'Bien — sigamos' },
+  'q.repCost.confirm.note': { en: 'Nothing for you to do here.', es: 'Nada que hacer aquí.' },
+
   // ── 3. THE NUMBER — what I'll pay FOR this property ──
   'money.section.title': { en: 'Your number', es: 'Tu número' },
+
+  // cash-back toward closing — the BUYER's own request for help (a lever).
+  'q.cashBack.question': {
+    en: 'Want to ask the seller to chip in toward your closing costs?',
+    es: '¿Quieres pedirle al vendedor que aporte a tus costos de cierre?',
+  },
+  'q.cashBack.help': {
+    en: 'This is you asking for help, and that’s fair. But know it’s a lever: in a competitive spot, asking for money back can make your offer less attractive than one that doesn’t. Your call — we’ll show you the trade.',
+    es: 'Esto es pedir ayuda, y es justo. Pero es una palanca: en una situación competida, pedir dinero de vuelta puede hacer tu oferta menos atractiva que una que no lo pide. Tú decides — te mostramos el intercambio.',
+  },
+  'term.closingcosts.word': { en: 'closing costs', es: 'costos de cierre' },
+  'term.closingcosts.plain': {
+    en: 'The one-time fees to finish the sale — things like the loan setup, title, and escrow. Separate from the price of the home itself.',
+    es: 'Las tarifas únicas para cerrar la venta — cosas como el trámite del préstamo, el título y el depósito en garantía. Aparte del precio de la casa.',
+  },
+  'cashBack.c.none': { en: 'No — I’ll cover my own costs', es: 'No — yo cubro mis propios costos' },
+  'cashBack.c.none.note': { en: 'The cleaner, stronger offer.', es: 'La oferta más limpia y fuerte.' },
+  'cashBack.c.ask': { en: 'Yes — ask for help toward closing', es: 'Sí — pedir ayuda con el cierre' },
+  'cashBack.c.ask.note': { en: 'We’ll show how it affects your standing.', es: 'Te mostramos cómo afecta tu posición.' },
 
   'q.offerPrice.question': {
     en: 'What will you pay for this property?',

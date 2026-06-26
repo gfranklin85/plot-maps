@@ -57,6 +57,21 @@ export const OFFER_ASK: AskFlow = {
             { id: 'change', label: 'inspection.c.change', note: 'inspection.c.change.note' },
           ],
         },
+        // Representation comp — NOT an ask (kills RPA G(3)'s hat-in-hand
+        // begging). Shown to the buyer as a SETTLED FACT: costs them nothing,
+        // handled before the offer is seen, folded into the seller's NET in
+        // the OfferHouse. The buyer just acknowledges + continues.
+        {
+          id: 'repCost',
+          question: 'q.repCost.question',
+          help: 'q.repCost.help',
+          fact: 'q.repCost.fact',
+          factSource: 'q.repCost.factSource',
+          kind: 'choice',
+          choices: [
+            { id: 'ok', label: 'q.repCost.confirm', note: 'q.repCost.confirm.note' },
+          ],
+        },
         // NEXT (with Greg): any other term that's genuinely the BUYER's to
         // set (possession date? what conveys?). Keep weeding anything that
         // was never in the buyer's control — those reflect from the crew.
@@ -75,8 +90,25 @@ export const OFFER_ASK: AskFlow = {
           kind: 'money',
           placeholder: 'q.offerPrice.placeholder',
         },
+        // Cash-back toward closing — the BUYER's OWN request for help (RPA
+        // G(1) stays — it serves the buyer). Framed as a LEVER with the
+        // trade-off shown; "closing costs" carries its jargon sponsor.
+        {
+          id: 'cashBack',
+          question: 'q.cashBack.question',
+          help: 'q.cashBack.help',
+          terms: [
+            { word: 'term.closingcosts.word', plain: 'term.closingcosts.plain' },
+          ],
+          kind: 'choice',
+          choices: [
+            { id: 'none', label: 'cashBack.c.none', note: 'cashBack.c.none.note' },
+            { id: 'ask', label: 'cashBack.c.ask', note: 'cashBack.c.ask.note' },
+          ],
+        },
         // NEXT: monthly-first SANITY CHECK ("does this number fit your
-        // life?") — a reassurance, not the offer itself.
+        // life?") — a reassurance, not the offer itself. Then the seller-NET
+        // preview (OfferHouse) the buyer's price produces.
       ],
     },
   ],

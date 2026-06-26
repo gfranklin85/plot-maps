@@ -40,6 +40,27 @@ const STRINGS: Record<string, Entry> = {
   },
   'q.property.placeholder': { en: 'Search an address…', es: 'Busca una dirección…' },
 
+  // agency disclosure — who represents whom. Reflected (system/agent has it),
+  // comes first. Confirmed, not asked.
+  'q.agency.question': {
+    en: 'Here’s who’s representing everyone.',
+    es: 'Esto es quién representa a cada parte.',
+  },
+  'q.agency.help': {
+    en: 'Before anything else, it should be crystal clear who works for whom. You have your own agent on your side. The seller has theirs. No mixing it up, no hidden loyalties.',
+    es: 'Antes que nada, debe quedar clarísimo quién trabaja para quién. Tú tienes tu propio agente de tu lado. El vendedor tiene el suyo. Sin confusiones, sin lealtades ocultas.',
+  },
+  'q.agency.fact': {
+    en: 'You: Greg Franklin, Position Realty · Seller: their listing agent',
+    es: 'Tú: Greg Franklin, Position Realty · Vendedor: su agente de venta',
+  },
+  'q.agency.factSource': {
+    en: 'Already on file · your side is your side',
+    es: 'Ya registrado · tu lado es tu lado',
+  },
+  'q.agency.confirm': { en: 'Clear — let’s build the offer', es: 'Claro — construyamos la oferta' },
+  'q.agency.confirm.note': { en: 'Nothing to enter — just so you know.', es: 'Nada que ingresar — solo para que sepas.' },
+
   // ── 2. THE TERMS — engaged as a lever, stated with confidence ──
   'terms.section.title': { en: 'Your terms', es: 'Tus condiciones' },
 
@@ -155,6 +176,68 @@ const STRINGS: Record<string, Entry> = {
     es: 'Un solo número. Esto cubre todo — sin dividir tarifas pequeñas, sin regateo de trámites. Tú manejas los costos del trato, y el vendedor ve exactamente lo que se lleva. Oferta limpia, sin letra chica.',
   },
   'q.offerPrice.placeholder': { en: '$400,000', es: '$400,000' },
+
+  // loan type — SHARE. The listing agent needs the terms that come with it.
+  'q.loanType.question': {
+    en: 'How are you paying for it?',
+    es: '¿Cómo lo vas a pagar?',
+  },
+  'q.loanType.help': {
+    en: 'This is worth sharing — the seller’s side needs to know, because each path comes with its own rules and timeline. It’s not a weakness to show; it’s just how the deal works.',
+    es: 'Vale la pena compartir esto — el lado del vendedor necesita saberlo, porque cada camino tiene sus propias reglas y tiempos. No es debilidad mostrarlo; es simplemente cómo funciona el trato.',
+  },
+  'loanType.c.cash': { en: 'All cash', es: 'Todo en efectivo' },
+  'loanType.c.cash.note': { en: 'The simplest, fastest path.', es: 'El camino más simple y rápido.' },
+  'loanType.c.conventional': { en: 'A regular loan (conventional)', es: 'Un préstamo regular (convencional)' },
+  'loanType.c.conventional.note': { en: 'The most common way.', es: 'La forma más común.' },
+  'loanType.c.fha': { en: 'An FHA loan', es: 'Un préstamo FHA' },
+  'loanType.c.fha.note': { en: 'Lower down, a few extra rules.', es: 'Menos enganche, unas reglas extra.' },
+  'loanType.c.va': { en: 'A VA loan', es: 'Un préstamo VA' },
+  'loanType.c.va.note': { en: 'For those who served.', es: 'Para quienes sirvieron.' },
+
+  // deposit — SHARE. Real skin-in-the-game signal, easily understood.
+  'q.deposit.question': {
+    en: 'How much will you put down as a good-faith deposit?',
+    es: '¿Cuánto pondrás como depósito de buena fe?',
+  },
+  'q.deposit.help': {
+    en: 'This is money you put up right away to show you’re serious — it goes toward the purchase, it’s not extra. A solid deposit tells the seller you mean business. Share it with confidence.',
+    es: 'Es dinero que pones de inmediato para mostrar que vas en serio — cuenta para la compra, no es extra. Un buen depósito le dice al vendedor que hablas en serio. Compártelo con confianza.',
+  },
+  'term.deposit.word': { en: 'good-faith deposit', es: 'depósito de buena fe' },
+  'term.deposit.plain': {
+    en: 'A chunk of money you hand over early to prove you’re for real. It’s held safely and counts toward what you’re paying — you don’t lose it by going forward.',
+    es: 'Una cantidad que entregas temprano para probar que vas en serio. Se guarda de forma segura y cuenta para lo que pagas — no la pierdes por seguir adelante.',
+  },
+  'q.deposit.placeholder': { en: '$8,000', es: '$8,000' },
+
+  // close of escrow — SHARE. When the deal completes.
+  'q.coe.question': {
+    en: 'How soon do you want this to be done and yours?',
+    es: '¿Qué tan pronto quieres que esté cerrado y sea tuyo?',
+  },
+  'q.coe.help': {
+    en: 'This is the finish line — the day everything’s signed, paid, and the place is officially yours. A normal timeline is around a month; faster can make your offer stronger if your crew’s ready (and yours is).',
+    es: 'Esta es la meta — el día en que todo está firmado, pagado y el lugar es oficialmente tuyo. Un tiempo normal es cerca de un mes; más rápido puede hacer tu oferta más fuerte si tu equipo está listo (y el tuyo lo está).',
+  },
+  'coe.c.fast': { en: 'Fast — about 2-3 weeks', es: 'Rápido — unas 2-3 semanas' },
+  'coe.c.fast.note': { en: 'A strong signal — your crew’s ready.', es: 'Una señal fuerte — tu equipo está listo.' },
+  'coe.c.normal': { en: 'Normal — about a month', es: 'Normal — cerca de un mes' },
+  'coe.c.normal.note': { en: 'The usual, comfortable pace.', es: 'El ritmo usual y cómodo.' },
+
+  // expiration — SHARE. How long the offer stands.
+  'q.expiration.question': {
+    en: 'How long should this offer stand before they have to answer?',
+    es: '¿Cuánto tiempo debe durar esta oferta antes de que respondan?',
+  },
+  'q.expiration.help': {
+    en: 'You’re giving the seller a window to say yes. Short and firm shows confidence and keeps things moving; too long lets them shop your offer around. A couple of days is plenty.',
+    es: 'Le das al vendedor una ventana para decir sí. Corto y firme muestra confianza y mantiene el ritmo; demasiado largo les deja comparar tu oferta. Un par de días es suficiente.',
+  },
+  'expiration.c.short': { en: '2 days — let’s keep it moving', es: '2 días — mantengamos el ritmo' },
+  'expiration.c.short.note': { en: 'Confident and clean.', es: 'Seguro y limpio.' },
+  'expiration.c.standard': { en: '3 days — the standard', es: '3 días — el estándar' },
+  'expiration.c.standard.note': { en: 'Reasonable breathing room.', es: 'Un margen razonable.' },
 
   // the seller-net preview (OfferHouse math) shown after the price is set.
   'offerPrice.net.fact': {

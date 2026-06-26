@@ -34,6 +34,26 @@ export const OFFER_ASK: AskFlow = {
       ],
     },
 
+    // ── 1b. AGENCY — who represents whom. Comes first, REFLECTED (system/
+    //    agent already has it), confirmed not asked. RPA §2. ──
+    {
+      id: 'agency',
+      title: 'target.section.title',
+      steps: [
+        {
+          id: 'agency',
+          question: 'q.agency.question',
+          help: 'q.agency.help',
+          fact: 'q.agency.fact',
+          factSource: 'q.agency.factSource',
+          kind: 'choice',
+          choices: [
+            { id: 'ok', label: 'q.agency.confirm', note: 'q.agency.confirm.note' },
+          ],
+        },
+      ],
+    },
+
     // ── 2. TERMS — the lever. Ownership-posture intro, then inspection
     //    stated as a confident affirmation (not a concession). Loan +
     //    appraisal intentionally omitted (lender already owns those). ──
@@ -98,11 +118,30 @@ export const OFFER_ASK: AskFlow = {
             { id: 'keep', label: 'items.c.keep', note: 'items.c.keep.note' },
           ],
         },
+        // Loan type — SHARE (RPA E(1)). The listing agent needs the terms
+        // that come with the loan path. Not a vulnerability; useful info.
+        {
+          id: 'loanType',
+          question: 'q.loanType.question',
+          help: 'q.loanType.help',
+          kind: 'choice',
+          choices: [
+            { id: 'cash', label: 'loanType.c.cash', note: 'loanType.c.cash.note' },
+            { id: 'conventional', label: 'loanType.c.conventional', note: 'loanType.c.conventional.note' },
+            { id: 'fha', label: 'loanType.c.fha', note: 'loanType.c.fha.note' },
+            { id: 'va', label: 'loanType.c.va', note: 'loanType.c.va.note' },
+          ],
+        },
+
         // WEEDED from buyer questions (reflect from crew/system, not asks):
         //  · L(4) Insurance → from the insurance vendor (new to the roster)
         //  · L(6) Prelim Title → early system process, taught not asked
         //  · L(5) Seller disclosure → Position's OWN interactive questionnaire
         //    / buyer-seller Zoom (big own surface — banked)
+        // DE-EMPHASIZED: rate "not to exceed X%" (RPA E(1)) — a flaky escape
+        //    hatch that signals how stretched the buyer is. Not featured.
+        // GUARDED: down payment (RPA F) — a CARD (strength + vulnerability),
+        //    handled carefully, not auto-exposed. (Surfaces in number section.)
       ],
     },
 
@@ -139,9 +178,47 @@ export const OFFER_ASK: AskFlow = {
             { id: 'ask', label: 'cashBack.c.ask', note: 'cashBack.c.ask.note' },
           ],
         },
+        // Deposit — SHARE (RPA D(1)). Real skin-in-the-game; "good-faith
+        // deposit" carries its jargon sponsor.
+        {
+          id: 'deposit',
+          question: 'q.deposit.question',
+          help: 'q.deposit.help',
+          terms: [
+            { word: 'term.deposit.word', plain: 'term.deposit.plain' },
+          ],
+          kind: 'money',
+          placeholder: 'q.deposit.placeholder',
+        },
+
+        // Close of escrow — SHARE (RPA B). When it's done + yours.
+        {
+          id: 'coe',
+          question: 'q.coe.question',
+          help: 'q.coe.help',
+          kind: 'choice',
+          choices: [
+            { id: 'fast', label: 'coe.c.fast', note: 'coe.c.fast.note' },
+            { id: 'normal', label: 'coe.c.normal', note: 'coe.c.normal.note' },
+          ],
+        },
+
+        // Expiration of offer — SHARE (RPA C). How long it stands.
+        {
+          id: 'expiration',
+          question: 'q.expiration.question',
+          help: 'q.expiration.help',
+          kind: 'choice',
+          choices: [
+            { id: 'short', label: 'expiration.c.short', note: 'expiration.c.short.note' },
+            { id: 'standard', label: 'expiration.c.standard', note: 'expiration.c.standard.note' },
+          ],
+        },
+
         // NEXT: monthly-first SANITY CHECK ("does this number fit your
         // life?") — a reassurance, not the offer itself. Then the seller-NET
-        // preview (OfferHouse) the buyer's price produces.
+        // preview (OfferHouse) the buyer's price produces. Then review + sign
+        // + the comprehension certificate.
       ],
     },
   ],

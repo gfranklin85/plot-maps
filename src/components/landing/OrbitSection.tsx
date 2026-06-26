@@ -59,6 +59,41 @@ function OrbitTool() {
   const [status, setStatus] = useState<'idle' | 'finding' | 'orbiting' | 'notfound' | 'error'>('idle');
   const [shown, setShown] = useState<string | null>(null);
 
+  // ── address autocomplete (public places routes) ──
+  type Sug = { placeId: string; mainText: string; secondaryText: string };
+  const [suggestions, setSuggestions] = useState<Sug[]>([]);
+  const [acOpen, setAcOpen] = useState(false);
+  const acDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const acSeq = useRef(0); // guard against out-of-order responses
+
+  const onAddressChange = (val: string) => {
+    setAddress(val);
+    if (acDebounce.current) clearTimeout(acDebounce.current);
+    if (val.trim().length < 3) { setSuggestions([]); setAcOpen(false); return; }
+    const seq = ++acSeq.current;
+    acDebounce.current = setTimeout(async () => {
+      try {
+        const r = await fetch(`/api/public/places-autocomplete?q=${encodeURIComponent(val.trim())}`);
+        const d = await r.json();
+        if (seq !== acSeq.current) return; // a newer keystroke won
+        setSuggestions(d.suggestions ?? []);
+        setAcOpen((d.suggestions ?? []).length > 0);
+      } catch { /* silent */ }
+    }, 220);
+  };
+
+  const pickSuggestion = async (s: Sug) => {
+    const label = [s.mainText, s.secondaryText].filter(Boolean).join(', ');
+    setAddress(label);
+    setSuggestions([]); setAcOpen(false);
+    // Resolve to the precise formatted address for a clean orbit/render.
+    try {
+      const r = await fetch(`/api/public/place-details?placeId=${encodeURIComponent(s.placeId)}`);
+      const d = await r.json();
+      if (d.hit && d.formatted) setAddress(d.formatted);
+    } catch { /* keep the label */ }
+  };
+
   const [cine, setCine] = useState<'idle' | 'submitting' | 'rendering' | 'ready' | 'unsupported' | 'error'>('idle');
   const [cineUri, setCineUri] = useState<string | null>(null);
   const [showCine, setShowCine] = useState(false);
@@ -136,16 +171,33 @@ function OrbitTool() {
 
   return (
     <div className="fp-orbit">
-      {/* address input */}
+      {/* address input + autocomplete */}
       <div className="fp-orbit__bar">
-        <input
-          value={address}
-          onChange={(e) => setAddress(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') orbit(); }}
-          placeholder="Type any address…"
-          className="fp-orbit__input"
-        />
-        <button onClick={orbit} disabled={!maps3d || !address.trim() || status === 'finding'} className="fp-cta fp-cta--primary">
+        <div className="fp-orbit__ac">
+          <input
+            value={address}
+            onChange={(e) => onAddressChange(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') { setAcOpen(false); orbit(); } }}
+            onFocus={() => { if (suggestions.length) setAcOpen(true); }}
+            onBlur={() => setTimeout(() => setAcOpen(false), 120)}
+            placeholder="Type any address…"
+            className="fp-orbit__input"
+            autoComplete="off"
+          />
+          {acOpen && suggestions.length > 0 && (
+            <ul className="fp-orbit__suggestions">
+              {suggestions.map((s) => (
+                <li key={s.placeId}>
+                  <button type="button" onMouseDown={(e) => { e.preventDefault(); pickSuggestion(s); }}>
+                    <span className="fp-orbit__sug-main">{s.mainText}</span>
+                    {s.secondaryText && <span className="fp-orbit__sug-sec">{s.secondaryText}</span>}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <button onClick={() => { setAcOpen(false); orbit(); }} disabled={!maps3d || !address.trim() || status === 'finding'} className="fp-cta fp-cta--primary">
           {status === 'finding' ? 'Finding…' : 'Orbit it →'}
         </button>
         <button onClick={renderCinematic} disabled={!address.trim() || !consent} className="fp-cta fp-cta--ghost">

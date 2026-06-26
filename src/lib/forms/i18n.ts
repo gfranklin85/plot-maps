@@ -151,10 +151,20 @@ const STRINGS: Record<string, Entry> = {
     es: '¿Cuánto pagarás por esta propiedad?',
   },
   'q.offerPrice.help': {
-    en: 'This is your offer — the price you’re putting on the table. Not what you can afford in general. What you’ll give for this one.',
-    es: 'Esta es tu oferta — el precio que pones sobre la mesa. No lo que puedes pagar en general. Lo que darás por esta.',
+    en: 'One number. This covers everything — no splitting little fees, no admin haggling. You handle the costs of the deal, and the seller sees exactly what they take home. Clean offer, no fine print.',
+    es: 'Un solo número. Esto cubre todo — sin dividir tarifas pequeñas, sin regateo de trámites. Tú manejas los costos del trato, y el vendedor ve exactamente lo que se lleva. Oferta limpia, sin letra chica.',
   },
   'q.offerPrice.placeholder': { en: '$400,000', es: '$400,000' },
+
+  // the seller-net preview (OfferHouse math) shown after the price is set.
+  'offerPrice.net.fact': {
+    en: 'The seller sees their real take-home — costs already handled.',
+    es: 'El vendedor ve lo que realmente se lleva — costos ya cubiertos.',
+  },
+  'offerPrice.net.source': {
+    en: 'One clean number · no allocation grid · no fine print',
+    es: 'Un número limpio · sin tabla de costos · sin letra chica',
+  },
 
   // a jargon sponsor example (rule: no jargon without a sponsor)
   'term.downpayment.word': { en: 'down payment', es: 'pago inicial' },

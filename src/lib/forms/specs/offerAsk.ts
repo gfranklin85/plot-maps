@@ -115,6 +115,11 @@ export const OFFER_ASK: AskFlow = {
           id: 'offerPrice',
           question: 'q.offerPrice.question',
           help: 'q.offerPrice.help',
+          // ONE number absorbs all costs (RPA Page 3 allocation grid dissolves
+          // — buyer covers, folded in). The fact line states the OfferHouse
+          // promise: seller sees their real net, no allocation grid ever.
+          fact: 'offerPrice.net.fact',
+          factSource: 'offerPrice.net.source',
           kind: 'money',
           placeholder: 'q.offerPrice.placeholder',
         },

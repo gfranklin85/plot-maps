@@ -64,6 +64,12 @@ export interface AskStep {
   derive?: 'price' | 'loanAmount' | 'downPaymentPct' | 'monthlyTotal' | 'offerSummary';
   /** optional worked example shown with the question (real numbers). */
   example?: TKey;
+  /** a SETTLED FACT reflected from upstream (the buyer's assembled crew) —
+      shown as a confirmed line the captain confirms, not a question they
+      answer. `factSource` credits where it came from (e.g. "your ready crew").
+      Until the crew flow feeds it, this is a sensible placeholder. */
+  fact?: TKey;
+  factSource?: TKey;
   /** only ask this step when this predicate over prior answers is true. */
   showWhen?: (answers: Record<string, string>) => boolean;
 }
@@ -73,6 +79,9 @@ export interface AskStep {
 export interface AskSection {
   id: string;
   title: TKey;
+  /** optional framing shown once when entering the section's first step
+      (e.g. the ownership-posture intro on the terms section). */
+  intro?: TKey;
   steps: AskStep[];
 }
 

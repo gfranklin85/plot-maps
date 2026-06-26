@@ -6,7 +6,7 @@
 // the form's framing + the objective-first opener; the per-page question
 // flow (built from docs/rpa-teardown.md) gets wired in next, page by page.
 
-import { use, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { notFound, useSearchParams } from 'next/navigation';
 import MaterialIcon from '@/components/ui/MaterialIcon';
@@ -19,9 +19,9 @@ import CostCockpit from '@/components/offer/CostCockpit';
 export default function FormFlowPage({
   params,
 }: {
-  params: Promise<{ slug: string }>;
+  params: { slug: string };
 }) {
-  const { slug } = use(params);
+  const { slug } = params;
   const form = findForm(slug);
   // The offer has two lenses: the negotiation (what each term gives away)
   // and the money (every live dollar the buyer drives). Same instrument.

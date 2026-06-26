@@ -31,12 +31,14 @@ export default function AskFlow({ flow }: { flow: AskFlowSpec }) {
   const [answers, setAnswers] = useState<Record<string, string>>({});
 
   // Flatten sections → a single ordered list of steps, respecting showWhen.
+  // The section `intro` rides on the section's FIRST step so the engine can
+  // surface the framing (e.g. the ownership posture) when you enter it.
   const steps = useMemo(() => {
-    const all: { step: AskStep; sectionTitle: string }[] = [];
+    const all: { step: AskStep; sectionTitle: string; sectionIntro?: string }[] = [];
     for (const section of flow.sections) {
-      for (const step of section.steps) {
-        all.push({ step, sectionTitle: section.title });
-      }
+      section.steps.forEach((step, i) => {
+        all.push({ step, sectionTitle: section.title, sectionIntro: i === 0 ? section.intro : undefined });
+      });
     }
     return all;
   }, [flow]);
@@ -83,6 +85,15 @@ export default function AskFlow({ flow }: { flow: AskFlowSpec }) {
           />
         ))}
       </div>
+
+      {/* section framing (e.g. the ownership posture) — only on entry */}
+      {current?.sectionIntro && hasKey(current.sectionIntro) && (
+        <div className="rounded-2xl p-5" style={{ background: 'linear-gradient(160deg, rgba(19,73,212,0.08), rgba(18,45,141,0.05))', border: '1px solid rgba(19,73,212,0.18)' }}>
+          <p className="text-sm md:text-[15px] leading-relaxed font-medium text-[#1a2c52]">
+            {t(current.sectionIntro, lang)}
+          </p>
+        </div>
+      )}
 
       {/* the one question */}
       {current && (
@@ -145,6 +156,22 @@ function QuestionCard({
         <div className="mt-4 rounded-xl p-3.5 text-sm" style={{ background: 'rgba(27,158,106,0.07)', border: '1px solid rgba(27,158,106,0.22)', color: '#1b7a55' }}>
           <MaterialIcon icon="lightbulb" className="text-[14px] mr-1.5 align-middle" />
           {t(step.example!, lang)}
+        </div>
+      )}
+
+      {/* a SETTLED FACT reflected from the buyer's ready crew — a plan they
+          already own, not a question. Backup quietly stands by. */}
+      {hasKey(step.fact) && (
+        <div className="mt-4 rounded-xl p-4 flex items-start gap-3" style={{ background: 'rgba(19,73,212,0.06)', border: '1px solid rgba(19,73,212,0.22)' }}>
+          <MaterialIcon icon="verified" className="text-[20px] mt-0.5" />
+          <div>
+            <div className="font-bold text-[#0c1322]">{t(step.fact!, lang)}</div>
+            {hasKey(step.factSource) && (
+              <div className="text-xs mt-0.5 font-semibold text-[#1349d4] uppercase tracking-wide">
+                {t(step.factSource!, lang)}
+              </div>
+            )}
+          </div>
         </div>
       )}
 

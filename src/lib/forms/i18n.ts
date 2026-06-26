@@ -27,18 +27,65 @@ const STRINGS: Record<string, Entry> = {
   'offer.eyebrow': { en: 'Your Offer · in plain language', es: 'Tu Oferta · en lenguaje sencillo' },
   'offer.title': { en: "Let's build your offer together.", es: 'Construyamos tu oferta juntos.' },
 
-  // ── money section (authored page-by-page; seeds below) ──
-  'money.section.title': { en: 'The money', es: 'El dinero' },
+  // ── 1. THE TARGET — what property (agnostic: home, land, commercial) ──
+  'target.section.title': { en: 'The property', es: 'La propiedad' },
 
-  'q.monthly.question': {
-    en: 'How much can you comfortably pay each month?',
-    es: '¿Cuánto puedes pagar cómodamente cada mes?',
+  'q.property.question': {
+    en: 'What property are you making an offer on?',
+    es: '¿Sobre qué propiedad estás haciendo una oferta?',
   },
-  'q.monthly.help': {
-    en: 'This is the only number that really matters — what fits your life. Everything else, we figure out from this.',
-    es: 'Este es el único número que de verdad importa — lo que cabe en tu vida. Todo lo demás lo calculamos a partir de esto.',
+  'q.property.help': {
+    en: 'An offer is about one specific property. If you came here from the map, it’s already set below. If not, search for the address.',
+    es: 'Una oferta es sobre una propiedad específica. Si llegaste desde el mapa, ya está puesta abajo. Si no, busca la dirección.',
   },
-  'q.monthly.placeholder': { en: '$2,200 / month', es: '$2,200 / mes' },
+  'q.property.placeholder': { en: 'Search an address…', es: 'Busca una dirección…' },
+
+  // ── 2. THE TERMS — engaged as a lever, stated with confidence ──
+  'terms.section.title': { en: 'Your terms', es: 'Tus condiciones' },
+
+  // ownership-posture framing shown at the top of terms
+  'terms.intro': {
+    en: 'Terms aren’t fine print — they’re how you win the deal, and they say what kind of owner you’re about to be. You’re not asking for a favor here. You’re stepping up to take care of this place.',
+    es: 'Las condiciones no son letra chica — son cómo ganas el trato, y dicen qué tipo de dueño vas a ser. Aquí no estás pidiendo un favor. Estás dando un paso al frente para cuidar este lugar.',
+  },
+
+  // inspection — REFLECTED as an already-settled fact from the crew the buyer
+  // assembled upstream (their chosen inspector), confirmed not interrogated.
+  'q.inspection.question': {
+    en: 'Your inspection is already lined up. Ready to lock it in?',
+    es: 'Tu inspección ya está lista. ¿Listo para confirmarla?',
+  },
+  'q.inspection.help': {
+    en: 'You already picked your inspector when you built your crew — they showed you their calendar and how they work. So this isn’t a guess. It’s you confirming a plan you already own. (And a backup is quietly standing by, just in case.)',
+    es: 'Ya elegiste a tu inspector cuando armaste tu equipo — te mostró su calendario y cómo trabaja. Así que esto no es una adivinanza. Es confirmar un plan que ya es tuyo. (Y un reemplazo está listo en silencio, por si acaso.)',
+  },
+  // the settled fact line (crew source pre-fills this once the crew flow exists)
+  'q.inspection.fact': {
+    en: 'Your inspector is on site within 5 days of acceptance.',
+    es: 'Tu inspector estará en el sitio dentro de 5 días de la aceptación.',
+  },
+  'q.inspection.factSource': {
+    en: 'From your ready crew · backup standing by',
+    es: 'De tu equipo listo · reemplazo en espera',
+  },
+  // captain stays in control — confirm or change
+  'inspection.c.confirm': { en: 'Yep — that’s my plan. Lock it in.', es: 'Sí — ese es mi plan. Confírmalo.' },
+  'inspection.c.confirm.note': { en: 'A statement of confidence. You’re ready.', es: 'Una declaración de confianza. Estás listo.' },
+  'inspection.c.change': { en: 'I want to adjust the timing', es: 'Quiero ajustar el tiempo' },
+  'inspection.c.change.note': { en: 'You’re the captain — change it if you like.', es: 'Tú eres el capitán — cámbialo si quieres.' },
+
+  // ── 3. THE NUMBER — what I'll pay FOR this property ──
+  'money.section.title': { en: 'Your number', es: 'Tu número' },
+
+  'q.offerPrice.question': {
+    en: 'What will you pay for this property?',
+    es: '¿Cuánto pagarás por esta propiedad?',
+  },
+  'q.offerPrice.help': {
+    en: 'This is your offer — the price you’re putting on the table. Not what you can afford in general. What you’ll give for this one.',
+    es: 'Esta es tu oferta — el precio que pones sobre la mesa. No lo que puedes pagar en general. Lo que darás por esta.',
+  },
+  'q.offerPrice.placeholder': { en: '$400,000', es: '$400,000' },
 
   // a jargon sponsor example (rule: no jargon without a sponsor)
   'term.downpayment.word': { en: 'down payment', es: 'pago inicial' },

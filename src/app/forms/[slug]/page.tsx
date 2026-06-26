@@ -12,8 +12,8 @@ import { notFound, useSearchParams } from 'next/navigation';
 import MaterialIcon from '@/components/ui/MaterialIcon';
 import AppHeader from '@/components/layout/AppHeader';
 import { findForm } from '@/lib/forms/formCatalog';
-import FormFlow from '@/components/forms/FormFlow';
-import { RPA_FLOW } from '@/lib/forms/specs/rpa';
+import AskFlow from '@/components/forms/AskFlow';
+import { OFFER_ASK } from '@/lib/forms/specs/offerAsk';
 import CostCockpit from '@/components/offer/CostCockpit';
 
 export default function FormFlowPage({
@@ -75,7 +75,7 @@ export default function FormFlowPage({
               />
             </div>
 
-            {lens === 'negotiation' ? <FormFlow flow={RPA_FLOW} /> : <CostCockpit />}
+            {lens === 'negotiation' ? <AskFlow flow={OFFER_ASK} /> : <CostCockpit />}
           </>
         ) : (
           <div className="text-center pt-16">

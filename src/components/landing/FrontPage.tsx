@@ -9,7 +9,10 @@ import { useAuth } from '@/lib/auth-context';
 // ── FrontPage ─────────────────────────────────────────────────────────
 //
 // The unified public front door for PlotMaps + Position Realty.
-// "See every home like never before. / Move when you're ready."
+// Hero message = the reframe (the stance): "It only happens because of you."
+// Same beautiful layout/styling; the message leads with the plain fact, not a
+// feature. memory/feedback_reveal_facts_not_hype_voice. Sections below
+// (intent network, tools, agents, features, close) are unchanged.
 //
 // PlotMaps is the world/experience (universal — explore, prospect,
 // relocate, scout a new city, fly your own backyard, the coming social
@@ -75,24 +78,28 @@ export default function FrontPage() {
           <div className="fp-hero__grid">
             {/* left — the live headline */}
             <div style={{ flex: 1, position: 'relative', zIndex: 2 }}>
-              <span className="fp-pill">EXPLORE · PROSPECT · MOVE</span>
+              <span className="fp-pill">A PLAIN FACT</span>
               <h1 className="fp-head font-headline">
-                See every home
+                It only happens
                 <br />
-                like never before.
-                <span className="accent">Move when you&apos;re ready.</span>
+                <span className="accent">because of you.</span>
               </h1>
               <p className="fp-sub">
-                <b>PlotMaps</b> lets you fly any neighborhood in the country —
-                explore the land, read the market, and find your next move.
-                When it&apos;s time, <b>Position</b> is the brokerage that helps
-                you act.
+                No buyer, no deal — no commission, no lender, no listing worth
+                anything. The whole thing moves because someone decided to go get
+                something. That someone is <b>you</b>, and it always was. So why
+                have you been the one chasing? Only because no one ever showed you
+                that you could just <b>say what you want</b> — and watch it come
+                to you.
               </p>
-              {/* ONE hero button — the universal hook (fly the map). The
-                  intent-network story (claim your home / find your next) lives
-                  in its own section below. memory/project_intent_network_two_sided */}
+              {/* New message, same beautiful hero. Primary = the reframe action
+                  (say what you want → the Bullpen); secondary keeps the map hook.
+                  memory/feedback_reveal_facts_not_hype_voice */}
               <div className="fp-cta-row">
-                <button type="button" className="fp-cta fp-cta--primary" onClick={() => goMap('3d')}>
+                <a href="/bullpen" className="fp-cta fp-cta--primary">
+                  Say what you want <span aria-hidden>→</span>
+                </a>
+                <button type="button" className="fp-cta fp-cta--ghost" onClick={() => goMap('3d')}>
                   Explore the map <span aria-hidden>→</span>
                 </button>
               </div>
@@ -125,6 +132,102 @@ export default function FrontPage() {
                 {/* The land plate IS the hero — no listing card over it.
                     Nothing obstructs the floating world. */}
               </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ════ THE REPOSITION — the buyer-elevation platform ════
+          Right under the hero: explain + show how the dynamic gets put back
+          where it belongs — balanced toward the one buying. Steel-calm,
+          structural; reveal the fact, don't hype.
+          Frameless + sky: no boxes — people just stand in the open sky (the
+          screen IS the sky, our locked design language).
+          memory/feedback_reveal_facts_not_hype_voice + feedback_screen_is_always_2d */}
+      <section className="fp-reposition">
+        <div className="fp-reposition__sky" aria-hidden />
+        <div className="fp__wrap" style={{ position: 'relative', zIndex: 1 }}>
+          <div className="fp-intent__head">
+            <div className="fp-intent__eyebrow">The reposition</div>
+            <h2 className="fp-intent__h">The dynamic, put back where it belongs.</h2>
+            <p className="fp-intent__lede">
+              For as long as anyone can remember, the person buying has been cast
+              as the one who chases — applying, qualifying, hoping to be picked.
+              That was always backwards. You are the reason the market moves. So
+              here, the market moves toward you.
+            </p>
+          </div>
+
+          <div className="fp-reposition__grid">
+            {/* the rebalance, told plainly — no card, just text in the sky */}
+            <div className="fp-reposition__copy">
+              <h3 className="fp-reposition__h">You stand still. The market comes to you.</h3>
+              <p className="fp-reposition__p">
+                Instead of going door to door telling your story over and over,
+                you say what you want once — and the people who can deliver it
+                step toward you, on your terms. No begging. No chasing. The
+                gravity simply runs the right direction.
+              </p>
+              <ul className="fp-flist">
+                <li><span className="chk" aria-hidden>✓</span> You say what you want, plainly — once.</li>
+                <li><span className="chk" aria-hidden>✓</span> Lenders, inspectors, insurers come compete to serve you.</li>
+                <li><span className="chk" aria-hidden>✓</span> You review, you choose. They came to you.</li>
+              </ul>
+              <a href="/bullpen" className="fp-cta fp-cta--primary" style={{ marginTop: 22 }}>
+                Step into the Bullpen <span aria-hidden>→</span>
+              </a>
+            </div>
+
+            {/* The elevation, floating in the sky — no frame. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/landing/buyers-on-platform.png"
+              alt="Buyers standing elevated on a platform in the sky while agents and providers on lower tiers reach up toward them"
+              className="fp-reposition__img"
+              draggable={false}
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* ════ THE BROKERAGE — independent by architecture, protective by design ════
+          Steel-calm, NOT a crusade. The position is immovable. We fix unjust
+          architecture + protect agents — never throw rocks at a building.
+          memory/feedback_reveal_facts_not_hype_voice + project_operator_tier_culture_thesis */}
+      <section className="fp-section" style={{ background: '#fafbff' }}>
+        <div className="fp__wrap">
+          <div className="fp-intent__head">
+            <div className="fp-intent__eyebrow">Where we stand</div>
+            <h2 className="fp-intent__h">A brokerage that stands on its own.</h2>
+            <p className="fp-intent__lede">
+              We don&apos;t lean on the MLS, and we don&apos;t take our marching
+              orders from the trade groups. Not out of spite — out of standards.
+              When the architecture is built to extract, you don&apos;t work
+              inside it and hope; you build a better one and stand on it. Ours is
+              immovable.
+            </p>
+          </div>
+
+          <div className="fp-features">
+            <div className="fp-fcard">
+              <h3 className="fp-fcard__h">Our own instruments.</h3>
+              <p className="fp-fcard__p">
+                We write our own contracts and our own disclosures — in plain
+                language a normal person actually understands, not fine print
+                built to be initialed and forgotten. The deal is honest because
+                it&apos;s legible.
+              </p>
+            </div>
+            <div className="fp-fcard fp-fcard--pos">
+              <h3 className="fp-fcard__h">Built to protect our agents.</h3>
+              <p className="fp-fcard__p">
+                No constant overhead fees nickel-and-diming you for the privilege
+                of working. We organize the operation for efficiency — which
+                lowers your liability, because the system carries the parts that
+                used to leave you exposed. And above all: we care more about who
+                you are than the real estate you sell.
+              </p>
+              <a href="/join-position" className="fp-fcard__cta">For agents →</a>
             </div>
           </div>
         </div>

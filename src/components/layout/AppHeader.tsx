@@ -36,11 +36,13 @@ export default function AppHeader({ variant = 'public' }: { variant?: 'public' |
           </a>
 
           {variant === 'public' ? (
+            // The shared marketing nav spine — same links on every public
+            // surface so nothing orphans. memory/feedback_reveal_facts_not_hype_voice
             <div className="fp-navlinks">
-              <a className="fp-navlink" href="/map">Plot Maps</a>
-              <a className="fp-navlink" href="/position">Brokerage</a>
-              <a className="fp-navlink" href="/map">Listings</a>
-              <a className="fp-navlink" href="/position">Company</a>
+              <a className="fp-navlink" href="/map">The map</a>
+              <a className="fp-navlink" href="/bullpen">The Bullpen</a>
+              <a className="fp-navlink" href="/essays">Essays</a>
+              <a className="fp-navlink" href="/position">Position</a>
             </div>
           ) : (
             <div className="fp-navlinks">

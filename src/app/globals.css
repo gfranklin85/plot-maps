@@ -1417,6 +1417,30 @@ gmp-popover-3d-element[plot-card-popover],
 .fp-eyebrow { text-align: center; font-size: 12.5px; font-weight: 700; letter-spacing: 0.12em; color: var(--fp-green); text-transform: uppercase; }
 .fp-h2 { text-align: center; font-weight: 800; letter-spacing: -0.02em; font-size: clamp(26px, 3.2vw, 38px); margin-top: 10px; color: var(--fp-ink); }
 
+/* ── The reposition — frameless, the screen IS the sky ── */
+.fp-reposition { position: relative; padding: 72px 0 88px; overflow: hidden; }
+/* a soft sky wash that blends into the image's baked-in clouds — no boxes */
+.fp-reposition__sky {
+  position: absolute; inset: 0; z-index: 0; pointer-events: none;
+  background:
+    radial-gradient(120% 80% at 70% 18%, rgba(207,225,247,0.55), rgba(255,255,255,0) 60%),
+    linear-gradient(180deg, #eaf2fc 0%, #f3f8ff 45%, #ffffff 100%);
+}
+.fp-reposition__grid {
+  display: grid; grid-template-columns: 1fr; gap: 28px; align-items: center; margin-top: 8px;
+}
+@media (min-width: 920px) {
+  .fp-reposition__grid { grid-template-columns: 0.85fr 1.15fr; gap: 36px; }
+}
+.fp-reposition__copy { max-width: 460px; }
+.fp-reposition__h { font-weight: 800; font-size: 24px; letter-spacing: -0.015em; line-height: 1.15; color: var(--fp-ink); }
+.fp-reposition__p { color: var(--fp-body); font-size: 15.5px; line-height: 1.6; margin-top: 14px; }
+/* the people float in the sky — no card, just a soft lift shadow */
+.fp-reposition__img {
+  width: 100%; height: auto; display: block;
+  filter: drop-shadow(0 24px 40px rgba(40,70,130,0.16));
+}
+
 /* two feature cards */
 .fp-features { display: grid; gap: 20px; grid-template-columns: 1fr; margin-top: 8px; }
 @media (min-width: 880px) { .fp-features { grid-template-columns: 1fr 1fr; } }

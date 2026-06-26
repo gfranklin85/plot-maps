@@ -28,6 +28,7 @@ const PUBLIC_PATHS = [
   '/essays',
   '/bullpen',
   '/buyers-first',
+  '/orbit',
 ];
 
 // Logged-in pages reachable even for users without beta access. The

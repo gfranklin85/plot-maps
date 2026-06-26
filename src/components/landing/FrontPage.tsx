@@ -1,6 +1,7 @@
 'use client';
 
 import AppHeader from '@/components/layout/AppHeader';
+import OrbitSection from '@/components/landing/OrbitSection';
 import ToolGrid from '@/components/dashboard/ToolGrid';
 import MaterialIcon from '@/components/ui/MaterialIcon';
 import { signInWithGoogle } from '@/lib/signIn';
@@ -233,30 +234,10 @@ export default function FrontPage() {
         </div>
       </section>
 
-      {/* ════ ORBIT PROPERTY — the free front-door scout ════
-          A give-first hook: see any home fly, free. memory/project_orbit_property_agent_magnet */}
-      <section className="fp-section">
-        <div className="fp__wrap">
-          <div className="fp-intent__head">
-            <div className="fp-intent__eyebrow">Orbit Property · free</div>
-            <h2 className="fp-intent__h">Every home, in motion.</h2>
-            <p className="fp-intent__lede">
-              See any property fly. Type an address and watch it orbit in instant
-              3D — or pull the full cinematic flyover, rendered in photoreal
-              detail. It&apos;s free, and it makes a listing impossible to scroll
-              past.
-            </p>
-          </div>
-          <div className="fp-cta-row" style={{ justifyContent: 'center' }}>
-            <a href="/orbit" className="fp-cta fp-cta--primary">
-              Orbit any home <span aria-hidden>→</span>
-            </a>
-          </div>
-          <p className="fp-intent__note">
-            Listing agents: every home you list gets one, free.
-          </p>
-        </div>
-      </section>
+      {/* ════ ORBIT PROPERTY — the free front-door scout, live + compact ════
+          The working tool lives HERE on the landing page (not a lonely page).
+          memory/project_orbit_property_agent_magnet */}
+      <OrbitSection />
 
       {/* ════ THE INTENT NETWORK — "Claim your home. Name your next one." ════
           The two-sided moat: owners claim their house + post status/sell

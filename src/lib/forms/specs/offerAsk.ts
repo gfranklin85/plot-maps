@@ -72,9 +72,37 @@ export const OFFER_ASK: AskFlow = {
             { id: 'ok', label: 'q.repCost.confirm', note: 'q.repCost.confirm.note' },
           ],
         },
-        // NEXT (with Greg): any other term that's genuinely the BUYER's to
-        // set (possession date? what conveys?). Keep weeding anything that
-        // was never in the buyer's control — those reflect from the crew.
+        // Possession — Greg's favorite. Plainest language; the buyer usually
+        // knew their move-in day before the search started. (Early possession
+        // — occupy before closing — deliberately punted: protect the buyer.)
+        {
+          id: 'possession',
+          question: 'q.possession.question',
+          help: 'q.possession.help',
+          kind: 'choice',
+          choices: [
+            { id: 'closing', label: 'possession.c.closing', note: 'possession.c.closing.note' },
+            { id: 'specific', label: 'possession.c.specific', note: 'possession.c.specific.note' },
+          ],
+        },
+        // Items included/excluded — a fun direct ask with a "how the ask
+        // lands" prompt. Homeowner-OG ethic: don't burden people for a clear
+        // space. RPA P(1)/P(2).
+        {
+          id: 'items',
+          question: 'q.items.question',
+          help: 'q.items.help',
+          kind: 'choice',
+          choices: [
+            { id: 'asis', label: 'items.c.asis', note: 'items.c.asis.note' },
+            { id: 'keep', label: 'items.c.keep', note: 'items.c.keep.note' },
+          ],
+        },
+        // WEEDED from buyer questions (reflect from crew/system, not asks):
+        //  · L(4) Insurance → from the insurance vendor (new to the roster)
+        //  · L(6) Prelim Title → early system process, taught not asked
+        //  · L(5) Seller disclosure → Position's OWN interactive questionnaire
+        //    / buyer-seller Zoom (big own surface — banked)
       ],
     },
 

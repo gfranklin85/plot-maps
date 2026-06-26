@@ -95,6 +95,35 @@ const STRINGS: Record<string, Entry> = {
   'q.repCost.confirm': { en: 'Good — let’s keep going', es: 'Bien — sigamos' },
   'q.repCost.confirm.note': { en: 'Nothing for you to do here.', es: 'Nada que hacer aquí.' },
 
+  // possession — plainest language; the buyer often knew their move-in day
+  // before the search even started.
+  'q.possession.question': {
+    en: 'When do you want to move in?',
+    es: '¿Cuándo quieres mudarte?',
+  },
+  'q.possession.help': {
+    en: 'Most people already know this — the day you’ve been picturing. Tell us plainly. We’ll usually line it up with the day the place is officially yours, so you get the keys the moment it’s done.',
+    es: 'La mayoría ya lo sabe — el día que has estado imaginando. Dínoslo con claridad. Normalmente lo alineamos con el día en que el lugar es oficialmente tuyo, para que recibas las llaves en cuanto se cierre.',
+  },
+  'possession.c.closing': { en: 'The day it’s officially mine', es: 'El día que sea oficialmente mía' },
+  'possession.c.closing.note': { en: 'Clean and simple — keys at closing.', es: 'Limpio y simple — llaves al cierre.' },
+  'possession.c.specific': { en: 'I have a specific day in mind', es: 'Tengo un día específico en mente' },
+  'possession.c.specific.note': { en: 'Tell us — we’ll work it in.', es: 'Dínoslo — lo acomodamos.' },
+
+  // items included / excluded — a fun, direct ask with a "how it lands" prompt
+  'q.items.question': {
+    en: 'Anything in the place you’d like to keep — or have them take with them?',
+    es: '¿Algo en el lugar que te gustaría conservar — o que se lo lleven?',
+  },
+  'q.items.help': {
+    en: 'Think appliances, that nice light fixture, the shed out back. A small, fair ask reads as easy to say yes to. Asking someone to haul off something big and built-in can feel like a burden — you’re about to be the owner here, so ask the way you’d want to be asked.',
+    es: 'Piensa en electrodomésticos, esa bonita lámpara, el cobertizo de atrás. Una petición pequeña y justa es fácil de aceptar. Pedirle a alguien que se lleve algo grande e instalado puede sentirse como una carga — estás por ser el dueño aquí, así que pide como te gustaría que te pidieran.',
+  },
+  'items.c.asis': { en: 'I’m good with it as it is', es: 'Estoy bien con como está' },
+  'items.c.asis.note': { en: 'The easiest offer to accept.', es: 'La oferta más fácil de aceptar.' },
+  'items.c.keep': { en: 'There’s something I’d like to stay', es: 'Hay algo que me gustaría que se quede' },
+  'items.c.keep.note': { en: 'We’ll note it — keep it reasonable.', es: 'Lo anotamos — manténlo razonable.' },
+
   // ── 3. THE NUMBER — what I'll pay FOR this property ──
   'money.section.title': { en: 'Your number', es: 'Tu número' },
 

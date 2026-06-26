@@ -1370,7 +1370,7 @@ export default function MapPage() {
   return (
     <BuyerSettingsProvider>
     <div
-      className="relative h-screen w-full overflow-hidden md:pl-[360px]"
+      className="relative h-screen w-full overflow-hidden md:pl-[52px]"
       onContextMenu={(e) => {
         // Prevent the browser/OS right-click menu. Steam Input on the
         // gamepad maps B to right-click; without this, pressing B opens

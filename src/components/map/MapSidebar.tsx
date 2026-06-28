@@ -6,13 +6,12 @@
 // Soft light palette, consistent with the rest of the app.
 // See memory/project_map_page_finished_sidebar (correction 2 + palette).
 
-import { useEffect, useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import type { Lead } from '@/types';
 import type { MapMode } from '@/lib/useMapMode';
 import MaterialIcon from '@/components/ui/MaterialIcon';
 import PlotMapsLogo from '@/components/brand/PlotMapsLogo';
-import SidebarPropertyCard from '@/components/map/SidebarPropertyCard';
 
 export interface MapSidebarProps {
   searchSlot: ReactNode;
@@ -50,22 +49,21 @@ const MODES: { mode: MapMode; icon: string; label: string }[] = [
 ];
 
 export default function MapSidebar(p: MapSidebarProps) {
-  // Optional pop-up sheets above the dash (search results, property card,
-  // tools). Default: nothing open — just the slim dash + full map.
-  const [sheet, setSheet] = useState<'search' | 'tools' | 'property' | null>(null);
-
-  useEffect(() => { if (p.selectedLead) setSheet('property'); }, [p.selectedLead]);
-  const toggle = (k: 'search' | 'tools' | 'property') => setSheet((c) => (c === k ? null : k));
+  // Pop-up sheets that rise above the dash: search results + tools.
+  // The PROPERTY card no longer lives here — it now opens in the LEFT MATTE
+  // beside the shrunk map (the map scales down to make room, never covered).
+  // See .map-card-col in globals.css + the page's .is-carded handling.
+  const [sheet, setSheet] = useState<'search' | 'tools' | null>(null);
+  const toggle = (k: 'search' | 'tools') => setSheet((c) => (c === k ? null : k));
 
   return (
     <>
-      {/* a pop-up SHEET that rises from the dash (above it, not over the map
-          body) — for search results, tools, and the property card. */}
+      {/* a pop-up SHEET that rises from the dash — for search results + tools. */}
       {sheet && (
         <div className="map-sheet">
           <div className="map-sheet__head">
             <span className="map-sheet__title">
-              {sheet === 'search' ? 'Search' : sheet === 'tools' ? 'Tools & layers' : 'Property'}
+              {sheet === 'search' ? 'Search' : 'Tools & layers'}
             </span>
             <button className="map-sheet__close" onClick={() => setSheet(null)} aria-label="Close">
               <MaterialIcon icon="close" className="text-[18px]" />
@@ -90,9 +88,6 @@ export default function MapSidebar(p: MapSidebarProps) {
                 {p.photoreal?.visible && <Tool icon="terrain" label="Photorealistic 3D" active={p.photoreal.on} onClick={p.photoreal.onToggle} pill />}
                 <Tool icon={p.poisVisible ? 'visibility' : 'visibility_off'} label="POI labels" active={p.poisVisible} onClick={p.onTogglePois} pill />
               </div>
-            )}
-            {sheet === 'property' && p.selectedLead && (
-              <SidebarPropertyCard lead={p.selectedLead} onClose={() => { p.onCloseCard(); setSheet(null); }} />
             )}
           </div>
         </div>
@@ -130,10 +125,10 @@ export default function MapSidebar(p: MapSidebarProps) {
           <MaterialIcon icon="tune" className="text-[20px]" />
         </button>
         <button
-          className={`map-dash__btn ${sheet === 'property' ? 'is-active' : ''}`}
-          onClick={() => toggle('property')}
+          className={`map-dash__btn ${p.selectedLead ? 'is-active' : ''}`}
+          onClick={() => { if (p.selectedLead) p.onCloseCard(); }}
           disabled={!p.selectedLead}
-          title="Property"
+          title={p.selectedLead ? 'Close property card' : 'Property'}
         >
           <MaterialIcon icon="home_work" className="text-[20px]" />
         </button>

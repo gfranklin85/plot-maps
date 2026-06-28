@@ -259,6 +259,9 @@ function Inner({
   mapElForwardRef,
   cameraForwardRef,
   ritualTetherForwardRef,
+  gamepadReticleXFraction,
+  gamepadReticleYFraction,
+  onMoveReticle,
 }: {
   center?: { lat: number; lng: number } | null;
   gamepadEnabled: boolean;
@@ -268,6 +271,14 @@ function Inner({
   turnRateMultiplier?: number;
   tiltRateMultiplier?: number;
   flyToTarget?: FlyToTarget | null;
+  /** FIXED gamepad reticle position (0..1 viewport fraction). The reticle
+   *  pins here; A fires the parcel-open synthetic click at this pixel.
+   *  [[controller-cursor-model]] */
+  gamepadReticleXFraction?: number;
+  gamepadReticleYFraction?: number;
+  /** LB-held + right stick moves the reticle: dxFrac/dyFrac are per-frame
+   *  deltas in viewport fractions. The page applies them via setPosition. */
+  onMoveReticle?: (dxFrac: number, dyFrac: number) => void;
   onAltitudeChange?: (meters: number) => void;
   /** True when no input for >threshold. Stops camera writes + hover
    *  wave + altitude reporting until next input. Pure GPU savings;
@@ -588,10 +599,11 @@ function Inner({
   const fireOpenParcel = useCallback(() => {
     const mapEl = elRef.current;
     if (!mapEl) return;
-    const cx = cursorXRef.current;
-    const cy = cursorYRef.current;
-    const x = cx >= 0 ? cx : window.innerWidth / 2;
-    const y = cy >= 0 ? cy : window.innerHeight / 2;
+    // Fire at the FIXED reticle pixel (gamepad owns it), NOT the OS cursor.
+    // Google's gmp-click ray-casts the surface at this pixel → onMapClick
+    // resolves the parcel. [[controller-cursor-model]]
+    const x = reticleXFracRef.current * window.innerWidth;
+    const y = reticleYFracRef.current * window.innerHeight;
     try {
       mapEl.dispatchEvent(new PointerEvent('pointerdown', {
         clientX: x, clientY: y, bubbles: true, cancelable: true,
@@ -654,6 +666,19 @@ function Inner({
   // user isn't watching.
   const isIdleRef = useRef<boolean>(isIdle);
   isIdleRef.current = isIdle;
+  // FIXED reticle position (0..1) + the move callback, mirrored to refs so
+  // the per-frame gamepad loop reads the latest without re-subscribing.
+  // [[controller-cursor-model]] — LB-held + right stick moves the reticle.
+  const reticleXFracRef = useRef<number>(gamepadReticleXFraction ?? 0.5);
+  reticleXFracRef.current = gamepadReticleXFraction ?? 0.5;
+  const reticleYFracRef = useRef<number>(gamepadReticleYFraction ?? 0.42);
+  reticleYFracRef.current = gamepadReticleYFraction ?? 0.42;
+  const onMoveReticleRef = useRef(onMoveReticle);
+  onMoveReticleRef.current = onMoveReticle;
+  // True while LB is held (placing the reticle) — drives the placing glow.
+  // The ref mirror lets the RAF loop read/compare without a stale closure.
+  const [placingReticle, setPlacingReticle] = useState(false);
+  const placingReticleRef = useRef(false);
   // Altitude reporting throttle — the per-frame loop pings the page's
   // AltitudeGauge via onAltitudeChange, but only ~5×/sec to avoid
   // React state churn at 60Hz.
@@ -1005,7 +1030,7 @@ function Inner({
     // after 64fe866 stopped the map from remounting on every click,
     // which had been masking this by churning the ref + re-rendering.)
     enabled: gamepadEnabled,
-    onFrame: ({ dt, elapsedMs, leftStick, rightStick, triggers, justPressed }) => {
+    onFrame: ({ dt, elapsedMs, leftStick, rightStick, triggers, justPressed, pressed }) => {
       const el = elRef.current;
       const cam = camRef.current;
       const air = airRef.current;
@@ -1032,6 +1057,27 @@ function Inner({
         return;
       }
 
+      // ── LB-AIM: hold LB → right stick MOVES the fixed reticle ──────
+      // While LB is held the right stick places the reticle (set-and-forget
+      // cursor) instead of yawing/pitching. Left stick keeps flying. Release
+      // LB → right stick returns to flight. [[controller-cursor-model]]
+      const lbHeld = !!pressed && pressed.has('lb');
+      if (lbHeld !== placingReticleRef.current) {
+        placingReticleRef.current = lbHeld;
+        setPlacingReticle(lbHeld);
+      }
+      if (lbHeld) {
+        const rxa = shapeStick(rightStick.x);
+        const rya = shapeStick(rightStick.y);
+        if (rxa !== 0 || rya !== 0) {
+          // move at a comfortable rate (fraction of the screen per second)
+          const RETICLE_MOVE_RATE = 0.55; // screens/sec at full deflection
+          const dxFrac = rxa * RETICLE_MOVE_RATE * dt;
+          const dyFrac = rya * RETICLE_MOVE_RATE * dt;
+          onMoveReticleRef.current?.(dxFrac, dyFrac);
+        }
+      }
+
       // ── Edge-triggered button actions (same as 2D) ────────────────
       if (justPressed.size > 0) {
         const fire = (name: ButtonName, fn?: () => void) => {
@@ -1053,11 +1099,9 @@ function Inner({
         if (justPressed.has('rb')) {
           fireTetherRef.current();
         }
-        // LB = summon OT (dedicated shoulder button, freed up now that
-        // Steam Input isn't using it for cursor-move). X also summons OT.
-        fire('lb', actionsRef.current?.onSummonCompanion);
-        // X also summons OT (was onRotateChannel — see
-        // [[project-outreach-flow-unfinished]]).
+        // LB is now the RETICLE-AIM modifier (hold + right stick to place),
+        // handled above — it no longer summons OT. (OT summon kept on X
+        // until OT's voice is fixed; he currently appears but is mute.)
         fire('x', actionsRef.current?.onSummonCompanion);
         fire('y', actionsRef.current?.onInspect);
         fire('b', actionsRef.current?.onCancel);
@@ -1084,8 +1128,11 @@ function Inner({
 
       const lx = shapeStick(leftStick.x);
       const ly = shapeStick(leftStick.y);
-      const rx = shapeStick(rightStick.x);
-      const ry = shapeStick(rightStick.y);
+      // While LB-aiming, the right stick MOVES THE RETICLE (handled above),
+      // so suppress its flight contribution (no yaw/pitch). Left stick keeps
+      // flying. [[controller-cursor-model]]
+      const rx = lbHeld ? 0 : shapeStick(rightStick.x);
+      const ry = lbHeld ? 0 : shapeStick(rightStick.y);
       // ── Control mapping (Greg locked 2026-05-21, restored drone feel) ──
       //   LEFT-X   → strafe sideways
       //   LEFT-Y   → fly forward / reverse (throttle, drone feel)
@@ -1309,7 +1356,12 @@ function Inner({
             map container. The OS cursor still moves (Steam Input or
             mouse) and still fires real click events; we just replace
             the *visual* with a custom SVG. */}
-        <CustomReticle hoverActive={hoverActive} />
+        <CustomReticle
+          hoverActive={hoverActive}
+          fixedXFraction={gamepadReticleXFraction ?? 0.5}
+          fixedYFraction={gamepadReticleYFraction ?? 0.42}
+          placing={placingReticle}
+        />
       </div>
     </AtmosphereProvider>
   );
@@ -1341,6 +1393,9 @@ export default function MapView3D(props: MapViewProps) {
         mapElForwardRef={props.mapElForwardRef}
         cameraForwardRef={props.cameraForwardRef}
         ritualTetherForwardRef={props.ritualTetherForwardRef}
+        gamepadReticleXFraction={props.gamepadReticleXFraction}
+        gamepadReticleYFraction={props.gamepadReticleYFraction}
+        onMoveReticle={props.onMoveReticle}
       />
     </APIProvider>
   );

@@ -136,6 +136,10 @@ export interface MapViewProps {
    *  synthetic pointermove events at this position. */
   gamepadReticleXFraction?: number;
   gamepadReticleYFraction?: number;
+  /** LB-held + right stick moves the fixed reticle. Per-frame deltas in
+   *  viewport fractions; the page applies them via useReticlePosition.
+   *  [[controller-cursor-model]] */
+  onMoveReticle?: (dxFrac: number, dyFrac: number) => void;
   /** Fires when the reticle's hovered target changes (incl. null). */
   onGamepadReticleTargetChange?: (target: ReticleTarget | null) => void;
   /** Fires when the controller's per-frame parcel hit-test changes

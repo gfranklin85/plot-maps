@@ -30,33 +30,56 @@ interface CustomReticleProps {
   /** Disable rendering entirely. Useful for non-flight modes where
    *  the standard OS cursor should remain visible. */
   enabled?: boolean;
+  /** FIXED gamepad reticle. When provided, the reticle pins at this 0..1
+   *  viewport fraction and IGNORES the mouse (the gamepad owns it; LB+right-
+   *  stick moves it via useReticlePosition upstream). When omitted, falls
+   *  back to legacy mouse-following. [[controller-cursor-model]] */
+  fixedXFraction?: number;
+  fixedYFraction?: number;
+  /** Visually emphasize the reticle while the user is actively moving it
+   *  (LB held). A brighter ring so placement is obvious. */
+  placing?: boolean;
 }
 
-export default function CustomReticle({ hoverActive = false, enabled = true }: CustomReticleProps) {
+export default function CustomReticle({
+  hoverActive = false,
+  enabled = true,
+  fixedXFraction,
+  fixedYFraction,
+  placing = false,
+}: CustomReticleProps) {
   const svgRef = useRef<SVGSVGElement | null>(null);
-  // Track real OS cursor at window level. Both the real mouse AND
-  // Steam Input's gamepad-driven cursor produce mousemove events,
-  // so this single listener captures both input paths.
-  const cursorXRef = useRef<number>(-1);
-  const cursorYRef = useRef<number>(-1);
-  // Visibility flag — hide until the user has moved at least once.
-  // Avoids a frame-zero reticle ghost at (0,0).
+  const fixed = typeof fixedXFraction === 'number' && typeof fixedYFraction === 'number';
+  // Visibility flag — hide until positioned. Fixed mode is visible at once.
   const [seen, setSeen] = useState(false);
 
+  // ── FIXED mode: pin to the stored viewport fraction, ignore the mouse.
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled || !fixed) return;
+    const place = () => {
+      if (!svgRef.current) return;
+      const x = (fixedXFraction as number) * window.innerWidth;
+      const y = (fixedYFraction as number) * window.innerHeight;
+      svgRef.current.style.transform = `translate3d(${x - 24}px, ${y - 24}px, 0)`;
+    };
+    place();
+    setSeen(true);
+    window.addEventListener('resize', place);
+    return () => window.removeEventListener('resize', place);
+  }, [enabled, fixed, fixedXFraction, fixedYFraction]);
+
+  // ── Legacy MOUSE mode (desktop fallback when no fixed position given).
+  useEffect(() => {
+    if (!enabled || fixed) return;
     const onMove = (e: MouseEvent) => {
-      cursorXRef.current = e.clientX;
-      cursorYRef.current = e.clientY;
       if (svgRef.current) {
-        // translate3d hints the GPU compositor; smoother than left/top.
         svgRef.current.style.transform = `translate3d(${e.clientX - 24}px, ${e.clientY - 24}px, 0)`;
       }
       if (!seen) setSeen(true);
     };
     window.addEventListener('mousemove', onMove, { passive: true });
     return () => window.removeEventListener('mousemove', onMove);
-  }, [enabled, seen]);
+  }, [enabled, fixed, seen]);
 
   if (!enabled) return null;
 
@@ -68,8 +91,12 @@ export default function CustomReticle({ hoverActive = false, enabled = true }: C
   // Greg locked 2026-05-27.
   const strokeNeutral = '#00FF94';
   const strokeAcquired = '#FFFFFF';
-  const stroke = hoverActive ? strokeAcquired : strokeNeutral;
-  const shadow = 'drop-shadow(0 0 2px rgba(0,0,0,0.85)) drop-shadow(0 0 4px rgba(0,255,148,0.35))';
+  // While placing (LB held) the reticle glows white + a stronger halo so
+  // the user clearly sees what they're aiming/positioning.
+  const stroke = (hoverActive || placing) ? strokeAcquired : strokeNeutral;
+  const shadow = placing
+    ? 'drop-shadow(0 0 3px rgba(0,0,0,0.9)) drop-shadow(0 0 7px rgba(255,255,255,0.6))'
+    : 'drop-shadow(0 0 2px rgba(0,0,0,0.85)) drop-shadow(0 0 4px rgba(0,255,148,0.35))';
 
   return (
     <svg
@@ -137,17 +164,17 @@ export default function CustomReticle({ hoverActive = false, enabled = true }: C
           transition: `fill ${RITUAL_TIMING.HOVER_STATE_TRANSITION_MS}ms ease-out`,
         }}
       />
-      {/* Acquisition halo — only visible when hoverActive. White ring
-          around the reticle when over targetable map surface. */}
-      {hoverActive && (
+      {/* Acquisition / placing halo — white ring around the reticle when
+          over targetable surface OR while being placed (LB held). */}
+      {(hoverActive || placing) && (
         <circle
           cx={24}
           cy={24}
           r={17}
           fill="none"
           stroke={strokeAcquired}
-          strokeWidth={0.75}
-          opacity={0.7}
+          strokeWidth={placing ? 1.25 : 0.75}
+          opacity={placing ? 0.95 : 0.7}
         />
       )}
     </svg>

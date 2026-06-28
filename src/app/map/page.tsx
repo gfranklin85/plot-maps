@@ -22,7 +22,9 @@ import { BuyerSettingsProvider } from "@/lib/buyer-settings/context";
 // commented out at ~1144; restore the import alongside the mount when
 // the panel returns.
 import PlotPropertyHighlight from "@/components/map/PlotPropertyHighlight";
-import InWorldPropertyCard, { cardDataFromLead } from "@/components/map/InWorldPropertyCard";
+// InWorldPropertyCard corner-pop removed 2026-06-26 — it double-rendered
+// over the dash sheet's SidebarPropertyCard. Component kept on disk; the
+// single card surface is now SidebarPropertyCard inside MapSidebar.
 // PlotSummonedMonument, PlotWorldPopover, PropertyCardBillboard were
 // unmounted 2026-06-04 during the world-aware-interface rebuild (HTML
 // easel direction + zoom isolation). Components remain on disk parked
@@ -40,6 +42,7 @@ import ProspectCoachOverlay from "@/components/map/ProspectCoachOverlay";
 import Mobile3DCoachOverlay from "@/components/map/Mobile3DCoachOverlay";
 import GamepadStatusChip from "@/components/map/GamepadStatusChip";
 import MapSidebar from "@/components/map/MapSidebar";
+import SidebarPropertyCard from "@/components/map/SidebarPropertyCard";
 import { useMapMode } from "@/lib/useMapMode";
 import FlightTuningPanel from "@/components/map/FlightTuningPanel";
 import { useFlightTuning } from "@/lib/useFlightTuning";
@@ -991,7 +994,16 @@ export default function MapPage() {
   // can be dragged anywhere on the map; this hook persists the position
   // and seeds the default. Both the visual MapReticle and the
   // controller's hit-test sample point read from this.
-  const { position: reticlePosition } = useReticlePosition();
+  const { position: reticlePosition, setPosition: setReticlePosition } = useReticlePosition();
+  // LB-held + right stick moves the fixed reticle (set-and-forget cursor).
+  // The 3D loop hands us per-frame viewport-fraction deltas; we accumulate
+  // into the stored position. [[controller-cursor-model]]
+  const handleMoveReticle = useCallback((dxFrac: number, dyFrac: number) => {
+    setReticlePosition({
+      xFraction: reticlePosition.xFraction + dxFrac,
+      yFraction: reticlePosition.yFraction + dyFrac,
+    });
+  }, [reticlePosition.xFraction, reticlePosition.yFraction, setReticlePosition]);
 
   // Camera-driven parcel prefetch — silently caches parcels in view (and
   // a margin ahead) into the in-memory parcelCache so clicks/shots resolve
@@ -1367,10 +1379,85 @@ export default function MapPage() {
   // was removed (UI now lives in the world as the slab texture). When
   // the click-through detail page lands, recompute audience there.
 
+  // A property card is open → the map shrinks to free the left matte for it.
+  const cardOpen = !!selectedLead && !walkMode;
+
+  // The bottom-dock chrome (search + mode toggle + tools + property card
+  // trigger). Built here, rendered in the .map-shell__dock row below so it's
+  // a real layout neighbor of the map frame — never an overlay over the map.
+  const dashEl = walkMode ? null : (
+    <MapSidebar
+      searchSlot={
+        <ProspectSearch
+          compact
+          placeholder="Search address, APN, owner, or lead"
+          onSelect={(payload) => {
+            setMapCenter({ lat: payload.lat, lng: payload.lng });
+            setHasUserPanned(true);
+            dispatchFlight({
+              center: { lat: payload.lat, lng: payload.lng },
+              zoom: 19, duration: 900, easing: 'easeInOutCubic',
+            });
+            setFlyToTarget({
+              lat: payload.lat, lng: payload.lng,
+              altitude: 280, heading: 0, pitch: -45, range: 600, durationMs: 1200,
+            });
+            if (payload.leadId && user) {
+              supabase.from('leads').select('*')
+                .eq('id', payload.leadId).eq('user_id', user.id).single()
+                .then(({ data }) => { if (data) setPinnedRef(data as Lead); });
+            }
+          }}
+        />
+      }
+      resultIndex={selectedLead ? filteredLeads.findIndex(l => l.id === selectedLead.id) : null}
+      resultTotal={filteredLeads.length}
+      onPrevResult={() => {
+        if (!filteredLeads.length) return;
+        const i = selectedLead ? filteredLeads.findIndex(l => l.id === selectedLead.id) : 0;
+        const prev = filteredLeads[(i - 1 + filteredLeads.length) % filteredLeads.length];
+        if (prev) setSelectedLead(prev);
+      }}
+      onNextResult={() => {
+        if (!filteredLeads.length) return;
+        const i = selectedLead ? filteredLeads.findIndex(l => l.id === selectedLead.id) : -1;
+        const next = filteredLeads[(i + 1) % filteredLeads.length];
+        if (next) setSelectedLead(next);
+      }}
+      mapMode={mapMode}
+      onMode={(m) => {
+        if (m === 'WORK_2D') mapModeDispatch({ type: 'ENTER_2D' });
+        else if (m === 'FLY_3D') mapModeDispatch({ type: 'ENTER_3D' });
+        else if (isSubscribed) mapModeDispatch({ type: 'ENTER_WALK' });
+        else setShowGate(true);
+      }}
+      has3DSupport={has3DSupport}
+      isSubscribed={isSubscribed}
+      onFlySomewhere={() => setDestinationsOpen(v => !v)}
+      destinationsOpen={destinationsOpen}
+      onFlightFeel={() => setFlightTuningOpen(v => !v)}
+      flightFeelOpen={flightTuningOpen}
+      view3D={view3D}
+      onSelectProspects={() => handleToggleProspectMode()}
+      prospectMode={prospectMode}
+      onToggleParcels={() => setShowParcels(v => !v)}
+      showParcels={showParcels}
+      onTogglePois={() => togglePois()}
+      poisVisible={poisVisible}
+      photoreal={profile.isAdmin ? {
+        visible: true,
+        on: !!profile.enable3DTilesAdmin,
+        onToggle: () => updateProfile({ enable3DTilesAdmin: !profile.enable3DTilesAdmin }),
+      } : undefined}
+      selectedLead={selectedLead}
+      onCloseCard={() => setSelectedLead(null)}
+    />
+  );
+
   return (
     <BuyerSettingsProvider>
     <div
-      className="relative h-screen w-full overflow-hidden pb-[64px]"
+      className="map-shell"
       onContextMenu={(e) => {
         // Prevent the browser/OS right-click menu. Steam Input on the
         // gamepad maps B to right-click; without this, pressing B opens
@@ -1398,80 +1485,13 @@ export default function MapPage() {
           to be reworked later. Component kept; just unmounted. */}
       {/* {!walkMode && <BuyerSettingsPanel />} */}
 
-      {/* ═══ THE FINISHED MAP UI — one clean LEFT SIDEBAR ═══
-          All chrome (search, 2D/3D/Walk, tool toggles, property card)
-          consolidated into MapSidebar. Replaces the old dark floating
-          MapToolbar + ModeSwitch + search overlays. The page still owns
-          all state; the sidebar is pure presentation + callbacks.
+      {/* ═══ THE FINISHED MAP UI — chrome consolidated into MapSidebar ═══
+          The dash markup is built here as `dashEl` and rendered DOWN in the
+          bottom-dock slot (a real layout row), so it sits beside the map
+          frame instead of floating over it. The page still owns all state;
+          MapSidebar is pure presentation + callbacks.
           memory/project_map_page_finished_sidebar */}
-      {!walkMode && (
-        <MapSidebar
-          searchSlot={
-            <ProspectSearch
-              compact
-              placeholder="Search address, APN, owner, or lead"
-              onSelect={(payload) => {
-                setMapCenter({ lat: payload.lat, lng: payload.lng });
-                setHasUserPanned(true);
-                dispatchFlight({
-                  center: { lat: payload.lat, lng: payload.lng },
-                  zoom: 19, duration: 900, easing: 'easeInOutCubic',
-                });
-                setFlyToTarget({
-                  lat: payload.lat, lng: payload.lng,
-                  altitude: 280, heading: 0, pitch: -45, range: 600, durationMs: 1200,
-                });
-                if (payload.leadId && user) {
-                  supabase.from('leads').select('*')
-                    .eq('id', payload.leadId).eq('user_id', user.id).single()
-                    .then(({ data }) => { if (data) setPinnedRef(data as Lead); });
-                }
-              }}
-            />
-          }
-          resultIndex={selectedLead ? filteredLeads.findIndex(l => l.id === selectedLead.id) : null}
-          resultTotal={filteredLeads.length}
-          onPrevResult={() => {
-            if (!filteredLeads.length) return;
-            const i = selectedLead ? filteredLeads.findIndex(l => l.id === selectedLead.id) : 0;
-            const prev = filteredLeads[(i - 1 + filteredLeads.length) % filteredLeads.length];
-            if (prev) setSelectedLead(prev);
-          }}
-          onNextResult={() => {
-            if (!filteredLeads.length) return;
-            const i = selectedLead ? filteredLeads.findIndex(l => l.id === selectedLead.id) : -1;
-            const next = filteredLeads[(i + 1) % filteredLeads.length];
-            if (next) setSelectedLead(next);
-          }}
-          mapMode={mapMode}
-          onMode={(m) => {
-            if (m === 'WORK_2D') mapModeDispatch({ type: 'ENTER_2D' });
-            else if (m === 'FLY_3D') mapModeDispatch({ type: 'ENTER_3D' });
-            else if (isSubscribed) mapModeDispatch({ type: 'ENTER_WALK' });
-            else setShowGate(true);
-          }}
-          has3DSupport={has3DSupport}
-          isSubscribed={isSubscribed}
-          onFlySomewhere={() => setDestinationsOpen(v => !v)}
-          destinationsOpen={destinationsOpen}
-          onFlightFeel={() => setFlightTuningOpen(v => !v)}
-          flightFeelOpen={flightTuningOpen}
-          view3D={view3D}
-          onSelectProspects={() => handleToggleProspectMode()}
-          prospectMode={prospectMode}
-          onToggleParcels={() => setShowParcels(v => !v)}
-          showParcels={showParcels}
-          onTogglePois={() => togglePois()}
-          poisVisible={poisVisible}
-          photoreal={profile.isAdmin ? {
-            visible: true,
-            on: !!profile.enable3DTilesAdmin,
-            onToggle: () => updateProfile({ enable3DTilesAdmin: !profile.enable3DTilesAdmin }),
-          } : undefined}
-          selectedLead={selectedLead}
-          onCloseCard={() => setSelectedLead(null)}
-        />
-      )}
+      {/* dash rendered in the bottom-dock slot below — see dashEl */}
 
       {/* Flight tuning + destinations panels — triggered from the sidebar. */}
       {!walkMode && (
@@ -1667,6 +1687,25 @@ export default function MapPage() {
         </div>
       )}
 
+      {/* ═══ THE MAP BODY — a landscape-capped frame floating in matte ═══
+          The map takes all WIDTH but caps its HEIGHT to --map-aspect, so it
+          never goes portrait — extra space becomes matte (the home for chrome).
+          When a card opens, the WHOLE map SHRINKS uniformly + slides right
+          (.is-carded) and the card takes the freed LEFT matte — shrink, never
+          cover. Tune from the CSS vars in globals.css (--map-aspect,
+          --map-frame-gap, --map-card-w, --map-shrink, --map-frame-radius). */}
+      <div className={`map-shell__body ${cardOpen ? 'is-carded' : ''}`}>
+        {/* CARD COLUMN — lives in the freed LEFT matte when a card is open.
+            Never crosses the map glass; the map shrank to make room. */}
+        {cardOpen && (
+          <div className="map-card-col">
+            <SidebarPropertyCard lead={selectedLead!} onClose={() => setSelectedLead(null)} />
+          </div>
+        )}
+
+        {/* MAP REGION (matte) → MAP FRAME (the floating, landscape-capped box) */}
+        <div className="map-shell__region">
+          <div className="map-frame">
       {/* Map or Walk Mode — the back-out. GSAP drives the SCALE with
           expoScale() so the zoom looks perceptually uniform (a normal ease
           appears to change speed when scaling — expoScale bends the curve
@@ -1678,7 +1717,8 @@ export default function MapPage() {
         style={{
           transformOrigin: 'center center',
           borderRadius: spikeZoom ? 18 : 0,
-          overflow: spikeZoom ? 'hidden' : 'visible',
+          // Always clip — the gmp canvas must never paint past the frame edge.
+          overflow: 'hidden',
           boxShadow: spikeZoom ? '0 30px 90px rgba(0,0,0,0.7), 0 0 0 3px rgba(40,46,56,1)' : 'none',
           transition: 'border-radius 300ms ease, box-shadow 300ms ease',
         }}
@@ -1827,6 +1867,7 @@ export default function MapPage() {
             gamepadAirplaneTargets={airplaneTargets}
             gamepadReticleXFraction={reticlePosition.xFraction}
             gamepadReticleYFraction={reticlePosition.yFraction}
+            onMoveReticle={handleMoveReticle}
             onGamepadReticleTargetChange={handleReticleTargetChange}
             onGamepadParcelHoverChange={handleParcelHoverChange}
             onGamepadStatusChange={handleGamepadStatus}
@@ -1911,6 +1952,15 @@ export default function MapPage() {
           </div>
         )}
       </div>
+          </div>{/* /.map-frame */}
+        </div>{/* /.map-shell__region */}
+      </div>{/* /.map-shell__body */}
+
+      {/* ═══ BOTTOM DOCK — a real layout row, not a floating bar.
+          The map frame ends exactly at the top of this dock; it can never
+          cover the map. Move this to a rail / top bar later by re-slotting
+          MapSidebar and adjusting --map-rail-w / --map-top-h. ═══ */}
+      {!walkMode && <div className="map-shell__dock">{dashEl}</div>}
 
       {/* ═══ PINNED REFERENCE SIDEBAR — persistent comp while prospecting ═══ */}
       {pinnedRef && !walkMode && (
@@ -1988,46 +2038,13 @@ export default function MapPage() {
         </>
       )}
 
-      {/* ═══ PROPERTY CARD — CORNER POP (v1) ═══
-          Select a property → the card pops to the top-RIGHT corner of the
-          screen. NOT a sidebar, NOT pinned in the world (that popup was
-          retired — bubble box, scrollbar, camera jerk). Just a clean card
-          docked in the corner, out of the flight path. Slides in from the
-          right; content legible immediately (in-flight UI rule — no
-          blur-in, only transform/opacity animate). Keyed on the lead so a
-          new selection replays the entrance. (Free push-to-slide card
-          physics + the elusive back-out come later — see
-          [[project-desk-surface-backout-ui]].) */}
-      {selectedLead && !walkMode && (
-        <div
-          key={selectedLead.id}
-          className="pointer-events-auto fixed left-4 bottom-6 z-40"
-          style={{
-            transformOrigin: 'bottom left',
-            animation: 'plot-card-corner-in 360ms cubic-bezier(0.16, 1, 0.3, 1) both',
-          }}
-        >
-          <div className="relative" style={{ transform: 'scale(0.7)', transformOrigin: 'bottom left' }}>
-            {/* Visible close — works with mouse/keyboard (no controller B
-                needed). Sits on the card's top-right corner. */}
-            <button
-              onClick={() => setSelectedLead(null)}
-              title="Close (Esc)"
-              aria-label="Close property card"
-              className="absolute -right-3 -top-3 z-10 flex h-11 w-11 items-center justify-center rounded-full border border-white/15 text-white shadow-xl transition-transform hover:scale-105 active:scale-95"
-              style={{ background: 'linear-gradient(145deg, #2a3550, #141b2c)' }}
-            >
-              <MaterialIcon icon="close" className="text-[22px]" />
-            </button>
-            <InWorldPropertyCard
-              data={cardDataFromLead(selectedLead)}
-              onAction={(a) => {
-                if (a === 'close') setSelectedLead(null);
-              }}
-            />
-          </div>
-        </div>
-      )}
+      {/* ═══ PROPERTY CARD ═══
+          The single property card now lives in the bottom-dash SHEET
+          (SidebarPropertyCard inside MapSidebar) — light, tabbed, docked,
+          out of the flight path. The old dark corner-pop InWorldPropertyCard
+          mounted here was removed 2026-06-26: it rendered a SECOND card on
+          top of the sheet card (the double-card bug Greg flagged). One card,
+          one surface. See memory/project_map_page_finished_sidebar. */}
 
       {/* SUMMONED MONUMENT REMOVED 2026-06-04. The rising glb block is
           retired — moving to the HTML "easel" projection-card direction

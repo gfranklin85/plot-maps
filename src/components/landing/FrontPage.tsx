@@ -32,21 +32,27 @@ import { useAuth } from '@/lib/auth-context';
 // layer with zero other changes. memory/feedback_screen_is_always_2d.
 
 const HERO = '/dashboard/hero';
+const CREW = '/landing/crew';
 
 // Sky layer — Greg's real sky (same 2560×1440 canvas) sits behind the
 // platform. Set to null to fall back to the CSS gradient sky.
 const SKY_SRC: string | null = `${HERO}/sky.svg`;
 
-// Floating land-platform scene — each layer is the full 2560×1440 canvas
-// with one piece in place, so stacking at inset-0 reproduces the exact
-// composition. `anim` is its gentle loop.
+// The vendor-crew scene — 9 layered SVGs (same 1920×1080 canvas, full-frame
+// pieces that self-align at inset-0). Order is back→front (Greg's numbering):
+// the 3 rear floating callout cards, then the buyer family on the column,
+// then the 5 vendors on surrounding pillars. The 3 cards drift gently; the
+// figures stay grounded. memory/feedback_screen_is_always_2d.
 const SCENE_LAYERS: { src: string; anim: string; alt: string }[] = [
-  { src: `${HERO}/cloud-3.svg`,   anim: 'float-cloud-c', alt: '' },
-  { src: `${HERO}/cloud-2.svg`,   anim: 'float-cloud-b', alt: '' },
-  { src: `${HERO}/cloud-1.svg`,   anim: 'float-cloud-a', alt: '' },
-  { src: `${HERO}/island.svg`,    anim: 'float-island',  alt: 'Map of the market floating in the sky' },
-  { src: `${HERO}/card-line.svg`, anim: 'float-card-b',  alt: '' },
-  { src: `${HERO}/cards.svg`,     anim: 'float-card-a',  alt: '' },
+  { src: `${CREW}/01-card-team-ready.svg`,       anim: 'float-card-a', alt: '' },
+  { src: `${CREW}/02-card-you-choose.svg`,       anim: 'float-card-b', alt: '' },
+  { src: `${CREW}/03-card-private-estimates.svg`, anim: 'float-card-c', alt: '' },
+  { src: `${CREW}/04-family.svg`,                anim: '',             alt: 'A homebuying family standing on a raised column' },
+  { src: `${CREW}/05-vendor-1.svg`,             anim: '',             alt: '' },
+  { src: `${CREW}/06-vendor-5.svg`,             anim: '',             alt: '' },
+  { src: `${CREW}/07-vendor-2.svg`,             anim: '',             alt: '' },
+  { src: `${CREW}/08-vendor-4.svg`,             anim: '',             alt: '' },
+  { src: `${CREW}/09-vendor-3.svg`,             anim: '',             alt: '' },
 ];
 
 export default function FrontPage() {
@@ -79,39 +85,39 @@ export default function FrontPage() {
           <div className="fp-hero__grid">
             {/* left — the live headline */}
             <div style={{ flex: 1, position: 'relative', zIndex: 2 }}>
-              <span className="fp-pill">A PLAIN FACT</span>
+              <span className="fp-pill">FREE FOR BUYERS &amp; AGENTS</span>
               <h1 className="fp-head font-headline">
-                It only happens
+                Build Your Position.
                 <br />
-                <span className="accent">because of you.</span>
+                <span className="accent">Before You Offer.</span>
               </h1>
               <p className="fp-sub">
-                No buyer, no deal — no commission, no lender, no listing worth
-                anything. The whole thing moves because someone decided to go get
-                something. That someone is <b>you</b>, and it always was. So why
-                have you been the one chasing? Only because no one ever showed you
-                that you could just <b>say what you want</b> — and watch it come
-                to you.
+                Get your people in place before the offer ever goes in. Post your
+                goals and criteria, and the platform puts you on the radar of the
+                local pros who do this work — lenders, inspectors, insurers — who
+                watch the board and bring private estimates to <b>you</b>. You
+                review, you choose, you move with leverage.
               </p>
-              {/* New message, same beautiful hero. Primary = the reframe action
-                  (say what you want → the Bullpen); secondary keeps the map hook.
-                  memory/feedback_reveal_facts_not_hype_voice */}
+              {/* the three concrete steps (the mechanism, not magic) */}
+              <ul className="fp-checks">
+                <li><MaterialIcon icon="check_circle" className="fp-checks__i" /> Post your goals — you go on the board.</li>
+                <li><MaterialIcon icon="check_circle" className="fp-checks__i" /> Pros watching the board bring private estimates.</li>
+                <li><MaterialIcon icon="check_circle" className="fp-checks__i" /> You pick the team and terms that fit.</li>
+              </ul>
               <div className="fp-cta-row">
                 <a href="/bullpen" className="fp-cta fp-cta--primary">
-                  Say what you want <span aria-hidden>→</span>
+                  Get started — free <span aria-hidden>→</span>
                 </a>
                 <button type="button" className="fp-cta fp-cta--ghost" onClick={() => goMap('3d')}>
                   Explore the map <span aria-hidden>→</span>
                 </button>
               </div>
-              {/* Honest credibility, not fake faces: the broker credential —
-                  built by someone who actually does the job, not a tech
-                  tourist. memory/project_credibility_markers_honest */}
+              {/* honest credibility + the no-vendor-ads promise */}
               <div className="fp-cred">
                 <span className="fp-cred__seal"><MaterialIcon icon="verified" /></span>
                 <p className="fp-cred__text">
-                  <b>Built by a licensed California broker.</b>
-                  <br />Gregory M. Franklin · CA DRE #02090737 · Position Realty.
+                  <b>Free for buyers. Free for agents. No public vendor ads.</b>
+                  <br />Built by Gregory M. Franklin · CA broker · DRE #02090737 · Position Realty.
                 </p>
               </div>
             </div>

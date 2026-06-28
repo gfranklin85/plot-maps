@@ -288,6 +288,50 @@ const STRINGS: Record<string, Entry> = {
     es: 'En una casa de $400,000, poner el 20% inicial significa $80,000 de ti y $320,000 del préstamo.',
   },
 
+  // ── EDUCATION LAYER — advisories become learning moments that earn the
+  //    comprehension certificate (RPA §4 advisories). Learn → affirm. ──
+  'learn.section.title': { en: 'Know your rights', es: 'Conoce tus derechos' },
+  'learn.intro': {
+    en: 'A few quick things every buyer should actually understand — not fine print to scroll past. Read them, and you’ll walk away knowing more than most people ever get told. At the end, you earn a certificate that says so.',
+    es: 'Unas cosas rápidas que todo comprador debería entender de verdad — no letra chica para saltarse. Léelas y sabrás más que la mayoría. Al final, ganas un certificado que lo dice.',
+  },
+
+  // Fair Housing — the heart of it. NOTE: the strings below are a PROVISIONAL
+  // placeholder from general knowledge — DO NOT SHIP. Greg authors the real
+  // teaching from the actual Fair Housing form (FHDA). Replace before launch.
+  'q.fairHousing.question': {
+    en: 'Fair housing: everyone gets the same shot. Including you.',
+    es: 'Vivienda justa: todos tienen la misma oportunidad. Incluyéndote a ti.',
+  },
+  'q.fairHousing.help': {
+    en: 'The law says no one can be treated differently when buying a home because of their race, color, religion, sex, family situation, disability, where they’re from, or who they are. It protects you — and it’s on all of us to honor it for the next person too. No steering, no “this neighborhood isn’t for you,” no quiet doors closing. Same shot, every time.',
+    es: 'La ley dice que a nadie se le puede tratar diferente al comprar una casa por su raza, color, religión, sexo, situación familiar, discapacidad, de dónde viene o quién es. Te protege a ti — y nos toca a todos honrarlo para el siguiente también. Sin direccionamiento, sin “este vecindario no es para ti”, sin puertas que se cierran en silencio. La misma oportunidad, siempre.',
+  },
+  'q.fairHousing.affirm': { en: 'I understand — and I stand for it', es: 'Lo entiendo — y lo defiendo' },
+  'q.fairHousing.affirm.note': { en: 'You’re now someone who knows their rights and honors others’.', es: 'Ahora eres alguien que conoce sus derechos y honra los de los demás.' },
+
+  // Wire fraud — protects them from real theft.
+  'q.wireFraud.question': {
+    en: 'Before you ever wire money: stop and call.',
+    es: 'Antes de transferir dinero: detente y llama.',
+  },
+  'q.wireFraud.help': {
+    en: 'Criminals send fake emails that look exactly like your escrow or title company, with new “wiring instructions.” People have lost their entire down payment this way. The rule that saves you: never trust wiring instructions from an email. Call the office at a number you already know, and confirm out loud, every time.',
+    es: 'Los criminales envían correos falsos que se ven idénticos a tu compañía de garantía o título, con nuevas “instrucciones de transferencia”. Hay quienes han perdido todo su enganche así. La regla que te salva: nunca confíes en instrucciones de transferencia de un correo. Llama a la oficina a un número que ya conoces y confirma en voz alta, cada vez.',
+  },
+  'q.wireFraud.affirm': { en: 'Got it — I’ll always call to confirm', es: 'Entendido — siempre llamaré para confirmar' },
+  'q.wireFraud.affirm.note': { en: 'That one habit protects everything you’ve saved.', es: 'Ese hábito protege todo lo que has ahorrado.' },
+
+  // the certificate capstone
+  'cert.title': { en: 'Your certificate', es: 'Tu certificado' },
+  'cert.question': { en: 'You earned it.', es: 'Te lo ganaste.' },
+  'cert.statement': {
+    en: 'You now understand your rights as a homebuyer, you know how the process works, and you stand for fair housing for everyone. That’s more than most people are ever given — and it’s yours.',
+    es: 'Ahora entiendes tus derechos como comprador, sabes cómo funciona el proceso y defiendes la vivienda justa para todos. Eso es más de lo que a la mayoría se le da — y es tuyo.',
+  },
+  'cert.affirm': { en: 'Claim my certificate', es: 'Reclamar mi certificado' },
+  'cert.affirm.note': { en: 'A real credential — knowledgeable, and standing for fairness.', es: 'Una credencial real — informado y a favor de la justicia.' },
+
   // ── engine chrome ──
   'ui.continue': { en: 'Continue', es: 'Continuar' },
   'ui.back': { en: 'Back', es: 'Atrás' },

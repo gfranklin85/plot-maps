@@ -9,6 +9,13 @@
 # testing
 /coverage
 
+# Rust build artifacts (Plot Pad helper) — commit the source + the small
+# shipped public/download/PlotPad.exe, NOT the multi-hundred-MB target dir.
+/tools/plot-pad/target/
+# EV code-signing credentials for Plot Pad — NEVER commit these.
+.env.signing.ps1
+/tools/plot-pad/.env.signing.ps1
+
 # next.js
 /.next/
 /out/

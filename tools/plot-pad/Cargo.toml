@@ -1,0 +1,27 @@
+[package]
+name = "plot-pad"
+version = "0.1.0"
+edition = "2021"
+description = "Plot Pad — full gamepad flight helper for plot.solutions"
+authors = ["Plot Solutions LLC"]
+
+[[bin]]
+name = "PlotPad"
+path = "src/main.rs"
+
+[dependencies]
+# Windows API: XInput (gamepad), SendInput (clicks/keys), foreground window.
+windows = { version = "0.58", features = [
+    "Win32_Foundation",
+    "Win32_UI_Input_XboxController",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_System_Threading",
+] }
+
+[profile.release]
+opt-level = "z"     # optimize for size — small single-file .exe
+lto = true
+strip = true
+panic = "abort"
+codegen-units = 1

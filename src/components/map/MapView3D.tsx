@@ -10,6 +10,7 @@ import type { GamepadActions } from "./GamepadFlightController";
 import { AtmosphereProvider } from "@/lib/atmosphere/AtmosphereContext";
 import AtmosphereOverlay from "./AtmosphereOverlay";
 import CustomReticle from "./CustomReticle";
+import ReticleCalibration, { type CalibCamera } from "./ReticleCalibration";
 import RitualTether, { type RitualTetherHandle } from "./RitualTether";
 import { RITUAL_TIMING } from "@/lib/ritualTiming";
 import { scheduleImpact } from "@/lib/ritualAudio";
@@ -597,28 +598,67 @@ function Inner({
   // uses, but we let onMapClick do the parcel work (don't query Places).
   // This is what lets the A-button open a parcel with no Steam Input.
   const fireOpenParcel = useCallback(() => {
-    const mapEl = elRef.current;
+    const mapEl = elRef.current as (HTMLElement & {
+      screenToLatLng?: (x: number, y: number) => { lat: number; lng: number } | null;
+    }) | null;
     if (!mapEl) return;
-    // Fire at the FIXED reticle pixel (gamepad owns it), NOT the OS cursor.
-    // Google's gmp-click ray-casts the surface at this pixel → onMapClick
-    // resolves the parcel. [[controller-cursor-model]]
+    // The reticle pixel (gamepad owns it; fixed near center).
     const x = reticleXFracRef.current * window.innerWidth;
     const y = reticleYFracRef.current * window.innerHeight;
-    try {
-      mapEl.dispatchEvent(new PointerEvent('pointerdown', {
-        clientX: x, clientY: y, bubbles: true, cancelable: true,
-        button: 0, pointerType: 'mouse',
-      }));
-      mapEl.dispatchEvent(new PointerEvent('pointerup', {
-        clientX: x, clientY: y, bubbles: true, cancelable: true,
-        button: 0, pointerType: 'mouse',
-      }));
-      mapEl.dispatchEvent(new MouseEvent('click', {
-        clientX: x, clientY: y, bubbles: true, cancelable: true,
-        button: 0,
-      }));
-    } catch { /* PointerEvent may not be constructable here */ }
-  }, []);
+
+    // ── Resolve the surface lat/lng at the reticle pixel ──────────────
+    // Map3D IGNORES synthetic DOM clicks for its ray-cast (verified 2026-
+    // 06-28: gmp-click never fires from a dispatched PointerEvent), so we
+    // resolve the position ourselves and open the parcel DIRECTLY — no fake
+    // click. Two sources, best-first:
+    //   1. The parcel overlay's hit-tester (pixel → {apn,lat,lng}) — exact,
+    //      uses the rendered polygons. Only works when parcels are loaded.
+    //   2. Map3D's own screenToLatLng(x,y) ray-cast → /api/parcels/at-point.
+    let apn: string | null = null;
+    let lat: number | null = null;
+    let lng: number | null = null;
+
+    const hit = effectiveHitTesterRef.current?.(x, y) ?? null;
+    if (hit) { apn = hit.apn; lat = hit.lat; lng = hit.lng; }
+
+    const openWithApn = (resolvedApn: string, plat: number, plng: number) => {
+      const camAtClick = camRef.current ? { ...camRef.current } : null;
+      onParcelClickRef.current?.(
+        resolvedApn,
+        { lat: plat, lng: plng },
+        camAtClick ? {
+          screenX: x, screenY: y,
+          camera: {
+            lat: camAtClick.lat, lng: camAtClick.lng, altitude: camAtClick.altitude,
+            heading: camAtClick.heading, pitch: camAtClick.pitch,
+          },
+        } : undefined,
+      );
+    };
+
+    if (apn && lat != null && lng != null) {
+      openWithApn(apn, lat, lng);
+      return;
+    }
+
+    // Fallback: ray-cast the pixel to a surface lat/lng, then resolve the
+    // parcel server-side (same API the old click path used).
+    const surface = mapEl.screenToLatLng?.(x, y) ?? null;
+    if (surface && Number.isFinite(surface.lat) && Number.isFinite(surface.lng)) {
+      const slat = surface.lat, slng = surface.lng;
+      fetch(`/api/parcels/at-point?lat=${slat}&lng=${slng}`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((pj) => {
+          if (!pj?.apn) return;
+          if (pj.geometry) {
+            (window as unknown as { __plotParcelGeomCache?: Map<string, unknown> }).__plotParcelGeomCache ??= new Map();
+            (window as unknown as { __plotParcelGeomCache: Map<string, unknown> }).__plotParcelGeomCache.set(pj.apn, pj.geometry);
+          }
+          openWithApn(pj.apn as string, slat, slng);
+        })
+        .catch(() => { /* no parcel under reticle — silent no-op */ });
+    }
+  }, [effectiveHitTesterRef]);
   const fireOpenParcelRef = useRef(fireOpenParcel);
   fireOpenParcelRef.current = fireOpenParcel;
   // Cursor move → drop the candidate cache so the next RB tap fires a
@@ -1083,13 +1123,14 @@ function Inner({
         const fire = (name: ButtonName, fn?: () => void) => {
           if (justPressed.has(name) && fn) fn();
         };
-        // A = OPEN PARCEL (no Steam needed, 2026-06-11). fireOpenParcel
-        // dispatches a synthetic click at the reticle → Google gmp-click →
-        // onMapClick resolves the address/parcel and opens the card.
-        // NOTE: onShoot (the laser) is fired by GamepadFlightController's
-        // loop, NOT here — calling it here too double-fired the laser.
-        // This loop only adds the parcel-open.
+        // A = FIRE + OPEN PARCEL. The 3D path runs its OWN gamepad loop and
+        // does NOT mount GamepadFlightController, so onShoot must be called
+        // HERE (the old comment wrongly assumed the 2D controller fires it —
+        // it isn't mounted in 3D, so the laser never fired in flight). 2026-
+        // 06-28 fix. onShoot dispatches plot:fire-laser + the projectile +
+        // sound; fireOpenParcel resolves the parcel/card at the reticle.
         if (justPressed.has('a')) {
+          actionsRef.current?.onShoot?.();
           fireOpenParcelRef.current();
         }
         // RB-tap = tether. Forgiveness-zone target acquisition: cursor
@@ -1253,11 +1294,24 @@ function Inner({
       // eye position + view direction every frame in fpToMap3D.
       cam.heading = (cam.heading + vel.heading * dt + 360) % 360;
       // Pitch convention: stick-up (ry<0) pitches view UP toward sky;
-      // negative pitch = looking down, positive = looking up. No
-      // app-side clamp — Map3D's own tilt ceiling will do whatever
-      // it does. Tilt into the ground if you want to, let's learn
-      // what happens.
+      // negative pitch = looking down, positive = looking up.
+      //
+      // CLAMP to the usable range (Greg, 2026-06-29). The view maps via
+      // map3dTilt = clamp(90 + pitch, 0, 85), so only pitch ∈ [−90, −5]
+      // actually moves the view; tilt saturates at 85 (horizon) above −5.
+      // Previously pitch was UNCLAMPED ("let's learn what happens") — so
+      // holding look-up let cam.pitch accumulate phantom overshoot (+20,
+      // +50…) while the view sat pinned at the horizon. Then look-down had
+      // to burn off all that overshoot before the view responded — the
+      // "stuck looking up, can't look back down" dead zone. Clamping kills
+      // the overshoot so look-down responds instantly. Tiny epsilon above
+      // −5 so a held look-up doesn't hard-stick exactly at the ceiling.
       cam.pitch += vel.tilt * dt;
+      cam.pitch = clamp(cam.pitch, -90, -5);
+      // Kill upward tilt velocity once pinned at the horizon ceiling, so we
+      // don't keep trying to integrate into a wall.
+      if (cam.pitch <= -90 && vel.tilt < 0) vel.tilt = 0;
+      if (cam.pitch >= -5 && vel.tilt > 0) vel.tilt = 0;
 
       // Apply hover wave as a brief modulation, not accumulating drift.
       const map3d = fpToMap3D({
@@ -1353,15 +1407,31 @@ function Inner({
           }}
         />
         {/* Plot's theodolite reticle replaces the OS cursor inside the
-            map container. The OS cursor still moves (Steam Input or
-            mouse) and still fires real click events; we just replace
-            the *visual* with a custom SVG. */}
+            map container. The OS cursor still moves (Plot Pad's stick or
+            the mouse) and still fires real click events; we just replace
+            the *visual* with a custom SVG. followCursor pins the reticle
+            to the REAL cursor so a Plot Pad A-press OS click lands exactly
+            on the reticle → Map3D's gmp-click fires there → Google's exact
+            ground raycast. memory/project_plot_pad_os_click_helper */}
         <CustomReticle
           hoverActive={hoverActive}
+          followCursor
           fixedXFraction={gamepadReticleXFraction ?? 0.5}
           fixedYFraction={gamepadReticleYFraction ?? 0.42}
           placing={placingReticle}
         />
+        {/* INTERNAL: reticle ground-projection calibration. Mount only with
+            ?calibrate=1 — fixed truth marker + live shadow dot + vFOV knob,
+            to derive/verify the reticle→ground math by flying. */}
+        {typeof window !== 'undefined'
+          && new URLSearchParams(window.location.search).get('calibrate') === '1' && (
+          <ReticleCalibration
+            cameraRef={camRef as React.MutableRefObject<CalibCamera | null>}
+            mapElRef={elRef as React.MutableRefObject<HTMLElement | null>}
+            reticleXFraction={gamepadReticleXFraction ?? 0.5}
+            reticleYFraction={gamepadReticleYFraction ?? 0.42}
+          />
+        )}
       </div>
     </AtmosphereProvider>
   );

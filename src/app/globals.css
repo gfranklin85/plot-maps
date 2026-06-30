@@ -1675,9 +1675,81 @@ gmp-popover-3d-element[plot-card-popover],
 .fp-foot__compliance { font-size: 12px; color: #8a94a3; line-height: 1.6; max-width: 60em; }
 .fp-foot__compliance b { color: #5d6675; font-weight: 600; }
 
+/* ── PLOT PAD banner — full gamepad flight download (top of landing) ──
+   A confident brand-blue band (the "cockpit unlock"), in palette
+   #1349d4 / #122d8d. Sits right under the header, above the hero. */
+.ppad {
+  position: relative;
+  background:
+    radial-gradient(120% 140% at 88% -20%, rgba(58,122,255,0.55), rgba(18,45,141,0) 60%),
+    linear-gradient(135deg, #122d8d 0%, #1641b8 52%, #1349d4 100%);
+  color: #eaf1ff;
+  overflow: hidden;
+}
+.ppad::before {
+  /* faint engraved grid — hand-made surface, not a library default */
+  content: ''; position: absolute; inset: 0; pointer-events: none; opacity: 0.10;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(120% 100% at 80% 0%, #000 30%, transparent 75%);
+}
+.ppad__wrap {
+  position: relative; z-index: 1;
+  display: flex; align-items: center; gap: 28px;
+  padding-top: 30px; padding-bottom: 30px;
+}
+.ppad__copy { flex: 1; min-width: 0; }
+.ppad__eyebrow {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 12px; font-weight: 800; letter-spacing: 0.12em;
+  color: #bcd2ff; margin-bottom: 12px;
+}
+.ppad__eyebrow-i { font-size: 18px; }
+.ppad__h { font-size: clamp(26px, 3.4vw, 40px); line-height: 1.06; letter-spacing: -0.02em; font-weight: 800; color: #fff; margin: 0; }
+.ppad__accent { color: #9ec2ff; }
+.ppad__sub { margin-top: 14px; max-width: 40em; font-size: 15.5px; line-height: 1.6; color: #d3e0ff; }
+.ppad__sub b { color: #fff; font-weight: 700; }
+.ppad__feats { display: flex; flex-wrap: wrap; gap: 8px 22px; margin-top: 16px; padding: 0; list-style: none; }
+.ppad__feats li { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: #e7eeff; }
+.ppad__feat-i { font-size: 19px; color: #9ec2ff; }
+
+.ppad__cta-row { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin-top: 24px; }
+.ppad__dl {
+  display: inline-flex; align-items: center; gap: 11px;
+  background: #fff; color: #122d8d;
+  font-weight: 800; font-size: 16px;
+  padding: 14px 22px; border-radius: 13px;
+  box-shadow: 0 14px 30px -10px rgba(0,0,0,0.5);
+  transition: transform .15s, box-shadow .15s;
+}
+.ppad__dl:hover { transform: translateY(-1px); box-shadow: 0 18px 38px -10px rgba(0,0,0,0.55); }
+.ppad__dl-i { font-size: 22px; }
+.ppad__dl-os { font-size: 11.5px; font-weight: 700; letter-spacing: 0.04em; color: #5b6bb0; padding-left: 11px; margin-left: 3px; border-left: 1px solid rgba(18,45,141,0.2); }
+
+.ppad__status {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 13.5px; font-weight: 600; color: #bcd2ff;
+}
+.ppad__dot { width: 9px; height: 9px; border-radius: 50%; background: #6f86c8; box-shadow: 0 0 0 0 rgba(120,220,150,0); transition: background .2s; }
+.ppad__status.is-on { color: #c6f7d6; }
+.ppad__status.is-on .ppad__dot { background: #36d97a; box-shadow: 0 0 10px 1px rgba(54,217,122,0.7); animation: ppad-pulse 1.8s ease-in-out infinite; }
+@keyframes ppad-pulse { 0%,100% { box-shadow: 0 0 8px 0 rgba(54,217,122,0.5); } 50% { box-shadow: 0 0 14px 3px rgba(54,217,122,0.85); } }
+
+.ppad__art { position: relative; width: 230px; flex-shrink: 0; display: none; }
+@media (min-width: 900px) { .ppad__art { display: block; } }
+.ppad__art-glow { position: absolute; inset: -20% -10%; background: radial-gradient(circle at 50% 45%, rgba(158,194,255,0.45), transparent 65%); filter: blur(6px); }
+.ppad__art-pad { position: relative; font-size: 188px; color: #dfe9ff; opacity: 0.96; filter: drop-shadow(0 18px 30px rgba(0,0,0,0.4)); }
+
+@media (max-width: 720px) {
+  .ppad__wrap { padding-top: 24px; padding-bottom: 24px; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .float-island,.float-card-a,.float-card-b,.float-cloud-a,.float-cloud-b,.float-cloud-c,
   .fp-scene::after,.fp-featured { animation: none !important; }
+  .ppad__status.is-on .ppad__dot { animation: none !important; }
 }
 
 /* ── front-page logo + bigger hero scene (post-asset tuning) ── */

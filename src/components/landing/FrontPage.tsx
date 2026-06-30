@@ -1,6 +1,7 @@
 'use client';
 
 import AppHeader from '@/components/layout/AppHeader';
+import PlotPadBanner from '@/components/landing/PlotPadBanner';
 import OrbitSection from '@/components/landing/OrbitSection';
 import ToolGrid from '@/components/dashboard/ToolGrid';
 import MaterialIcon from '@/components/ui/MaterialIcon';
@@ -68,6 +69,13 @@ export default function FrontPage() {
     <div className="fp">
       {/* ════ HEADER (shared with the dashboard for one consistent chrome) ════ */}
       <AppHeader variant="public" />
+
+      {/* ════ PLOT PAD — full gamepad flight (front-and-center download) ════
+          The OS-level helper that unlocks real controller flight: exact
+          targeting, auto full-screen, every button. Greg's call: this is
+          top-of-page no matter what else is here.
+          memory/project_plot_pad_os_click_helper */}
+      <PlotPadBanner />
 
       {/* ════ HERO ════ */}
       <section className="fp-hero">

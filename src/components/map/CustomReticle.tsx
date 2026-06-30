@@ -30,6 +30,11 @@ interface CustomReticleProps {
   /** Disable rendering entirely. Useful for non-flight modes where
    *  the standard OS cursor should remain visible. */
   enabled?: boolean;
+  /** Plot Pad mode. When true, the reticle tracks the REAL OS cursor
+   *  (which Plot Pad's right-stick moves), so the drawn reticle sits
+   *  exactly where an A-press OS click lands → Map3D's gmp-click fires at
+   *  the reticle. Overrides fixed mode. memory/project_plot_pad_os_click_helper */
+  followCursor?: boolean;
   /** FIXED gamepad reticle. When provided, the reticle pins at this 0..1
    *  viewport fraction and IGNORES the mouse (the gamepad owns it; LB+right-
    *  stick moves it via useReticlePosition upstream). When omitted, falls
@@ -44,12 +49,16 @@ interface CustomReticleProps {
 export default function CustomReticle({
   hoverActive = false,
   enabled = true,
+  followCursor = false,
   fixedXFraction,
   fixedYFraction,
   placing = false,
 }: CustomReticleProps) {
   const svgRef = useRef<SVGSVGElement | null>(null);
-  const fixed = typeof fixedXFraction === 'number' && typeof fixedYFraction === 'number';
+  // Plot Pad mode wins: track the real OS cursor so the reticle sits where
+  // the A-press OS click lands. Otherwise use fixed (browser-API stick) mode.
+  const fixed = !followCursor
+    && typeof fixedXFraction === 'number' && typeof fixedYFraction === 'number';
   // Visibility flag — hide until positioned. Fixed mode is visible at once.
   const [seen, setSeen] = useState(false);
 
@@ -68,9 +77,20 @@ export default function CustomReticle({
     return () => window.removeEventListener('resize', place);
   }, [enabled, fixed, fixedXFraction, fixedYFraction]);
 
-  // ── Legacy MOUSE mode (desktop fallback when no fixed position given).
+  // ── CURSOR mode: track the real OS cursor (Plot Pad's stick moves it,
+  //    or the mouse). The drawn reticle sits exactly on the cursor, so an
+  //    A-press OS click lands on the reticle → Map3D gmp-click fires there.
+  //    Also the desktop-mouse fallback when no fixed position is given.
   useEffect(() => {
     if (!enabled || fixed) return;
+    // Seed at screen-center so the reticle is visible before the first move
+    // (Plot Pad parks the cursor near center on launch).
+    if (svgRef.current) {
+      const cx = window.innerWidth / 2;
+      const cy = window.innerHeight * 0.46;
+      svgRef.current.style.transform = `translate3d(${cx - 24}px, ${cy - 24}px, 0)`;
+    }
+    setSeen(true);
     const onMove = (e: MouseEvent) => {
       if (svgRef.current) {
         svgRef.current.style.transform = `translate3d(${e.clientX - 24}px, ${e.clientY - 24}px, 0)`;

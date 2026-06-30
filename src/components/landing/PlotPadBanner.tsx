@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import MaterialIcon from '@/components/ui/MaterialIcon';
+import PlotPadModal from '@/components/landing/PlotPadModal';
 
 // ── PlotPadBanner ─────────────────────────────────────────────────────
 //
@@ -19,10 +20,9 @@ import MaterialIcon from '@/components/ui/MaterialIcon';
 // the download. memory/project_plot_pad_os_click_helper,
 // project_gamepad_is_os_layer.
 
-const DOWNLOAD_URL = '/download/PlotPad.exe';
-
 export default function PlotPadBanner() {
   const [padConnected, setPadConnected] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
 
   useEffect(() => {
     // Reflect whether any gamepad is currently visible to the browser.
@@ -69,11 +69,11 @@ export default function PlotPadBanner() {
           </ul>
 
           <div className="ppad__cta-row">
-            <a href={DOWNLOAD_URL} download className="ppad__dl">
+            <button type="button" onClick={() => setModalOpen(true)} className="ppad__dl">
               <MaterialIcon icon="download" className="ppad__dl-i" />
               Download Plot Pad
               <span className="ppad__dl-os">Windows · free</span>
-            </a>
+            </button>
             <span className={`ppad__status ${padConnected ? 'is-on' : ''}`}>
               <span className="ppad__dot" aria-hidden />
               {padConnected ? 'Controller detected' : 'Plug in a controller'}
@@ -87,6 +87,9 @@ export default function PlotPadBanner() {
           <MaterialIcon icon="stadia_controller" className="ppad__art-pad" />
         </div>
       </div>
+
+      {/* pre-download trust flow */}
+      <PlotPadModal open={modalOpen} onClose={() => setModalOpen(false)} />
     </section>
   );
 }

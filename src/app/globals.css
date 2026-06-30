@@ -1732,10 +1732,33 @@ gmp-popover-3d-element[plot-card-popover],
   display: inline-flex; align-items: center; gap: 8px;
   font-size: 13.5px; font-weight: 600; color: #bcd2ff;
 }
+.ppad__status-i { font-size: 17px; color: #36d97a; }
 .ppad__dot { width: 9px; height: 9px; border-radius: 50%; background: #6f86c8; box-shadow: 0 0 0 0 rgba(120,220,150,0); transition: background .2s; }
+/* none → muted; connected → amber (nudge); active → green ✓ flight-ready */
+.ppad__status.is-off { color: #aab8e0; }
+.ppad__status.is-wait { color: #ffe1a6; }
+.ppad__status.is-wait .ppad__dot { background: #ffc24d; box-shadow: 0 0 10px 1px rgba(255,194,77,0.7); animation: ppad-pulse-amber 1.6s ease-in-out infinite; }
 .ppad__status.is-on { color: #c6f7d6; }
 .ppad__status.is-on .ppad__dot { background: #36d97a; box-shadow: 0 0 10px 1px rgba(54,217,122,0.7); animation: ppad-pulse 1.8s ease-in-out infinite; }
 @keyframes ppad-pulse { 0%,100% { box-shadow: 0 0 8px 0 rgba(54,217,122,0.5); } 50% { box-shadow: 0 0 14px 3px rgba(54,217,122,0.85); } }
+@keyframes ppad-pulse-amber { 0%,100% { box-shadow: 0 0 8px 0 rgba(255,194,77,0.5); } 50% { box-shadow: 0 0 14px 3px rgba(255,194,77,0.9); } }
+
+/* Install nudge — appears when a controller is connected but Plot Pad
+   input hasn't been seen. A warm, inviting prompt, not a warning. */
+.ppad__nudge {
+  display: inline-flex; align-items: center; gap: 9px;
+  margin-top: 14px;
+  font-size: 13.5px; font-weight: 700; color: #fff8e8;
+  background: rgba(255,194,77,0.14);
+  border: 1px solid rgba(255,194,77,0.4);
+  padding: 10px 15px; border-radius: 11px;
+  transition: background .15s, transform .15s;
+  animation: ppad-nudge-in 240ms ease-out;
+}
+.ppad__nudge:hover { background: rgba(255,194,77,0.22); transform: translateY(-1px); }
+.ppad__nudge-i { font-size: 18px; color: #ffd27a; }
+.ppad__nudge-go { font-weight: 800; color: #ffd27a; padding-left: 4px; }
+@keyframes ppad-nudge-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 
 .ppad__art { position: relative; width: 230px; flex-shrink: 0; display: none; }
 @media (min-width: 900px) { .ppad__art { display: block; } }
@@ -1837,7 +1860,9 @@ gmp-popover-3d-element[plot-card-popover],
 @media (prefers-reduced-motion: reduce) {
   .float-island,.float-card-a,.float-card-b,.float-cloud-a,.float-cloud-b,.float-cloud-c,
   .fp-scene::after,.fp-featured { animation: none !important; }
-  .ppad__status.is-on .ppad__dot { animation: none !important; }
+  .ppad__status.is-on .ppad__dot,
+  .ppad__status.is-wait .ppad__dot { animation: none !important; }
+  .ppad__nudge { animation: none !important; }
   .ppm__overlay,.ppm { animation: none !important; }
 }
 

@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import MaterialIcon from '@/components/ui/MaterialIcon';
 import PlotPadModal from '@/components/landing/PlotPadModal';
+import { usePlotPadStatus } from '@/lib/usePlotPadStatus';
 
 // ── PlotPadBanner ─────────────────────────────────────────────────────
 //
@@ -15,33 +16,21 @@ import PlotPadModal from '@/components/landing/PlotPadModal';
 //   • Every controller button, reliably (the browser misses A/B/X/Y).
 //   • Right-stick aim, rumble, one-button launch.
 //
-// The browser CAN detect a connected gamepad (Gamepad API), so the banner
-// reacts live: "controller detected" vs "plug one in" — and always offers
-// the download. memory/project_plot_pad_os_click_helper,
-// project_gamepad_is_os_layer.
+// The chip is a live THREE-STATE flight-readiness light (usePlotPadStatus):
+//   none → "plug in a controller" · connected → "install Plot Pad to fly"
+//   (nudges the download) · active → "Plot Pad active" (flight-ready, the
+//   installed-correctly indicator, proven by live gamepad input).
+// memory/project_plot_pad_os_click_helper, project_gamepad_is_os_layer.
+
+const STATUS_COPY = {
+  none:      { dot: 'is-off',  text: 'Plug in a controller' },
+  connected: { dot: 'is-wait', text: 'Controller found — install Plot Pad to fly' },
+  active:    { dot: 'is-on',   text: 'Plot Pad active — flight-ready' },
+} as const;
 
 export default function PlotPadBanner() {
-  const [padConnected, setPadConnected] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
-
-  useEffect(() => {
-    // Reflect whether any gamepad is currently visible to the browser.
-    const refresh = () => {
-      const pads = navigator.getGamepads?.() ?? [];
-      setPadConnected(Array.from(pads).some((p) => p && p.connected));
-    };
-    refresh();
-    window.addEventListener('gamepadconnected', refresh);
-    window.addEventListener('gamepaddisconnected', refresh);
-    // Chrome only populates getGamepads() after an input event, so poll
-    // a few times early to catch an already-plugged pad.
-    const iv = window.setInterval(refresh, 1000);
-    return () => {
-      window.removeEventListener('gamepadconnected', refresh);
-      window.removeEventListener('gamepaddisconnected', refresh);
-      window.clearInterval(iv);
-    };
-  }, []);
+  const { status } = usePlotPadStatus();
 
   return (
     <section className="ppad">
@@ -74,11 +63,21 @@ export default function PlotPadBanner() {
               Download Plot Pad
               <span className="ppad__dl-os">Windows · free</span>
             </button>
-            <span className={`ppad__status ${padConnected ? 'is-on' : ''}`}>
+            <span className={`ppad__status ${STATUS_COPY[status].dot}`}>
               <span className="ppad__dot" aria-hidden />
-              {padConnected ? 'Controller detected' : 'Plug in a controller'}
+              {status === 'active' && <MaterialIcon icon="check" className="ppad__status-i" />}
+              {STATUS_COPY[status].text}
             </span>
           </div>
+
+          {/* Controller plugged in but no Plot Pad input seen → nudge install. */}
+          {status === 'connected' && (
+            <button type="button" className="ppad__nudge" onClick={() => setModalOpen(true)}>
+              <MaterialIcon icon="bolt" className="ppad__nudge-i" />
+              Controller detected — get Plot Pad to fly it.
+              <span className="ppad__nudge-go">Install →</span>
+            </button>
+          )}
         </div>
 
         {/* right — controller mark */}

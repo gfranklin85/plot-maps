@@ -10,7 +10,6 @@ import type { GamepadActions } from "./GamepadFlightController";
 import { AtmosphereProvider } from "@/lib/atmosphere/AtmosphereContext";
 import AtmosphereOverlay from "./AtmosphereOverlay";
 import CustomReticle from "./CustomReticle";
-import ReticleCalibration, { type CalibCamera } from "./ReticleCalibration";
 import RitualTether, { type RitualTetherHandle } from "./RitualTether";
 import { RITUAL_TIMING } from "@/lib/ritualTiming";
 import { scheduleImpact } from "@/lib/ritualAudio";
@@ -1420,18 +1419,11 @@ function Inner({
           fixedYFraction={gamepadReticleYFraction ?? 0.42}
           placing={placingReticle}
         />
-        {/* INTERNAL: reticle ground-projection calibration. Mount only with
-            ?calibrate=1 — fixed truth marker + live shadow dot + vFOV knob,
-            to derive/verify the reticle→ground math by flying. */}
-        {typeof window !== 'undefined'
-          && new URLSearchParams(window.location.search).get('calibrate') === '1' && (
-          <ReticleCalibration
-            cameraRef={camRef as React.MutableRefObject<CalibCamera | null>}
-            mapElRef={elRef as React.MutableRefObject<HTMLElement | null>}
-            reticleXFraction={gamepadReticleXFraction ?? 0.5}
-            reticleYFraction={gamepadReticleYFraction ?? 0.42}
-          />
-        )}
+        {/* The old ?calibrate=1 reticle-projection harness was removed: we
+            no longer reverse-engineer the pixel→ground math (it drifted
+            ~700m near the horizon). Selection now uses a REAL OS click via
+            Plot Pad → Map3D's gmp-click → Google's exact raycast.
+            memory/project_plot_pad_os_click_helper */}
       </div>
     </AtmosphereProvider>
   );

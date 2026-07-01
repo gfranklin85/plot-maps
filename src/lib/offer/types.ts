@@ -64,6 +64,14 @@ export interface OfferInputs {
   // ── carrying costs the buyer knows or the listing supplies ──
   monthlyHoa: number;
 
+  // ── the listing context, for offer-vs-list + $/sqft market fit ──
+  listPrice?: number;          // what the home is listed at
+  livingAreaSqft?: number;     // for $/sqft of this offer
+
+  // ── deposit / earnest money + any seller credit (statement credits) ──
+  earnestDeposit?: number;
+  sellerCredit?: number;
+
   // ── marketplace workflow state for the two claimable cards ──
   loanState: ProviderState;
   insuranceState: ProviderState;
@@ -77,6 +85,62 @@ export interface CostLine {
   source: Provenance;
   /** plain-language note — what this is / why it's here */
   note?: string;
+  /** the party responsible for this line, as it appears on a real Buyer's
+   *  Statement (e.g. "Kind Lending, LLC", "Chicago Title Company"). */
+  provider?: string;
+  /** when a real person (lender/escrow/insurer) has checked off this line,
+   *  their name + optional face — provenance-with-a-face. */
+  verifiedBy?: { name: string; avatarUrl?: string };
+}
+
+// ── The live pre-close Buyer's Statement ──────────────────────────────
+// Mirrors the real Final Buyer's Statement (Chicago Title samples): the same
+// computed cost lines, regrouped into the named sections a buyer/escrow
+// actually reads, as DEBITS vs CREDITS that balance to the funds due.
+// See memory/project_live_buyers_statement.
+
+export type LedgerSide = 'debit' | 'credit';
+
+/** A statement line = a cost line placed on the debit or credit side. */
+export interface StatementLine extends CostLine {
+  side: LedgerSide;
+  /** sub-detail rendered under the line (e.g. proration math, N mo × $/mo). */
+  detail?: string;
+}
+
+export interface StatementSection {
+  id: string;
+  title: string;
+  lines: StatementLine[];
+  /** optional section subtotal label + amount (e.g. "Total Loan Charges"). */
+  subtotalLabel?: string;
+  subtotal?: number;
+}
+
+export interface BuyersStatement {
+  sections: StatementSection[];
+  totalDebits: number;
+  totalCredits: number;
+  /** positive = buyer brings funds; negative = balance due TO buyer. */
+  balanceDueFromBuyer: number;
+}
+
+/** How this offer sits against the list price + the area market. */
+export interface OfferPosition {
+  listPrice?: number;
+  offerPrice: number;
+  /** offerPrice − listPrice (negative = under list). */
+  vsListDollars?: number;
+  vsListPct?: number;
+  /** this offer's $/sqft, when living area is known. */
+  offerPerSqft?: number;
+  /** the area's low–high $/sqft range (from PlotMaps sales data). */
+  areaPerSqftLow?: number;
+  areaPerSqftHigh?: number;
+  /** where the offer's $/sqft falls in the area range, 0–1 (null if no comps). */
+  areaPositionPct?: number | null;
+  /** provenance of the area comps — 'pending' until Import is reverified. */
+  areaCompsSource: 'plotmaps-sales' | 'pending-import';
 }
 
 export interface MonthlyBreakdown {

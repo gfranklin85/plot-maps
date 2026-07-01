@@ -32,6 +32,7 @@ const PUBLIC_PATHS = [
   '/invite', // the agent's tool — make a branded buyer link (no account)
   '/orbit',
   '/compare',
+  '/statement', // the live pre-close Buyer's Statement (offer builder)
   '/b/', // shared bullpen link view — openable by anyone (lenders, family, friends)
 ];
 

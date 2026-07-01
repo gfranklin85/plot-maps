@@ -1750,6 +1750,57 @@ gmp-popover-3d-element[plot-card-popover],
 .shb-agent { display: inline-flex; align-items: center; gap: 7px; margin-top: 14px; padding: 8px 14px; border-radius: 999px; font-size: 13px; font-weight: 600; color: #15563b; background: rgba(27,158,106,0.08); border: 1px solid rgba(27,158,106,0.26); }
 .shb-agent .material-symbols-outlined, .shb-agent .material-symbols-rounded { color: #1b9e6a; }
 
+/* ════ LIVE BUYER'S STATEMENT (the offer builder room) ════ */
+.lbs { max-width: 640px; margin: 0 auto; }
+.lbs-head { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.lbs-metric { border-radius: 14px; padding: 14px 16px; background: #fbfcff; border: 1px solid rgba(19,73,212,0.12); }
+.lbs-metric.is-big { background: linear-gradient(160deg, rgba(19,73,212,0.07), rgba(224,231,251,0.5)); border-color: rgba(19,73,212,0.2); }
+.lbs-metric__k { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #8a93a4; }
+.lbs-metric__v { font-family: var(--font-headline, inherit); font-weight: 800; font-size: 22px; color: #0c1322; margin-top: 3px; letter-spacing: -.01em; }
+.lbs-metric.is-big .lbs-metric__v { font-size: 26px; color: #122d8d; }
+.lbs-metric__v.is-good { color: #1b9e6a; }
+.lbs-metric__v.is-warn { color: #b8860b; }
+.lbs-metric__sub { font-size: 11.5px; color: #6b7689; margin-top: 2px; }
+
+.lbs-market { margin-top: 14px; border-radius: 14px; padding: 15px 17px; background: #fff; border: 1px solid rgba(19,73,212,0.12); }
+.lbs-market__head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.lbs-market__title { font-size: 12.5px; font-weight: 700; color: #4a5568; }
+.lbs-market__psf { font-weight: 800; font-size: 15px; color: #1349d4; }
+.lbs-market__pending { display: flex; align-items: center; gap: 6px; margin-top: 10px; font-size: 12.5px; color: #8a93a4; }
+.lbs-market__pending .material-symbols-outlined, .lbs-market__pending .material-symbols-rounded { color: #b8860b; }
+.lbs-market__bar { position: relative; height: 8px; margin-top: 14px; border-radius: 999px; background: linear-gradient(90deg, rgba(27,158,106,0.35), rgba(217,176,102,0.5), rgba(180,35,31,0.4)); }
+.lbs-market__marker { position: absolute; top: 50%; transform: translate(-50%,-50%); width: 16px; height: 16px; border-radius: 50%; background: #1349d4; border: 3px solid #fff; box-shadow: 0 2px 8px -2px rgba(19,73,212,0.7); }
+.lbs-market__scale { display: flex; justify-content: space-between; margin-top: 8px; font-size: 10.5px; font-weight: 600; color: #8a93a4; }
+.lbs-market__mid { color: #b6bdc9; }
+
+.lbs-stmt { margin-top: 18px; border-radius: 16px; padding: 18px 20px; background: #fff; border: 1px solid rgba(19,73,212,0.12); box-shadow: 0 12px 30px -24px rgba(20,50,120,0.45); }
+.lbs-stmt__head { display: flex; align-items: flex-start; gap: 10px; padding-bottom: 14px; border-bottom: 1px solid rgba(19,73,212,0.1); }
+.lbs-stmt__head .material-symbols-outlined, .lbs-stmt__head .material-symbols-rounded { color: #1349d4; }
+.lbs-stmt__title { font-family: var(--font-headline, inherit); font-weight: 800; font-size: 17px; color: #0c1322; }
+.lbs-stmt__sub { font-size: 12.5px; line-height: 1.5; color: #6b7689; margin-top: 2px; }
+
+.lbs-sec { padding: 12px 0 4px; border-bottom: 1px solid rgba(19,73,212,0.06); }
+.lbs-sec__title { font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; color: #1349d4; margin-bottom: 8px; }
+.lbs-line { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 7px 0; }
+.lbs-line__label { font-size: 13.5px; font-weight: 600; color: #0c1322; }
+.lbs-line__credit { font-size: 11px; font-weight: 700; color: #1b9e6a; text-transform: uppercase; letter-spacing: .04em; }
+.lbs-line__meta { font-size: 11px; color: #8a93a4; margin-top: 1px; }
+.lbs-line__provider { font-weight: 600; color: #6b7689; }
+.lbs-line__right { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; flex: none; }
+.lbs-line__amt { font-size: 14px; font-weight: 700; color: #0c1322; font-variant-numeric: tabular-nums; }
+.lbs-line__amt.is-credit { color: #1b9e6a; }
+.lbs-line__verified { display: inline-flex; align-items: center; gap: 3px; }
+.lbs-line__verified .material-symbols-outlined, .lbs-line__verified .material-symbols-rounded { color: #1b9e6a; }
+.lbs-avatar { width: 18px; height: 18px; border-radius: 50%; object-fit: cover; }
+.lbs-avatar--initial { display: inline-flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 800; color: #fff; background: #1349d4; }
+.lbs-sub { display: flex; justify-content: space-between; padding: 8px 0 2px; font-size: 12.5px; }
+.lbs-sub span { color: #8a93a4; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; font-size: 10.5px; }
+.lbs-sub b { color: #0c1322; font-variant-numeric: tabular-nums; }
+.lbs-balance { display: flex; justify-content: space-between; align-items: center; margin-top: 14px; padding: 14px 16px; border-radius: 12px; background: linear-gradient(160deg, rgba(19,73,212,0.08), rgba(224,231,251,0.5)); border: 1px solid rgba(19,73,212,0.22); }
+.lbs-balance span { font-size: 13px; font-weight: 700; color: #4a5568; text-transform: uppercase; letter-spacing: .04em; }
+.lbs-balance b { font-family: var(--font-headline, inherit); font-weight: 800; font-size: 22px; color: #122d8d; font-variant-numeric: tabular-nums; }
+@media (max-width: 560px) { .lbs-head { grid-template-columns: 1fr 1fr; } }
+
 /* ════ FINISHED MAP UI — contained map + BOTTOM COCKPIT DASH (soft light) ════
    Flight first: the map is a contained windshield; all chrome lives in one
    soft-light bottom dash (no side rail, no overlay over the map body). Sheets

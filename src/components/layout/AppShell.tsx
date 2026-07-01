@@ -32,7 +32,7 @@ const SELF_HEADERED = ['/forms'];
 // Public marketing pages that should NOT get the app header for logged-out
 // visitors (they're their own surfaces). The front page handles its own
 // header for everyone.
-const OWN_SURFACE = ['/', '/position', '/contact', '/privacy', '/terms', '/cookies', '/support', '/join-position', '/bullpen', '/buyers-first', '/orbit'];
+const OWN_SURFACE = ['/', '/position', '/contact', '/privacy', '/terms', '/cookies', '/support', '/join-position', '/bullpen', '/buyers-first', '/orbit', '/compare'];
 
 export default function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();

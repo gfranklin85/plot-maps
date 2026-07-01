@@ -1446,6 +1446,46 @@ gmp-popover-3d-element[plot-card-popover],
   filter: drop-shadow(0 24px 40px rgba(40,70,130,0.16));
 }
 
+/* ════ LENDER-COMPARISON COCKPIT (/compare) — soft light, Plot never ranks ════ */
+.cmp-position { border-radius: 18px; padding: 22px; background: linear-gradient(160deg, rgba(19,73,212,0.06), rgba(224,231,251,0.4)); border: 1px solid rgba(19,73,212,0.14); }
+.cmp-position__eyebrow { font-size: 10px; font-weight: 800; letter-spacing: .3em; text-transform: uppercase; color: #1349d4; }
+.cmp-position__h { font-family: var(--font-headline, inherit); font-weight: 800; font-size: clamp(20px,2.4vw,26px); letter-spacing: -.015em; margin-top: 6px; color: #0c1322; }
+.cmp-position__facts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
+@media (min-width: 720px) { .cmp-position__facts { grid-template-columns: repeat(4,1fr); } }
+.cmp-position__factk { font-size: 10px; text-transform: uppercase; letter-spacing: .04em; font-weight: 700; color: #8a93a4; }
+.cmp-position__factv { font-size: 13.5px; font-weight: 700; color: #0c1322; margin-top: 2px; }
+
+.cmp-framing { margin: 22px 0 4px; font-size: 14.5px; line-height: 1.6; color: #4a5568; }
+
+.cmp-sort { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 16px 0 18px; }
+.cmp-sort__label { font-size: 12px; font-weight: 700; color: #8a93a4; text-transform: uppercase; letter-spacing: .04em; margin-right: 2px; }
+.cmp-sort__btn { padding: 7px 13px; border-radius: 999px; font-size: 12.5px; font-weight: 700; color: #4a5568; background: #fff; border: 1px solid rgba(19,73,212,0.16); transition: all .14s; }
+.cmp-sort__btn:hover { border-color: rgba(19,73,212,0.35); }
+.cmp-sort__btn.is-active { background: linear-gradient(160deg,#1349d4,#122d8d); color: #fff; border-color: transparent; box-shadow: 0 6px 14px -8px rgba(19,73,212,0.7); }
+
+.cmp-list { display: grid; gap: 14px; }
+.cmp-card { border-radius: 16px; padding: 18px 20px; background: #fff; border: 1px solid rgba(19,73,212,0.12); box-shadow: 0 12px 30px -24px rgba(20,50,120,0.45); }
+.cmp-card.is-chosen { border-color: rgba(27,158,106,0.5); box-shadow: 0 12px 30px -20px rgba(27,158,106,0.4); }
+.cmp-card__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.cmp-card__lender { font-weight: 800; font-size: 16px; color: #0c1322; }
+.cmp-card__loan { font-size: 12.5px; color: #6b7689; margin-top: 1px; }
+.cmp-card__rate { text-align: right; flex: none; }
+.cmp-card__rate-n { font-weight: 800; font-size: 20px; color: #1349d4; letter-spacing: -.02em; }
+.cmp-card__rate-l { font-size: 11px; color: #8a93a4; }
+.cmp-card__note { font-size: 13px; font-style: italic; color: #6b7689; margin: 10px 0 0; line-height: 1.5; }
+.cmp-card__grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 22px; margin: 14px 0 4px; }
+@media (min-width: 640px) { .cmp-card__grid { grid-template-columns: repeat(5,1fr); } }
+.cmp-line { display: flex; flex-direction: column; gap: 2px; font-size: 12px; }
+.cmp-line span { color: #8a93a4; text-transform: uppercase; letter-spacing: .03em; font-weight: 700; font-size: 10px; }
+.cmp-line b { color: #0c1322; font-size: 14px; }
+.cmp-line.is-strong b { color: #0c1322; font-weight: 800; }
+.cmp-line.is-strong span { color: #1349d4; }
+.cmp-card__choose { width: 100%; margin-top: 14px; padding: 11px; border-radius: 11px; font-size: 13.5px; font-weight: 700; color: #fff; background: linear-gradient(160deg,#1349d4,#122d8d); box-shadow: 0 10px 24px -12px rgba(19,73,212,0.7); transition: all .14s; }
+.cmp-card__choose:disabled { background: #1b9e6a; box-shadow: none; opacity: .95; }
+
+.cmp-chosen { margin-top: 20px; display: flex; align-items: flex-start; gap: 12px; border-radius: 14px; padding: 16px 18px; font-size: 14px; line-height: 1.55; color: #15563b; background: rgba(27,158,106,0.08); border: 1px solid rgba(27,158,106,0.3); }
+.cmp-chosen .material-symbols-outlined, .cmp-chosen .material-symbols-rounded { color: #1b9e6a; flex: none; }
+
 /* ════ FINISHED MAP UI — contained map + BOTTOM COCKPIT DASH (soft light) ════
    Flight first: the map is a contained windshield; all chrome lives in one
    soft-light bottom dash (no side rail, no overlay over the map body). Sheets
@@ -2445,6 +2485,10 @@ gmp-popover-3d-element[plot-card-popover],
 .fp-intent__eyebrow { font-size: 12.5px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--plot-brand); }
 .fp-intent__h { font-weight: 800; letter-spacing: -0.025em; font-size: clamp(28px, 4vw, 46px); color: var(--plot-ink); margin-top: 10px; }
 .fp-intent__lede { color: #4a5568; font-size: clamp(15px,1.4vw,18px); line-height: 1.55; margin-top: 14px; }
+/* the RESPA "why" line carries more weight — slightly larger + darker so the
+   honest hook isn't skimmed past. memory/feedback_reveal_facts_not_hype_voice */
+.fp-intent__lede--respa { color: #27313f; font-size: clamp(16px,1.55vw,19.5px); line-height: 1.6; }
+.fp-intent__lede--respa b { color: #1349d4; font-weight: 800; }
 
 .fp-intent__paths { display: grid; gap: 20px; grid-template-columns: 1fr; max-width: 980px; margin: 0 auto; }
 @media (min-width: 820px) { .fp-intent__paths { grid-template-columns: 1fr 1fr; } }

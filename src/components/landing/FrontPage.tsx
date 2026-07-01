@@ -93,38 +93,36 @@ export default function FrontPage() {
           <div className="fp-hero__grid">
             {/* left — the live headline */}
             <div style={{ flex: 1, position: 'relative', zIndex: 2 }}>
-              <span className="fp-pill">FREE FOR BUYERS &amp; AGENTS</span>
+              <span className="fp-pill">A DIFFERENT KIND OF BROKERAGE</span>
               <h1 className="fp-head font-headline">
                 Build Your Position.
                 <br />
                 <span className="accent">Before You Offer.</span>
               </h1>
+              {/* Hero = Position as the UMBRELLA over a constellation of
+                  capabilities. Capability-led, no enemy named — the
+                  independence is felt, never proclaimed.
+                  memory/project_position_comingout_framing */}
               <p className="fp-sub">
-                Get your people in place before the offer ever goes in. Post your
-                goals and criteria, and the platform puts you on the radar of the
-                local pros who do this work — lenders, inspectors, insurers — who
-                watch the board and bring private estimates to <b>you</b>. You
-                review, you choose, you move with leverage.
+                Position is a brokerage that rebuilt the tools — the map, the
+                offer, the disclosures, the way you find your team — around the
+                one person they were always supposed to serve: <b>you</b>.
+                Everything&apos;s plainer, fairer, and finally on your side. And
+                this is just the beginning.
               </p>
-              {/* the three concrete steps (the mechanism, not magic) */}
-              <ul className="fp-checks">
-                <li><MaterialIcon icon="check_circle" className="fp-checks__i" /> Post your goals — you go on the board.</li>
-                <li><MaterialIcon icon="check_circle" className="fp-checks__i" /> Pros watching the board bring private estimates.</li>
-                <li><MaterialIcon icon="check_circle" className="fp-checks__i" /> You pick the team and terms that fit.</li>
-              </ul>
               <div className="fp-cta-row">
-                <a href="/bullpen" className="fp-cta fp-cta--primary">
-                  Get started — free <span aria-hidden>→</span>
-                </a>
-                <button type="button" className="fp-cta fp-cta--ghost" onClick={() => goMap('3d')}>
+                <button type="button" className="fp-cta fp-cta--primary" onClick={() => goMap('3d')}>
                   Explore the map <span aria-hidden>→</span>
                 </button>
+                <a href="/bullpen" className="fp-cta fp-cta--ghost">
+                  See how it works <span aria-hidden>→</span>
+                </a>
               </div>
-              {/* honest credibility + the no-vendor-ads promise */}
+              {/* honest credibility */}
               <div className="fp-cred">
                 <span className="fp-cred__seal"><MaterialIcon icon="verified" /></span>
                 <p className="fp-cred__text">
-                  <b>Free for buyers. Free for agents. No public vendor ads.</b>
+                  <b>Free for buyers. Free for agents.</b>
                   <br />Built by Gregory M. Franklin · CA broker · DRE #02090737 · Position Realty.
                 </p>
               </div>
@@ -163,34 +161,43 @@ export default function FrontPage() {
         <div className="fp-reposition__sky" aria-hidden />
         <div className="fp__wrap" style={{ position: 'relative', zIndex: 1 }}>
           <div className="fp-intent__head">
-            <div className="fp-intent__eyebrow">The reposition</div>
-            <h2 className="fp-intent__h">The dynamic, put back where it belongs.</h2>
-            <p className="fp-intent__lede">
-              For as long as anyone can remember, the person buying has been cast
-              as the one who chases — applying, qualifying, hoping to be picked.
-              That was always backwards. You are the reason the market moves. So
-              here, the market moves toward you.
+            <div className="fp-intent__eyebrow">The buyer&apos;s platform · free</div>
+            <h2 className="fp-intent__h">Where buyers and lenders meet on fair ground.</h2>
+            <p className="fp-intent__lede fp-intent__lede--respa">
+              Buying a home got lopsided somewhere along the way. There&apos;s
+              even a rule — <b>RESPA</b> — that keeps your agent from pointing you
+              to a lender, for good reason: it stops kickbacks and steering. But
+              it left a gap. At the most important moment, the money, you&apos;re
+              often on your own to go find financing.
             </p>
           </div>
 
           <div className="fp-reposition__grid">
-            {/* the rebalance, told plainly — no card, just text in the sky */}
+            {/* the rebalance, warm — RESPA as a shared gap, nobody the enemy.
+                memory/feedback_reveal_facts_not_hype_voice (keep-everyone-in-the-fold) */}
             <div className="fp-reposition__copy">
-              <h3 className="fp-reposition__h">You stand still. The market comes to you.</h3>
+              <h3 className="fp-reposition__h">You share once. Good lenders come to you.</h3>
               <p className="fp-reposition__p">
-                Instead of going door to door telling your story over and over,
-                you say what you want once — and the people who can deliver it
-                step toward you, on your terms. No begging. No chasing. The
-                gravity simply runs the right direction.
+                So we built a fairer meeting place. Instead of tracking down
+                lenders one at a time, you share your profile once — and good
+                lenders come to you, with their honest numbers, side by side. You
+                compare, and you choose the one that&apos;s right for you. Better
+                for buyers, and a clean, respectful way for the lenders in your
+                community to earn a client on the merits.
               </p>
               <ul className="fp-flist">
-                <li><span className="chk" aria-hidden>✓</span> You say what you want, plainly — once.</li>
-                <li><span className="chk" aria-hidden>✓</span> Lenders, inspectors, insurers come compete to serve you.</li>
-                <li><span className="chk" aria-hidden>✓</span> You review, you choose. They came to you.</li>
+                <li><span className="chk" aria-hidden>✓</span> We don&apos;t take money from any vendor — this platform isn&apos;t for sale.</li>
+                <li><span className="chk" aria-hidden>✓</span> No lender is featured or favored. Everyone competes on equal footing.</li>
+                <li><span className="chk" aria-hidden>✓</span> Bring your own agent — your relationship is respected here.</li>
               </ul>
-              <a href="/bullpen" className="fp-cta fp-cta--primary" style={{ marginTop: 22 }}>
-                Step into the Bullpen <span aria-hidden>→</span>
-              </a>
+              <div className="fp-cta-row" style={{ marginTop: 22 }}>
+                <a href="/compare" className="fp-cta fp-cta--primary">
+                  Share your profile <span aria-hidden>→</span>
+                </a>
+                <a href="/bullpen" className="fp-cta fp-cta--ghost">
+                  Already qualified? Build your team <span aria-hidden>→</span>
+                </a>
+              </div>
             </div>
 
             {/* The elevation, floating in the sky — no frame. */}

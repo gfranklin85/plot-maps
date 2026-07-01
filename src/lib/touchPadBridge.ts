@@ -89,6 +89,12 @@ export function installTouchPad(): void {
   navigator.getGamepads = function (): (Gamepad | null)[] {
     let real: (Gamepad | null)[] = [];
     try { real = (realGetGamepads() as (Gamepad | null)[]) || []; } catch { /* ignore */ }
+    // CRITICAL: a REAL controller must ALWAYS win. If any physical pad is
+    // connected, return the real list untouched — never let the synthetic
+    // touch pad shadow a real Xbox/Steam pad (that would kill desktop
+    // flight). The synthetic pad is only surfaced when NO real pad exists.
+    const hasRealPad = real.some((p) => p && p.connected);
+    if (hasRealPad) return real;
     const out: (Gamepad | null)[] = [pad as unknown as Gamepad];
     for (let i = 1; i < real.length; i++) out[i] = real[i] || null;
     return out;

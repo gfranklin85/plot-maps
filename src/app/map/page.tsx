@@ -145,7 +145,13 @@ export default function MapPage() {
     if (typeof window === 'undefined') return;
     const coarse = window.matchMedia('(pointer: coarse)').matches;
     const noHover = window.matchMedia('(hover: none)').matches;
-    if (!coarse || !noHover || !has3DSupport) return;
+    // Require a genuine touch device (coarse pointer, no hover), a narrow
+    // viewport (real phone, not a touchscreen laptop), AND NO real gamepad
+    // present — a controller user must never get the touch pad shadowing
+    // their real pad. Guards desktop/gamepad flight.
+    const narrow = window.matchMedia('(max-width: 900px)').matches;
+    const hasRealPad = (navigator.getGamepads?.() ?? []).some((p) => p && p.connected);
+    if (!coarse || !noHover || !narrow || hasRealPad || !has3DSupport) return;
     installTouchPad();          // fires gamepadconnected → airplane flight
     setTouchFly(true);
   }, [has3DSupport]);
@@ -1021,6 +1027,37 @@ export default function MapPage() {
       yFraction: reticlePosition.yFraction + dyFrac,
     });
   }, [reticlePosition.xFraction, reticlePosition.yFraction, setReticlePosition]);
+
+  // ── UNIFY the reticle with the real cursor ───────────────────────────
+  // The visible green reticle follows the OS cursor (followCursor mode —
+  // Plot Pad's right stick moves that cursor; a mouse moves it too). But
+  // FIRE, hover-detection, and the laser all read reticlePosition (a stored
+  // fraction). If those diverge, the laser hits an "invisible spot" near the
+  // reticle and nothing selects. So: mirror the cursor INTO reticlePosition
+  // every move, making the green reticle, the fire point, the hover sample,
+  // and the laser one and the same. memory/project_plot_pad_os_click_helper
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    let raf = 0;
+    let pending: { x: number; y: number } | null = null;
+    const onMove = (e: MouseEvent) => {
+      pending = { x: e.clientX, y: e.clientY };
+      if (raf) return;
+      raf = window.requestAnimationFrame(() => {
+        raf = 0;
+        if (!pending) return;
+        const xf = pending.x / window.innerWidth;
+        const yf = pending.y / window.innerHeight;
+        pending = null;
+        setReticlePosition({ xFraction: xf, yFraction: yf });
+      });
+    };
+    window.addEventListener('mousemove', onMove, { passive: true });
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      if (raf) window.cancelAnimationFrame(raf);
+    };
+  }, [setReticlePosition]);
 
   // Camera-driven parcel prefetch — silently caches parcels in view (and
   // a margin ahead) into the in-memory parcelCache so clicks/shots resolve

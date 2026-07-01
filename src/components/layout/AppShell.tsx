@@ -18,7 +18,16 @@ import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import AppHeader from './AppHeader';
 import CallBar from '@/components/call/CallBar';
+import { useGamepadNav } from '@/lib/useGamepadNav';
 import type { ReactNode } from 'react';
+
+// Controller navigation on every NON-map surface: plug in a pad, cycle the
+// highlight through the page's buttons, A to activate. The map is excluded
+// (it owns flight controls). memory/project_controller_first_class_input
+function GamepadNavMount({ enabled }: { enabled: boolean }) {
+  useGamepadNav({ enabled });
+  return null;
+}
 
 // The map gets the immersive nav overlay (its own translucent in-world nav).
 const MAP_PAGES = ['/map'];
@@ -59,7 +68,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
     OWN_SURFACE.includes(pathname) || pathname === '/' || pathname.startsWith('/essays') ||
     pathname.startsWith('/b/') || pathname.startsWith('/deal/'); // link view + buyer hub bring own chrome
   if (selfHeadered || ownSurface) {
-    return <>{children}</>;
+    return <><GamepadNavMount enabled />{children}</>;
   }
 
   // Everything else: a SIGNED-IN user on an old inner page (Leads, Imports,
@@ -70,6 +79,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
   if (user) {
     return (
       <>
+        <GamepadNavMount enabled />
         <div className="fp">
           <AppHeader variant="app" />
         </div>
@@ -80,5 +90,5 @@ export default function AppShell({ children }: { children: ReactNode }) {
   }
 
   // Logged-out fallback (shouldn't normally hit — middleware gates these).
-  return <>{children}</>;
+  return <><GamepadNavMount enabled />{children}</>;
 }

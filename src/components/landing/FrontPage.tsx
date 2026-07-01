@@ -58,6 +58,7 @@ const SCENE_LAYERS: { src: string; anim: string; alt: string }[] = [
 
 export default function FrontPage() {
   const { user } = useAuth();
+  // Controller navigation is mounted globally for non-map pages in AppShell.
   // CTAs are auth-aware: a signed-in user goes straight to the action;
   // a logged-out user goes through Google sign-in first.
   const goMap = (view: '2d' | '3d') => {

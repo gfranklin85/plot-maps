@@ -67,7 +67,13 @@ export default function PlotPadBanner() {
             {status === 'active' && <MaterialIcon icon="check" className="ppad__status-i" />}
             {STATUS_COPY[status].text}
           </span>
-          <button type="button" onClick={() => setModalOpen(true)} className="ppad__dl">
+          <button
+            type="button"
+            onClick={() => setModalOpen(true)}
+            className="ppad__dl"
+            data-gamepad-focusable
+            data-gamepad-primary
+          >
             <MaterialIcon icon="download" className="ppad__dl-i" />
             Download Plot Pad
             <span className="ppad__dl-os">Windows · free</span>

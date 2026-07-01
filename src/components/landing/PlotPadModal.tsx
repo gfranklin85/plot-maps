@@ -159,8 +159,8 @@ export default function PlotPadModal({
             <span className="ppm__proof-item"><MaterialIcon icon="memory" /> 119 KB · Windows · free</span>
           </div>
           <div className="ppm__actions">
-            <button type="button" className="ppm__cancel" onClick={onClose}>Not now</button>
-            <button type="button" className="ppm__dl" onClick={startDownload}>
+            <button type="button" className="ppm__cancel" onClick={onClose} data-gamepad-focusable>Not now</button>
+            <button type="button" className="ppm__dl" onClick={startDownload} data-gamepad-focusable data-gamepad-primary>
               <MaterialIcon icon="download" className="ppm__dl-i" />
               Download Plot Pad
             </button>

@@ -1901,6 +1901,25 @@ gmp-popover-3d-element[plot-card-popover],
 .map-card-col > * { pointer-events: auto; width: 100%; }
 @keyframes mapCardColIn { from { opacity: 0; transform: translateX(-12px); } to { opacity: 1; transform: none; } }
 
+/* ── Gamepad focus highlight ──────────────────────────────────────────
+   Whatever the controller lands on lights up with a branded blue glow +
+   ring, so it's unmistakable which element A will activate.
+   memory/project_controller_first_class_input */
+.gp-focus {
+  position: relative;
+  outline: 3px solid #1349d4 !important;
+  outline-offset: 3px;
+  border-radius: 12px;
+  box-shadow: 0 0 0 3px rgba(19,73,212,0.25), 0 0 26px 4px rgba(19,73,212,0.55) !important;
+  animation: gp-focus-pulse 1.4s ease-in-out infinite;
+  z-index: 2;
+}
+@keyframes gp-focus-pulse {
+  0%,100% { box-shadow: 0 0 0 3px rgba(19,73,212,0.22), 0 0 20px 3px rgba(19,73,212,0.45); }
+  50%     { box-shadow: 0 0 0 4px rgba(19,73,212,0.32), 0 0 30px 6px rgba(19,73,212,0.7); }
+}
+@media (prefers-reduced-motion: reduce) { .gp-focus { animation: none; } }
+
 /* dock floats OVER the bottom of the full-screen map */
 .map-shell__dock { position: absolute; left: 0; right: 0; bottom: 0; height: var(--map-dash-h); z-index: 30; }
 

@@ -10,6 +10,8 @@ import { Lead, LeadStatus, Priority } from "@/types";
 import MapDynamic from "@/components/map/MapDynamic";
 import type { PinMode } from "@/components/map/MapView";
 import StreetViewProspecting from "@/components/map/StreetViewProspecting";
+import TouchZonePad from "@/components/map/TouchZonePad";
+import { installTouchPad } from "@/lib/touchPadBridge";
 import ProspectSearch from "@/components/dashboard/ProspectSearch";
 import { PRIORITIES } from "@/lib/constants";
 import { useProfile } from "@/lib/profile-context";
@@ -132,6 +134,21 @@ export default function MapPage() {
       return () => clearTimeout(t);
     }
   }, [has3DSupport, requestEnter3D]);
+
+  // ── MOBILE TOUCH FLIGHT ──────────────────────────────────────────────
+  // On a touch device (no mouse), install the synthetic touch gamepad so
+  // Plot's existing gamepad flight loop drives FLY_3D from the on-screen
+  // ZONE PAD. Portrait layout: condensed landscape map on top, zone pad
+  // below. memory/project_phone_as_controller, project_2d_work_mode
+  const [touchFly, setTouchFly] = useState(false);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const coarse = window.matchMedia('(pointer: coarse)').matches;
+    const noHover = window.matchMedia('(hover: none)').matches;
+    if (!coarse || !noHover || !has3DSupport) return;
+    installTouchPad();          // fires gamepadconnected → airplane flight
+    setTouchFly(true);
+  }, [has3DSupport]);
 
   function dismiss3DCoach() {
     setShow3DCoach(false);
@@ -1457,7 +1474,7 @@ export default function MapPage() {
   return (
     <BuyerSettingsProvider>
     <div
-      className="map-shell"
+      className={`map-shell ${touchFly && !walkMode ? 'map-shell--touchfly' : ''}`}
       onContextMenu={(e) => {
         // Prevent the browser/OS right-click menu. Steam Input on the
         // gamepad maps B to right-click; without this, pressing B opens
@@ -1961,6 +1978,20 @@ export default function MapPage() {
           cover the map. Move this to a rail / top bar later by re-slotting
           MapSidebar and adjusting --map-rail-w / --map-top-h. ═══ */}
       {!walkMode && <div className="map-shell__dock">{dashEl}</div>}
+
+      {/* ═══ MOBILE ZONE PAD — on-screen touch flight (portrait) ═══
+          Drives the injected touch gamepad → Plot's flight loop. Tap the
+          map to select (a real touch = a trusted gmp-click). B closes a
+          card. memory/project_phone_as_controller */}
+      {touchFly && !walkMode && (
+        <div className="map-touchpad">
+          <TouchZonePad
+            onButton={(k, downNow) => {
+              if (k === 'b' && downNow && selectedLead) setSelectedLead(null);
+            }}
+          />
+        </div>
+      )}
 
       {/* ═══ PINNED REFERENCE SIDEBAR — persistent comp while prospecting ═══ */}
       {pinnedRef && !walkMode && (

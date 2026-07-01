@@ -12,6 +12,35 @@ import type { Lead } from '@/types';
 import type { MapMode } from '@/lib/useMapMode';
 import MaterialIcon from '@/components/ui/MaterialIcon';
 import PlotMapsLogo from '@/components/brand/PlotMapsLogo';
+import { usePlotPadStatus } from '@/lib/usePlotPadStatus';
+
+// Plot Pad flight-readiness chip for the cockpit dash — mirrors the landing
+// chip so you always know, while flying, whether the gamepad helper is live.
+// memory/project_plot_pad_os_click_helper
+const PAD_COPY = {
+  none:      { icon: 'sports_esports', label: 'No pad', cls: 'is-off' },
+  connected: { icon: 'bolt',           label: 'Run Plot Pad', cls: 'is-wait' },
+  active:    { icon: 'check_circle',    label: 'Plot Pad', cls: 'is-on' },
+} as const;
+
+function PlotPadDashChip() {
+  const { status } = usePlotPadStatus();
+  const c = PAD_COPY[status];
+  return (
+    <span
+      className={`map-dash__pad ${c.cls}`}
+      title={
+        status === 'active' ? 'Plot Pad active — gamepad flight ready'
+        : status === 'connected' ? 'Controller found — run Plot Pad to fly it'
+        : 'Plug in a controller + run Plot Pad for gamepad flight'
+      }
+    >
+      <span className="map-dash__pad-dot" aria-hidden />
+      <MaterialIcon icon={c.icon} className="text-[16px]" />
+      <span className="hidden md:inline">{c.label}</span>
+    </span>
+  );
+}
 
 export interface MapSidebarProps {
   searchSlot: ReactNode;
@@ -119,6 +148,9 @@ export default function MapSidebar(p: MapSidebarProps) {
             );
           })}
         </div>
+
+        {/* Plot Pad flight-readiness — live status right on the cockpit dash */}
+        <PlotPadDashChip />
 
         {/* dash buttons → sheets */}
         <button className={`map-dash__btn ${sheet === 'tools' ? 'is-active' : ''}`} onClick={() => toggle('tools')} title="Tools & layers">

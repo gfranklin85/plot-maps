@@ -1904,6 +1904,55 @@ gmp-popover-3d-element[plot-card-popover],
 /* dock floats OVER the bottom of the full-screen map */
 .map-shell__dock { position: absolute; left: 0; right: 0; bottom: 0; height: var(--map-dash-h); z-index: 30; }
 
+/* ── MOBILE TOUCH FLIGHT — portrait: condensed landscape map on top,
+      zone pad below (the YouTube-video-over-controls layout Greg locked) ── */
+:root { --tzp-h: 42vh; }
+.map-shell--touchfly .map-shell__body {
+  /* map region gets the TOP portion; the pad owns the bottom band */
+  bottom: var(--tzp-h);
+}
+.map-shell--touchfly .map-shell__region { bottom: var(--tzp-h); }
+/* keep the map a landscape rectangle (letterboxed, YouTube-style) */
+.map-shell--touchfly .map-frame {
+  bottom: var(--tzp-h);
+  background: #0a1020; /* letterbox matte behind the landscape map */
+}
+/* dock (search + modes) sits just above the pad, not at the very bottom */
+.map-shell--touchfly .map-shell__dock { bottom: var(--tzp-h); }
+
+/* the zone pad band */
+.map-touchpad {
+  position: absolute; left: 0; right: 0; bottom: 0; height: var(--tzp-h);
+  z-index: 40;
+  background: linear-gradient(180deg, #0e1730 0%, #0a1020 100%);
+  border-top: 1px solid rgba(125,168,255,0.25);
+  touch-action: none; /* we own all touch — no browser scroll/zoom hijack */
+  user-select: none; -webkit-user-select: none;
+}
+.tzp { position: absolute; inset: 0; touch-action: none; }
+.tzp__row { position: absolute; inset: 0; display: flex; }
+.tzp__zone {
+  height: 100%; display: flex; align-items: center; justify-content: center;
+  border-left: 1px solid rgba(255,255,255,0.06);
+  border-right: 1px solid rgba(255,255,255,0.06);
+}
+.tzp--tinted .tzp__zone--primary { background: rgba(120,210,140,0.10); }
+.tzp--tinted .tzp__zone--climb   { background: rgba(255,150,110,0.12); }
+.tzp--tinted .tzp__zone--seam    { background: rgba(70,150,255,0.18); }
+.tzp__label {
+  color: rgba(255,255,255,0.42); font-size: 12px; font-weight: 800;
+  letter-spacing: 2px; pointer-events: none;
+}
+.tzp__btn {
+  position: absolute; top: 12px; display: grid; place-items: center;
+  border-radius: 999px; font-weight: 800; color: rgba(125,168,255,0.95);
+  border: 2px solid rgba(125,168,255,0.55); background: rgba(10,16,32,0.5);
+  touch-action: none;
+}
+.tzp__btn--a { right: 20px; width: 58px; height: 58px; font-size: 19px; border-color: rgba(125,168,255,0.9); }
+.tzp__btn--b { left: 20px; width: 50px; height: 50px; font-size: 17px; }
+.tzp__btn.is-down { background: rgba(61,123,255,0.85); border-color: #fff; color: #fff; }
+
 .map-dash {
   position: relative; z-index: 30; height: 100%; width: 100%;
   display: flex; align-items: center; gap: 12px; padding: 0 16px;
@@ -1917,6 +1966,14 @@ gmp-popover-3d-element[plot-card-popover],
 .map-dash__mode { display: inline-flex; align-items: center; gap: 5px; height: 34px; padding: 0 11px; border-radius: 8px; font-size: 12.5px; font-weight: 700; color: #4a5568; transition: all .14s; }
 .map-dash__mode.is-active { background: linear-gradient(160deg,#1349d4,#122d8d); color: #fff; box-shadow: 0 6px 14px -7px rgba(19,73,212,0.7); }
 .map-dash__mode:disabled { opacity: .38; cursor: not-allowed; }
+/* Plot Pad flight-readiness chip — soft-light cockpit style, 3 states */
+.map-dash__pad { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 11px; border-radius: 8px; font-size: 12px; font-weight: 700; flex: none; border: 1px solid transparent; transition: all .14s; }
+.map-dash__pad-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex: none; }
+.map-dash__pad.is-off  { color: #8a93a3; background: #f2f4f8; }
+.map-dash__pad.is-wait { color: #b6791b; background: rgba(255,194,77,0.16); border-color: rgba(255,194,77,0.45); }
+.map-dash__pad.is-wait .map-dash__pad-dot { animation: ppad-pulse-amber 1.6s ease-in-out infinite; }
+.map-dash__pad.is-on   { color: #11804a; background: rgba(17,128,74,0.1); border-color: rgba(17,128,74,0.32); }
+.map-dash__pad.is-on .map-dash__pad-dot { animation: ppad-pulse 1.8s ease-in-out infinite; }
 .map-dash__btn { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 11px; color: #4a5568; background: #fff; border: 1px solid rgba(19,73,212,0.12); flex: none; transition: all .14s; }
 .map-dash__btn:hover { border-color: rgba(19,73,212,0.3); color: #1349d4; }
 .map-dash__btn.is-active { background: rgba(19,73,212,0.1); border-color: rgba(19,73,212,0.4); color: #1349d4; }

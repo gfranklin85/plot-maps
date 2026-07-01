@@ -46,11 +46,11 @@ export default function BullpenPage() {
 
           <StatePosition />
 
-          {/* the RESPA-clean, private promise, stated quietly */}
+          {/* stated-only, buyer-controlled — quietly */}
           <p className="mt-8 text-center text-xs text-[#8a93a4] max-w-md mx-auto flex items-center justify-center gap-1.5">
             <MaterialIcon icon="lock" className="text-[14px]" />
-            Private to licensed lenders — never public. No credit pull, no bank
-            login. You&apos;re in control of everything you share.
+            No credit pull, no bank login, nothing to verify. You share only what
+            you choose — and you get a link that&apos;s yours to send wherever you like.
           </p>
         </section>
       </main>

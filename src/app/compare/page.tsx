@@ -6,16 +6,37 @@
 // we expose, we don't crown. Warm toward lenders — nobody's the enemy.
 // See memory/project_position_job_posting_architecture ("we do not rank").
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import PlotMapsLogo from '@/components/brand/PlotMapsLogo';
 import PositionFooter from '@/components/public/PositionFooter';
 import MaterialIcon from '@/components/ui/MaterialIcon';
 import { SAMPLE_OFFERS, SAMPLE_POSITION, type LenderOffer } from '@/lib/compare/sampleOffers';
+import type { BullpenOffer, BullpenPost } from '@/lib/bullpen/types';
 
 type SortKey = 'timeline' | 'monthly' | 'total' | 'rate';
 
-const money = (n: number) => `$${n.toLocaleString()}`;
+const money = (n: number) => `$${Math.round(n).toLocaleString()}`;
+
+// A real bullpen offer → the LenderOffer shape the cockpit renders. Where a
+// lender left a field blank we fill defensively (never fabricate — a missing
+// 5-yr total sorts to the end, not to a made-up number).
+function toLenderOffer(o: BullpenOffer): LenderOffer {
+  return {
+    id: o.id,
+    lenderName: o.lenderName,
+    loanType: o.loanType || '—',
+    ratePct: o.ratePct ?? 0,
+    aprPct: o.aprPct ?? o.ratePct ?? 0,
+    points: o.points ?? 0,
+    lenderFees: o.lenderFees ?? 0,
+    credit: o.credit ?? 0,
+    monthlyPI: o.monthlyPI ?? 0,
+    estCost5yr: o.estCost5yr ?? 0,
+    receivedAt: o.createdAt,
+    note: o.note ?? undefined,
+  };
+}
 
 export default function ComparePage() {
   // The buyer sorts for themselves. Default = timeline (arrival order) — the
@@ -23,8 +44,31 @@ export default function ComparePage() {
   const [sort, setSort] = useState<SortKey>('timeline');
   const [chosen, setChosen] = useState<string | null>(null);
 
+  // Real offers when the URL carries ?slug= (the buyer's live page); otherwise
+  // the seeded sample so /compare is always demoable + screenshottable.
+  const [live, setLive] = useState<{ offers: LenderOffer[]; post: BullpenPost } | null>(null);
+  const [slug, setSlug] = useState<string | null>(null);
+
+  useEffect(() => {
+    const s = new URLSearchParams(window.location.search).get('slug');
+    if (!s) return;
+    setSlug(s);
+    (async () => {
+      try {
+        const res = await fetch(`/api/bullpen/${s}`, { cache: 'no-store' });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.post) {
+          setLive({ offers: (data.offers ?? []).map(toLenderOffer), post: data.post });
+        }
+      } catch { /* fall back to sample */ }
+    })();
+  }, []);
+
+  const sourceOffers = live ? live.offers : SAMPLE_OFFERS;
+
   const offers = useMemo(() => {
-    const list = [...SAMPLE_OFFERS];
+    const list = [...sourceOffers];
     switch (sort) {
       case 'monthly': return list.sort((a, b) => a.monthlyPI - b.monthlyPI);
       case 'total': return list.sort((a, b) => a.estCost5yr - b.estCost5yr);
@@ -32,9 +76,19 @@ export default function ComparePage() {
       case 'timeline':
       default: return list.sort((a, b) => a.receivedAt.localeCompare(b.receivedAt));
     }
-  }, [sort]);
+  }, [sort, sourceOffers]);
 
-  const chosenOffer = SAMPLE_OFFERS.find((o) => o.id === chosen) || null;
+  const chosenOffer = sourceOffers.find((o) => o.id === chosen) || null;
+
+  // Position header: live post when present, else the sample.
+  const position = live
+    ? {
+        loanType: live.post.loanType || '—',
+        priceRange: live.post.priceRange || '—',
+        downPayment: live.post.downPayment || '—',
+        timeline: live.post.timeline || '—',
+      }
+    : SAMPLE_POSITION;
 
   return (
     <div className="min-h-screen flex flex-col bg-white text-[#0c1322]">
@@ -56,10 +110,10 @@ export default function ComparePage() {
             <div className="cmp-position__eyebrow">Your position</div>
             <h1 className="cmp-position__h">Here&apos;s what you shared — and who came to you.</h1>
             <div className="cmp-position__facts">
-              <Fact k="Loan" v={SAMPLE_POSITION.loanType} />
-              <Fact k="Price range" v={SAMPLE_POSITION.priceRange} />
-              <Fact k="Down payment" v={SAMPLE_POSITION.downPayment} />
-              <Fact k="Timeline" v={SAMPLE_POSITION.timeline} />
+              <Fact k="Loan" v={position.loanType} />
+              <Fact k="Price range" v={position.priceRange} />
+              <Fact k="Down payment" v={position.downPayment} />
+              <Fact k="Timeline" v={position.timeline} />
             </div>
           </div>
 
@@ -90,16 +144,28 @@ export default function ComparePage() {
           </div>
 
           {/* the offers — a neutral timeline, no winner slot */}
-          <div className="cmp-list">
-            {offers.map((o) => (
-              <OfferCard
-                key={o.id}
-                offer={o}
-                chosen={chosen === o.id}
-                onChoose={() => setChosen(o.id)}
-              />
-            ))}
-          </div>
+          {live && offers.length === 0 ? (
+            <div className="cmp-empty">
+              <MaterialIcon icon="hourglass_empty" className="text-[30px]" />
+              <b>No offers yet — that’s normal.</b>
+              <p>
+                The more you share your link, the faster lenders find you. Every
+                offer that lands here makes the next one more likely.
+              </p>
+              {slug && <a href={`/b/${slug}`} className="cmp-empty__cta">Share your link →</a>}
+            </div>
+          ) : (
+            <div className="cmp-list">
+              {offers.map((o) => (
+                <OfferCard
+                  key={o.id}
+                  offer={o}
+                  chosen={chosen === o.id}
+                  onChoose={() => setChosen(o.id)}
+                />
+              ))}
+            </div>
+          )}
 
           {/* chosen confirmation */}
           {chosenOffer && (

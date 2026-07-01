@@ -9,6 +9,7 @@
 
 import { useMemo, useState } from 'react';
 import MaterialIcon from '@/components/ui/MaterialIcon';
+import ShareBullpen from './ShareBullpen';
 
 type Kind = 'text' | 'choice' | 'money' | 'optional-upload';
 
@@ -25,6 +26,14 @@ interface Step {
 
 // The flow — occupation-hero, light basics, optional depth, optional proof.
 const STEPS: Step[] = [
+  // ── who you are (first name — humanizes the link, never load-bearing) ──
+  {
+    id: 'buyerName',
+    q: 'First, what’s your name?',
+    help: 'Just a first name is perfect. It’s what people will see when your link gets shared — “help Maria get her home.”',
+    kind: 'text',
+    placeholder: 'Maria',
+  },
   // ── the hero signal ──
   {
     id: 'occupation',
@@ -130,12 +139,49 @@ const STEPS: Step[] = [
     kind: 'optional-upload',
     optional: true,
   },
+
+  // ── your agent (their info rides IN the post — it carries the vouch) ──
+  {
+    id: 'hasAgent',
+    q: 'Are you working with an agent?',
+    help: 'If you are, their name goes on your link. When a lender sees a familiar agent behind it, they trust it’s real — and your agent can share it into their own circle of lenders.',
+    kind: 'choice',
+    choices: [
+      { id: 'yes', label: 'Yes — I have an agent', note: 'We’ll add them to your link.' },
+      { id: 'no', label: 'Not yet', note: 'No problem — you can share it yourself.' },
+    ],
+  },
+  {
+    id: 'agentName',
+    q: 'What’s your agent’s name?',
+    kind: 'text',
+    placeholder: 'e.g. Greg Franklin',
+    showWhen: (a) => a.hasAgent === 'yes',
+  },
+  {
+    id: 'agentContact',
+    q: 'Their email or phone? (optional)',
+    help: 'So lenders and interested folks can reach your agent directly. Optional — a name alone is fine.',
+    kind: 'text',
+    placeholder: 'greg@position.realty · (559) 555-0134',
+    optional: true,
+    showWhen: (a) => a.hasAgent === 'yes',
+  },
 ];
+
+// Split "email or phone" into the two DB fields, and map the credit choice id
+// to a readable band.
+function agentEmailPhone(v?: string): { email: string | null; phone: string | null } {
+  if (!v) return { email: null, phone: null };
+  return v.includes('@') ? { email: v, phone: null } : { email: null, phone: v };
+}
 
 export default function StatePosition() {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [idx, setIdx] = useState(0);
-  const [done, setDone] = useState(false);
+  const [slug, setSlug] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const visible = useMemo(() => STEPS.filter((s) => !s.showWhen || s.showWhen(answers)), [answers]);
   const clamped = Math.min(idx, visible.length - 1);
@@ -145,20 +191,48 @@ export default function StatePosition() {
   const canNext = step?.optional || step?.kind === 'optional-upload' || !!answers[step?.id ?? '']?.trim();
   const isLast = clamped >= visible.length - 1;
 
-  if (done) {
+  async function submit() {
+    setSubmitting(true);
+    setError(null);
+    const { email, phone } = agentEmailPhone(answers.agentContact);
+    const payload = {
+      buyerName: answers.buyerName || null,
+      occupation: answers.occupation,
+      military: answers.military || null,
+      militaryDetail: answers.military_detail || null,
+      priceRange: answers.price || null,
+      downPayment: answers.down || null,
+      loanType: answers.loanType || null,
+      timeline: answers.timeline || null,
+      income: answers.income || null,
+      debts: answers.debts || null,
+      creditBand: answers.credit || null,
+      proofNote: answers.proof || null,
+      agentName: answers.hasAgent === 'yes' ? (answers.agentName || null) : null,
+      agentEmail: answers.hasAgent === 'yes' ? email : null,
+      agentPhone: answers.hasAgent === 'yes' ? phone : null,
+    };
+    try {
+      const res = await fetch('/api/bullpen', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.slug) throw new Error(data.error || 'Something went wrong');
+      setSlug(data.slug);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Something went wrong. Try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  // Posted → the share screen (the heart of the agent tool).
+  if (slug) {
     return (
       <div className="sp">
-        <div className="sp-done">
-          <MaterialIcon icon="verified" className="text-[40px]" />
-          <h2>Your position is posted.</h2>
-          <p>
-            Lenders can now see what you shared and reach out to earn your business.
-            If one wants more to firm up your numbers, they&apos;ll ask you directly —
-            and you decide what to share. The moment one puts out a real estimate,
-            your profile shows you&apos;re a serious buyer, and more come compete.
-          </p>
-          <a href="/compare" className="sp-cta">See offers as they come in →</a>
-        </div>
+        <ShareBullpen slug={slug} buyerName={answers.buyerName} hasAgent={answers.hasAgent === 'yes'} />
       </div>
     );
   }
@@ -213,16 +287,20 @@ export default function StatePosition() {
           )}
         </div>
 
+        {error && <p className="sp-error"><MaterialIcon icon="error_outline" className="text-[16px]" /> {error}</p>}
+
         <div className="sp-nav">
-          <button className="sp-back" onClick={() => setIdx((i) => Math.max(0, i - 1))} disabled={clamped === 0}>
+          <button className="sp-back" onClick={() => setIdx((i) => Math.max(0, i - 1))} disabled={clamped === 0 || submitting}>
             ← Back
           </button>
           <button
             className="sp-next"
-            disabled={!canNext}
-            onClick={() => { if (isLast) setDone(true); else setIdx((i) => i + 1); }}
+            disabled={!canNext || submitting}
+            onClick={() => { if (isLast) submit(); else setIdx((i) => i + 1); }}
           >
-            {isLast ? 'Post my position' : (step.optional ? 'Skip / Continue' : 'Continue')} →
+            {submitting
+              ? 'Posting…'
+              : `${isLast ? 'Post my position' : (step.optional ? 'Skip / Continue' : 'Continue')} →`}
           </button>
         </div>
       </div>

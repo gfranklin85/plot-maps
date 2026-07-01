@@ -30,6 +30,7 @@ const PUBLIC_PATHS = [
   '/buyers-first',
   '/orbit',
   '/compare',
+  '/b/', // shared bullpen link view — openable by anyone (lenders, family, friends)
 ];
 
 // Logged-in pages reachable even for users without beta access. The

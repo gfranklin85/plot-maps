@@ -10,6 +10,7 @@
 import { useMemo, useState } from 'react';
 import MaterialIcon from '@/components/ui/MaterialIcon';
 import ShareBullpen from './ShareBullpen';
+import type { AgentInvite } from '@/lib/bullpen/invite';
 
 type Kind = 'text' | 'choice' | 'money' | 'optional-upload' | 'multi';
 
@@ -235,14 +236,24 @@ function agentEmailPhone(v?: string): { email: string | null; phone: string | nu
   return v.includes('@') ? { email: v, phone: null } : { email: null, phone: v };
 }
 
-export default function StatePosition() {
+// The agent-invite steps we skip when a buyer arrived via an agent's link
+// (the agent's info is already known from the invite).
+const AGENT_STEP_IDS = new Set(['hasAgent', 'agentName', 'agentContact']);
+
+export default function StatePosition({ agentPrefill }: { agentPrefill?: AgentInvite | null } = {}) {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [idx, setIdx] = useState(0);
   const [slug, setSlug] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const visible = useMemo(() => STEPS.filter((s) => !s.showWhen || s.showWhen(answers)), [answers]);
+  // When an agent invited this buyer, drop the agent questions — we already
+  // have the agent from the invite. (memory/project_agent_branded_template)
+  const steps = useMemo(
+    () => (agentPrefill ? STEPS.filter((s) => !AGENT_STEP_IDS.has(s.id)) : STEPS),
+    [agentPrefill],
+  );
+  const visible = useMemo(() => steps.filter((s) => !s.showWhen || s.showWhen(answers)), [steps, answers]);
   const clamped = Math.min(idx, visible.length - 1);
   const step = visible[clamped];
   const set = (id: string, v: string) => setAnswers((p) => ({ ...p, [id]: v }));
@@ -286,9 +297,11 @@ export default function StatePosition() {
       debts: answers.debts || null,
       creditBand: answers.credit || null,
       proofNote: answers.proof || null,
-      agentName: answers.hasAgent === 'yes' ? (answers.agentName || null) : null,
-      agentEmail: answers.hasAgent === 'yes' ? email : null,
-      agentPhone: answers.hasAgent === 'yes' ? phone : null,
+      // Agent: from the invite when present (auto-attached), else what the
+      // buyer answered themselves.
+      agentName: agentPrefill ? agentPrefill.agentName : (answers.hasAgent === 'yes' ? (answers.agentName || null) : null),
+      agentEmail: agentPrefill ? agentPrefill.agentEmail : (answers.hasAgent === 'yes' ? email : null),
+      agentPhone: agentPrefill ? agentPrefill.agentPhone : (answers.hasAgent === 'yes' ? phone : null),
     };
     try {
       const res = await fetch('/api/bullpen', {
@@ -310,7 +323,12 @@ export default function StatePosition() {
   if (slug) {
     return (
       <div className="sp">
-        <ShareBullpen slug={slug} buyerName={answers.buyerName} hasAgent={answers.hasAgent === 'yes'} />
+        <ShareBullpen
+          slug={slug}
+          buyerName={answers.buyerName}
+          hasAgent={!!agentPrefill || answers.hasAgent === 'yes'}
+          agentName={agentPrefill?.agentName ?? (answers.hasAgent === 'yes' ? answers.agentName : undefined)}
+        />
       </div>
     );
   }

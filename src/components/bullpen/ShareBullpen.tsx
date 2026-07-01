@@ -20,10 +20,12 @@ export default function ShareBullpen({
   slug,
   buyerName,
   hasAgent,
+  agentName,
 }: {
   slug: string;
   buyerName?: string | null;
   hasAgent?: boolean;
+  agentName?: string | null;
 }) {
   const [copied, setCopied] = useState(false);
 
@@ -105,6 +107,12 @@ export default function ShareBullpen({
           the more offers come in — and the better your deal gets. Share it far
           and wide.
         </p>
+        {agentName && (
+          <div className="shb-agent">
+            <MaterialIcon icon="check_circle" className="text-[16px]" />
+            {agentName} is attached as your agent — they&apos;ll see it too.
+          </div>
+        )}
       </div>
 
       {/* the link itself — the product */}

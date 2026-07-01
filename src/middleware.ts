@@ -29,6 +29,7 @@ const PUBLIC_PATHS = [
   '/bullpen',
   '/buyers-first',
   '/buyers', // the public board of buyer positions — anyone can browse
+  '/invite', // the agent's tool — make a branded buyer link (no account)
   '/orbit',
   '/compare',
   '/b/', // shared bullpen link view — openable by anyone (lenders, family, friends)

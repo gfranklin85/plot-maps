@@ -1707,6 +1707,49 @@ gmp-popover-3d-element[plot-card-popover],
 .pb-activity__count { font-family: var(--font-headline, inherit); font-weight: 800; font-size: 18px; color: #0c1322; }
 .pb-activity__sub { margin-top: 6px; font-size: 13.5px; line-height: 1.55; color: #6b7689; }
 
+/* ════ AGENT INVITE (/invite) — the agent's branded buyer link ════ */
+.ai-form { border-radius: 18px; padding: 22px; background: #fbfcff; border: 1px solid rgba(19,73,212,0.12); }
+.ai-form__row { display: grid; grid-template-columns: 1fr; gap: 12px; margin-bottom: 12px; }
+@media (min-width: 560px) { .ai-form__row { grid-template-columns: 1fr 1fr; } }
+.ai-field { display: flex; flex-direction: column; gap: 5px; }
+.ai-field__label { font-size: 11.5px; font-weight: 700; color: #6b7689; }
+.ai-field__input { padding: 11px 13px; border-radius: 10px; font-size: 14px; color: #0c1322; background: #fff; border: 1px solid rgba(19,73,212,0.18); }
+.ai-field__input:focus { outline: none; border-color: #1349d4; box-shadow: 0 0 0 3px rgba(19,73,212,0.12); }
+.ai-form__err { display: flex; align-items: center; gap: 6px; margin-top: 4px; font-size: 13px; font-weight: 600; color: #b4231f; }
+.ai-form__err .material-symbols-outlined, .ai-form__err .material-symbols-rounded { color: #b4231f; }
+.ai-form__submit { width: 100%; margin-top: 14px; padding: 14px; border-radius: 13px; font-size: 15px; font-weight: 700; color: #fff; background: linear-gradient(160deg,#1349d4,#122d8d); box-shadow: 0 14px 30px -14px rgba(19,73,212,0.7); }
+.ai-form__submit:disabled { opacity: .5; box-shadow: none; }
+.ai-form__fine { margin-top: 10px; text-align: center; font-size: 12px; color: #8a93a4; }
+
+.ai-done { text-align: center; }
+.ai-badge { display: inline-flex; align-items: center; justify-content: center; width: 58px; height: 58px; border-radius: 16px; background: linear-gradient(160deg, rgba(19,73,212,0.12), rgba(224,231,251,0.5)); border: 1px solid rgba(19,73,212,0.2); }
+.ai-badge .material-symbols-outlined, .ai-badge .material-symbols-rounded { color: #1349d4; }
+.ai-done h2 { font-family: var(--font-headline, inherit); font-weight: 800; font-size: clamp(23px,3vw,30px); margin-top: 14px; color: #0c1322; }
+.ai-done > p { font-size: 15px; line-height: 1.6; color: #4a5568; max-width: 460px; margin: 12px auto 0; }
+.ai-linkrow { display: flex; gap: 8px; margin: 24px auto 12px; max-width: 520px; }
+.ai-link { flex: 1; min-width: 0; padding: 13px 15px; border-radius: 12px; font-size: 14px; font-weight: 600; color: #1349d4; background: #f4f7ff; border: 1px solid rgba(19,73,212,0.2); }
+.ai-copy { flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 0 16px; border-radius: 12px; font-size: 13.5px; font-weight: 700; color: #1349d4; background: #fff; border: 1px solid rgba(19,73,212,0.28); }
+.ai-text { text-align: left; max-width: 520px; margin: 14px auto 0; border-radius: 14px; padding: 16px 18px; background: #fbfcff; border: 1px solid rgba(19,73,212,0.12); }
+.ai-text__label { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .1em; color: #8a93a4; }
+.ai-text__body { margin-top: 8px; font-size: 13.5px; line-height: 1.55; color: #4a5568; }
+.ai-text__copy { display: inline-flex; align-items: center; gap: 6px; margin-top: 12px; padding: 8px 14px; border-radius: 999px; font-size: 12.5px; font-weight: 700; color: #1349d4; background: #fff; border: 1px solid rgba(19,73,212,0.24); }
+.ai-how { max-width: 520px; margin: 22px auto 0; text-align: left; display: grid; gap: 10px; }
+.ai-how__step { display: flex; align-items: center; gap: 12px; font-size: 14px; color: #4a5568; }
+.ai-how__step b { flex: none; width: 26px; height: 26px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; color: #fff; background: #1349d4; }
+.ai-preview { display: inline-block; margin-top: 22px; font-size: 14px; font-weight: 700; color: #1349d4; }
+
+/* ════ AGENT BRANDING on the buyer flow (arrived via invite) ════ */
+.bp-agentbrand { display: flex; align-items: center; gap: 12px; margin-bottom: 22px; padding: 12px 16px; border-radius: 14px; background: #fbfcff; border: 1px solid rgba(19,73,212,0.14); }
+.bp-agentbrand__logo { height: 40px; width: auto; max-width: 120px; object-fit: contain; }
+.bp-agentbrand__mark { flex: none; width: 40px; height: 40px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; background: rgba(19,73,212,0.08); }
+.bp-agentbrand__mark .material-symbols-outlined, .bp-agentbrand__mark .material-symbols-rounded { color: #1349d4; }
+.bp-agentbrand__by { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: #8a93a4; }
+.bp-agentbrand__name { font-size: 15px; font-weight: 800; color: #0c1322; }
+.bp-agentbrand__name span { color: #6b7689; font-weight: 600; }
+
+.shb-agent { display: inline-flex; align-items: center; gap: 7px; margin-top: 14px; padding: 8px 14px; border-radius: 999px; font-size: 13px; font-weight: 600; color: #15563b; background: rgba(27,158,106,0.08); border: 1px solid rgba(27,158,106,0.26); }
+.shb-agent .material-symbols-outlined, .shb-agent .material-symbols-rounded { color: #1b9e6a; }
+
 /* ════ FINISHED MAP UI — contained map + BOTTOM COCKPIT DASH (soft light) ════
    Flight first: the map is a contained windshield; all chrome lives in one
    soft-light bottom dash (no side rail, no overlay over the map body). Sheets

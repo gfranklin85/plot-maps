@@ -52,10 +52,27 @@ export async function POST(req: Request) {
     slug = makeSlug();
   }
 
+  // Visibility choice: 'named' shows the buyer's name/profile; anything else
+  // (default) is anonymous. The position itself is public either way.
+  const displayMode = str(body.displayMode) === 'named' ? 'named' : 'anonymous';
+
+  // Crew needs — sanitized to a known set of chips.
+  const NEED_SET = new Set(['lender', 'inspector', 'insurance', 'contractor', 'escrow', 'title', 'agent']);
+  const needs = Array.isArray(body.needs)
+    ? Array.from(new Set(body.needs.map((v) => String(v).toLowerCase().trim()).filter((v) => NEED_SET.has(v))))
+    : ['lender'];
+
   const row = {
     slug,
+    display_mode: displayMode,
+    is_public: true,
     buyer_name: str(body.buyerName),
     occupation,
+    city: str(body.city),
+    headline: str(body.headline),
+    monthly: str(body.monthly),
+    needs: needs.length ? needs : ['lender'],
+    profile_note: str(body.profileNote),
     agent_name: str(body.agentName),
     agent_email: str(body.agentEmail),
     agent_phone: str(body.agentPhone),

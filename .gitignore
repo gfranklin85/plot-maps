@@ -82,3 +82,4 @@ public/assets/cards/*.png
 
 # Otanimus pose-generation scratch (not app source)
 otanimus-gen/
+dev.log

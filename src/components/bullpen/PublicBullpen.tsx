@@ -14,7 +14,17 @@ import Link from 'next/link';
 import PlotMapsLogo from '@/components/brand/PlotMapsLogo';
 import PositionFooter from '@/components/public/PositionFooter';
 import MaterialIcon from '@/components/ui/MaterialIcon';
+import BuyerEmblem from './BuyerEmblem';
 import type { BullpenPost, BullpenOffer } from '@/lib/bullpen/types';
+import {
+  WORKSHEET, LOAN_HEADER, totalMonthly, totalClosing, cashToClose,
+  type WLine, type WorksheetValues,
+} from '@/lib/bullpen/worksheet';
+
+const NEED_LABEL: Record<string, string> = {
+  lender: 'Lender', inspector: 'Inspector', insurance: 'Insurance',
+  contractor: 'Contractor', escrow: 'Escrow', title: 'Title', agent: 'Agent',
+};
 
 const money = (n: number) => `$${Math.round(n).toLocaleString()}`;
 
@@ -73,16 +83,24 @@ export default function PublicBullpen({ slug }: { slug: string }) {
 
           {post && !loading && (
             <>
-              {/* the buyer's position — occupation is the hero */}
+              {/* the buyer's position — emblem + occupation is the hero */}
               <div className="pb-hero">
-                <div className="pb-hero__eyebrow">A home buyer’s position</div>
-                <h1 className="pb-hero__name">
-                  {post.buyerName ? post.buyerName : 'A serious buyer'} is looking for the right lender.
-                </h1>
+                <div className="pb-hero__top">
+                  <BuyerEmblem occupation={post.occupation} size={64} />
+                  <div>
+                    <div className="pb-hero__eyebrow">A home buyer’s position</div>
+                    <h1 className="pb-hero__name">
+                      {post.headline
+                        ? post.headline
+                        : `${post.buyerName ? post.buyerName : 'A serious buyer'} is looking for the right team.`}
+                    </h1>
+                  </div>
+                </div>
                 <div className="pb-occ">
                   <MaterialIcon icon="badge" className="text-[20px]" />
-                  <span>{post.occupation}</span>
+                  <span>{post.occupation}{post.city ? ` · ${post.city}` : ''}</span>
                 </div>
+                {post.profileNote && <p className="pb-profilenote">“{post.profileNote}”</p>}
                 {post.agentName && (
                   <div className="pb-agent">
                     Represented by <b>{post.agentName}</b>
@@ -94,6 +112,18 @@ export default function PublicBullpen({ slug }: { slug: string }) {
                   </div>
                 )}
               </div>
+
+              {/* the crew they're assembling */}
+              {post.needs && post.needs.length > 0 && (
+                <div className="pb-needs">
+                  <span className="pb-needs__label">Looking for</span>
+                  {post.needs.map((n) => (
+                    <span key={n} className={`pb-needchip ${n === 'lender' ? 'is-live' : ''}`}>
+                      {NEED_LABEL[n] || n}{n !== 'lender' && <em> · soon</em>}
+                    </span>
+                  ))}
+                </div>
+              )}
 
               {/* the trust light — market-generated, no lender named */}
               {offers.length > 0 && (
@@ -156,9 +186,9 @@ export default function PublicBullpen({ slug }: { slug: string }) {
                         {o.ratePct != null && <span className="pb-offer__rate">{fmtRate(o.ratePct)}%</span>}
                       </div>
                       <div className="pb-offer__line">
-                        {o.monthlyPI != null && <span>{money(o.monthlyPI)}/mo</span>}
+                        {o.totalMonthly ? <span>{money(o.totalMonthly)}/mo</span> : (o.monthlyPI != null && <span>{money(o.monthlyPI)}/mo</span>)}
                         {o.aprPct != null && <span>{fmtRate(o.aprPct)}% APR</span>}
-                        {o.estCost5yr != null && <span>{money(o.estCost5yr)} over 5 yrs</span>}
+                        {o.cashToClose ? <span>{money(o.cashToClose)} to close</span> : null}
                       </div>
                       {o.note && <p className="pb-offer__note">“{o.note}”</p>}
                     </div>
@@ -187,6 +217,12 @@ function OfferForm({ slug, onPosted }: { slug: string; onPosted: () => void }) {
   const [err, setErr] = useState<string | null>(null);
   const set = (k: string, v: string) => setF((p) => ({ ...p, [k]: v }));
 
+  // Live totals as the lender types — the honest picture, summed the way the
+  // real worksheet sums it.
+  const monthly = totalMonthly(f);
+  const closing = totalClosing(f);
+  const cash = cashToClose(f);
+
   async function post() {
     setBusy(true); setErr(null);
     try {
@@ -197,15 +233,10 @@ function OfferForm({ slug, onPosted }: { slug: string; onPosted: () => void }) {
           lenderName: f.lenderName,
           lenderEmail: f.lenderEmail,
           lenderNmls: f.lenderNmls,
-          loanType: f.loanType,
-          ratePct: f.ratePct,
-          aprPct: f.aprPct,
-          points: f.points,
-          lenderFees: f.lenderFees,
-          credit: f.credit,
-          monthlyPI: f.monthlyPI,
-          estCost5yr: f.estCost5yr,
+          originatorName: f.originatorName,
+          originatorPhone: f.originatorPhone,
           note: f.note,
+          worksheet: f, // the full line-item blob
         }),
       });
       const data = await res.json();
@@ -218,36 +249,80 @@ function OfferForm({ slug, onPosted }: { slug: string; onPosted: () => void }) {
     }
   }
 
+  const nmlsValid = /^\d{3,10}$/.test((f.lenderNmls || '').replace(/\D/g, ''));
+
   return (
     <div className="pb-form">
-      <div className="pb-form__row">
-        <Field label="Your name or company *" v={f.lenderName} onChange={(v) => set('lenderName', v)} placeholder="Valley First Lending" />
-        <Field label="NMLS # (optional)" v={f.lenderNmls} onChange={(v) => set('lenderNmls', v)} placeholder="123456" />
+      {/* who you are — NMLS is the bar (licensed = in) */}
+      <div className="pb-form__section">
+        <div className="pb-form__sectitle">You (the lender)</div>
+        <div className="pb-form__row">
+          <Field label="Company / lender name *" v={f.lenderName} onChange={(v) => set('lenderName', v)} placeholder="American Pacific Mtg" />
+          <Field label="NMLS # * (licensed = welcome)" v={f.lenderNmls} onChange={(v) => set('lenderNmls', v)} placeholder="229752" />
+        </div>
+        <div className="pb-form__row">
+          <Field label="Originator name" v={f.originatorName} onChange={(v) => set('originatorName', v)} placeholder="Dustin Maciel" />
+          <Field label="Phone" v={f.originatorPhone} onChange={(v) => set('originatorPhone', v)} placeholder="559-589-6044" />
+          <Field label="Email" v={f.lenderEmail} onChange={(v) => set('lenderEmail', v)} placeholder="you@lender.com" />
+        </div>
       </div>
-      <div className="pb-form__row">
-        <Field label="Loan type" v={f.loanType} onChange={(v) => set('loanType', v)} placeholder="30-yr fixed conventional" />
-        <Field label="Your email (optional)" v={f.lenderEmail} onChange={(v) => set('lenderEmail', v)} placeholder="you@lender.com" />
+
+      {/* the loan */}
+      <WSectionFields title="The loan" lines={LOAN_HEADER} f={f} set={set} />
+
+      {/* every worksheet section */}
+      {WORKSHEET.map((s) => (
+        <WSectionFields key={s.id} title={s.title} lines={s.lines} f={f} set={set} />
+      ))}
+
+      {/* a line for the buyer */}
+      <div className="pb-form__section">
+        <Field label="A line for the buyer (optional)" v={f.note} onChange={(v) => set('note', v)} placeholder="No points, a credit toward closing — what you see is what you pay." />
       </div>
-      <div className="pb-form__row">
-        <Field label="Rate %" v={f.ratePct} onChange={(v) => set('ratePct', v)} placeholder="6.25" num />
-        <Field label="APR %" v={f.aprPct} onChange={(v) => set('aprPct', v)} placeholder="6.31" num />
-        <Field label="Monthly (P&I)" v={f.monthlyPI} onChange={(v) => set('monthlyPI', v)} placeholder="1971" num />
+
+      {/* live totals */}
+      <div className="pb-totals">
+        <Total k="Monthly payment" v={monthly} />
+        <Total k="Total closing costs" v={closing} />
+        <Total k="Cash to close" v={cash} strong />
       </div>
-      <div className="pb-form__row">
-        <Field label="Points" v={f.points} onChange={(v) => set('points', v)} placeholder="0" num />
-        <Field label="Lender fees $" v={f.lenderFees} onChange={(v) => set('lenderFees', v)} placeholder="900" num />
-        <Field label="Lender credit $" v={f.credit} onChange={(v) => set('credit', v)} placeholder="1500" num />
-      </div>
-      <div className="pb-form__row">
-        <Field label="Est. 5-year cost $ (optional)" v={f.estCost5yr} onChange={(v) => set('estCost5yr', v)} placeholder="118760" num />
-      </div>
-      <Field label="A line for the buyer (optional)" v={f.note} onChange={(v) => set('note', v)} placeholder="No points, a credit toward closing — what you see is what you pay." />
 
       {err && <p className="pb-form__err">{err}</p>}
-      <button className="pb-form__submit" onClick={post} disabled={busy || !f.lenderName?.trim()}>
-        {busy ? 'Posting…' : 'Post my offer'}
+      <button className="pb-form__submit" onClick={post} disabled={busy || !f.lenderName?.trim() || !nmlsValid}>
+        {busy ? 'Posting…' : 'Post my worksheet'}
       </button>
-      <p className="pb-form__fine">Stated only — Plot doesn’t verify or rank offers. The buyer sees your name and your numbers, and decides.</p>
+      <p className="pb-form__fine">A valid NMLS ID is required — that’s the only bar. Every licensed lender is welcome; none is favored. The buyer sees your full worksheet and decides. Plot doesn’t rank.</p>
+    </div>
+  );
+}
+
+function WSectionFields({ title, lines, f, set }: {
+  title: string; lines: WLine[]; f: WorksheetValues; set: (k: string, v: string) => void;
+}) {
+  return (
+    <div className="pb-form__section">
+      <div className="pb-form__sectitle">{title}</div>
+      <div className="pb-form__grid">
+        {lines.map((l) => (
+          <Field
+            key={l.id}
+            label={l.kind === 'pct' ? `${l.label} (%)` : l.label}
+            v={f[l.id]}
+            onChange={(v) => set(l.id, v)}
+            placeholder={l.hint}
+            num={l.kind !== 'text'}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function Total({ k, v, strong }: { k: string; v: number; strong?: boolean }) {
+  return (
+    <div className={`pb-total ${strong ? 'is-strong' : ''}`}>
+      <span>{k}</span>
+      <b>{money(v)}</b>
     </div>
   );
 }

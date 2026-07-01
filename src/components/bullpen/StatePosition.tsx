@@ -11,7 +11,7 @@ import { useMemo, useState } from 'react';
 import MaterialIcon from '@/components/ui/MaterialIcon';
 import ShareBullpen from './ShareBullpen';
 
-type Kind = 'text' | 'choice' | 'money' | 'optional-upload';
+type Kind = 'text' | 'choice' | 'money' | 'optional-upload' | 'multi';
 
 interface Step {
   id: string;
@@ -43,6 +43,13 @@ const STEPS: Step[] = [
     placeholder: 'e.g. Correctional Officer, Corcoran · LT at NAS Lemoore · Nurse, Adventist Health',
   },
   {
+    id: 'city',
+    q: 'What area are you buying in?',
+    help: 'The city or area. This is how the right local lenders — the ones who serve your market — find you on the board.',
+    kind: 'text',
+    placeholder: 'Lemoore, CA · Hanford · Kings County',
+  },
+  {
     id: 'military',
     q: 'Are you military?',
     help: 'If you are, we’ll factor your housing allowance (BAH) — it’s real income lenders count.',
@@ -64,11 +71,27 @@ const STEPS: Step[] = [
 
   // ── the light basics: what you're after ──
   {
+    id: 'headline',
+    q: 'In your words — what are you looking for?',
+    help: 'One plain line. This is what lenders see first on the board. Say it like you’d say it to a friend.',
+    kind: 'text',
+    placeholder: 'Looking for a 3bd in Lemoore, move-in by fall',
+    optional: true,
+  },
+  {
     id: 'price',
     q: 'What are you looking to spend on a home?',
     help: 'A range is fine — you’re not locked in.',
     kind: 'text',
     placeholder: '$380,000 – $420,000',
+  },
+  {
+    id: 'monthly',
+    q: 'A monthly payment you’d be comfortable with? (optional)',
+    help: 'Roughly what you’d want your house payment to be. It helps lenders bring you options that actually fit.',
+    kind: 'text',
+    placeholder: '~$2,200/mo',
+    optional: true,
   },
   {
     id: 'down',
@@ -131,6 +154,21 @@ const STEPS: Step[] = [
     ],
   },
 
+  // ── the crew you need (buyer assembles a competing team) ──
+  {
+    id: 'needs',
+    q: 'Who do you want to come compete for you?',
+    help: 'Pick everyone you’ll need. Each one competes for your business — you choose who to work with. (Lenders are live now; the rest are joining.)',
+    kind: 'multi',
+    choices: [
+      { id: 'lender', label: 'Lender', note: 'Your loan + rate' },
+      { id: 'inspector', label: 'Inspector', note: 'Checks the home' },
+      { id: 'insurance', label: 'Insurance', note: 'Homeowner’s policy' },
+      { id: 'contractor', label: 'Contractor', note: 'Repairs / work' },
+      { id: 'escrow', label: 'Escrow / Title', note: 'Closes the deal' },
+    ],
+  },
+
   // ── optional role-proof (the speed bump for the aimless) ──
   {
     id: 'proof',
@@ -167,6 +205,27 @@ const STEPS: Step[] = [
     optional: true,
     showWhen: (a) => a.hasAgent === 'yes',
   },
+
+  // ── how you want to appear (your choice — visibility is the point) ──
+  {
+    id: 'displayMode',
+    q: 'How do you want to show up on the board?',
+    help: 'Your position is public either way — that’s how the market finds you. This is just whether your name shows, or only your work and area. Your contact details stay private no matter what.',
+    kind: 'choice',
+    choices: [
+      { id: 'anonymous', label: 'Just my work and area', note: '“Correctional Officer, Corcoran” — no name shown.' },
+      { id: 'named', label: 'Show my name', note: 'Be fully seen — some folks prefer it.' },
+    ],
+  },
+  {
+    id: 'profileNote',
+    q: 'Anything you’d like them to know? (optional)',
+    help: 'A line about you or your search — first-time buyer, growing family, relocating for work. Shows on your profile. Skip if you’d rather keep it simple.',
+    kind: 'text',
+    placeholder: 'First home for our growing family — ready when the right one comes.',
+    optional: true,
+    showWhen: (a) => a.displayMode === 'named',
+  },
 ];
 
 // Split "email or phone" into the two DB fields, and map the credit choice id
@@ -188,16 +247,35 @@ export default function StatePosition() {
   const step = visible[clamped];
   const set = (id: string, v: string) => setAnswers((p) => ({ ...p, [id]: v }));
 
-  const canNext = step?.optional || step?.kind === 'optional-upload' || !!answers[step?.id ?? '']?.trim();
+  const canNext =
+    step?.optional ||
+    step?.kind === 'optional-upload' ||
+    (step?.kind === 'multi' ? !!answers[step.id]?.trim() : !!answers[step?.id ?? '']?.trim());
   const isLast = clamped >= visible.length - 1;
+
+  // Toggle a value in a comma-joined multi-select answer.
+  const toggleMulti = (id: string, val: string) => {
+    setAnswers((p) => {
+      const cur = (p[id] ? p[id].split(',') : []).filter(Boolean);
+      const next = cur.includes(val) ? cur.filter((v) => v !== val) : [...cur, val];
+      return { ...p, [id]: next.join(',') };
+    });
+  };
 
   async function submit() {
     setSubmitting(true);
     setError(null);
     const { email, phone } = agentEmailPhone(answers.agentContact);
+    const needs = (answers.needs ? answers.needs.split(',') : []).filter(Boolean);
     const payload = {
       buyerName: answers.buyerName || null,
       occupation: answers.occupation,
+      city: answers.city || null,
+      headline: answers.headline || null,
+      monthly: answers.monthly || null,
+      needs: needs.length ? needs : ['lender'],
+      displayMode: answers.displayMode === 'named' ? 'named' : 'anonymous',
+      profileNote: answers.displayMode === 'named' ? (answers.profileNote || null) : null,
       military: answers.military || null,
       militaryDetail: answers.military_detail || null,
       priceRange: answers.price || null,
@@ -275,6 +353,26 @@ export default function StatePosition() {
                   {c.note && <span className="sp-choice__note">{c.note}</span>}
                 </button>
               ))}
+            </div>
+          )}
+          {step.kind === 'multi' && (
+            <div className="sp-choices">
+              {step.choices!.map((c) => {
+                const on = (answers[step.id]?.split(',') ?? []).includes(c.id);
+                return (
+                  <button
+                    key={c.id}
+                    onClick={() => toggleMulti(step.id, c.id)}
+                    className={`sp-choice sp-choice--multi ${on ? 'is-active' : ''}`}
+                  >
+                    <span className="sp-choice__check">
+                      <MaterialIcon icon={on ? 'check_box' : 'check_box_outline_blank'} className="text-[18px]" />
+                    </span>
+                    <span className="sp-choice__label">{c.label}</span>
+                    {c.note && <span className="sp-choice__note">{c.note}</span>}
+                  </button>
+                );
+              })}
             </div>
           )}
           {step.kind === 'optional-upload' && (

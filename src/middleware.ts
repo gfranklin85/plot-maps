@@ -28,6 +28,7 @@ const PUBLIC_PATHS = [
   '/essays',
   '/bullpen',
   '/buyers-first',
+  '/buyers', // the public board of buyer positions — anyone can browse
   '/orbit',
   '/compare',
   '/b/', // shared bullpen link view — openable by anyone (lenders, family, friends)

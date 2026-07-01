@@ -7,8 +7,14 @@
 
 export interface BullpenPost {
   slug: string;
-  buyerName: string | null;
+  displayMode: string;        // 'anonymous' | 'named' — the buyer's visibility choice
+  buyerName: string | null;   // shown ONLY when displayMode === 'named'
   occupation: string;
+  city: string | null;        // the market — for lender filtering
+  headline: string | null;    // plain-language "Looking for a 3bd in Lemoore…"
+  monthly: string | null;     // "~$2,200/mo"
+  needs: string[];            // crew chips: lender/inspector/insurance/…
+  profileNote: string | null; // optional buyer blurb/ledger (named mode)
   agentName: string | null;
   agentEmail: string | null;
   agentPhone: string | null;
@@ -26,31 +32,66 @@ export interface BullpenPost {
   createdAt: string;
 }
 
+// A lighter row for the public board list (only what a browsing lender needs
+// to decide whether to open + bid — never private data).
+export interface BullpenBoardItem {
+  slug: string;
+  displayMode: string;
+  buyerName: string | null;   // null unless 'named'
+  occupation: string;
+  city: string | null;
+  headline: string | null;
+  monthly: string | null;
+  needs: string[];
+  loanType: string | null;
+  timeline: string | null;
+  priceRange: string | null;
+  military: string | null;
+  hasOffer: boolean;          // market trust light — never names the lender
+  offerCount: number;
+  createdAt: string;
+}
+
 export interface BullpenOffer {
   id: string;
   lenderName: string;
   lenderNmls: string | null;
+  originatorName: string | null;
+  originatorPhone: string | null;
   loanType: string | null;
   ratePct: number | null;
   aprPct: number | null;
   points: number | null;
-  lenderFees: number | null;
+  lenderFees: number | null;   // = total closing costs
   credit: number | null;
   monthlyPI: number | null;
-  estCost5yr: number | null;
+  loanAmount: number | null;
+  termMonths: number | null;
+  totalMonthly: number | null;
+  totalClosing: number | null;
+  cashToClose: number | null;
+  worksheet: Record<string, string>; // the full line-item blob
   note: string | null;
   createdAt: string;
 }
 
-// A raw bullpen_posts row → the PUBLIC shape a link viewer sees. Note:
-// agent_email/phone are shown (they're the contact-the-agent path, and the
-// agent chose to be listed), but created_by is NEVER exposed.
+// A raw bullpen_posts row → the PUBLIC shape a link viewer sees. Anonymity is
+// enforced HERE, at the boundary: buyer_name + profile_note are only exposed
+// when the buyer chose 'named'. agent_email/phone are shown (the agent opted in
+// by listing themselves), but created_by is NEVER exposed.
 export function shapePost(row: Record<string, unknown>): BullpenPost {
   const s = (v: unknown) => (v == null ? null : String(v));
+  const named = String(row.display_mode ?? 'anonymous') === 'named';
   return {
     slug: String(row.slug),
-    buyerName: s(row.buyer_name),
+    displayMode: String(row.display_mode ?? 'anonymous'),
+    buyerName: named ? s(row.buyer_name) : null,
     occupation: String(row.occupation ?? ''),
+    city: s(row.city),
+    headline: s(row.headline),
+    monthly: s(row.monthly),
+    needs: Array.isArray(row.needs) ? (row.needs as string[]) : [],
+    profileNote: named ? s(row.profile_note) : null,
     agentName: s(row.agent_name),
     agentEmail: s(row.agent_email),
     agentPhone: s(row.agent_phone),
@@ -76,6 +117,8 @@ export function shapeOffer(row: Record<string, unknown>): BullpenOffer {
     id: String(row.id),
     lenderName: String(row.lender_name ?? ''),
     lenderNmls: s(row.lender_nmls),
+    originatorName: s(row.originator_name),
+    originatorPhone: s(row.originator_phone),
     loanType: s(row.loan_type),
     ratePct: n(row.rate_pct),
     aprPct: n(row.apr_pct),
@@ -83,8 +126,38 @@ export function shapeOffer(row: Record<string, unknown>): BullpenOffer {
     lenderFees: n(row.lender_fees),
     credit: n(row.credit),
     monthlyPI: n(row.monthly_pi),
-    estCost5yr: n(row.est_cost_5yr),
+    loanAmount: n(row.loan_amount),
+    termMonths: n(row.term_months),
+    totalMonthly: n(row.total_monthly),
+    totalClosing: n(row.total_closing),
+    cashToClose: n(row.cash_to_close),
+    worksheet: (row.worksheet && typeof row.worksheet === 'object')
+      ? (row.worksheet as Record<string, string>) : {},
     note: s(row.note),
+    createdAt: String(row.created_at),
+  };
+}
+
+// A raw post row (+ its offer count) → the public board item. Same anonymity
+// boundary: name only in 'named' mode.
+export function shapeBoardItem(row: Record<string, unknown>, offerCount: number): BullpenBoardItem {
+  const s = (v: unknown) => (v == null ? null : String(v));
+  const named = String(row.display_mode ?? 'anonymous') === 'named';
+  return {
+    slug: String(row.slug),
+    displayMode: String(row.display_mode ?? 'anonymous'),
+    buyerName: named ? s(row.buyer_name) : null,
+    occupation: String(row.occupation ?? ''),
+    city: s(row.city),
+    headline: s(row.headline),
+    monthly: s(row.monthly),
+    needs: Array.isArray(row.needs) ? (row.needs as string[]) : [],
+    loanType: s(row.loan_type),
+    timeline: s(row.timeline),
+    priceRange: s(row.price_range),
+    military: s(row.military),
+    hasOffer: offerCount > 0,
+    offerCount,
     createdAt: String(row.created_at),
   };
 }

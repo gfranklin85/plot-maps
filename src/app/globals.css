@@ -1614,6 +1614,92 @@ gmp-popover-3d-element[plot-card-popover],
 
 .pb-pass { margin-top: 28px; text-align: center; font-size: 14px; line-height: 1.6; color: #4a5568; max-width: 460px; margin-left: auto; margin-right: auto; }
 
+/* ════ BUYER EMBLEM — circle avatar, occupation-lane color + icon ════ */
+.be-emblem { flex: none; display: inline-flex; align-items: center; justify-content: center; box-shadow: 0 6px 16px -8px rgba(20,50,120,0.5); }
+
+/* ════ THE BOARD (/buyers) — public visibility platform ════ */
+.bd-hero { text-align: center; padding: 30px 24px 22px; }
+.bd-hero__eyebrow { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: #1349d4; padding: 5px 12px; border-radius: 999px; background: rgba(19,73,212,0.08); }
+.bd-hero__eyebrow .material-symbols-outlined, .bd-hero__eyebrow .material-symbols-rounded { color: #1349d4; }
+.bd-hero__h { font-family: var(--font-headline, inherit); font-weight: 800; font-size: clamp(26px,4vw,40px); letter-spacing: -.025em; line-height: 1.08; margin-top: 16px; color: #0c1322; }
+.bd-hero__h span { color: #1349d4; }
+.bd-hero__sub { font-size: 15px; line-height: 1.6; color: #4a5568; max-width: 520px; margin: 14px auto 0; }
+.bd-hero__live { display: inline-flex; align-items: center; gap: 8px; margin-top: 16px; font-size: 13px; font-weight: 700; color: #6b7689; }
+.bd-hero__dot { width: 8px; height: 8px; border-radius: 50%; background: #1b9e6a; box-shadow: 0 0 0 4px rgba(27,158,106,0.16); }
+
+.bd-filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 12px; border-radius: 14px; background: #fbfcff; border: 1px solid rgba(19,73,212,0.12); }
+.bd-search { flex: 1 1 220px; min-width: 180px; display: flex; align-items: center; gap: 8px; padding: 0 12px; border-radius: 10px; background: #fff; border: 1px solid rgba(19,73,212,0.16); }
+.bd-search .material-symbols-outlined, .bd-search .material-symbols-rounded { color: #8a93a4; }
+.bd-search input { flex: 1; border: none; outline: none; padding: 10px 0; font-size: 14px; color: #0c1322; background: transparent; }
+.bd-select { padding: 10px 12px; border-radius: 10px; font-size: 13px; font-weight: 600; color: #4a5568; background: #fff; border: 1px solid rgba(19,73,212,0.16); cursor: pointer; }
+
+.bd-loading, .bd-empty { text-align: center; padding: 40px 20px; color: #8a93a4; }
+.bd-empty .material-symbols-outlined, .bd-empty .material-symbols-rounded { color: #1349d4; }
+.bd-empty b { display: block; margin-top: 8px; font-size: 16px; color: #0c1322; }
+.bd-empty p { margin-top: 6px; font-size: 14px; }
+
+.bd-list { display: grid; gap: 12px; margin-top: 14px; }
+.bd-row { display: flex; gap: 16px; padding: 18px 20px; border-radius: 16px; background: #fff; border: 1px solid rgba(19,73,212,0.12); box-shadow: 0 12px 30px -26px rgba(20,50,120,0.5); transition: all .15s; }
+.bd-row:hover { border-color: rgba(19,73,212,0.3); box-shadow: 0 16px 36px -24px rgba(20,50,120,0.5); transform: translateY(-1px); }
+.bd-row__body { flex: 1; min-width: 0; }
+.bd-new { display: inline-block; font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: #1b9e6a; margin-bottom: 4px; }
+.bd-row__headline { font-family: var(--font-headline, inherit); font-weight: 800; font-size: 17px; letter-spacing: -.01em; color: #0c1322; line-height: 1.25; }
+.bd-row__meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; margin-top: 6px; }
+.bd-row__money { font-weight: 800; font-size: 15px; color: #1349d4; }
+.bd-row__price { font-size: 13px; color: #6b7689; }
+.bd-row__where { display: flex; align-items: center; gap: 5px; margin-top: 6px; font-size: 13px; color: #4a5568; }
+.bd-row__where .material-symbols-outlined, .bd-row__where .material-symbols-rounded { color: #8a93a4; }
+.bd-row__occ { color: #6b7689; }
+.bd-needs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 10px; }
+.bd-needs__label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #8a93a4; }
+.bd-chip { font-size: 11.5px; font-weight: 700; color: #4a5568; padding: 3px 9px; border-radius: 999px; background: rgba(19,73,212,0.06); border: 1px solid rgba(19,73,212,0.14); }
+.bd-row__side { flex: none; width: 150px; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; text-align: right; }
+.bd-ready { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; }
+.bd-ready--go { color: #15563b; }
+.bd-ready--go .material-symbols-outlined, .bd-ready--go .material-symbols-rounded { color: #1b9e6a; }
+.bd-ready--open { color: #8a93a4; }
+.bd-ready--open .material-symbols-outlined, .bd-ready--open .material-symbols-rounded { color: #b6bdc9; }
+.bd-posted { font-size: 11px; color: #8a93a4; }
+.bd-offer { margin-top: 4px; font-size: 13px; font-weight: 700; color: #1349d4; }
+.bd-private { font-size: 10.5px; color: #b6bdc9; }
+.bd-more { text-align: center; margin-top: 20px; font-size: 13px; color: #8a93a4; }
+.bd-promise { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 18px; margin: 0 24px; font-size: 12.5px; color: #6b7689; text-align: center; border-top: 1px solid rgba(19,73,212,0.08); }
+.bd-promise .material-symbols-outlined, .bd-promise .material-symbols-rounded { color: #1b9e6a; }
+@media (max-width: 560px) {
+  .bd-row { flex-direction: column; }
+  .bd-row__side { width: 100%; align-items: flex-start; text-align: left; margin-top: 4px; flex-direction: row; flex-wrap: wrap; gap: 12px; }
+}
+
+/* ════ PUBLIC VIEW additions — emblem hero, crew needs, worksheet form ════ */
+.pb-hero__top { display: flex; align-items: center; gap: 16px; }
+.pb-profilenote { margin-top: 12px; font-size: 14px; font-style: italic; color: #4a5568; line-height: 1.5; }
+.pb-needs { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 18px; }
+.pb-needs__label { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; color: #8a93a4; }
+.pb-needchip { font-size: 12.5px; font-weight: 700; color: #8a93a4; padding: 5px 12px; border-radius: 999px; background: #f4f6fb; border: 1px solid rgba(19,73,212,0.1); }
+.pb-needchip.is-live { color: #1349d4; background: rgba(19,73,212,0.08); border-color: rgba(19,73,212,0.22); }
+.pb-needchip em { font-style: normal; opacity: .7; font-weight: 600; }
+
+.pb-form__section { margin-bottom: 18px; padding-bottom: 16px; border-bottom: 1px solid rgba(19,73,212,0.08); }
+.pb-form__sectitle { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .1em; color: #1349d4; margin-bottom: 12px; }
+.pb-form__grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (min-width: 640px) { .pb-form__grid { grid-template-columns: repeat(3, 1fr); } }
+.pb-totals { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 6px 0 4px; }
+.pb-total { border-radius: 12px; padding: 12px 14px; background: #fbfcff; border: 1px solid rgba(19,73,212,0.14); }
+.pb-total span { display: block; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #8a93a4; }
+.pb-total b { font-size: 18px; color: #0c1322; }
+.pb-total.is-strong { background: linear-gradient(160deg, rgba(19,73,212,0.08), rgba(224,231,251,0.5)); border-color: rgba(19,73,212,0.26); }
+.pb-total.is-strong b { color: #1349d4; }
+@media (max-width: 560px) { .pb-totals { grid-template-columns: 1fr; } }
+
+/* ════ STATE-YOUR-POSITION — multi-select ════ */
+.sp-choice--multi { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.sp-choice__check { display: inline-flex; }
+.sp-choice__check .material-symbols-outlined, .sp-choice__check .material-symbols-rounded { color: #1349d4; }
+.sp-choice--multi.is-active { border-color: rgba(19,73,212,0.5); background: rgba(19,73,212,0.05); }
+
+/* ════ COMPARE — worksheet note ════ */
+.cmp-worksheet-note { margin-top: 16px; font-size: 13px; line-height: 1.55; color: #6b7689; text-align: center; }
+
 /* ════ FINISHED MAP UI — contained map + BOTTOM COCKPIT DASH (soft light) ════
    Flight first: the map is a contained windshield; all chrome lives in one
    soft-light bottom dash (no side rail, no overlay over the map body). Sheets

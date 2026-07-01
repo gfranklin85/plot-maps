@@ -18,9 +18,9 @@ type SortKey = 'timeline' | 'monthly' | 'total' | 'rate';
 
 const money = (n: number) => `$${Math.round(n).toLocaleString()}`;
 
-// A real bullpen offer → the LenderOffer shape the cockpit renders. Where a
-// lender left a field blank we fill defensively (never fabricate — a missing
-// 5-yr total sorts to the end, not to a made-up number).
+// A real bullpen offer → the LenderOffer shape the cockpit renders. The honest
+// bottom-line for a real worksheet is CASH TO CLOSE (what the buyer actually
+// brings), so it fills the "total" slot; monthly = the full PITI total.
 function toLenderOffer(o: BullpenOffer): LenderOffer {
   return {
     id: o.id,
@@ -29,10 +29,10 @@ function toLenderOffer(o: BullpenOffer): LenderOffer {
     ratePct: o.ratePct ?? 0,
     aprPct: o.aprPct ?? o.ratePct ?? 0,
     points: o.points ?? 0,
-    lenderFees: o.lenderFees ?? 0,
+    lenderFees: o.lenderFees ?? o.totalClosing ?? 0,
     credit: o.credit ?? 0,
-    monthlyPI: o.monthlyPI ?? 0,
-    estCost5yr: o.estCost5yr ?? 0,
+    monthlyPI: o.totalMonthly ?? o.monthlyPI ?? 0,
+    estCost5yr: o.cashToClose ?? o.totalClosing ?? 0,
     receivedAt: o.createdAt,
     note: o.note ?? undefined,
   };
@@ -160,11 +160,19 @@ export default function ComparePage() {
                 <OfferCard
                   key={o.id}
                   offer={o}
+                  real={!!live}
                   chosen={chosen === o.id}
                   onChoose={() => setChosen(o.id)}
                 />
               ))}
             </div>
+          )}
+
+          {live && offers.length > 0 && (
+            <p className="cmp-worksheet-note">
+              These are the lenders’ own fee worksheets — the same numbers they’d
+              put on a Loan Estimate. Compare the real lines, not just the rate.
+            </p>
           )}
 
           {/* chosen confirmation */}
@@ -195,8 +203,13 @@ function Fact({ k, v }: { k: string; v: string }) {
   );
 }
 
-function OfferCard({ offer, chosen, onChoose }: { offer: LenderOffer; chosen: boolean; onChoose: () => void }) {
+function OfferCard({ offer, real, chosen, onChoose }: { offer: LenderOffer; real?: boolean; chosen: boolean; onChoose: () => void }) {
   const o = offer;
+  // Real worksheets: points is already a $ amount; the honest bottom line is
+  // cash-to-close and the monthly is full PITI. Samples keep the 5-yr framing.
+  const pointsV = real
+    ? (o.points ? money(o.points) : 'None')
+    : (o.points ? `${o.points} (${money(Math.round(o.points * 3800))})` : 'None');
   return (
     <div className={`cmp-card ${chosen ? 'is-chosen' : ''}`}>
       {/* header: lender + their pitch */}
@@ -215,11 +228,11 @@ function OfferCard({ offer, chosen, onChoose }: { offer: LenderOffer; chosen: bo
 
       {/* the full honest breakdown — junk fees visible; buyer draws the conclusion */}
       <div className="cmp-card__grid">
-        <Line k="Monthly (P&amp;I)" v={money(o.monthlyPI)} />
-        <Line k="Points" v={o.points ? `${o.points} (${money(Math.round(o.points * 3800))})` : 'None'} />
-        <Line k="Lender fees" v={money(o.lenderFees)} />
-        <Line k="Lender credit" v={o.credit ? `− ${money(o.credit)}` : 'None'} good={!!o.credit} />
-        <Line k="Est. 5-year cost" v={money(o.estCost5yr)} strong />
+        <Line k={real ? 'Monthly (PITI)' : 'Monthly (P&amp;I)'} v={money(o.monthlyPI)} />
+        <Line k="Points" v={pointsV} />
+        <Line k={real ? 'Closing costs' : 'Lender fees'} v={money(o.lenderFees)} />
+        <Line k="Credits" v={o.credit ? `− ${money(o.credit)}` : 'None'} good={!!o.credit} />
+        <Line k={real ? 'Cash to close' : 'Est. 5-year cost'} v={money(o.estCost5yr)} strong />
       </div>
 
       <button className="cmp-card__choose" onClick={onChoose} disabled={chosen}>

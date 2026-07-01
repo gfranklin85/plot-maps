@@ -1680,53 +1680,131 @@ gmp-popover-3d-element[plot-card-popover],
    #1349d4 / #122d8d. Sits right under the header, above the hero. */
 .ppad {
   position: relative;
+  /* a real sky, not a flat blue slab: bright high-altitude light up top-
+     right (where the island floats), deepening to brand blue on the left
+     behind the text. */
   background:
-    radial-gradient(120% 140% at 88% -20%, rgba(58,122,255,0.55), rgba(18,45,141,0) 60%),
-    linear-gradient(135deg, #122d8d 0%, #1641b8 52%, #1349d4 100%);
+    radial-gradient(90% 160% at 82% -30%, rgba(150,196,255,0.9), rgba(58,122,255,0) 55%),
+    radial-gradient(70% 120% at 96% 120%, rgba(120,170,255,0.5), rgba(20,50,150,0) 60%),
+    linear-gradient(105deg, #122d8d 0%, #17429c 44%, #2d63d6 100%);
   color: #eaf1ff;
   overflow: hidden;
 }
 .ppad::before {
   /* faint engraved grid — hand-made surface, not a library default */
-  content: ''; position: absolute; inset: 0; pointer-events: none; opacity: 0.10;
+  content: ''; position: absolute; inset: 0; pointer-events: none; opacity: 0.10; z-index: 0;
   background-image:
     linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px),
     linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px);
   background-size: 44px 44px;
   mask-image: radial-gradient(120% 100% at 80% 0%, #000 30%, transparent 75%);
 }
-.ppad__wrap {
-  position: relative; z-index: 1;
-  display: flex; align-items: center; gap: 28px;
-  padding-top: 30px; padding-bottom: 30px;
+
+/* ── the floating island scene (PlotMaps flying identity) ──────────────
+   Full-frame self-aligning SVGs pinned to the RIGHT of the band; the
+   island bleeds off the top/right edge so it reads as a slice of a bigger
+   flying world, not a boxed picture. Sits behind the text. */
+.ppad__scene {
+  position: absolute; top: 0; right: 0; bottom: 0;
+  width: min(52%, 760px);
+  z-index: 0; pointer-events: none;
+  overflow: hidden;
+  /* thin left fade only, so the island isn't erased */
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 18%);
+          mask-image: linear-gradient(90deg, transparent 0%, #000 18%);
 }
-.ppad__copy { flex: 1; min-width: 0; }
+/* island.svg = a raster island living ~center of a 1920×1080 frame. We
+   scale the frame and anchor bottom-right so the island's mass lands in the
+   band and bleeds off the bottom edge (floating in from below). Smaller +
+   responsive via clamp() on the width. */
+.ppad__scene img {
+  position: absolute;
+  right: -14%; bottom: -64%;
+  width: clamp(320px, 40vw, 620px); height: auto; max-width: none;
+  /* each layer runs a one-shot slide-IN, then hands off to its idle float.
+     The float classes (.float-island / .float-cloud-*) still apply on the
+     element; we drive entrance on the <img> so the two don't fight. */
+  opacity: 0;
+  animation-fill-mode: both;
+}
+.ppad__island {
+  filter: drop-shadow(0 18px 30px rgba(4,14,48,0.45));
+  animation: ppad-in-island 900ms cubic-bezier(0.16,0.8,0.24,1) 160ms forwards;
+}
+.ppad__cloud--back {
+  right: -6%; bottom: -36%; width: clamp(300px, 42vw, 640px); opacity: 0;
+  animation: ppad-in-cloud-back 1100ms ease-out 60ms forwards;
+}
+.ppad__cloud--front {
+  right: -22%; bottom: -80%; width: clamp(280px, 36vw, 560px); opacity: 0;
+  animation: ppad-in-cloud-front 1000ms ease-out 420ms forwards;
+}
+/* Entrances: settle to a resting transform, then the idle float keyframes
+   (added as a second animation below) take over seamlessly. */
+@keyframes ppad-in-island {
+  from { opacity: 0; transform: translateY(46px) scale(0.94); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes ppad-in-cloud-back {
+  from { opacity: 0; transform: translateX(70px); }
+  to   { opacity: 0.5; transform: translateX(0); }
+}
+@keyframes ppad-in-cloud-front {
+  from { opacity: 0; transform: translateX(90px); }
+  to   { opacity: 0.72; transform: translateX(0); }
+}
+/* After the entrance, layer a gentle perpetual drift (compounds via a
+   second animation once the first finishes its fill). */
+.ppad__island  { animation: ppad-in-island 900ms cubic-bezier(0.16,0.8,0.24,1) 160ms forwards, ppad-drift-y 6s ease-in-out 1100ms infinite; }
+.ppad__cloud--back  { animation: ppad-in-cloud-back 1100ms ease-out 60ms forwards, ppad-drift-x-a 15s ease-in-out 1200ms infinite; }
+.ppad__cloud--front { animation: ppad-in-cloud-front 1000ms ease-out 420ms forwards, ppad-drift-x-b 13s ease-in-out 1500ms infinite; }
+@keyframes ppad-drift-y   { 0%,100%{ transform: translateY(0); } 50%{ transform: translateY(-8px); } }
+@keyframes ppad-drift-x-a { 0%,100%{ transform: translateX(0); } 50%{ transform: translateX(14px); } }
+@keyframes ppad-drift-x-b { 0%,100%{ transform: translateX(0); } 50%{ transform: translateX(-12px); } }
+
+@media (max-width: 860px) {
+  .ppad__scene { width: 46%; }
+  .ppad__scene img { width: clamp(240px, 44vw, 380px); }
+}
+@media (max-width: 560px) {
+  /* very narrow: keep a soft cloud hint, drop the island so text breathes */
+  .ppad__island { display: none; }
+}
+.ppad__wrap {
+  position: relative; z-index: 2;
+  display: flex; align-items: center; flex-wrap: wrap; gap: 10px 24px;
+  padding-top: 22px; padding-bottom: 22px;
+  min-height: 132px;
+}
+.ppad__copy { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 8px; }
 .ppad__eyebrow {
   display: inline-flex; align-items: center; gap: 8px;
-  font-size: 12px; font-weight: 800; letter-spacing: 0.12em;
-  color: #bcd2ff; margin-bottom: 12px;
+  font-size: 11.5px; font-weight: 800; letter-spacing: 0.14em;
+  color: #cfe0ff; text-transform: uppercase;
 }
-.ppad__eyebrow-i { font-size: 18px; }
-.ppad__h { font-size: clamp(26px, 3.4vw, 40px); line-height: 1.06; letter-spacing: -0.02em; font-weight: 800; color: #fff; margin: 0; }
-.ppad__accent { color: #9ec2ff; }
-.ppad__sub { margin-top: 14px; max-width: 40em; font-size: 15.5px; line-height: 1.6; color: #d3e0ff; }
-.ppad__sub b { color: #fff; font-weight: 700; }
-.ppad__feats { display: flex; flex-wrap: wrap; gap: 8px 22px; margin-top: 16px; padding: 0; list-style: none; }
-.ppad__feats li { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: #e7eeff; }
-.ppad__feat-i { font-size: 19px; color: #9ec2ff; }
+.ppad__eyebrow-i { font-size: 18px; color: #fff; }
+/* headline: a confident strip title, two-tone, one line */
+.ppad__h { font-size: clamp(18px, 2vw, 24px); line-height: 1.15; letter-spacing: -0.015em; font-weight: 800; color: #fff; margin: 0; }
+.ppad__h br { display: none; }
+.ppad__accent { color: #a8c8ff; }
+.ppad__accent::before { content: ' '; }
+/* the long paragraph + feature list are hidden in the compact strip; the
+   full pitch lives in the pre-download modal. */
+.ppad__sub { display: none; }
+.ppad__feats { display: none; }
 
-.ppad__cta-row { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin-top: 24px; }
+.ppad__cta-row { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-left: auto; flex-shrink: 0; }
 .ppad__dl {
-  display: inline-flex; align-items: center; gap: 11px;
+  display: inline-flex; align-items: center; gap: 9px;
   background: #fff; color: #122d8d;
-  font-weight: 800; font-size: 16px;
-  padding: 14px 22px; border-radius: 13px;
-  box-shadow: 0 14px 30px -10px rgba(0,0,0,0.5);
+  font-weight: 800; font-size: 14px;
+  padding: 9px 16px; border-radius: 10px;
+  box-shadow: 0 8px 18px -8px rgba(0,0,0,0.45);
   transition: transform .15s, box-shadow .15s;
 }
-.ppad__dl:hover { transform: translateY(-1px); box-shadow: 0 18px 38px -10px rgba(0,0,0,0.55); }
-.ppad__dl-i { font-size: 22px; }
-.ppad__dl-os { font-size: 11.5px; font-weight: 700; letter-spacing: 0.04em; color: #5b6bb0; padding-left: 11px; margin-left: 3px; border-left: 1px solid rgba(18,45,141,0.2); }
+.ppad__dl:hover { transform: translateY(-1px); box-shadow: 0 12px 24px -8px rgba(0,0,0,0.5); }
+.ppad__dl-i { font-size: 19px; }
+.ppad__dl-os { font-size: 11px; font-weight: 700; letter-spacing: 0.04em; color: #5b6bb0; padding-left: 9px; margin-left: 2px; border-left: 1px solid rgba(18,45,141,0.2); }
 
 .ppad__status {
   display: inline-flex; align-items: center; gap: 8px;
@@ -1746,12 +1824,11 @@ gmp-popover-3d-element[plot-card-popover],
 /* Install nudge — appears when a controller is connected but Plot Pad
    input hasn't been seen. A warm, inviting prompt, not a warning. */
 .ppad__nudge {
-  display: inline-flex; align-items: center; gap: 9px;
-  margin-top: 14px;
-  font-size: 13.5px; font-weight: 700; color: #fff8e8;
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 12.5px; font-weight: 700; color: #fff8e8;
   background: rgba(255,194,77,0.14);
   border: 1px solid rgba(255,194,77,0.4);
-  padding: 10px 15px; border-radius: 11px;
+  padding: 7px 13px; border-radius: 9px;
   transition: background .15s, transform .15s;
   animation: ppad-nudge-in 240ms ease-out;
 }
@@ -1760,10 +1837,9 @@ gmp-popover-3d-element[plot-card-popover],
 .ppad__nudge-go { font-weight: 800; color: #ffd27a; padding-left: 4px; }
 @keyframes ppad-nudge-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 
-.ppad__art { position: relative; width: 230px; flex-shrink: 0; display: none; }
-@media (min-width: 900px) { .ppad__art { display: block; } }
-.ppad__art-glow { position: absolute; inset: -20% -10%; background: radial-gradient(circle at 50% 45%, rgba(158,194,255,0.45), transparent 65%); filter: blur(6px); }
-.ppad__art-pad { position: relative; font-size: 188px; color: #dfe9ff; opacity: 0.96; filter: drop-shadow(0 18px 30px rgba(0,0,0,0.4)); }
+/* big controller art removed for the compact strip — it forced the band
+   tall and ate the hero. The small eyebrow icon carries the motif. */
+.ppad__art { display: none !important; }
 
 @media (max-width: 720px) {
   .ppad__wrap { padding-top: 24px; padding-bottom: 24px; }
@@ -1864,6 +1940,10 @@ gmp-popover-3d-element[plot-card-popover],
   .ppad__status.is-wait .ppad__dot { animation: none !important; }
   .ppad__nudge { animation: none !important; }
   .ppm__overlay,.ppm { animation: none !important; }
+  /* island scene: no motion — just show it settled + visible */
+  .ppad__island { animation: none !important; opacity: 1 !important; transform: none !important; }
+  .ppad__cloud--back { animation: none !important; opacity: 0.5 !important; transform: none !important; }
+  .ppad__cloud--front { animation: none !important; opacity: 0.72 !important; transform: none !important; }
 }
 
 /* ── front-page logo + bigger hero scene (post-asset tuning) ── */

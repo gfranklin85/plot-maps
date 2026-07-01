@@ -34,56 +34,44 @@ export default function PlotPadBanner() {
 
   return (
     <section className="ppad">
+      {/* PlotMaps flying identity — the old isometric floating island +
+          drifting clouds return here, in the sky band. This banner IS the
+          "fly the map" front door (the hero below is the Position brokerage
+          door). Full-frame self-aligning SVGs on the shared 1920×1080
+          canvas. memory/project_plot_pad_os_click_helper, feedback_screen_is_always_2d */}
+      <div className="ppad__scene" aria-hidden>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/dashboard/hero/cloud-2.svg" alt="" className="ppad__cloud ppad__cloud--back" draggable={false} />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/dashboard/hero/island.svg" alt="" className="ppad__island" draggable={false} />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/dashboard/hero/cloud-1.svg" alt="" className="ppad__cloud ppad__cloud--front" draggable={false} />
+      </div>
       <div className="fp__wrap ppad__wrap">
-        {/* left — the pitch */}
+        {/* compact strip: motif + short title on the left; download +
+            live status on the right. No giant hero type, no big art —
+            the full pitch lives in the pre-download modal. */}
         <div className="ppad__copy">
           <div className="ppad__eyebrow">
             <MaterialIcon icon="sports_esports" className="ppad__eyebrow-i" />
             FULL GAMEPAD FLIGHT
           </div>
           <h2 className="ppad__h font-headline">
-            Plug in your controller.<br />
-            <span className="ppad__accent">Fly the map for real.</span>
+            Plug in your controller.<span className="ppad__accent">Fly the map for real.</span>
           </h2>
-          <p className="ppad__sub">
-            Download <b>Plot Pad</b> — the free helper that turns your controller
-            into the cockpit. True full-screen the moment you take off,
-            pixel-perfect targeting, every button live. The website can&apos;t do
-            this alone; this is the key.
-          </p>
-          <ul className="ppad__feats">
-            <li><MaterialIcon icon="my_location" className="ppad__feat-i" /> Pixel-perfect property targeting</li>
-            <li><MaterialIcon icon="fullscreen" className="ppad__feat-i" /> Auto full-screen on takeoff</li>
-            <li><MaterialIcon icon="stadia_controller" className="ppad__feat-i" /> Every button, every time</li>
-          </ul>
-
-          <div className="ppad__cta-row">
-            <button type="button" onClick={() => setModalOpen(true)} className="ppad__dl">
-              <MaterialIcon icon="download" className="ppad__dl-i" />
-              Download Plot Pad
-              <span className="ppad__dl-os">Windows · free</span>
-            </button>
-            <span className={`ppad__status ${STATUS_COPY[status].dot}`}>
-              <span className="ppad__dot" aria-hidden />
-              {status === 'active' && <MaterialIcon icon="check" className="ppad__status-i" />}
-              {STATUS_COPY[status].text}
-            </span>
-          </div>
-
-          {/* Controller plugged in but no Plot Pad input seen → nudge install. */}
-          {status === 'connected' && (
-            <button type="button" className="ppad__nudge" onClick={() => setModalOpen(true)}>
-              <MaterialIcon icon="bolt" className="ppad__nudge-i" />
-              Controller detected — get Plot Pad to fly it.
-              <span className="ppad__nudge-go">Install →</span>
-            </button>
-          )}
         </div>
 
-        {/* right — controller mark */}
-        <div className="ppad__art" aria-hidden>
-          <div className="ppad__art-glow" />
-          <MaterialIcon icon="stadia_controller" className="ppad__art-pad" />
+        <div className="ppad__cta-row">
+          <span className={`ppad__status ${STATUS_COPY[status].dot}`}>
+            <span className="ppad__dot" aria-hidden />
+            {status === 'active' && <MaterialIcon icon="check" className="ppad__status-i" />}
+            {STATUS_COPY[status].text}
+          </span>
+          <button type="button" onClick={() => setModalOpen(true)} className="ppad__dl">
+            <MaterialIcon icon="download" className="ppad__dl-i" />
+            Download Plot Pad
+            <span className="ppad__dl-os">Windows · free</span>
+          </button>
         </div>
       </div>
 

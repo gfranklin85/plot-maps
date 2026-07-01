@@ -15,7 +15,7 @@ import PlotMapsLogo from '@/components/brand/PlotMapsLogo';
 import PositionFooter from '@/components/public/PositionFooter';
 import MaterialIcon from '@/components/ui/MaterialIcon';
 import BuyerEmblem from './BuyerEmblem';
-import type { BullpenPost, BullpenOffer } from '@/lib/bullpen/types';
+import type { BullpenPost } from '@/lib/bullpen/types';
 import {
   WORKSHEET, LOAN_HEADER, totalMonthly, totalClosing, cashToClose,
   type WLine, type WorksheetValues,
@@ -35,7 +35,9 @@ const MILITARY_LABEL: Record<string, string> = {
 
 export default function PublicBullpen({ slug }: { slug: string }) {
   const [post, setPost] = useState<BullpenPost | null>(null);
-  const [offers, setOffers] = useState<BullpenOffer[]>([]);
+  // PUBLIC view: only the COUNT of offers, never the offers themselves. The
+  // lenders + their numbers are private to the buyer. (memory/project_bullpen_offer_privacy_and_flow)
+  const [offerCount, setOfferCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [showForm, setShowForm] = useState(false);
@@ -46,7 +48,7 @@ export default function PublicBullpen({ slug }: { slug: string }) {
       if (res.status === 404) { setNotFound(true); return; }
       const data = await res.json();
       setPost(data.post);
-      setOffers(data.offers ?? []);
+      setOfferCount(data.offerCount ?? 0);
     } catch {
       setNotFound(true);
     } finally {
@@ -126,12 +128,12 @@ export default function PublicBullpen({ slug }: { slug: string }) {
               )}
 
               {/* the trust light — market-generated, no lender named */}
-              {offers.length > 0 && (
+              {offerCount > 0 && (
                 <div className="pb-trust">
                   <MaterialIcon icon="verified" className="text-[18px]" />
                   <span>
                     A licensed lender has already put a real offer on this buyer.
-                    {offers.length > 1 ? ` ${offers.length} lenders are competing.` : ''}
+                    {offerCount > 1 ? ` ${offerCount} lenders are competing.` : ''}
                   </span>
                 </div>
               )}
@@ -175,24 +177,19 @@ export default function PublicBullpen({ slug }: { slug: string }) {
                 )}
               </div>
 
-              {/* offers so far — neutral timeline (buyer does the sorting on /compare) */}
-              {offers.length > 0 && (
-                <div className="pb-offers">
-                  <div className="pb-offers__title">Offers in, as they arrived</div>
-                  {offers.map((o) => (
-                    <div key={o.id} className="pb-offer">
-                      <div className="pb-offer__top">
-                        <span className="pb-offer__lender">{o.lenderName}</span>
-                        {o.ratePct != null && <span className="pb-offer__rate">{fmtRate(o.ratePct)}%</span>}
-                      </div>
-                      <div className="pb-offer__line">
-                        {o.totalMonthly ? <span>{money(o.totalMonthly)}/mo</span> : (o.monthlyPI != null && <span>{money(o.monthlyPI)}/mo</span>)}
-                        {o.aprPct != null && <span>{fmtRate(o.aprPct)}% APR</span>}
-                        {o.cashToClose ? <span>{money(o.cashToClose)} to close</span> : null}
-                      </div>
-                      {o.note && <p className="pb-offer__note">“{o.note}”</p>}
-                    </div>
-                  ))}
+              {/* Market activity — SEALED. Lenders' names + numbers are private
+                  to the buyer's own view; the public sees only that offers exist.
+                  (memory/project_bullpen_offer_privacy_and_flow) */}
+              {offerCount > 0 && (
+                <div className="pb-activity">
+                  <div className="pb-activity__count">
+                    {offerCount} {offerCount === 1 ? 'offer' : 'offers'} in
+                  </div>
+                  <p className="pb-activity__sub">
+                    The lenders and their numbers stay private — they go straight to
+                    {post.buyerName ? ` ${post.buyerName}` : ' the buyer'}, who compares them and chooses.
+                    No lender is shown here, and none is favored.
+                  </p>
                 </div>
               )}
 
@@ -353,7 +350,6 @@ function Fact({ k, v }: { k: string; v: string }) {
   );
 }
 
-const fmtRate = (n: number) => n.toFixed(3).replace(/0+$/, '').replace(/\.$/, '');
 function loanLabel(v: string) {
   return { conventional: 'Conventional', fha: 'FHA', va: 'VA', unsure: 'Open to options' }[v] || v;
 }

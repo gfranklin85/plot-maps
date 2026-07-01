@@ -20,7 +20,7 @@ export default function BullpenPage() {
           <PlotMapsLogo color="#0c1322" className="h-7 w-auto" />
         </Link>
         <nav className="hidden md:flex items-center gap-6 text-sm text-[#4a5568]">
-          <Link href="/orbit" className="hover:text-[#1349d4] transition-colors">Orbit</Link>
+          <Link href="/buyers" className="hover:text-[#1349d4] transition-colors">Browse buyers</Link>
           <Link href="/essays" className="hover:text-[#1349d4] transition-colors">Essays</Link>
           <Link href="/position" className="hover:text-[#1349d4] transition-colors">Position</Link>
         </nav>
@@ -42,6 +42,9 @@ export default function BullpenPage() {
               business. If one needs more, they&apos;ll ask you directly, and you
               decide what to share.
             </p>
+            <Link href="/buyers" className="inline-flex items-center gap-1.5 mt-5 text-[13px] font-semibold text-[#1349d4] hover:underline">
+              See who&apos;s already looking →
+            </Link>
           </div>
 
           <StatePosition />

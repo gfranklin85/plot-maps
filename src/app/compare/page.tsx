@@ -55,7 +55,7 @@ export default function ComparePage() {
     setSlug(s);
     (async () => {
       try {
-        const res = await fetch(`/api/bullpen/${s}`, { cache: 'no-store' });
+        const res = await fetch(`/api/bullpen/${s}/offers`, { cache: 'no-store' });
         if (!res.ok) return;
         const data = await res.json();
         if (data.post) {

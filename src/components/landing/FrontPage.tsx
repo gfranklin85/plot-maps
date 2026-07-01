@@ -191,11 +191,11 @@ export default function FrontPage() {
                 <li><span className="chk" aria-hidden>✓</span> Bring your own agent — your relationship is respected here.</li>
               </ul>
               <div className="fp-cta-row" style={{ marginTop: 22 }}>
-                <a href="/bullpen" className="fp-cta fp-cta--primary">
-                  State your position <span aria-hidden>→</span>
+                <a href="/buyers" className="fp-cta fp-cta--primary">
+                  See who&apos;s looking <span aria-hidden>→</span>
                 </a>
-                <a href="/compare" className="fp-cta fp-cta--ghost">
-                  See how offers stack up <span aria-hidden>→</span>
+                <a href="/bullpen" className="fp-cta fp-cta--ghost">
+                  State your position <span aria-hidden>→</span>
                 </a>
               </div>
             </div>

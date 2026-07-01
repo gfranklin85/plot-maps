@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-server';
-import { shapePost, shapeOffer } from '@/lib/bullpen/types';
+import { shapePost } from '@/lib/bullpen/types';
 
 // GET /api/bullpen/[slug]
 //
@@ -34,18 +34,18 @@ export async function GET(
     return NextResponse.json({ error: 'not found' }, { status: 404 });
   }
 
-  const { data: offers } = await supabaseAdmin
+  // PUBLIC read: we return ONLY the offer COUNT — never lender names or their
+  // numbers. The full offer stack is private to the buyer (served by the
+  // [slug]/offers route, buyer-gated once the portal lands). A stranger sees
+  // that offers exist, never who or what. (memory/project_bullpen_offer_privacy_and_flow)
+  const { count } = await supabaseAdmin
     .from('bullpen_offers')
-    .select('*')
-    .eq('post_id', post.id)
-    .order('created_at', { ascending: true });
+    .select('id', { count: 'exact', head: true })
+    .eq('post_id', post.id);
 
   return NextResponse.json({
     post: shapePost(post as Record<string, unknown>),
-    offers: (offers ?? []).map((o) => shapeOffer(o as Record<string, unknown>)),
-    // A market-generated trust signal: the FIRST real offer means a licensed
-    // lender took this buyer seriously. We surface the FACT, never the lender
-    // (memory/project_buyer_financial_capture "the first offer = trust keystone").
-    hasOffer: (offers?.length ?? 0) > 0,
+    offerCount: count ?? 0,
+    hasOffer: (count ?? 0) > 0,
   });
 }

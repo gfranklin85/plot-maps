@@ -104,6 +104,9 @@ export default function BuyerBoard() {
             <span className="bd-hero__dot" />
             {loading ? 'Loading buyers…' : `${items.length} ${items.length === 1 ? 'buyer' : 'buyers'} on the board`}
           </div>
+          <div className="bd-hero__cta">
+            <Link href="/bullpen" className="bd-hero__btn">Buying a home? State your position →</Link>
+          </div>
         </section>
 
         {/* filter bar */}

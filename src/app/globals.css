@@ -1625,6 +1625,8 @@ gmp-popover-3d-element[plot-card-popover],
 .bd-hero__h span { color: #1349d4; }
 .bd-hero__sub { font-size: 15px; line-height: 1.6; color: #4a5568; max-width: 520px; margin: 14px auto 0; }
 .bd-hero__live { display: inline-flex; align-items: center; gap: 8px; margin-top: 16px; font-size: 13px; font-weight: 700; color: #6b7689; }
+.bd-hero__cta { margin-top: 18px; }
+.bd-hero__btn { display: inline-block; padding: 12px 22px; border-radius: 999px; font-size: 14px; font-weight: 700; color: #fff; background: linear-gradient(160deg,#1349d4,#122d8d); box-shadow: 0 14px 30px -14px rgba(19,73,212,0.7); }
 .bd-hero__dot { width: 8px; height: 8px; border-radius: 50%; background: #1b9e6a; box-shadow: 0 0 0 4px rgba(27,158,106,0.16); }
 
 .bd-filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 12px; border-radius: 14px; background: #fbfcff; border: 1px solid rgba(19,73,212,0.12); }
@@ -1699,6 +1701,11 @@ gmp-popover-3d-element[plot-card-popover],
 
 /* ════ COMPARE — worksheet note ════ */
 .cmp-worksheet-note { margin-top: 16px; font-size: 13px; line-height: 1.55; color: #6b7689; text-align: center; }
+
+/* ════ PUBLIC PROFILE — sealed market activity (no lender names/numbers) ════ */
+.pb-activity { margin-top: 28px; border-radius: 14px; padding: 18px 20px; background: #fbfcff; border: 1px solid rgba(19,73,212,0.12); }
+.pb-activity__count { font-family: var(--font-headline, inherit); font-weight: 800; font-size: 18px; color: #0c1322; }
+.pb-activity__sub { margin-top: 6px; font-size: 13.5px; line-height: 1.55; color: #6b7689; }
 
 /* ════ FINISHED MAP UI — contained map + BOTTOM COCKPIT DASH (soft light) ════
    Flight first: the map is a contained windshield; all chrome lives in one

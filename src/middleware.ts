@@ -33,6 +33,7 @@ const PUBLIC_PATHS = [
   '/orbit',
   '/compare',
   '/statement', // the live pre-close Buyer's Statement (offer builder)
+  '/deal/', // the buyer's home base hub (make an offer)
   '/b/', // shared bullpen link view — openable by anyone (lenders, family, friends)
 ];
 

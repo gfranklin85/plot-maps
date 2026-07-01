@@ -1559,6 +1559,9 @@ gmp-popover-3d-element[plot-card-popover],
 .shb-next .material-symbols-outlined, .shb-next .material-symbols-rounded { color: #1349d4; flex: none; }
 .shb-next p { font-size: 13.5px; line-height: 1.55; color: #4a5568; margin: 0; }
 .shb-view { display: block; text-align: center; margin-top: 22px; font-size: 14.5px; font-weight: 700; color: #1349d4; }
+.shb-actions { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-top: 22px; }
+.shb-actions .shb-view { margin-top: 0; }
+.shb-view--primary { padding: 13px 26px; border-radius: 999px; color: #fff; background: linear-gradient(160deg,#1349d4,#122d8d); box-shadow: 0 12px 28px -14px rgba(19,73,212,0.7); }
 
 /* ════ PUBLIC BULLPEN LINK VIEW (/b/[slug]) — what a shared link opens ════ */
 .pb-loading { text-align: center; padding: 60px 0; color: #8a93a4; font-size: 14px; }
@@ -1800,6 +1803,62 @@ gmp-popover-3d-element[plot-card-popover],
 .lbs-balance span { font-size: 13px; font-weight: 700; color: #4a5568; text-transform: uppercase; letter-spacing: .04em; }
 .lbs-balance b { font-family: var(--font-headline, inherit); font-weight: 800; font-size: 22px; color: #122d8d; font-variant-numeric: tabular-nums; }
 @media (max-width: 560px) { .lbs-head { grid-template-columns: 1fr 1fr; } }
+
+/* ════ OFFER INSTRUMENT — solicit the RATE (the key), slide the PRICE ════ */
+.oi { max-width: 640px; margin: 0 auto; }
+.oi-key { display: flex; gap: 14px; align-items: flex-start; border-radius: 16px; padding: 16px 18px; margin-bottom: 16px; }
+.oi-key.is-live { background: linear-gradient(160deg, rgba(27,158,106,0.09), rgba(224,247,237,0.5)); border: 1px solid rgba(27,158,106,0.3); }
+.oi-key.is-pending { background: #fbfcff; border: 1px solid rgba(19,73,212,0.14); }
+.oi-key__icon { flex: none; width: 42px; height: 42px; border-radius: 11px; display: inline-flex; align-items: center; justify-content: center; }
+.oi-key.is-live .oi-key__icon { background: rgba(27,158,106,0.14); }
+.oi-key.is-live .oi-key__icon .material-symbols-outlined, .oi-key.is-live .oi-key__icon .material-symbols-rounded { color: #1b9e6a; }
+.oi-key.is-pending .oi-key__icon { background: rgba(19,73,212,0.08); }
+.oi-key.is-pending .oi-key__icon .material-symbols-outlined, .oi-key.is-pending .oi-key__icon .material-symbols-rounded { color: #1349d4; }
+.oi-key__label { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #6b7689; }
+.oi-key__val { font-family: var(--font-headline, inherit); font-weight: 800; font-size: 26px; color: #15563b; margin-top: 2px; letter-spacing: -.01em; }
+.oi-key__valid { font-size: 12px; font-weight: 600; color: #1b9e6a; }
+.oi-key__note { font-size: 12.5px; line-height: 1.5; color: #6b7689; margin-top: 4px; }
+.oi-key__cta { display: inline-block; margin-top: 12px; padding: 10px 18px; border-radius: 999px; font-size: 13.5px; font-weight: 700; color: #fff; background: linear-gradient(160deg,#1349d4,#122d8d); box-shadow: 0 12px 26px -14px rgba(19,73,212,0.7); }
+
+.oi-controls { display: grid; gap: 16px; margin-bottom: 14px; }
+.oi-slider { border-radius: 14px; padding: 14px 16px; background: #fff; border: 1px solid rgba(19,73,212,0.12); }
+.oi-slider.is-primary { background: linear-gradient(160deg, rgba(19,73,212,0.05), rgba(224,231,251,0.35)); border-color: rgba(19,73,212,0.2); }
+.oi-slider__top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.oi-slider__label { font-size: 12.5px; font-weight: 700; color: #4a5568; }
+.oi-slider__value { font-family: var(--font-headline, inherit); font-weight: 800; font-size: 18px; color: #0c1322; }
+.oi-slider.is-primary .oi-slider__value { color: #122d8d; font-size: 20px; }
+.oi-slider__hint { font-size: 12px; font-weight: 600; color: #8a93a4; }
+.oi-slider__input { -webkit-appearance: none; appearance: none; width: 100%; height: 6px; border-radius: 999px; background: rgba(19,73,212,0.16); outline: none; }
+.oi-slider__input::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 22px; height: 22px; border-radius: 50%; background: #1349d4; border: 3px solid #fff; box-shadow: 0 3px 10px -2px rgba(19,73,212,0.7); cursor: pointer; }
+.oi-slider__input::-moz-range-thumb { width: 22px; height: 22px; border-radius: 50%; background: #1349d4; border: 3px solid #fff; box-shadow: 0 3px 10px -2px rgba(19,73,212,0.7); cursor: pointer; }
+
+.oi-keys-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+.oi-keychip { display: inline-flex; align-items: center; gap: 6px; padding: 7px 13px; border-radius: 999px; font-size: 12.5px; background: #fbfcff; border: 1px solid rgba(19,73,212,0.14); }
+.oi-keychip .material-symbols-outlined, .oi-keychip .material-symbols-rounded { color: #b8860b; }
+.oi-keychip.is-live { background: rgba(27,158,106,0.08); border-color: rgba(27,158,106,0.28); }
+.oi-keychip.is-live .material-symbols-outlined, .oi-keychip.is-live .material-symbols-rounded { color: #1b9e6a; }
+.oi-keychip__label { font-weight: 700; color: #8a93a4; text-transform: uppercase; letter-spacing: .04em; font-size: 10.5px; }
+.oi-keychip__val { font-weight: 700; color: #0c1322; }
+
+/* ════ BUYER HUB /deal/[slug] — the Make-an-Offer fork + home ════ */
+.hub { max-width: 680px; margin: 0 auto; }
+.hub-fork { text-align: center; padding: 20px 0 8px; }
+.hub-fork__q { font-family: var(--font-headline, inherit); font-weight: 800; font-size: clamp(22px,3vw,28px); color: #0c1322; }
+.hub-fork__sub { font-size: 14.5px; color: #4a5568; margin-top: 8px; max-width: 440px; margin-left: auto; margin-right: auto; line-height: 1.55; }
+.hub-fork__cards { display: grid; grid-template-columns: 1fr; gap: 12px; margin-top: 20px; }
+@media (min-width: 560px) { .hub-fork__cards { grid-template-columns: 1fr 1fr; } }
+.hub-forkcard { text-align: left; border-radius: 16px; padding: 18px 20px; background: #fff; border: 1px solid rgba(19,73,212,0.14); transition: all .15s; cursor: pointer; }
+.hub-forkcard:hover { border-color: rgba(19,73,212,0.4); transform: translateY(-1px); box-shadow: 0 14px 32px -22px rgba(20,50,120,0.5); }
+.hub-forkcard--primary { background: linear-gradient(160deg, rgba(19,73,212,0.06), rgba(224,231,251,0.4)); border-color: rgba(19,73,212,0.24); }
+.hub-forkcard__icon { width: 40px; height: 40px; border-radius: 11px; display: inline-flex; align-items: center; justify-content: center; background: rgba(19,73,212,0.09); margin-bottom: 10px; }
+.hub-forkcard__icon .material-symbols-outlined, .hub-forkcard__icon .material-symbols-rounded { color: #1349d4; }
+.hub-forkcard__title { font-weight: 800; font-size: 16px; color: #0c1322; }
+.hub-forkcard__body { font-size: 13px; line-height: 1.5; color: #6b7689; margin-top: 4px; }
+.hub-tabs { display: flex; gap: 6px; padding: 5px; border-radius: 12px; background: #f4f6fb; margin: 0 auto 20px; width: fit-content; }
+.hub-tab { padding: 8px 16px; border-radius: 9px; font-size: 13px; font-weight: 700; color: #6b7689; transition: all .12s; }
+.hub-tab.is-active { background: #fff; color: #1349d4; box-shadow: 0 4px 12px -6px rgba(20,50,120,0.4); }
+.hub-back { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; font-weight: 600; color: #6b7689; margin-bottom: 14px; }
+.hub-back:hover { color: #1349d4; }
 
 /* ════ FINISHED MAP UI — contained map + BOTTOM COCKPIT DASH (soft light) ════
    Flight first: the map is a contained windshield; all chrome lives in one

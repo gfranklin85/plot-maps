@@ -57,7 +57,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const selfHeadered = SELF_HEADERED.some((p) => pathname.startsWith(p));
   const ownSurface =
     OWN_SURFACE.includes(pathname) || pathname === '/' || pathname.startsWith('/essays') ||
-    pathname.startsWith('/b/'); // shared bullpen link view brings its own chrome
+    pathname.startsWith('/b/') || pathname.startsWith('/deal/'); // link view + buyer hub bring own chrome
   if (selfHeadered || ownSurface) {
     return <>{children}</>;
   }

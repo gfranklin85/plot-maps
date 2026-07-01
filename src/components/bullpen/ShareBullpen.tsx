@@ -175,7 +175,10 @@ export default function ShareBullpen({
         </p>
       </div>
 
-      <a href={path} className="shb-view">See your live page →</a>
+      <div className="shb-actions">
+        <a href={`/deal/${slug}`} className="shb-view shb-view--primary">Build your offer →</a>
+        <a href={path} className="shb-view">See your live page →</a>
+      </div>
     </div>
   );
 }

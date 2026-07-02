@@ -22,10 +22,13 @@ import { usePlotPadStatus } from '@/lib/usePlotPadStatus';
 //   installed-correctly indicator, proven by live gamepad input).
 // memory/project_plot_pad_os_click_helper, project_gamepad_is_os_layer.
 
+// Controller status chip. `connected` = a pad is plugged in and the page can
+// now be driven with the D-pad (useGamepadNav is live site-wide) — we tell
+// the user that directly. `active` = Plot Pad's OS-click layer is running too.
 const STATUS_COPY = {
-  none:      { dot: 'is-off',  text: 'Plug in a controller' },
-  connected: { dot: 'is-wait', text: 'Controller found — install Plot Pad to fly' },
-  active:    { dot: 'is-on',   text: 'Plot Pad active — flight-ready' },
+  none:      { dot: 'is-off',  icon: 'sports_esports', text: 'Plug in a controller' },
+  connected: { dot: 'is-on',   icon: 'stadia_controller', text: 'Controller connected — press the D-pad to move around' },
+  active:    { dot: 'is-on',   icon: 'check', text: 'Plot Pad active — flight-ready' },
 } as const;
 
 export default function PlotPadBanner() {
@@ -62,9 +65,9 @@ export default function PlotPadBanner() {
         </div>
 
         <div className="ppad__cta-row">
-          <span className={`ppad__status ${STATUS_COPY[status].dot}`}>
+          <span className={`ppad__status ${STATUS_COPY[status].dot} ${status !== 'none' ? 'is-live' : ''}`}>
             <span className="ppad__dot" aria-hidden />
-            {status === 'active' && <MaterialIcon icon="check" className="ppad__status-i" />}
+            <MaterialIcon icon={STATUS_COPY[status].icon} className="ppad__status-i" />
             {STATUS_COPY[status].text}
           </span>
           <button

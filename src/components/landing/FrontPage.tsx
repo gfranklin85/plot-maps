@@ -2,6 +2,7 @@
 
 import AppHeader from '@/components/layout/AppHeader';
 import PlotPadBanner from '@/components/landing/PlotPadBanner';
+import BullpenBoardMock from '@/components/landing/BullpenBoardMock';
 import OrbitSection from '@/components/landing/OrbitSection';
 import ToolGrid from '@/components/dashboard/ToolGrid';
 import MaterialIcon from '@/components/ui/MaterialIcon';
@@ -201,14 +202,12 @@ export default function FrontPage() {
               </div>
             </div>
 
-            {/* The elevation, floating in the sky — no frame. */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/landing/buyers-on-platform.png"
-              alt="Buyers standing elevated on a platform in the sky while agents and providers on lower tiers reach up toward them"
-              className="fp-reposition__img"
-              draggable={false}
-            />
+            {/* Show the PRODUCT, not a stock illustration: a polished mock
+                of the real buyer board (the thing this section describes).
+                memory/project_destination_match_cut_thesis */}
+            <div className="fp-reposition__ui">
+              <BullpenBoardMock />
+            </div>
           </div>
         </div>
       </section>

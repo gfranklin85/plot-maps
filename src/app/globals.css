@@ -1920,6 +1920,64 @@ gmp-popover-3d-element[plot-card-popover],
 }
 @media (prefers-reduced-motion: reduce) { .gp-focus { animation: none; } }
 
+/* ── Bullpen board mock (landing "show the product" visual) ───────────
+   A polished, brand-accurate mock of the real buyer board inside a browser
+   frame. Replaces the stock cloud illustration so the image IS the UI. */
+.fp-reposition__ui { position: relative; width: 100%; }
+.bbm {
+  width: 100%; border-radius: 16px; overflow: hidden;
+  background: #fff;
+  border: 1px solid rgba(19,73,212,0.12);
+  box-shadow: 0 30px 70px -30px rgba(20,50,120,0.45), 0 2px 0 rgba(255,255,255,0.6) inset;
+  transform: perspective(1400px) rotateY(-3deg) rotateX(1.5deg);
+  transform-origin: center;
+}
+.bbm__bar {
+  display: flex; align-items: center; gap: 7px;
+  padding: 9px 12px; background: #f3f5fa;
+  border-bottom: 1px solid rgba(12,19,34,0.07);
+}
+.bbm__dot { width: 10px; height: 10px; border-radius: 50%; }
+.bbm__dot--r { background: #ff5f57; } .bbm__dot--y { background: #febc2e; } .bbm__dot--g { background: #28c840; }
+.bbm__url {
+  margin-left: 8px; display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11.5px; font-weight: 600; color: #6b7688;
+  background: #fff; border: 1px solid rgba(12,19,34,0.08);
+  padding: 3px 12px; border-radius: 7px;
+}
+.bbm__body { padding: 16px 16px 18px; }
+.bbm__head { margin-bottom: 12px; }
+.bbm__eyebrow { display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; font-weight: 800; letter-spacing: 0.06em; color: #1349d4; background: rgba(19,73,212,0.08); padding: 3px 9px; border-radius: 999px; }
+.bbm__title { font-size: 17px; font-weight: 800; color: #14213d; margin-top: 8px; letter-spacing: -0.01em; }
+.bbm__filters { display: flex; align-items: center; gap: 7px; margin-bottom: 12px; flex-wrap: wrap; }
+.bbm__filters-sp { flex: 1; }
+.bbm__chip { font-size: 11.5px; font-weight: 700; color: #5b6479; background: #f2f4f8; padding: 5px 11px; border-radius: 8px; }
+.bbm__chip--on { background: linear-gradient(160deg,#1349d4,#122d8d); color: #fff; }
+.bbm__chip--ghost { display: inline-flex; align-items: center; gap: 4px; background: #fff; border: 1px solid rgba(12,19,34,0.1); }
+.bbm__rows { display: flex; flex-direction: column; gap: 9px; }
+.bbm__row {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 12px; border-radius: 12px;
+  background: #fff; border: 1px solid rgba(19,73,212,0.1);
+  transition: box-shadow .15s;
+}
+.bbm__row:hover { box-shadow: 0 10px 24px -12px rgba(20,50,120,0.35); }
+.bbm__emblem { flex: none; width: 46px; height: 46px; border-radius: 12px; display: grid; place-items: center; color: #fff; font-weight: 800; font-size: 15px; letter-spacing: 0.02em; }
+.bbm__rowbody { flex: 1; min-width: 0; }
+.bbm__headline { font-size: 14px; font-weight: 700; color: #14213d; }
+.bbm__meta { display: flex; align-items: baseline; gap: 8px; margin-top: 3px; }
+.bbm__money { font-size: 14px; font-weight: 800; color: #11804a; }
+.bbm__price { font-size: 12.5px; color: #6b7688; }
+.bbm__where { display: flex; align-items: center; gap: 3px; font-size: 12px; color: #6b7688; margin-top: 4px; }
+.bbm__occ { color: #8a93a3; }
+.bbm__needs { display: flex; gap: 5px; margin-top: 8px; flex-wrap: wrap; }
+.bbm__need { font-size: 10.5px; font-weight: 700; color: #1641b8; background: rgba(19,73,212,0.08); padding: 2px 8px; border-radius: 6px; }
+.bbm__side { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.bbm__offers { font-size: 11px; font-weight: 800; color: #5b6479; background: #f2f4f8; padding: 4px 9px; border-radius: 7px; white-space: nowrap; }
+.bbm__offers.is-hot { color: #11804a; background: rgba(17,128,74,0.1); }
+.bbm__posted { font-size: 10.5px; color: #9aa3b2; white-space: nowrap; }
+@media (max-width: 980px) { .bbm { transform: none; } }
+
 /* dock floats OVER the bottom of the full-screen map */
 .map-shell__dock { position: absolute; left: 0; right: 0; bottom: 0; height: var(--map-dash-h); z-index: 30; }
 

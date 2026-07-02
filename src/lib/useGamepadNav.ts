@@ -27,7 +27,6 @@
 import { useEffect } from 'react';
 
 const FOCUSABLE = '[data-gamepad-focusable],a[href],button:not(:disabled)';
-const DEADZONE = 0.5;
 const REPEAT_MS = 240; // debounce between cycles
 
 function collect(): HTMLElement[] {
@@ -96,14 +95,12 @@ export function useGamepadNav(opts: { enabled?: boolean } = {}) {
       let pad: Gamepad | null = null;
       for (const p of pads) { if (p && p.connected) { pad = p; break; } }
       if (pad) {
-        const ax = pad.axes[0] ?? 0;
-        const ay = pad.axes[1] ?? 0;
-        const next = pad.buttons[13]?.pressed || pad.buttons[15]?.pressed // dpad down/right
-          || pad.buttons[5]?.pressed                                       // RB
-          || ay > DEADZONE || ax > DEADZONE;
-        const prev = pad.buttons[12]?.pressed || pad.buttons[14]?.pressed // dpad up/left
-          || pad.buttons[4]?.pressed                                       // LB
-          || ay < -DEADZONE || ax < -DEADZONE;
+        // D-PAD ONLY cycles the highlight (crisp, discrete jumps — like a
+        // normal game menu). The STICK is deliberately NOT wired here: it's
+        // too touchy for menu nav, and it belongs to the reticle system. So
+        // some users cycle with the D-pad; stick-reticle folks aim instead.
+        const next = pad.buttons[13]?.pressed || pad.buttons[15]?.pressed; // dpad down / right
+        const prev = pad.buttons[12]?.pressed || pad.buttons[14]?.pressed; // dpad up / left
         const aBtn = !!pad.buttons[0]?.pressed;
         const bBtn = !!pad.buttons[1]?.pressed;
 

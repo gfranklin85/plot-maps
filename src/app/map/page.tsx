@@ -1028,36 +1028,21 @@ export default function MapPage() {
     });
   }, [reticlePosition.xFraction, reticlePosition.yFraction, setReticlePosition]);
 
-  // ── UNIFY the reticle with the real cursor ───────────────────────────
-  // The visible green reticle follows the OS cursor (followCursor mode —
-  // Plot Pad's right stick moves that cursor; a mouse moves it too). But
-  // FIRE, hover-detection, and the laser all read reticlePosition (a stored
-  // fraction). If those diverge, the laser hits an "invisible spot" near the
-  // reticle and nothing selects. So: mirror the cursor INTO reticlePosition
-  // every move, making the green reticle, the fire point, the hover sample,
-  // and the laser one and the same. memory/project_plot_pad_os_click_helper
+  // The visible reticle FOLLOWS the OS cursor (Plot Pad's stick moves it).
+  // Track the live cursor pixel so the laser + projectile fire AT the reticle
+  // you see, not the stored reticlePosition fraction (which decoupled after
+  // followCursor). Seeded near center for the pre-first-move frame.
+  const cursorPxRef = useRef<{ x: number; y: number }>({
+    x: typeof window !== 'undefined' ? window.innerWidth / 2 : 0,
+    y: typeof window !== 'undefined' ? window.innerHeight * 0.46 : 0,
+  });
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    let raf = 0;
-    let pending: { x: number; y: number } | null = null;
-    const onMove = (e: MouseEvent) => {
-      pending = { x: e.clientX, y: e.clientY };
-      if (raf) return;
-      raf = window.requestAnimationFrame(() => {
-        raf = 0;
-        if (!pending) return;
-        const xf = pending.x / window.innerWidth;
-        const yf = pending.y / window.innerHeight;
-        pending = null;
-        setReticlePosition({ xFraction: xf, yFraction: yf });
-      });
-    };
+    const onMove = (e: MouseEvent) => { cursorPxRef.current = { x: e.clientX, y: e.clientY }; };
     window.addEventListener('mousemove', onMove, { passive: true });
-    return () => {
-      window.removeEventListener('mousemove', onMove);
-      if (raf) window.cancelAnimationFrame(raf);
-    };
-  }, [setReticlePosition]);
+    return () => window.removeEventListener('mousemove', onMove);
+  }, []);
+
 
   // Camera-driven parcel prefetch — silently caches parcels in view (and
   // a margin ahead) into the in-memory parcelCache so clicks/shots resolve
@@ -1219,25 +1204,25 @@ export default function MapPage() {
 
         const fireProjectile = () => {
           shotCounterRef.current += 1;
+          // Aim at the reticle = the live OS cursor (followCursor), so the
+          // projectile and the beam converge on what you see.
           const newShot = {
             id: shotCounterRef.current,
             channel,
-            xFraction: reticlePosition.xFraction,
-            yFraction: reticlePosition.yFraction,
+            xFraction: cursorPxRef.current.x / window.innerWidth,
+            yFraction: cursorPxRef.current.y / window.innerHeight,
             mechanism: shotMechanismRef.current,
           };
           setShot(newShot);
           window.setTimeout(() => setShot(null), SHOT_TOTAL_MS + 40);
           try { playShotSound(channel); } catch { /* ignore */ }
-          // Fire the laser BEAM at the reticle too (the flight fire action —
-          // gamepad/phone trigger. SimpleLaser no longer keys off mouse
-          // clicks; it listens for this event). Aim = the reticle pixel.
+          // Fire the laser BEAM at the RETICLE (= the real OS cursor, which
+          // followCursor tracks). Using the live cursor pixel makes the beam
+          // land exactly on the reticle you see, not the stale stored
+          // fraction. memory/project_plot_pad_os_click_helper
           try {
             window.dispatchEvent(new CustomEvent('plot:fire-laser', {
-              detail: {
-                x: reticlePosition.xFraction * window.innerWidth,
-                y: reticlePosition.yFraction * window.innerHeight,
-              },
+              detail: { x: cursorPxRef.current.x, y: cursorPxRef.current.y },
             }));
           } catch { /* ignore */ }
         };

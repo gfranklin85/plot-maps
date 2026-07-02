@@ -34,6 +34,10 @@ export function useIdleDetection(): boolean {
   // Snapshot of last gamepad state so we can detect stick/trigger
   // movement without firing on rest-state poll cycles.
   const lastGamepadSnapshotRef = useRef<string>('');
+  // Timestamp of the last gamepad activity. While recent, we do NOT
+  // force-idle on window blur — a controller user isn't "away" when focus
+  // briefly flickers (Plot Pad's OS click can shift focus for an instant).
+  const gamepadActiveRef = useRef<number>(0);
   // Live ref of isIdle so the effect can read it without re-installing
   // listeners every time it flips. The effect dep array stays empty —
   // mount listeners once for the lifetime of the component.
@@ -94,7 +98,16 @@ export function useIdleDetection(): boolean {
         activity = true;
         lastGamepadSnapshotRef.current = snapshot;
       }
-      if (activity) markActive();
+      if (activity) {
+        // A gamepad user is present. Clear any focus-forced idle too — the
+        // window may have briefly lost strict focus (Plot Pad's OS click /
+        // F11, or a flicker to another app) but they're actively flying.
+        // Without this, forceIdle() freezes the whole flight loop and LB /
+        // sticks go dead until a MOUSE move revives it (the "worked for a
+        // second then stopped" bug). memory/project_plot_pad_os_click_helper
+        gamepadActiveRef.current = performance.now();
+        markActive();
+      }
     }, GAMEPAD_POLL_MS);
 
     // ── Window/tab not focused → idle IMMEDIATELY ───────────────────
@@ -104,6 +117,11 @@ export function useIdleDetection(): boolean {
     // at once (don't wait out the threshold) so the flight loop quiets
     // the instant you leave. Returning focus flips it back via markActive.
     function forceIdle() {
+      // Don't freeze the flight loop on a focus flicker if a gamepad was
+      // just active — Plot Pad's OS click / F11 can momentarily shift focus
+      // while the user is mid-flight. Only force-idle when they've genuinely
+      // been off the pad for a few seconds.
+      if (performance.now() - gamepadActiveRef.current < 5000) return;
       if (!isIdleRef.current) {
         isIdleRef.current = true;
         setIsIdle(true);

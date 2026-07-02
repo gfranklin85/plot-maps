@@ -1405,13 +1405,13 @@ function Inner({
             if (ritualTetherForwardRef) ritualTetherForwardRef.current = h;
           }}
         />
-        {/* Plot's theodolite reticle replaces the OS cursor inside the
-            map container. The OS cursor still moves (Plot Pad's stick or
-            the mouse) and still fires real click events; we just replace
-            the *visual* with a custom SVG. followCursor pins the reticle
-            to the REAL cursor so a Plot Pad A-press OS click lands exactly
-            on the reticle → Map3D's gmp-click fires there → Google's exact
-            ground raycast. memory/project_plot_pad_os_click_helper */}
+        {/* The reticle FOLLOWS the real OS cursor. Plot Pad's right stick
+            moves the OS cursor; this green reticle rides along, so what you
+            see IS the cursor. Press A → Plot Pad fires a real OS click at the
+            cursor = at the reticle → Map3D's gmp-click fires there → the
+            parcel opens IDENTICALLY to a mouse click. The cursor is the
+            single source of truth; no separate fire-resolve to drift out of
+            sync. memory/project_plot_pad_os_click_helper, controller-cursor-model */}
         <CustomReticle
           hoverActive={hoverActive}
           followCursor

@@ -39,8 +39,8 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
     MOUSEEVENTF_MOVE, MOUSEINPUT, VIRTUAL_KEY, VK_ESCAPE, VK_F11,
 };
 use windows::Win32::UI::Input::XboxController::{
-    XInputGetState, XINPUT_GAMEPAD_A, XINPUT_GAMEPAD_B, XINPUT_GAMEPAD_START,
-    XINPUT_STATE,
+    XInputGetState, XINPUT_GAMEPAD_A, XINPUT_GAMEPAD_B, XINPUT_GAMEPAD_LEFT_SHOULDER,
+    XINPUT_GAMEPAD_START, XINPUT_STATE,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     GetForegroundWindow, GetWindowTextW, GetWindowThreadProcessId,
@@ -73,6 +73,8 @@ const BROWSER_HINTS: &[&str] = &[
     "brave.exe",
     "opera.exe",
     "vivaldi.exe",
+    "code.exe",     // VS Code Simple Browser (dev testing)
+    "arc.exe",
 ];
 
 fn deadzone(v: i32) -> i32 {
@@ -287,8 +289,14 @@ fn main() {
             send_key(VK_F11);
         }
 
-        // ── RIGHT STICK → OS cursor (aim the reticle) ────────────────
-        if rx != 0 || ry != 0 {
+        // ── RIGHT STICK → OS cursor, but ONLY while LB is held ───────
+        // LB is the "aim with the gamepad" gesture. By DEFAULT (LB up) the
+        // right stick is left alone so the game/map gets it for look/flight.
+        // Hold LB → the right stick moves the OS cursor (aim the reticle),
+        // then A clicks it. This is what preserves camera look — Plot Pad no
+        // longer steals the right stick full-time.
+        let lb_held = (buttons & XINPUT_GAMEPAD_LEFT_SHOULDER.0) != 0;
+        if lb_held && (rx != 0 || ry != 0) {
             let dx = ((rx as f32 / 32767.0) * CURSOR_SPEED).round() as i32;
             // XInput Y is up-positive; screen Y is down-positive → invert.
             let dy = ((-ry as f32 / 32767.0) * CURSOR_SPEED).round() as i32;

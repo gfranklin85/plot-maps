@@ -36,10 +36,10 @@ use windows::Win32::System::Threading::{
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, INPUT_MOUSE, KEYBDINPUT,
     KEYBD_EVENT_FLAGS, KEYEVENTF_KEYUP, MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP,
-    MOUSEINPUT, VIRTUAL_KEY, VK_ESCAPE, VK_F11,
+    MOUSEEVENTF_MOVE, MOUSEINPUT, VIRTUAL_KEY, VK_ESCAPE, VK_F11,
 };
 use windows::Win32::UI::Input::XboxController::{
-    XInputGetState, XINPUT_GAMEPAD_A, XINPUT_GAMEPAD_B,
+    XInputGetState, XINPUT_GAMEPAD_A, XINPUT_GAMEPAD_B, XINPUT_GAMEPAD_LEFT_SHOULDER,
     XINPUT_GAMEPAD_START, XINPUT_STATE,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
@@ -51,6 +51,7 @@ const POLL_MS: u64 = 8; // ~120 Hz
 const DEADZONE: i32 = 8000; // XInput axis is -32768..32767
 const FLIGHT_ENGAGE: i32 = 12000; // stick magnitude that counts as "flying"
 const TRIGGER_ENGAGE: u8 = 40; // trigger value that counts as throttle/climb
+const CURSOR_SPEED: f32 = 18.0; // px per poll at full right-stick deflection
 
 // Window titles / process names that mean "this is Plot". We act only when
 // one of these is foreground. Substring, case-insensitive.
@@ -158,6 +159,25 @@ fn map_focused() -> bool {
 }
 
 // ── SendInput helpers — all REAL OS input events (isTrusted in browser) ─
+
+fn send_mouse_move(dx: i32, dy: i32) {
+    let input = INPUT {
+        r#type: INPUT_MOUSE,
+        Anonymous: INPUT_0 {
+            mi: MOUSEINPUT {
+                dx,
+                dy,
+                mouseData: 0,
+                dwFlags: MOUSEEVENTF_MOVE, // relative move
+                time: 0,
+                dwExtraInfo: 0,
+            },
+        },
+    };
+    unsafe {
+        SendInput(&[input], std::mem::size_of::<INPUT>() as i32);
+    }
+}
 
 fn send_left_click() {
     let down = INPUT {
@@ -269,6 +289,8 @@ fn main() {
 
         let lx = deadzone(gp.sThumbLX as i32);
         let ly = deadzone(gp.sThumbLY as i32);
+        let rx = deadzone(gp.sThumbRX as i32);
+        let ry = deadzone(gp.sThumbRY as i32);
 
         // ── FLIGHT DETECT → F11, ONLY on the MAP ─────────────────────
         // F11 expands the MAP for flight — it has no business firing while
@@ -283,10 +305,27 @@ fn main() {
             send_key(VK_F11);
         }
 
-        // Plot Pad's ONE job: turn A into a REAL OS click so Map3D's
-        // gmp-click opens the parcel under the reticle. No cursor movement —
-        // you aim by flying the camera frame, not by moving a cursor.
-        // ── A → REAL OS left-click ───────────────────────────────────
+        // ── RIGHT STICK → OS cursor, but ONLY while LB is held ───────
+        // LB is the "aim with the gamepad" gesture. By DEFAULT (LB up) the
+        // right stick is left alone so the map gets it for camera look/flight.
+        // Hold LB → the right stick moves the OS cursor (aim the reticle);
+        // the green reticle rides the cursor, then A clicks it. This is what
+        // preserves camera look — Plot Pad never steals the right stick
+        // full-time. memory/project_plot_pad_os_click_helper (LB-aim model).
+        let lb_held = (buttons & XINPUT_GAMEPAD_LEFT_SHOULDER.0) != 0;
+        if lb_held && (rx != 0 || ry != 0) {
+            let dx = ((rx as f32 / 32767.0) * CURSOR_SPEED).round() as i32;
+            // XInput Y is up-positive; screen Y is down-positive → invert.
+            let dy = ((-ry as f32 / 32767.0) * CURSOR_SPEED).round() as i32;
+            if dx != 0 || dy != 0 {
+                send_mouse_move(dx, dy);
+            }
+        }
+
+        // Plot Pad's ONE job: turn A into a REAL OS click so Map3D's gmp-click
+        // opens the parcel under the reticle. You aim the reticle by holding LB
+        // + right stick (above); A clicks exactly where the cursor/reticle sits.
+        // ── A → REAL OS left-click at the cursor ─────────────────────
         if just_pressed(XINPUT_GAMEPAD_A.0) {
             send_left_click();
         }

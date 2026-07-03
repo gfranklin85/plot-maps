@@ -8,10 +8,28 @@
 import { supabase } from '@/lib/supabase';
 
 export async function signInWithGoogle() {
-  await supabase.auth.signInWithOAuth({
+  // signInWithOAuth does a FULL-PAGE redirect to Google (no popup). If the
+  // current origin isn't in Supabase's allowed redirect URLs, it resolves
+  // WITHOUT navigating and the tap looks dead — the exact "nothing happened"
+  // on mobile prod. Surface the error + the origin so failures aren't silent,
+  // and drive the redirect ourselves via the returned url as a fallback.
+  const origin = window.location.origin;
+  const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
-      redirectTo: `${window.location.origin}/auth/callback`,
+      redirectTo: `${origin}/auth/callback`,
+      // skipBrowserRedirect lets us navigate deterministically below — some
+      // mobile browsers drop the auto-redirect from an async handler.
+      skipBrowserRedirect: true,
     },
   });
+  if (error) {
+    console.error('[signIn] Google OAuth failed for origin', origin, error.message);
+    return;
+  }
+  if (data?.url) {
+    window.location.assign(data.url);
+  } else {
+    console.error('[signIn] OAuth returned no redirect url for origin', origin);
+  }
 }

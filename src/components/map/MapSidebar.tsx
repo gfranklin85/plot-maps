@@ -125,8 +125,9 @@ export default function MapSidebar(p: MapSidebarProps) {
 
       {/* ── the bottom cockpit dash ── */}
       <div className="map-dash">
-        <Link href="/" className="map-dash__brand" aria-label="Home" title="Home">
-          <PlotMapsLogo color="#0c1322" className="h-5 w-auto" />
+        <Link href="/" className="map-dash__brand" aria-label="Back to home" title="Back to home" data-gamepad-focusable>
+          <MaterialIcon icon="home" className="map-dash__brand-home" />
+          <PlotMapsLogo color="#0c1322" className="h-6 w-auto" />
         </Link>
 
         <div className="map-dash__search">{p.searchSlot}</div>

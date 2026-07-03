@@ -3,6 +3,7 @@
 import AppHeader from '@/components/layout/AppHeader';
 import BullpenBoardMock from '@/components/landing/BullpenBoardMock';
 import HeroCitySearch from '@/components/landing/HeroCitySearch';
+import PlotPadHeroChip from '@/components/landing/PlotPadHeroChip';
 import OrbitSection from '@/components/landing/OrbitSection';
 import ToolGrid from '@/components/dashboard/ToolGrid';
 import MaterialIcon from '@/components/ui/MaterialIcon';
@@ -96,10 +97,10 @@ export default function FrontPage() {
                 <button type="button" className="fp-cta fp-cta--primary" onClick={() => goMap('3d')}>
                   Explore the map <span aria-hidden>→</span>
                 </button>
-                <a href="/bullpen" className="fp-cta fp-cta--ghost">
-                  See how it works <span aria-hidden>→</span>
-                </a>
               </div>
+              {/* Plot Pad — compact gamepad-flight chip (replaces the removed
+                  top strip): live status + download. memory/project_plot_pad_os_click_helper */}
+              <PlotPadHeroChip />
               {/* honest credibility */}
               <div className="fp-cred">
                 <span className="fp-cred__seal"><MaterialIcon icon="verified" /></span>

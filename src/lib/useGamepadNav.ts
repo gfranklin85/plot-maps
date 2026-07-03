@@ -34,6 +34,27 @@ const REPEAT_MS = 240; // debounce between cycles
 // filter those out hard: must be a decent size, actually visible, and have
 // real text (or opt in via data-gamepad-focusable). Cycled in visual order
 // (top→bottom, left→right) so the D-pad walks the page naturally.
+// Pick the REAL controller. On Windows a phantom pad often appears in slot 0
+// — e.g. Steam Input registers a "Plot Pad (Vendor 0075)" with mapping:"" and
+// every button/axis frozen at 0. Grabbing the first connected pad lands on
+// that dead phantom, so the D-pad (live on the real Xbox pad in another slot)
+// looks like it does nothing. Prefer a standard-mapping pad; otherwise the
+// first pad that actually has buttons. That was THE bug behind the frozen
+// highlight. (Confirmed via gamepadtester.com: slot0 "Plot Pad" mapping n/a,
+// slot1 "Xbox One Game Controller" mapping standard, D-pad → B15.)
+function pickPad(): Gamepad | null {
+  const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+  const live = Array.from(pads).filter((p): p is Gamepad => !!p && p.connected);
+  if (!live.length) return null;
+  // 1) a proper standard-mapping pad wins
+  const std = live.find((p) => p.mapping === 'standard');
+  if (std) return std;
+  // 2) else the first pad whose buttons aren't all dead (skips the phantom)
+  const alive = live.find((p) => p.buttons.some((b) => b && (b.pressed || b.value > 0.05)));
+  // 3) else just the first live pad (nothing pressed yet on a non-standard pad)
+  return alive ?? live.find((p) => p.buttons.length > 0) ?? live[0];
+}
+
 function collect(): HTMLElement[] {
   const out: HTMLElement[] = [];
   document.querySelectorAll<HTMLElement>(FOCUSABLE).forEach((el) => {
@@ -114,9 +135,8 @@ export function useGamepadNav(opts: { enabled?: boolean } = {}) {
     };
 
     const tick = () => {
-      const pads = navigator.getGamepads();
-      let pad: Gamepad | null = null;
-      for (const p of pads) { if (p && p.connected) { pad = p; break; } }
+      const pad = pickPad();
+
       if (pad) {
         // ── A controller is present → a button is ALWAYS highlighted ──
         // The moment a pad is connected, highlight the first button (Download)
@@ -126,25 +146,17 @@ export function useGamepadNav(opts: { enabled?: boolean } = {}) {
         if (!current) focusFirst();
         engaged = true;
 
-        // Cycle the highlight. Read the direction from EVERY common source so
-        // it works on any controller regardless of how it reports the D-pad:
-        //   • D-pad buttons 12 up / 13 down / 14 left / 15 right (standard)
-        //   • a hat-switch axis (axis 9 on many pads) → 8 compass values
-        //   • the left/right sticks (debounced, so not touchy)
+        // Cycle the highlight. The real controller is a standard-mapping pad
+        // (confirmed on the tester), so the D-pad is buttons 12 up / 13 down /
+        // 14 left / 15 right. Left stick mirrors it (debounced, so not touchy).
         const DZ = 0.6;
         const lx = pad.axes[0] ?? 0, ly = pad.axes[1] ?? 0;
-        const rx = pad.axes[2] ?? 0, ry = pad.axes[3] ?? 0;
-        const hat = pad.axes[9]; // hat: -1..~1 in 8 steps on many controllers
-        const hatDown = typeof hat === 'number' && hat > 0.1 && hat < 0.6;   // down/right region
-        const hatUp = typeof hat === 'number' && ((hat >= 0.6) || (hat < 0.1 && hat > -0.6)); // up/left region
         const next =
           pad.buttons[13]?.pressed || pad.buttons[15]?.pressed || // dpad down/right
-          ly > DZ || lx > DZ || ry > DZ || rx > DZ ||             // stick down/right
-          hatDown;
+          ly > DZ || lx > DZ;                                     // stick down/right
         const prev =
           pad.buttons[12]?.pressed || pad.buttons[14]?.pressed || // dpad up/left
-          ly < -DZ || lx < -DZ || ry < -DZ || rx < -DZ ||         // stick up/left
-          hatUp;
+          ly < -DZ || lx < -DZ;                                   // stick up/left
         const aBtn = !!pad.buttons[0]?.pressed;
 
         const now = performance.now();

@@ -14,9 +14,13 @@ export default function PostHogProvider({ children }: { children: ReactNode }) {
   const searchParams = useSearchParams();
   const prevPathRef = useRef('');
 
-  // Initialize PostHog once
+  // Initialize PostHog once — DISABLED 2026-07-03: its config.js load was
+  // throwing "Uncaught SyntaxError: Unexpected token '<'" (proxy returned an
+  // HTML 404), the persistent "1 error" on the page. Analytics is non-critical;
+  // re-enable once the /ingest proxy or a direct host is verified working.
   useEffect(() => {
-    initPostHog();
+    void initPostHog;
+    // initPostHog();
   }, []);
 
   // Toggle capture based on consent

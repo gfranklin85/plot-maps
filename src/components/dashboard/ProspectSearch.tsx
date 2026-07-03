@@ -74,21 +74,13 @@ export default function ProspectSearch({ compact = false, onSelect, placeholder 
       setGoogleReady(true);
       return;
     }
-    // A Google Maps script may ALREADY be on the page loaded WITHOUT `places`
-    // (the 3D map / other components). Look specifically for a script that
-    // includes libraries=places; only inject if none exists. Then poll until
-    // `places` actually appears, rather than trusting a places-less onload.
-    const placesScript = document.querySelector('script[src*="maps.googleapis.com"][src*="libraries=places"]');
-    if (!placesScript) {
-      const script = document.createElement('script');
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places`;
-      script.async = true;
-      script.onload = () => { if (window.google?.maps?.places) setGoogleReady(true); };
-      document.head.appendChild(script);
-    }
-    // Poll for places regardless — covers both the just-injected script and a
-    // pre-existing places-enabled loader that resolves asynchronously.
-    if (scriptRetries < 40) {
+    // NEVER inject our own Google Maps <script> — every surface that mounts
+    // this search already provides Google Maps + `places` via an ambient
+    // @vis.gl/react-google-maps APIProvider (the map page, and the landing
+    // page's OrbitSection loads ['maps3d','places']). A second raw script tag
+    // caused "loaded multiple times" crashes that killed page JS. We ONLY
+    // poll until `places` is available from that ambient loader.
+    if (scriptRetries < 60) {
       const timer = setTimeout(() => {
         if (window.google?.maps?.places) setGoogleReady(true);
         else setScriptRetries(r => r + 1);
@@ -209,12 +201,37 @@ export default function ProspectSearch({ compact = false, onSelect, placeholder 
       navigateToCoords({ lat: r.lat, lng: r.lng, address: r.address, leadId: r.id });
       return;
     }
-    if (!placesServiceRef.current) return;
+    // Resolve the place → coords. getDetails is the fast path; if the service
+    // isn't ready or the call fails, fall back to the Geocoder so a click
+    // ALWAYS navigates (the bug: a null service / non-OK status silently did
+    // nothing and the user stayed put).
+    const geocodeFallback = () => {
+      try {
+        const geo = new google.maps.Geocoder();
+        geo.geocode({ placeId: r.placeId }, (res, status) => {
+          if (status === 'OK' && res?.[0]?.geometry?.location) {
+            navigateToCoords({
+              lat: res[0].geometry.location.lat(),
+              lng: res[0].geometry.location.lng(),
+              address: res[0].formatted_address || r.description,
+            });
+          } else {
+            console.warn('[ProspectSearch] geocode fallback failed', status);
+          }
+        });
+      } catch (e) {
+        console.warn('[ProspectSearch] geocode fallback threw', e);
+      }
+    };
+
+    if (!placesServiceRef.current) { geocodeFallback(); return; }
     placesServiceRef.current.getDetails(
       { placeId: r.placeId, fields: ['geometry', 'formatted_address'], sessionToken: sessionTokenRef.current || undefined },
       (place, status) => {
-        if (status !== google.maps.places.PlacesServiceStatus.OK) return;
-        if (!place?.geometry?.location) return;
+        if (status !== google.maps.places.PlacesServiceStatus.OK || !place?.geometry?.location) {
+          geocodeFallback();
+          return;
+        }
         sessionTokenRef.current = new google.maps.places.AutocompleteSessionToken();
         navigateToCoords({
           lat: place.geometry.location.lat(),

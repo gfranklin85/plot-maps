@@ -1360,7 +1360,11 @@ gmp-popover-3d-element[plot-card-popover],
 .fp-checks { margin-top: 22px; display: grid; gap: 10px; list-style: none; }
 .fp-checks li { display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 600; color: #2c3646; }
 .fp-checks__i { color: #1349d4; flex: none; font-size: 20px; }
-.fp-cta-row { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 12px; }
+.fp-cta-row { margin-top: 18px; display: flex; flex-wrap: wrap; gap: 12px; max-width: 560px; }
+/* the primary CTA fills the column width so it lines up with the search bar
+   above and the Plot Pad chip below — one clean aligned stack, not a lonely
+   narrow button. */
+.fp-cta-row .fp-cta--primary { flex: 1; justify-content: center; min-width: 220px; }
 .fp-cta { display: inline-flex; align-items: center; gap: 9px; border-radius: 12px; padding: 13px 24px; font-size: 15px; font-weight: 600; transition: transform .16s, box-shadow .16s, background .16s; }
 .fp-cta--primary { background: var(--fp-green); color: #fff; box-shadow: 0 10px 22px -10px rgba(19,73,212,0.6); }
 .fp-cta--primary:hover { transform: translateY(-1px); background: var(--fp-green-deep); }
@@ -2016,6 +2020,26 @@ gmp-popover-3d-element[plot-card-popover],
     animation: none !important; opacity: 1 !important; transform: none !important;
   }
 }
+
+/* ── Plot Pad compact hero chip (blue gamepad outline + status + download) ── */
+.ppchip {
+  display: flex; align-items: center; gap: 9px;
+  width: 100%; max-width: 560px;
+  margin-top: 12px; padding: 11px 16px; border-radius: 12px;
+  background: rgba(19,73,212,0.05);
+  border: 1.5px solid rgba(19,73,212,0.45);
+  color: #1349d4; font-size: 13.5px; font-weight: 700;
+  cursor: pointer; transition: background .15s, border-color .15s, transform .15s;
+  text-align: left;
+}
+/* push the download icon to the far right so the chip reads as a full bar */
+.ppchip__text { flex: 1; }
+.ppchip:hover { background: rgba(19,73,212,0.1); border-color: #1349d4; transform: translateY(-1px); }
+.ppchip__pad { display: inline-flex; }
+.ppchip__pad .material-symbols-outlined, .ppchip__pad .material-symbols-rounded { font-size: 20px; }
+.ppchip__dot { width: 8px; height: 8px; border-radius: 50%; background: #9fb3d8; flex: none; }
+.ppchip.is-on .ppchip__dot { background: #22c55e; box-shadow: 0 0 9px 1px rgba(34,197,94,0.6); animation: ppad-pulse 1.8s ease-in-out infinite; }
+.ppchip__dl { font-size: 18px; margin-left: 2px; }
 
 /* ── Hero "fly any city" search + destination chips ──────────────────── */
 .hcs { margin: 14px 0 16px; max-width: 560px; }
@@ -3120,7 +3144,7 @@ gmp-popover-3d-element[plot-card-popover],
    HONEST CREDIBILITY — broker credential (replaces fake avatars) +
    founding-member social proof. memory/project_credibility_markers_honest
    ════════════════════════════════════════════════════════════════════ */
-.fp-cred { margin-top: 30px; display: flex; align-items: center; gap: 12px; }
+.fp-cred { margin-top: 18px; display: flex; align-items: center; gap: 12px; max-width: 560px; }
 .fp-cred__seal {
   flex: none; width: 38px; height: 38px; border-radius: 999px;
   display: flex; align-items: center; justify-content: center;

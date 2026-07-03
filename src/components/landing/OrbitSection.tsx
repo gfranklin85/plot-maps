@@ -35,7 +35,12 @@ export default function OrbitSection() {
               or the full cinematic flyover in photoreal detail. Both free.
               Listing agents: every home you list gets one.
             </p>
-            <APIProvider apiKey={API_KEY} libraries={['maps3d']}>
+            {/* ONE loader for the landing page: maps3d (orbit) + places (the
+                hero city search). A second Google Maps load from a raw script
+                tag crashed the page ("loaded multiple times / maps3d provided
+                more than once"), so ProspectSearch now polls for `places`
+                which THIS single loader provides. */}
+            <APIProvider apiKey={API_KEY} libraries={['maps3d', 'places']}>
               <OrbitTool />
             </APIProvider>
           </div>

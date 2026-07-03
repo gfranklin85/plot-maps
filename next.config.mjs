@@ -1,16 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   async rewrites() {
-    return [
-      {
-        source: '/ingest/static/:path*',
-        destination: 'https://us-assets.i.posthog.com/static/:path*',
-      },
-      {
-        source: '/ingest/:path*',
-        destination: 'https://us.i.posthog.com/:path*',
-      },
-    ];
+    // PostHog now points directly at its cloud host (see src/lib/posthog.ts),
+    // so the /ingest reverse-proxy rewrites are no longer needed. Kept empty.
+    return [];
   },
   // PostHog proxy should not follow redirects
   skipTrailingSlashRedirect: true,

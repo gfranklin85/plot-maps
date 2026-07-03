@@ -36,10 +36,10 @@ use windows::Win32::System::Threading::{
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, INPUT_MOUSE, KEYBDINPUT,
     KEYBD_EVENT_FLAGS, KEYEVENTF_KEYUP, MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP,
-    MOUSEEVENTF_MOVE, MOUSEINPUT, VIRTUAL_KEY, VK_ESCAPE, VK_F11,
+    MOUSEINPUT, VIRTUAL_KEY, VK_ESCAPE, VK_F11,
 };
 use windows::Win32::UI::Input::XboxController::{
-    XInputGetState, XINPUT_GAMEPAD_A, XINPUT_GAMEPAD_B, XINPUT_GAMEPAD_LEFT_SHOULDER,
+    XInputGetState, XINPUT_GAMEPAD_A, XINPUT_GAMEPAD_B,
     XINPUT_GAMEPAD_START, XINPUT_STATE,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
@@ -51,7 +51,6 @@ const POLL_MS: u64 = 8; // ~120 Hz
 const DEADZONE: i32 = 8000; // XInput axis is -32768..32767
 const FLIGHT_ENGAGE: i32 = 12000; // stick magnitude that counts as "flying"
 const TRIGGER_ENGAGE: u8 = 40; // trigger value that counts as throttle/climb
-const CURSOR_SPEED: f32 = 18.0; // px per poll at full right-stick deflection
 
 // Window titles / process names that mean "this is Plot". We act only when
 // one of these is foreground. Substring, case-insensitive.
@@ -146,25 +145,19 @@ fn plot_focused() -> bool {
     TITLE_HINTS.iter().any(|h| title.contains(h))
 }
 
-// ── SendInput helpers — all REAL OS input events (isTrusted in browser) ─
-fn send_mouse_move(dx: i32, dy: i32) {
-    let input = INPUT {
-        r#type: INPUT_MOUSE,
-        Anonymous: INPUT_0 {
-            mi: MOUSEINPUT {
-                dx,
-                dy,
-                mouseData: 0,
-                dwFlags: MOUSEEVENTF_MOVE, // relative move
-                time: 0,
-                dwExtraInfo: 0,
-            },
-        },
-    };
-    unsafe {
-        SendInput(&[input], std::mem::size_of::<INPUT>() as i32);
+/// True only when the MAP page is focused. F11 fullscreen belongs to the map
+/// (flight) ONLY — never the landing page or general browsing. The map page
+/// sets a DISTINCT document.title ("Plot Maps — Flight Map"); the generic site
+/// title ("Circle Prospecting Tool") shows on every page and must NOT match.
+fn map_focused() -> bool {
+    if !plot_focused() {
+        return false;
     }
+    let title = foreground_title_lower();
+    title.contains("flight map") || title.contains("/map")
 }
+
+// ── SendInput helpers — all REAL OS input events (isTrusted in browser) ─
 
 fn send_left_click() {
     let down = INPUT {
@@ -276,36 +269,24 @@ fn main() {
 
         let lx = deadzone(gp.sThumbLX as i32);
         let ly = deadzone(gp.sThumbLY as i32);
-        let rx = deadzone(gp.sThumbRX as i32);
-        let ry = deadzone(gp.sThumbRY as i32);
 
-        // ── FLIGHT DETECT → F11 (once) ───────────────────────────────
+        // ── FLIGHT DETECT → F11, ONLY on the MAP ─────────────────────
+        // F11 expands the MAP for flight — it has no business firing while
+        // browsing the rest of the site. Only fullscreen when the map page
+        // is focused and real flight input is seen.
         let flying = lx.abs() > FLIGHT_ENGAGE
             || ly.abs() > FLIGHT_ENGAGE
             || gp.bLeftTrigger > TRIGGER_ENGAGE
             || gp.bRightTrigger > TRIGGER_ENGAGE;
-        if flying && !went_fullscreen {
+        if flying && !went_fullscreen && map_focused() {
             went_fullscreen = true;
             send_key(VK_F11);
         }
 
-        // ── RIGHT STICK → OS cursor, but ONLY while LB is held ───────
-        // LB is the "aim with the gamepad" gesture. By DEFAULT (LB up) the
-        // right stick is left alone so the game/map gets it for look/flight.
-        // Hold LB → the right stick moves the OS cursor (aim the reticle),
-        // then A clicks it. This is what preserves camera look — Plot Pad no
-        // longer steals the right stick full-time.
-        let lb_held = (buttons & XINPUT_GAMEPAD_LEFT_SHOULDER.0) != 0;
-        if lb_held && (rx != 0 || ry != 0) {
-            let dx = ((rx as f32 / 32767.0) * CURSOR_SPEED).round() as i32;
-            // XInput Y is up-positive; screen Y is down-positive → invert.
-            let dy = ((-ry as f32 / 32767.0) * CURSOR_SPEED).round() as i32;
-            if dx != 0 || dy != 0 {
-                send_mouse_move(dx, dy);
-            }
-        }
-
-        // ── A → REAL OS left-click at the cursor (the whole point) ───
+        // Plot Pad's ONE job: turn A into a REAL OS click so Map3D's
+        // gmp-click opens the parcel under the reticle. No cursor movement —
+        // you aim by flying the camera frame, not by moving a cursor.
+        // ── A → REAL OS left-click ───────────────────────────────────
         if just_pressed(XINPUT_GAMEPAD_A.0) {
             send_left_click();
         }
@@ -313,8 +294,8 @@ fn main() {
         if just_pressed(XINPUT_GAMEPAD_B.0) {
             send_key(VK_ESCAPE);
         }
-        // ── Start/Menu → toggle full-screen manually ─────────────────
-        if just_pressed(XINPUT_GAMEPAD_START.0) {
+        // ── Start/Menu → toggle full-screen (map flight) ─────────────
+        if just_pressed(XINPUT_GAMEPAD_START.0) && map_focused() {
             send_key(VK_F11);
             went_fullscreen = true;
         }

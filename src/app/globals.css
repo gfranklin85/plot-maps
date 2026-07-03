@@ -1342,7 +1342,7 @@ gmp-popover-3d-element[plot-card-popover],
     linear-gradient(180deg, #f3f8ff 0%, #ffffff 70%);
 }
 .fp-hero__grid { position: relative; z-index: 2; display: flex; flex-direction: column; gap: 8px; padding-top: 40px; padding-bottom: 16px; }
-@media (min-width: 980px) { .fp-hero__grid { flex-direction: row; align-items: center; min-height: 76vh; gap: 24px; } }
+@media (min-width: 980px) { .fp-hero__grid { flex-direction: row; align-items: flex-start; min-height: 0; gap: 32px; padding-top: 30px; } }
 
 .fp-pill {
   display: inline-flex; align-items: center; gap: 7px;
@@ -1351,16 +1351,16 @@ gmp-popover-3d-element[plot-card-popover],
   padding: 6px 13px; border-radius: 999px; margin-bottom: 22px;
 }
 .fp-head {
-  font-weight: 800; letter-spacing: -0.025em; line-height: 1.0;
-  font-size: clamp(40px, 5.4vw, 68px); color: var(--fp-ink);
+  font-weight: 800; letter-spacing: -0.025em; line-height: 1.02;
+  font-size: clamp(34px, 4vw, 54px); color: var(--fp-ink);
 }
 .fp-head .accent { color: var(--fp-green); display: block; }
-.fp-sub { margin-top: 22px; max-width: 30em; font-size: clamp(15px, 1.4vw, 18px); line-height: 1.55; color: var(--fp-body); }
+.fp-sub { margin-top: 16px; max-width: 30em; font-size: clamp(14.5px, 1.3vw, 17px); line-height: 1.5; color: var(--fp-body); }
 .fp-sub b { color: var(--fp-ink); font-weight: 700; }
 .fp-checks { margin-top: 22px; display: grid; gap: 10px; list-style: none; }
 .fp-checks li { display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 600; color: #2c3646; }
 .fp-checks__i { color: #1349d4; flex: none; font-size: 20px; }
-.fp-cta-row { margin-top: 30px; display: flex; flex-wrap: wrap; gap: 12px; }
+.fp-cta-row { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 12px; }
 .fp-cta { display: inline-flex; align-items: center; gap: 9px; border-radius: 12px; padding: 13px 24px; font-size: 15px; font-weight: 600; transition: transform .16s, box-shadow .16s, background .16s; }
 .fp-cta--primary { background: var(--fp-green); color: #fff; box-shadow: 0 10px 22px -10px rgba(19,73,212,0.6); }
 .fp-cta--primary:hover { transform: translateY(-1px); background: var(--fp-green-deep); }
@@ -1373,7 +1373,8 @@ gmp-popover-3d-element[plot-card-popover],
 .fp-trust__text { font-size: 13.5px; color: var(--fp-body); line-height: 1.35; }
 
 /* the floating scene */
-.fp-hero__scene-col { position: relative; z-index: 1; flex: 1.05; }
+.fp-hero__scene-col { position: relative; z-index: 1; flex: 1.35; margin-top: -12px; min-width: 0; }
+@media (min-width: 980px) { .fp-hero__scene-col { align-self: center; } }
 .fp-scene { position: relative; width: 100%; margin: 0 auto; aspect-ratio: 2560 / 1440; }
 .fp-scene__layer { pointer-events: none; position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
 .fp-scene::after {
@@ -1907,16 +1908,16 @@ gmp-popover-3d-element[plot-card-popover],
    memory/project_controller_first_class_input */
 .gp-focus {
   position: relative;
-  outline: 3px solid #1349d4 !important;
+  outline: 4px solid #ffd400 !important;
   outline-offset: 3px;
   border-radius: 12px;
-  box-shadow: 0 0 0 3px rgba(19,73,212,0.25), 0 0 26px 4px rgba(19,73,212,0.55) !important;
-  animation: gp-focus-pulse 1.4s ease-in-out infinite;
-  z-index: 2;
+  box-shadow: 0 0 0 4px rgba(255,212,0,0.35), 0 0 32px 6px rgba(255,212,0,0.7) !important;
+  animation: gp-focus-pulse 1.2s ease-in-out infinite;
+  z-index: 3;
 }
 @keyframes gp-focus-pulse {
-  0%,100% { box-shadow: 0 0 0 3px rgba(19,73,212,0.22), 0 0 20px 3px rgba(19,73,212,0.45); }
-  50%     { box-shadow: 0 0 0 4px rgba(19,73,212,0.32), 0 0 30px 6px rgba(19,73,212,0.7); }
+  0%,100% { box-shadow: 0 0 0 4px rgba(255,212,0,0.32), 0 0 26px 5px rgba(255,212,0,0.6); }
+  50%     { box-shadow: 0 0 0 6px rgba(255,212,0,0.45), 0 0 40px 9px rgba(255,212,0,0.9); }
 }
 @media (prefers-reduced-motion: reduce) { .gp-focus { animation: none; } }
 
@@ -1977,6 +1978,83 @@ gmp-popover-3d-element[plot-card-popover],
 .bbm__offers.is-hot { color: #11804a; background: rgba(17,128,74,0.1); }
 .bbm__posted { font-size: 10.5px; color: #9aa3b2; white-space: nowrap; }
 @media (max-width: 980px) { .bbm { transform: none; } }
+
+/* ── Fused hero scene: island + destination cards + family (staggered) ──
+   All layers share the 1920×1080 canvas → self-align at inset-0. Each slides
+   in on load; family is the top layer (rendered last) and never covered.
+   memory/project_fused_hero_flight_brokerage */
+/* Landscape scene: let it bleed wider than its column so the island reads
+   big + horizontal (like the mockup), not a small centered vignette. */
+.fp-fscene { position: relative; width: 128%; margin-left: -8%; margin-top: -4%; aspect-ratio: 1920 / 1080; }
+@media (min-width: 1280px) { .fp-fscene { width: 138%; margin-left: -14%; } }
+.fp-fscene__layer { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; will-change: transform, opacity; }
+.fp-fscene__island { filter: drop-shadow(0 30px 50px rgba(20,50,120,0.18)); }
+.fp-fscene__family { z-index: 5; } /* outermost — on top of everything */
+
+/* island: gentle rise + settle, then a slow perpetual bob */
+.fscene-in-island {
+  opacity: 0;
+  animation: fscene-island-in 900ms cubic-bezier(0.16,0.8,0.24,1) 80ms forwards,
+             fscene-bob 7s ease-in-out 1000ms infinite;
+}
+@keyframes fscene-island-in { from { opacity: 0; transform: translateY(28px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes fscene-bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-1.2%); } }
+
+/* destination cards: pop/slide in one after another, then a soft float */
+.fscene-in-card { opacity: 0; }
+.fscene-d1 { animation: fscene-card-in 640ms cubic-bezier(0.2,0.9,0.2,1) 620ms forwards, float-card-a 5s ease-in-out 1300ms infinite; }
+.fscene-d2 { animation: fscene-card-in 640ms cubic-bezier(0.2,0.9,0.2,1) 800ms forwards, float-card-b 5.6s ease-in-out 1500ms infinite; }
+.fscene-d3 { animation: fscene-card-in 640ms cubic-bezier(0.2,0.9,0.2,1) 980ms forwards, float-card-c 6.2s ease-in-out 1700ms infinite; }
+@keyframes fscene-card-in { from { opacity: 0; transform: translateY(-14px) scale(0.94); } to { opacity: 1; transform: translateY(0) scale(1); } }
+
+/* family: slides UP in last, lands on top, stays put */
+.fscene-in-family { opacity: 0; animation: fscene-family-in 800ms cubic-bezier(0.16,0.8,0.24,1) 1100ms forwards; }
+@keyframes fscene-family-in { from { opacity: 0; transform: translateY(40px); } to { opacity: 1; transform: translateY(0); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .fscene-in-island, .fscene-in-card, .fscene-d1, .fscene-d2, .fscene-d3, .fscene-in-family {
+    animation: none !important; opacity: 1 !important; transform: none !important;
+  }
+}
+
+/* ── Hero "fly any city" search + destination chips ──────────────────── */
+.hcs { margin: 14px 0 16px; max-width: 560px; }
+.hcs__label { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 700; color: #4a5568; margin-bottom: 8px; }
+.hcs__pin { font-size: 15px; }
+/* Hero search — force the compact ProspectSearch input to a clean WHITE
+   hero-sized pill (its default compact bg-card/size is too small + tinted). */
+.hcs__bar { position: relative; }
+.hcs__bar input {
+  width: 100% !important;
+  height: 50px !important;
+  padding-left: 46px !important; padding-right: 18px !important;
+  border-radius: 13px !important;
+  font-size: 15px !important; color: #14213d !important;
+  background: #fff !important;
+  border: 1px solid rgba(19,73,212,0.2) !important;
+  box-shadow: 0 10px 26px -16px rgba(20,50,120,0.4) !important;
+}
+.hcs__bar input::placeholder { color: #7a8699 !important; }
+.hcs__bar input:focus {
+  outline: none !important;
+  border-color: #1349d4 !important;
+  box-shadow: 0 0 0 3px rgba(19,73,212,0.14), 0 14px 34px -16px rgba(20,50,120,0.5) !important;
+}
+/* the search icon inside ProspectSearch — recolor to brand blue, position it */
+.hcs__bar .material-symbols-outlined,
+.hcs__bar .material-symbols-rounded { color: #1349d4 !important; left: 16px !important; font-size: 22px !important; }
+
+.hcs__chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.hcs__chip {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 4px 12px 4px 4px; border-radius: 999px;
+  background: #fff; border: 1px solid rgba(19,73,212,0.16);
+  font-size: 13px; font-weight: 700; color: #1a2333;
+  cursor: pointer; transition: transform .14s, box-shadow .14s, border-color .14s;
+}
+.hcs__chip:hover { transform: translateY(-1px); border-color: rgba(19,73,212,0.4); box-shadow: 0 8px 18px -10px rgba(20,50,120,0.45); }
+.hcs__chip-img { width: 26px; height: 26px; border-radius: 50%; object-fit: cover; flex: none; }
+.hcs__chip-name { white-space: nowrap; }
 
 /* dock floats OVER the bottom of the full-screen map */
 .map-shell__dock { position: absolute; left: 0; right: 0; bottom: 0; height: var(--map-dash-h); z-index: 30; }

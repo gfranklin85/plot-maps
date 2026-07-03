@@ -1,8 +1,8 @@
 'use client';
 
 import AppHeader from '@/components/layout/AppHeader';
-import PlotPadBanner from '@/components/landing/PlotPadBanner';
 import BullpenBoardMock from '@/components/landing/BullpenBoardMock';
+import HeroCitySearch from '@/components/landing/HeroCitySearch';
 import OrbitSection from '@/components/landing/OrbitSection';
 import ToolGrid from '@/components/dashboard/ToolGrid';
 import MaterialIcon from '@/components/ui/MaterialIcon';
@@ -34,28 +34,10 @@ import { useAuth } from '@/lib/auth-context';
 // layer with zero other changes. memory/feedback_screen_is_always_2d.
 
 const HERO = '/dashboard/hero';
-const CREW = '/landing/crew';
 
-// Sky layer — Greg's real sky (same 2560×1440 canvas) sits behind the
-// platform. Set to null to fall back to the CSS gradient sky.
+// Sky layer — real sky behind the fused island scene. Set to null to fall
+// back to the CSS gradient sky.
 const SKY_SRC: string | null = `${HERO}/sky.svg`;
-
-// The vendor-crew scene — 9 layered SVGs (same 1920×1080 canvas, full-frame
-// pieces that self-align at inset-0). Order is back→front (Greg's numbering):
-// the 3 rear floating callout cards, then the buyer family on the column,
-// then the 5 vendors on surrounding pillars. The 3 cards drift gently; the
-// figures stay grounded. memory/feedback_screen_is_always_2d.
-const SCENE_LAYERS: { src: string; anim: string; alt: string }[] = [
-  { src: `${CREW}/01-card-team-ready.svg`,       anim: 'float-card-a', alt: '' },
-  { src: `${CREW}/02-card-you-choose.svg`,       anim: 'float-card-b', alt: '' },
-  { src: `${CREW}/03-card-private-estimates.svg`, anim: 'float-card-c', alt: '' },
-  { src: `${CREW}/04-family.svg`,                anim: '',             alt: 'A homebuying family standing on a raised column' },
-  { src: `${CREW}/05-vendor-1.svg`,             anim: '',             alt: '' },
-  { src: `${CREW}/06-vendor-5.svg`,             anim: '',             alt: '' },
-  { src: `${CREW}/07-vendor-2.svg`,             anim: '',             alt: '' },
-  { src: `${CREW}/08-vendor-4.svg`,             anim: '',             alt: '' },
-  { src: `${CREW}/09-vendor-3.svg`,             anim: '',             alt: '' },
-];
 
 export default function FrontPage() {
   const { user } = useAuth();
@@ -72,12 +54,9 @@ export default function FrontPage() {
       {/* ════ HEADER (shared with the dashboard for one consistent chrome) ════ */}
       <AppHeader variant="public" />
 
-      {/* ════ PLOT PAD — full gamepad flight (front-and-center download) ════
-          The OS-level helper that unlocks real controller flight: exact
-          targeting, auto full-screen, every button. Greg's call: this is
-          top-of-page no matter what else is here.
-          memory/project_plot_pad_os_click_helper */}
-      <PlotPadBanner />
+      {/* Plot Pad blue strip REMOVED from the top 2026-07-03 — the gamepad
+          download shouldn't be the first thing; the fused hero (flight +
+          brokerage) leads now. memory/project_fused_hero_flight_brokerage */}
 
       {/* ════ HERO ════ */}
       <section className="fp-hero">
@@ -95,23 +74,24 @@ export default function FrontPage() {
           <div className="fp-hero__grid">
             {/* left — the live headline */}
             <div style={{ flex: 1, position: 'relative', zIndex: 2 }}>
-              <span className="fp-pill">A DIFFERENT KIND OF BROKERAGE</span>
+              <span className="fp-pill"><MaterialIcon icon="place" className="text-[15px]" /> MAPS + BROKERAGE. BUILT FOR BUYERS.</span>
+              {/* Fused hero: the map exploration AND the brokerage in one line.
+                  memory/project_fused_hero_flight_brokerage */}
               <h1 className="fp-head font-headline">
+                Explore the Map.
+                <br />
                 Build Your Position.
                 <br />
                 <span className="accent">Before You Offer.</span>
               </h1>
-              {/* Hero = Position as the UMBRELLA over a constellation of
-                  capabilities. Capability-led, no enemy named — the
-                  independence is felt, never proclaimed.
-                  memory/project_position_comingout_framing */}
               <p className="fp-sub">
-                Position is a brokerage that rebuilt the tools — the map, the
-                offer, the disclosures, the way you find your team — around the
-                one person they were always supposed to serve: <b>you</b>.
-                Everything&apos;s plainer, fairer, and finally on your side. And
-                this is just the beginning.
+                PlotMaps helps you explore places, discover the right
+                destinations, and build the perfect team through <b>Position</b> —
+                so you can buy with clarity, confidence, and an unfair advantage.
               </p>
+              {/* Fly-any-city search — the exploration hook, front and center.
+                  memory/project_destination_match_cut_thesis */}
+              <HeroCitySearch />
               <div className="fp-cta-row">
                 <button type="button" className="fp-cta fp-cta--primary" onClick={() => goMap('3d')}>
                   Explore the map <span aria-hidden>→</span>
@@ -130,22 +110,24 @@ export default function FrontPage() {
               </div>
             </div>
 
-            {/* right — the floating sky-platform scene */}
+            {/* right — the FUSED scene: isometric island base, destination
+                cards that slide in, and the buyer family ON TOP (outermost,
+                never covered). All 5 layers share the 1920×1080 canvas so they
+                self-align. Staggered slide-in per Greg's layer naming.
+                memory/project_fused_hero_flight_brokerage */}
             <div className="fp-hero__scene-col">
-              <div className="fp-scene">
-                {SCENE_LAYERS.map((l) => (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    key={l.src}
-                    src={l.src}
-                    alt={l.alt}
-                    aria-hidden={l.alt ? undefined : true}
-                    className={`fp-scene__layer ${l.anim}`}
-                    draggable={false}
-                  />
-                ))}
-                {/* The land plate IS the hero — no listing card over it.
-                    Nothing obstructs the floating world. */}
+              <div className="fp-fscene">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/landing/hero-fused/island.svg" alt="An isometric world map you can fly" className="fp-fscene__layer fp-fscene__island fscene-in-island" draggable={false} />
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/landing/hero-fused/card-nyc.svg" alt="" aria-hidden className="fp-fscene__layer fscene-in-card fscene-d1" draggable={false} />
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/landing/hero-fused/card-acapulco.svg" alt="" aria-hidden className="fp-fscene__layer fscene-in-card fscene-d2" draggable={false} />
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/landing/hero-fused/card-paris.svg" alt="" aria-hidden className="fp-fscene__layer fscene-in-card fscene-d3" draggable={false} />
+                {/* family LAST = outermost/top layer, never covered */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/landing/hero-fused/family.svg" alt="A family looking out over the world they're exploring" className="fp-fscene__layer fp-fscene__family fscene-in-family" draggable={false} />
               </div>
             </div>
           </div>

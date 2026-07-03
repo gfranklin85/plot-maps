@@ -13,7 +13,6 @@ import AnalyticsProvider from '@/components/providers/AnalyticsProvider';
 import MetaPixelProvider from '@/components/providers/MetaPixelProvider';
 import GoogleAdsProvider from '@/components/providers/GoogleAdsProvider';
 import CookieBanner from '@/components/ui/CookieBanner';
-import GamepadCursor from '@/components/gamepad/GamepadCursor';
 import type { ReactNode } from 'react';
 
 export default function ClientProviders({ children }: { children: ReactNode }) {
@@ -32,9 +31,11 @@ export default function ClientProviders({ children }: { children: ReactNode }) {
                       <CesiumViewerProvider>
                         {children}
                         <CookieBanner />
-                        {/* No-Steam gamepad UI navigation (suppresses itself
-                            on the map, which has its own flight controls). */}
-                        <GamepadCursor />
+                        {/* GamepadCursor (a stick-driven on-screen reticle) was
+                            REMOVED 2026-07-02 — it drew the blue dot and fought
+                            the new D-pad button-cycle nav (useGamepadNav, mounted
+                            in AppShell). One system now: D-pad cycles buttons,
+                            no moving reticle off-map. memory/project_lb_control_model */}
                       </CesiumViewerProvider>
                     </PhoneProvider>
                   </SidebarProvider>

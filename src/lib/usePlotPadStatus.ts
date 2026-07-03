@@ -95,19 +95,39 @@ export function usePlotPadStatus(): {
       raf = requestAnimationFrame(tick);
     };
 
-    // Seed + react to connect/disconnect immediately.
-    const refresh = () => setStatus(anyConnected() ? (s) => (s === 'active' ? s : 'connected') : 'none');
-    window.addEventListener('gamepadconnected', refresh);
-    window.addEventListener('gamepaddisconnected', refresh);
-    refresh();
+    // ── Detection: instant + self-healing ───────────────────────────
+    // The browser fires gamepadconnected/disconnected the moment a pad is
+    // plugged/unplugged on a FOCUSED page — that's the normal user's case,
+    // and it's instant. But events can be missed (Chrome quirks), so we ALSO
+    // poll on a setInterval (independent of rAF, which Chrome throttles when
+    // the tab is backgrounded). Either path flips connected/none reliably.
+    const syncConnected = () => {
+      if (!mounted) return;
+      const conn = anyConnected();
+      setStatus((s) => {
+        if (!conn) return 'none';
+        return s === 'active' ? 'active' : 'connected';
+      });
+    };
+    window.addEventListener('gamepadconnected', syncConnected);
+    window.addEventListener('gamepaddisconnected', syncConnected);
+    // Some browsers only surface an already-plugged pad after a real input;
+    // a keydown/pointerdown nudge + the poll catch that case too.
+    window.addEventListener('pointerdown', syncConnected, { passive: true });
+    window.addEventListener('keydown', syncConnected);
+    const pollId = window.setInterval(syncConnected, 250);
+    syncConnected();
     raf = requestAnimationFrame(tick);
 
     return () => {
       mounted = false;
       cancelAnimationFrame(raf);
+      window.clearInterval(pollId);
       window.removeEventListener('plot:pad-hello', onHello);
-      window.removeEventListener('gamepadconnected', refresh);
-      window.removeEventListener('gamepaddisconnected', refresh);
+      window.removeEventListener('gamepadconnected', syncConnected);
+      window.removeEventListener('gamepaddisconnected', syncConnected);
+      window.removeEventListener('pointerdown', syncConnected);
+      window.removeEventListener('keydown', syncConnected);
     };
   }, []);
 

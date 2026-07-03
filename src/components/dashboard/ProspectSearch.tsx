@@ -74,14 +74,21 @@ export default function ProspectSearch({ compact = false, onSelect, placeholder 
       setGoogleReady(true);
       return;
     }
-    const existing = document.querySelector('script[src*="maps.googleapis.com"]');
-    if (!existing) {
+    // A Google Maps script may ALREADY be on the page loaded WITHOUT `places`
+    // (the 3D map / other components). Look specifically for a script that
+    // includes libraries=places; only inject if none exists. Then poll until
+    // `places` actually appears, rather than trusting a places-less onload.
+    const placesScript = document.querySelector('script[src*="maps.googleapis.com"][src*="libraries=places"]');
+    if (!placesScript) {
       const script = document.createElement('script');
       script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places`;
       script.async = true;
-      script.onload = () => setGoogleReady(true);
+      script.onload = () => { if (window.google?.maps?.places) setGoogleReady(true); };
       document.head.appendChild(script);
-    } else if (scriptRetries < 20) {
+    }
+    // Poll for places regardless — covers both the just-injected script and a
+    // pre-existing places-enabled loader that resolves asynchronously.
+    if (scriptRetries < 40) {
       const timer = setTimeout(() => {
         if (window.google?.maps?.places) setGoogleReady(true);
         else setScriptRetries(r => r + 1);
@@ -92,10 +99,24 @@ export default function ProspectSearch({ compact = false, onSelect, placeholder 
 
   useEffect(() => {
     if (!googleReady) return;
-    autocompleteRef.current = new google.maps.places.AutocompleteService();
-    const node = document.createElement('div');
-    placesServiceRef.current = new google.maps.places.PlacesService(node);
-    sessionTokenRef.current = new google.maps.places.AutocompleteSessionToken();
+    // Guard: another Google loader (e.g. the map's APIProvider) can populate
+    // window.google.maps WITHOUT the `places` library, so `places` may still
+    // be undefined even once googleReady is true. Only construct the services
+    // when places actually exists; otherwise poll briefly until it does.
+    let cancelled = false;
+    const build = () => {
+      if (cancelled) return true;
+      const places = window.google?.maps?.places;
+      if (!places?.AutocompleteService) return false;
+      autocompleteRef.current = new places.AutocompleteService();
+      const node = document.createElement('div');
+      placesServiceRef.current = new places.PlacesService(node);
+      sessionTokenRef.current = new places.AutocompleteSessionToken();
+      return true;
+    };
+    if (build()) return;
+    const id = window.setInterval(() => { if (build()) window.clearInterval(id); }, 200);
+    return () => { cancelled = true; window.clearInterval(id); };
   }, [googleReady]);
 
   useEffect(() => {

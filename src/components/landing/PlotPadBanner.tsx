@@ -27,7 +27,7 @@ import { usePlotPadStatus } from '@/lib/usePlotPadStatus';
 // the user that directly. `active` = Plot Pad's OS-click layer is running too.
 const STATUS_COPY = {
   none:      { dot: 'is-off',  icon: 'sports_esports', text: 'Plug in a controller' },
-  connected: { dot: 'is-on',   icon: 'stadia_controller', text: 'Controller connected — press the D-pad to move around' },
+  connected: { dot: 'is-on',   icon: 'stadia_controller', text: 'Controller connected' },
   active:    { dot: 'is-on',   icon: 'check', text: 'Plot Pad active — flight-ready' },
 } as const;
 

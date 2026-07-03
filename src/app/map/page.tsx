@@ -135,6 +135,17 @@ export default function MapPage() {
     }
   }, [has3DSupport, requestEnter3D]);
 
+  // Distinct document title so Plot Pad can tell the MAP apart from the rest
+  // of the site (F11 fullscreen + the A-click reticle flow belong to the map
+  // ONLY). The global metadata title is generic ("Circle Prospecting Tool")
+  // and shows on every page, so the helper keys on this map-only marker.
+  // memory/project_lb_control_model, project_plot_pad_os_click_helper
+  useEffect(() => {
+    const prev = document.title;
+    document.title = 'Plot Maps — Flight Map';
+    return () => { document.title = prev; };
+  }, []);
+
   // ── MOBILE TOUCH FLIGHT ──────────────────────────────────────────────
   // On a touch device (no mouse), install the synthetic touch gamepad so
   // Plot's existing gamepad flight loop drives FLY_3D from the on-screen

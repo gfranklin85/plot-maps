@@ -55,13 +55,25 @@ function pickPad(): Gamepad | null {
   return alive ?? live.find((p) => p.buttons.length > 0) ?? live[0];
 }
 
-function collect(): HTMLElement[] {
+function collect(scopeSelector?: string): HTMLElement[] {
   const out: HTMLElement[] = [];
-  document.querySelectorAll<HTMLElement>(FOCUSABLE).forEach((el) => {
+  // When scoped (e.g. the map: only the property card + bottom dash), gather
+  // focusables from the scope roots only — never the whole page. Keeps the
+  // map's D-pad on real UI, never a stray flight-surface button.
+  const roots: ParentNode[] = scopeSelector
+    ? Array.from(document.querySelectorAll(scopeSelector))
+    : [document];
+  if (scopeSelector && roots.length === 0) return out;
+  // When scoped we know these are real controls (card + dash), so allow
+  // smaller icon buttons (2D/3D/Walk, the two dash icons). Unscoped keeps the
+  // stricter size gate that killed the landing-page blue-dot.
+  const minW = scopeSelector ? 20 : 40;
+  const minH = scopeSelector ? 20 : 24;
+  roots.forEach((root) => root.querySelectorAll<HTMLElement>(FOCUSABLE).forEach((el) => {
     if (el.hasAttribute('data-gamepad-skip')) return;
     const r = el.getBoundingClientRect();
     // real, tappable size (kills icon-only stubs + zero-size stray elements)
-    if (r.width < 40 || r.height < 24) return;
+    if (r.width < minW || r.height < minH) return;
     const style = window.getComputedStyle(el);
     if (style.visibility === 'hidden' || style.display === 'none' || style.pointerEvents === 'none' || style.opacity === '0') return;
     // must have a real label — text, aria-label, or explicit opt-in — so we
@@ -75,7 +87,7 @@ function collect(): HTMLElement[] {
     // + landing on the outer wrapper instead of the real control)
     if (el.querySelector(FOCUSABLE)) return;
     out.push(el);
-  });
+  }));
   // visual order: top→bottom, then left→right within a row
   out.sort((a, b) => {
     const ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect();
@@ -85,8 +97,21 @@ function collect(): HTMLElement[] {
   return out;
 }
 
-export function useGamepadNav(opts: { enabled?: boolean } = {}) {
-  const { enabled = true } = opts;
+export function useGamepadNav(opts: {
+  enabled?: boolean;
+  /** Restrict cycling to focusables inside these containers (e.g. the map's
+   *  property card + bottom dash). Unset = whole page (landing). */
+  scopeSelector?: string;
+  /** D-pad only — ignore the sticks. Required on the map, where the sticks
+   *  fly the camera and must never move the highlight. */
+  dpadOnly?: boolean;
+  /** Do NOT auto-highlight the moment a pad connects. On the map there's
+   *  nothing to select during pure flight, so the highlight only appears once
+   *  the user presses the D-pad (or a card opens). Landing wants the opposite
+   *  (Download pre-highlighted), so it leaves this false. */
+  noAutoFocus?: boolean;
+} = {}) {
+  const { enabled = true, scopeSelector, dpadOnly = false, noAutoFocus = false } = opts;
 
   useEffect(() => {
     if (!enabled || typeof window === 'undefined' || !navigator.getGamepads) return;
@@ -94,7 +119,7 @@ export function useGamepadNav(opts: { enabled?: boolean } = {}) {
     let raf = 0;
     let lastMoveAt = 0;
     let prevA = false;
-    let engaged = false; // any button pressed → gamepad drives the page
+    let prevB = false;
     let current: HTMLElement | null = null;
 
     const setFocus = (el: HTMLElement | null) => {
@@ -103,15 +128,18 @@ export function useGamepadNav(opts: { enabled?: boolean } = {}) {
       current = el;
       if (current) {
         current.classList.add('gp-focus');
-        current.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        // scrollIntoView on the MAP flings the Map3D camera to a random place
+        // (the browser scrolls the map viewport to "center" the button). The
+        // card + dash are already fully on-screen, so skip scrolling when
+        // scoped. Only the full-page landing needs it. [[project_no_zoom_to_ui]]
+        if (!scopeSelector) current.scrollIntoView({ block: 'center', behavior: 'smooth' });
       }
     };
 
-    // Start on the priority target the first time we engage. If a modal
-    // ([role=dialog]) is open, prefer a primary inside it (so the flow
-    // continues into the modal), else the page's primary, else the first.
+    // Start on the priority target. If a modal ([role=dialog]) is open, prefer
+    // a primary inside it, else the page's primary, else the first item.
     const focusFirst = () => {
-      const all = collect();
+      const all = collect(scopeSelector);
       if (!all.length) return;
       const dialog = document.querySelector('[role="dialog"]');
       const inDialog = dialog
@@ -123,7 +151,7 @@ export function useGamepadNav(opts: { enabled?: boolean } = {}) {
     };
 
     const cycle = (delta: 1 | -1) => {
-      const all = collect();
+      const all = collect(scopeSelector);
       if (!all.length) return;
       // A modal is open but focus is outside it → jump into the modal.
       const dialog = document.querySelector('[role="dialog"]');
@@ -138,19 +166,16 @@ export function useGamepadNav(opts: { enabled?: boolean } = {}) {
       const pad = pickPad();
 
       if (pad) {
-        // ── A controller is present → a button is ALWAYS highlighted ──
-        // The moment a pad is connected, highlight the first button (Download)
-        // so there's a starting point to cycle FROM — the user shouldn't have
-        // to press anything to get a selection. D-pad cycles, A selects.
-        // memory/project_lb_control_model
-        if (!current) focusFirst();
-        engaged = true;
+        // Pre-highlight the priority target on connect — UNLESS noAutoFocus
+        // (the map: no stray yellow box while you're just flying).
+        if (!current && !noAutoFocus) focusFirst();
 
-        // Cycle the highlight. The real controller is a standard-mapping pad
-        // (confirmed on the tester), so the D-pad is buttons 12 up / 13 down /
-        // 14 left / 15 right. Left stick mirrors it (debounced, so not touchy).
+        // Cycle the highlight. Standard-mapping D-pad = buttons 12 up / 13 down
+        // / 14 left / 15 right. Left stick mirrors it — but only when NOT
+        // dpadOnly (the map keeps the sticks for flight).
         const DZ = 0.6;
-        const lx = pad.axes[0] ?? 0, ly = pad.axes[1] ?? 0;
+        const lx = dpadOnly ? 0 : (pad.axes[0] ?? 0);
+        const ly = dpadOnly ? 0 : (pad.axes[1] ?? 0);
         const next =
           pad.buttons[13]?.pressed || pad.buttons[15]?.pressed || // dpad down/right
           ly > DZ || lx > DZ;                                     // stick down/right
@@ -160,17 +185,33 @@ export function useGamepadNav(opts: { enabled?: boolean } = {}) {
         const aBtn = !!pad.buttons[0]?.pressed;
 
         const now = performance.now();
-        if (engaged && (next || prev) && now - lastMoveAt > REPEAT_MS) {
+        if ((next || prev) && now - lastMoveAt > REPEAT_MS) {
           lastMoveAt = now;
+          // First D-pad press in noAutoFocus mode: grab the first item rather
+          // than move — so pressing down enters the UI from nothing.
           if (!current) focusFirst();
           else cycle(next ? 1 : -1);
         }
 
-        if (engaged && aBtn && !prevA) {
-          if (!current) focusFirst();
-          else current.click();
+        // A activates the focused UI element. In scoped/map mode we ONLY act
+        // when something is actually highlighted — otherwise A belongs to the
+        // map (Plot Pad's real OS click to open a parcel), and we must not
+        // steal it. memory/project_plot_pad_os_click_helper
+        if (aBtn && !prevA && current) {
+          current.click();
         }
         prevA = aBtn;
+
+        // B → close the property card (and drop the highlight). Only when a
+        // card is on screen; otherwise B is the map's own dismiss (Plot Pad
+        // sends Escape). We click the card's close button so the map's own
+        // teardown runs. memory/project_map_page_finished_sidebar
+        const bBtn = !!pad.buttons[1]?.pressed;
+        if (bBtn && !prevB) {
+          const close = document.querySelector<HTMLElement>('.sb-card__close');
+          if (close) { close.click(); setFocus(null); }
+        }
+        prevB = bBtn;
       }
       raf = requestAnimationFrame(tick);
     };
@@ -181,5 +222,5 @@ export function useGamepadNav(opts: { enabled?: boolean } = {}) {
       if (current) current.classList.remove('gp-focus');
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled]);
+  }, [enabled, scopeSelector, dpadOnly, noAutoFocus]);
 }

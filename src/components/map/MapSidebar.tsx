@@ -55,6 +55,7 @@ export interface MapSidebarProps {
   isSubscribed: boolean;
 
   onFlySomewhere: () => void;
+  onMyLocation: () => void;
   destinationsOpen: boolean;
   onFlightFeel: () => void;
   flightFeelOpen: boolean;
@@ -141,6 +142,8 @@ export default function MapSidebar(p: MapSidebarProps) {
                 disabled={disabled}
                 className={`map-dash__mode ${p.mapMode === m.mode ? 'is-active' : ''}`}
                 title={m.label}
+                aria-label={m.label}
+                data-gamepad-focusable
               >
                 <MaterialIcon icon={m.icon} className="text-[17px]" />
                 <span className="hidden sm:inline">{m.label}</span>
@@ -152,8 +155,13 @@ export default function MapSidebar(p: MapSidebarProps) {
         {/* Plot Pad flight-readiness — live status right on the cockpit dash */}
         <PlotPadDashChip />
 
+        {/* My location — gamepad-friendly "fly to where I am", no typing */}
+        <button className="map-dash__btn" onClick={p.onMyLocation} title="Fly to my location" aria-label="Fly to my location" data-gamepad-focusable>
+          <MaterialIcon icon="my_location" className="text-[20px]" />
+        </button>
+
         {/* dash buttons → sheets */}
-        <button className={`map-dash__btn ${sheet === 'tools' ? 'is-active' : ''}`} onClick={() => toggle('tools')} title="Tools & layers">
+        <button className={`map-dash__btn ${sheet === 'tools' ? 'is-active' : ''}`} onClick={() => toggle('tools')} title="Tools & layers" aria-label="Tools & layers" data-gamepad-focusable>
           <MaterialIcon icon="tune" className="text-[20px]" />
         </button>
         <button
@@ -161,6 +169,8 @@ export default function MapSidebar(p: MapSidebarProps) {
           onClick={() => { if (p.selectedLead) p.onCloseCard(); }}
           disabled={!p.selectedLead}
           title={p.selectedLead ? 'Close property card' : 'Property'}
+          aria-label={p.selectedLead ? 'Close property card' : 'Property'}
+          data-gamepad-focusable
         >
           <MaterialIcon icon="home_work" className="text-[20px]" />
         </button>

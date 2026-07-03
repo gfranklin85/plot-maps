@@ -51,9 +51,13 @@ interface Props {
   // on /map.
   onSelect?: (payload: SelectPayload) => void;
   placeholder?: string;
+  // Open the results ABOVE the input instead of below. The map's search sits
+  // at the bottom of the screen, so a downward dropdown renders off-screen —
+  // dropUp makes the suggestions rise into view.
+  dropUp?: boolean;
 }
 
-export default function ProspectSearch({ compact = false, onSelect, placeholder }: Props) {
+export default function ProspectSearch({ compact = false, onSelect, placeholder, dropUp = false }: Props) {
   const router = useRouter();
   const { user } = useAuth();
   const [query, setQuery] = useState('');
@@ -291,7 +295,7 @@ export default function ProspectSearch({ compact = false, onSelect, placeholder 
       </div>
 
       {open && results.length > 0 && (
-        <div className="absolute top-full left-0 right-0 mt-2 bg-card rounded-2xl shadow-2xl border border-card-border overflow-hidden z-50">
+        <div className={`absolute left-0 right-0 bg-card rounded-2xl shadow-2xl border border-card-border overflow-hidden z-50 ${dropUp ? 'bottom-full mb-2' : 'top-full mt-2'}`}>
           {results.map((r, idx) => {
             const isHot = idx === highlight;
             if (r.kind === 'lead') {

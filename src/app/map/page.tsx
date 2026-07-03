@@ -1440,6 +1440,7 @@ export default function MapPage() {
       searchSlot={
         <ProspectSearch
           compact
+          dropUp
           placeholder="Search address, APN, owner, or lead"
           onSelect={(payload) => {
             setMapCenter({ lat: payload.lat, lng: payload.lng });
@@ -1484,6 +1485,22 @@ export default function MapPage() {
       has3DSupport={has3DSupport}
       isSubscribed={isSubscribed}
       onFlySomewhere={() => setDestinationsOpen(v => !v)}
+      onMyLocation={() => {
+        // Gamepad-friendly "fly to where I am" — no typing needed. Browser
+        // geolocation → the same cinematic flight the search-select uses.
+        if (typeof navigator === 'undefined' || !navigator.geolocation) return;
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            const lat = pos.coords.latitude, lng = pos.coords.longitude;
+            setMapCenter({ lat, lng });
+            setHasUserPanned(true);
+            dispatchFlight({ center: { lat, lng }, zoom: 19, duration: 900, easing: 'easeInOutCubic' });
+            setFlyToTarget({ lat, lng, altitude: 280, heading: 0, pitch: -45, range: 600, durationMs: 1200 });
+          },
+          (err) => { console.warn('[map] geolocation denied/failed', err?.message); },
+          { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 },
+        );
+      }}
       destinationsOpen={destinationsOpen}
       onFlightFeel={() => setFlightTuningOpen(v => !v)}
       flightFeelOpen={flightTuningOpen}

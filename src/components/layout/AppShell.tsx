@@ -24,8 +24,18 @@ import type { ReactNode } from 'react';
 // Controller navigation on every NON-map surface: plug in a pad, cycle the
 // highlight through the page's buttons, A to activate. The map is excluded
 // (it owns flight controls). memory/project_controller_first_class_input
-function GamepadNavMount({ enabled }: { enabled: boolean }) {
-  useGamepadNav({ enabled });
+function GamepadNavMount({
+  enabled,
+  scopeSelector,
+  dpadOnly,
+  noAutoFocus,
+}: {
+  enabled: boolean;
+  scopeSelector?: string;
+  dpadOnly?: boolean;
+  noAutoFocus?: boolean;
+}) {
+  useGamepadNav({ enabled, scopeSelector, dpadOnly, noAutoFocus });
   return null;
 }
 
@@ -55,6 +65,17 @@ export default function AppShell({ children }: { children: ReactNode }) {
       <>
         <main className="min-h-screen">{children}</main>
         {user && <CallBar />}
+        {/* Map D-pad UI nav: the sticks/triggers fly the camera, but the D-pad
+            is free — cycle the property card + bottom dash, A activates, B
+            closes. dpadOnly (never touch flight axes) + noAutoFocus (no stray
+            highlight during pure flight) + scoped to just those two containers.
+            memory/project_controller_first_class_input */}
+        <GamepadNavMount
+          enabled
+          scopeSelector=".sb-card, .map-dash"
+          dpadOnly
+          noAutoFocus
+        />
       </>
     );
   }

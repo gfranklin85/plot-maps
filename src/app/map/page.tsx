@@ -649,7 +649,16 @@ export default function MapPage() {
           // pitch=-45 (looking down 45°) → tilt=45
           // pitch=-90 (straight down) → tilt=0
           // Formula: tilt = 90 + pitch, clamped to [0, 85]
-          const tilt = Math.max(0, Math.min(85, 90 + match.pose.pitch));
+          //
+          // CAP arrival tilt at 60°: the cinematic poses were framed for a
+          // horizon-level SCREENSHOT (Vegas pitch -14 → tilt 76, near flat).
+          // Arriving that flat in a tall, dense city (Vegas strip) drops you
+          // effectively at street level looking down the road — and gamepad
+          // flight then can't climb out ("stuck in the ground"; Lemoore is
+          // low-rise so it never showed). Landing looking DOWN at the city
+          // (≤60°) keeps you safely above the 3D geometry everywhere.
+          // memory/project_open_threads (flight recovery).
+          const tilt = Math.max(0, Math.min(60, 90 + match.pose.pitch));
           resolvedDestinationTilt = tilt;
           // FORCE 3D MODE on destination arrival. The whole point of
           // clicking a destination card is the cinematic 3D approach;

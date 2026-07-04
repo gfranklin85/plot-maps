@@ -638,10 +638,13 @@ export default function MapPage() {
         if (match) {
           lat = match.pose.lat;
           lng = match.pose.lng;
-          // Aerial framing for destination arrivals — high enough that
-          // the visitor sees the city sprawl, low enough that detail
-          // reads. The map's own controls let them descend further.
-          resolvedDestinationZoom = 17;
+          // Aerial framing for destination arrivals. Zoom is Google's flat
+          // scale — it ignores terrain + building height, so the SAME zoom is
+          // near-ground in a tall dense city (Vegas strip) but comfortably high
+          // in a low-rise town (Lemoore). Zoom 17 dropped you INTO the Vegas
+          // strip; back off to 15 so you always arrive clearly ABOVE the city
+          // and gamepad flight can't start planted in the ground.
+          resolvedDestinationZoom = 15;
           resolvedDestinationHeading = match.pose.heading;
           // Convert first-person pitch (0=horizon, -45=looking 45° down)
           // to Map3D tilt (0=top-down, 85=horizon-level).

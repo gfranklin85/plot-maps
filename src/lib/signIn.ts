@@ -7,19 +7,18 @@
 
 import { supabase } from '@/lib/supabase';
 
-// The CANONICAL app origin OAuth must go through. The bug: on mobile you start
-// on plot.solutions (apex), but the callback lands on app.plot.solutions —
-// the PKCE verifier cookie is set for one origin and the code is exchanged on
-// the other, so the sign-in silently dies ("nothing happened" tapping Explore
-// the map). Pin redirectTo to the SAME origin the callback resolves to, so the
-// apex ↔ subdomain hop never splits the flow. Prod = app.plot.solutions;
-// localhost/preview keeps its own origin.
+// The ONE canonical app origin OAuth must go through. app.plot.solutions is
+// being retired — the app lives on the APEX plot.solutions. Sign-in must start
+// AND finish on that single origin; otherwise the PKCE verifier cookie is set
+// for one host and the code is exchanged on another, and the flow silently dies
+// ("nothing happened" tapping Explore the map on mobile — that was the app./apex
+// split). localhost + *.vercel.app previews keep their own origin.
+const CANONICAL_APP_ORIGIN = 'https://plot.solutions';
 function canonicalAuthOrigin(): string {
   const { hostname, origin } = window.location;
-  if (hostname === 'plot.solutions' || hostname.endsWith('.plot.solutions')) {
-    return 'https://app.plot.solutions';
-  }
-  return origin; // localhost, *.vercel.app previews, etc.
+  const isProdDomain =
+    hostname === 'plot.solutions' || hostname.endsWith('.plot.solutions');
+  return isProdDomain ? CANONICAL_APP_ORIGIN : origin;
 }
 
 export async function signInWithGoogle() {

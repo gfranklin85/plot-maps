@@ -6,7 +6,7 @@ import { supabaseAdmin } from './supabase-server';
 
 const TWILIO_SID = process.env.TWILIO_ACCOUNT_SID || '';
 const TWILIO_AUTH = process.env.TWILIO_AUTH_TOKEN || '';
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.plot.solutions';
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://plot.solutions';
 
 // Delay between calls (ms) — 1 call per second
 const CALL_INTERVAL_MS = 1000;

@@ -160,8 +160,8 @@ export async function POST(request: Request) {
         },
         quantity: addressCount,
       }],
-      success_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://app.plot.solutions'}/map?order=success&id=${order.id}`,
-      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://app.plot.solutions'}/map?order=canceled`,
+      success_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://plot.solutions'}/map?order=success&id=${order.id}`,
+      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://plot.solutions'}/map?order=canceled`,
       metadata: {
         user_id: user.id,
         order_id: order.id,

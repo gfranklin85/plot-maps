@@ -68,7 +68,7 @@ export async function POST(request: Request) {
   try {
     const purchased = await client.incomingPhoneNumbers.create({
       phoneNumber,
-      voiceUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'https://app.plot.solutions'}/api/twilio/voice`,
+      voiceUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'https://plot.solutions'}/api/twilio/voice`,
       voiceMethod: 'POST',
       friendlyName: `Plot Maps - ${user.id.slice(0, 8)}`,
     });

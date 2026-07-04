@@ -64,7 +64,7 @@ export async function middleware(request: NextRequest) {
 
   // ── OAuth code catcher ──────────────────────────────────────────────
   // Supabase + Google sometimes send OAuth callback traffic to the
-  // configured Site URL (https://app.plot.solutions/) instead of the
+  // configured Site URL (https://plot.solutions/) instead of the
   // explicit redirectTo (/auth/callback). Handle two cases:
   //
   // 1. ?code=... present AND no session yet → forward to /auth/callback

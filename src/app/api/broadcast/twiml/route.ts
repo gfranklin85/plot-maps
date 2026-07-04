@@ -39,7 +39,7 @@ export async function POST(request: Request) {
     ? broadcast.voicemail_audio_url
     : broadcast.audio_url;
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.plot.solutions';
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://plot.solutions';
   const dtmfUrl = `${appUrl}/api/broadcast/dtmf?broadcast_id=${broadcastId}&call_sid=${callSid || ''}`;
 
   let twiml: string;

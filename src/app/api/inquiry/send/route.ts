@@ -38,7 +38,7 @@ function newToken(): string {
 }
 
 function appUrl(): string {
-  return process.env.NEXT_PUBLIC_APP_URL || 'https://app.plot.solutions';
+  return process.env.NEXT_PUBLIC_APP_URL || 'https://plot.solutions';
 }
 
 export async function POST(request: Request) {

@@ -76,8 +76,8 @@ export async function POST(request: Request) {
         },
         quantity: 1,
       }],
-      success_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://app.plot.solutions'}/map?wallet=success&amount=${amount_cents}`,
-      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://app.plot.solutions'}/map?wallet=canceled`,
+      success_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://plot.solutions'}/map?wallet=success&amount=${amount_cents}`,
+      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://plot.solutions'}/map?wallet=canceled`,
       metadata: {
         user_id: user.id,
         type: 'wallet_topup',

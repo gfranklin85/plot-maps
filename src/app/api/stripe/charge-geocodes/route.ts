@@ -98,8 +98,8 @@ export async function POST(request: Request) {
         },
         quantity: count,
       }],
-      success_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://app.plot.solutions'}/imports?geocodes=success&count=${count}`,
-      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://app.plot.solutions'}/imports?geocodes=canceled`,
+      success_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://plot.solutions'}/imports?geocodes=success&count=${count}`,
+      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://plot.solutions'}/imports?geocodes=canceled`,
       metadata: { user_id: user.id, geocode_count: count.toString() },
     });
 

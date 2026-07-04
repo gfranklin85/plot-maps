@@ -35,7 +35,7 @@ export async function POST(request: Request) {
       .eq('id', user.id);
   }
 
-  const origin = request.headers.get('origin') || 'https://app.plot.solutions';
+  const origin = request.headers.get('origin') || 'https://plot.solutions';
 
   const session = await stripe.checkout.sessions.create({
     customer: customerId,

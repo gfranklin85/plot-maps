@@ -7,6 +7,7 @@
 
 import { useState, useRef, useCallback } from 'react';
 import { APIProvider, useMapsLibrary } from '@vis.gl/react-google-maps';
+import { GOOGLE_MAPS_LIBRARIES } from '@/lib/googleMapsConfig';
 
 const API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
 
@@ -40,7 +41,7 @@ export default function OrbitSection() {
                 tag crashed the page ("loaded multiple times / maps3d provided
                 more than once"), so ProspectSearch now polls for `places`
                 which THIS single loader provides. */}
-            <APIProvider apiKey={API_KEY} libraries={['maps3d', 'places']}>
+            <APIProvider apiKey={API_KEY} libraries={GOOGLE_MAPS_LIBRARIES}>
               <OrbitTool />
             </APIProvider>
           </div>

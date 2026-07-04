@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef } from "react";
+import { GOOGLE_MAPS_LIBRARIES } from "@/lib/googleMapsConfig";
 import {
   APIProvider,
   Map,
@@ -693,7 +694,7 @@ export default function MapView({ leads, onLeadClick, onCenterChanged, onMapClic
   return (
     <AtmosphereProvider lat={atmosCenter.lat} lng={atmosCenter.lng}>
     <div className="relative h-full w-full">
-    <APIProvider apiKey={API_KEY} libraries={['places', 'marker']}>
+    <APIProvider apiKey={API_KEY} libraries={GOOGLE_MAPS_LIBRARIES}>
       <Map
         defaultCenter={center || MAP_CENTER}
         defaultZoom={MAP_ZOOM}

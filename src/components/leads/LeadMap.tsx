@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { APIProvider, Map, useMap } from '@vis.gl/react-google-maps';
+import { GOOGLE_MAPS_LIBRARIES } from '@/lib/googleMapsConfig';
 
 interface Props {
   lat: number | null;
@@ -50,7 +51,7 @@ export default function LeadMap({ lat, lng, mapType }: Props) {
   if (lat == null || lng == null) return null;
 
   return (
-    <APIProvider apiKey={API_KEY}>
+    <APIProvider apiKey={API_KEY} libraries={GOOGLE_MAPS_LIBRARIES}>
       <Map
         defaultCenter={{ lat, lng }}
         defaultZoom={18}

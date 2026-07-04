@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { APIProvider, useApiIsLoaded } from "@vis.gl/react-google-maps";
+import { GOOGLE_MAPS_LIBRARIES } from "@/lib/googleMapsConfig";
 import { Lead, STATUS_COLORS, LISTING_STATUS_COLORS } from "@/types";
 import { useTheme } from "next-themes";
 import PropertyPopup from "./PropertyPopup";
@@ -543,7 +544,7 @@ function StreetViewInner({ leads, startPosition, onDataChanged, onPositionChange
 
 export default function StreetViewProspecting({ leads, startPosition, onDataChanged, onPositionChanged, onExitWalk }: Props) {
   return (
-    <APIProvider apiKey={API_KEY}>
+    <APIProvider apiKey={API_KEY} libraries={GOOGLE_MAPS_LIBRARIES}>
       <StreetViewInner leads={leads} startPosition={startPosition} onDataChanged={onDataChanged} onPositionChanged={onPositionChanged} onExitWalk={onExitWalk} />
     </APIProvider>
   );

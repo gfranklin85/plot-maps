@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { APIProvider, useMapsLibrary } from "@vis.gl/react-google-maps";
+import { GOOGLE_MAPS_LIBRARIES } from "@/lib/googleMapsConfig";
 import { MAP_CENTER } from "@/lib/constants";
 import { useGamepad } from "@/lib/useGamepad";
 import type { ButtonName } from "@/lib/gamepadActions";
@@ -1432,7 +1433,7 @@ function Inner({
 export default function MapView3D(props: MapViewProps) {
   const memoCenter = useMemo(() => props.center ?? null, [props.center]);
   return (
-    <APIProvider apiKey={API_KEY} libraries={['places', 'marker', 'maps3d']}>
+    <APIProvider apiKey={API_KEY} libraries={GOOGLE_MAPS_LIBRARIES}>
       <Inner
         center={memoCenter}
         gamepadEnabled={!!props.gamepadEnabled}

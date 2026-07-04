@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { APIProvider, Map, useMap } from "@vis.gl/react-google-maps";
+import { GOOGLE_MAPS_LIBRARIES } from "@/lib/googleMapsConfig";
 
 const API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
 
@@ -64,7 +65,7 @@ function PinDropper({ pins }: { pins: Pin[] }) {
 
 export default function ImportMiniMap({ pins }: { pins: Pin[] }) {
   return (
-    <APIProvider apiKey={API_KEY}>
+    <APIProvider apiKey={API_KEY} libraries={GOOGLE_MAPS_LIBRARIES}>
       <Map
         defaultCenter={{ lat: 36.3008, lng: -119.7828 }}
         defaultZoom={13}

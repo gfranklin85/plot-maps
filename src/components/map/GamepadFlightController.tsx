@@ -167,6 +167,12 @@ const TILT_MAX_3D = 67;
 const ZOOM_MIN = 3;
 const ZOOM_MAX = 21;
 
+// "Level out / pull up" safe pose — R3 (right-stick click) snaps here so you
+// can never get stuck in the ground. A comfortable flying altitude (zoom well
+// back from the max) looking gently down. All velocities zero on reset.
+const SAFE_ZOOM = 16;
+const SAFE_TILT = 45;
+
 // ── Yaw "sideways pivot fake" ─────────────────────────────────────────
 // Maps' camera always pivots around lat/lng. When the heading rotates,
 // the visual focal point in front of the user sweeps sideways across the
@@ -485,6 +491,16 @@ export default function GamepadFlightController({
         fire('y', actionsRef.current.onInspect);
         fire('b', actionsRef.current.onCancel);
         fire('back', actionsRef.current.onBackOut);        // Back/Select = back out
+        // R3 (right-stick click) = LEVEL OUT / PULL UP. Snap to a safe flying
+        // pose so you can never get trapped in the ground (Vegas bug: zoomed
+        // all the way in + tilted into buildings, no escape). Kills all runaway
+        // velocity too. memory/project_open_threads (flight recovery).
+        if (justPressed.has('rstick')) {
+          cam.tilt = SAFE_TILT;
+          cam.zoom = Math.min(cam.zoom, SAFE_ZOOM);
+          velRef.current = { panX: 0, panY: 0, heading: 0, tilt: 0, zoom: 0 };
+          airRef.current = { throttle: 0, strafe: 0, yaw: 0 };
+        }
         if (justPressed.has('up') || justPressed.has('left')) actionsRef.current.onCyclePrev?.();
         if (justPressed.has('down') || justPressed.has('right')) actionsRef.current.onCycleNext?.();
       }

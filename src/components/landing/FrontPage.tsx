@@ -50,41 +50,6 @@ export default function FrontPage() {
     else signInWithGoogle();
   };
 
-  // The tools grid IS the signed-in user's dashboard. Logged in → it rises to
-  // the top (their command center, right under the hero) with a "welcome back"
-  // header + the sign-in-pitch sections below are hidden. Logged out → it stays
-  // in its marketing position with the "choose what you want to do" framing.
-  // memory/project_one_page_tools_on_landing
-  const firstName =
-    (user?.user_metadata?.full_name || user?.user_metadata?.name || '')
-      .toString().trim().split(/\s+/)[0] || '';
-  const toolsSection = (
-    <section className="fp-section fp-tools" style={{ paddingTop: 8 }}>
-      {/* sky backdrop + drifting clouds (behind the cards) */}
-      <div className="fp-tools__sky" aria-hidden>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={`${HERO}/cloud-1.svg`} alt="" className="fp-tools__cloud fp-tools__cloud--1 float-cloud-a" draggable={false} />
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={`${HERO}/cloud-2.svg`} alt="" className="fp-tools__cloud fp-tools__cloud--2 float-cloud-b" draggable={false} />
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={`${HERO}/cloud-3.svg`} alt="" className="fp-tools__cloud fp-tools__cloud--3 float-cloud-c" draggable={false} />
-      </div>
-      <div className="dash" style={{ position: 'relative', zIndex: 2 }}>
-        <div className="dash__wrap" style={{ paddingTop: 0 }}>
-          <div className="fp-eyebrow" style={{ textAlign: 'left' }}>
-            {user ? 'Your workspace' : 'Choose what you want to do'}
-          </div>
-          <h2 className="fp-h2" style={{ textAlign: 'left', marginTop: 6, marginBottom: 24 }}>
-            {user
-              ? `Welcome back${firstName ? `, ${firstName}` : ''}. Pick up where you left off.`
-              : 'Powerful tools for every neighborhood.'}
-          </h2>
-          <ToolGrid />
-        </div>
-      </div>
-    </section>
-  );
-
   return (
     <div className="fp">
       {/* ════ HEADER (shared with the dashboard for one consistent chrome) ════ */}
@@ -170,15 +135,6 @@ export default function FrontPage() {
         </div>
       </section>
 
-      {/* Signed in → the tools grid IS the dashboard: it rises to the top,
-          directly under the hero, as the user's command center. */}
-      {user && toolsSection}
-
-      {/* The sign-in-pitch sections (reposition / where-we-stand / owner+buyer
-          intent) are all "sign in to claim/start" CTAs — noise for someone
-          already signed in. Show them ONLY when logged out. */}
-      {!user && (
-      <>
       {/* ════ THE REPOSITION — the buyer-elevation platform ════
           Right under the hero: explain + show how the dynamic gets put back
           where it belongs — balanced toward the one buying. Steel-calm,
@@ -350,17 +306,32 @@ export default function FrontPage() {
           </p>
         </div>
       </section>
-      </>
-      )}
 
       {/* ════ THE TOOL GRID — the dashboard, right on the front page ════
           Everything is gated at the action (try-before-buy), so the full
           toolset is shown up front. The cards float over a sky backdrop with
           drifting clouds — the floating-in-sky depth carries through here.
           memory/project_one_page_tools_on_landing */}
-      {/* Logged out → tools grid stays here in its marketing slot (try-before-
-          buy). Logged in → it already rendered up top as the dashboard. */}
-      {!user && toolsSection}
+      <section className="fp-section fp-tools" style={{ paddingTop: 8 }}>
+        {/* sky backdrop + drifting clouds (behind the cards) */}
+        <div className="fp-tools__sky" aria-hidden>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={`${HERO}/cloud-1.svg`} alt="" className="fp-tools__cloud fp-tools__cloud--1 float-cloud-a" draggable={false} />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={`${HERO}/cloud-2.svg`} alt="" className="fp-tools__cloud fp-tools__cloud--2 float-cloud-b" draggable={false} />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={`${HERO}/cloud-3.svg`} alt="" className="fp-tools__cloud fp-tools__cloud--3 float-cloud-c" draggable={false} />
+        </div>
+        <div className="dash" style={{ position: 'relative', zIndex: 2 }}>
+          <div className="dash__wrap" style={{ paddingTop: 0 }}>
+            <div className="fp-eyebrow" style={{ textAlign: 'left' }}>Choose what you want to do</div>
+            <h2 className="fp-h2" style={{ textAlign: 'left', marginTop: 6, marginBottom: 24 }}>
+              Powerful tools for every neighborhood.
+            </h2>
+            <ToolGrid />
+          </div>
+        </div>
+      </section>
 
       {/* ════ FOR AGENTS & BROKERS — the operator doors ════
           The minority who came for the tools. memory/project_dreamer_funnel_buttons */}
@@ -370,7 +341,7 @@ export default function FrontPage() {
           <h2 className="fp-h2">The operator&apos;s toolkit.</h2>
           <div className="fp-agents__grid">
             {[
-              { href: '/forms', icon: 'history_edu', title: 'Prepare your own contracts', sub: 'Offers & disclosures in plain English — your instruments, not borrowed forms.' },
+              { href: '/documents', icon: 'history_edu', title: 'Prepare your own contracts', sub: 'Offers & disclosures in plain English — your instruments, not borrowed forms.' },
               { href: '/campaigns/commercials', icon: 'sell', title: 'Post your listing', sub: 'Put a property on the map with an Orbit video and reach real buyers.' },
               { href: '/join-position', icon: 'workspace_premium', title: 'Join Position', sub: 'A brokerage built for operators — the tools others pay for, free.' },
               { href: '/position', icon: 'lan', title: 'See our tech solutions', sub: 'The infrastructure behind Plot — data, prospecting, and the platform.' },

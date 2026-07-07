@@ -629,40 +629,40 @@ export default function MapPage() {
     // profile default and the visitor can still navigate.
     let lat = latStr ? parseFloat(latStr) : NaN;
     let lng = lngStr ? parseFloat(lngStr) : NaN;
-    let resolvedDestinationZoom: number | null = null;
+    const resolvedDestinationZoom: number | null = null;
     let resolvedDestinationHeading: number | null = null;
-    let resolvedDestinationTilt: number | null = null;
+    const resolvedDestinationTilt: number | null = null;
+    // The FULL first-person pose for a destination arrival. When set, we fly
+    // via flyToTarget (the Map3D altitude/pitch/range camera the GAMEPAD also
+    // flies) instead of dispatchFlight({zoom}) (the flat 2D map.setZoom path).
+    // THAT mismatch was the "stuck in the ground" bug: the arrival set a zoom
+    // level, but the gamepad reads altitude — so Vegas landed at street level
+    // with no way up. Lemoore never showed it because Lemoore arrives via the
+    // profile default (91m altitude seed), not this destination path at all.
+    let destinationPose: {
+      lat: number; lng: number; altitude: number;
+      heading: number; pitch: number; range: number;
+    } | null = null;
     if (Number.isNaN(lat) || Number.isNaN(lng)) {
       if (destinationParam) {
         const match = DESTINATIONS.find(d => d.slug === destinationParam);
         if (match) {
           lat = match.pose.lat;
           lng = match.pose.lng;
-          // Aerial framing for destination arrivals. Zoom is Google's flat
-          // scale — it ignores terrain + building height, so the SAME zoom is
-          // near-ground in a tall dense city (Vegas strip) but comfortably high
-          // in a low-rise town (Lemoore). Zoom 17 dropped you INTO the Vegas
-          // strip; back off to 15 so you always arrive clearly ABOVE the city
-          // and gamepad flight can't start planted in the ground.
-          resolvedDestinationZoom = 15;
           resolvedDestinationHeading = match.pose.heading;
-          // Convert first-person pitch (0=horizon, -45=looking 45° down)
-          // to Map3D tilt (0=top-down, 85=horizon-level).
-          // pitch=0 (horizon-level) → tilt=85 (Google's max)
-          // pitch=-45 (looking down 45°) → tilt=45
-          // pitch=-90 (straight down) → tilt=0
-          // Formula: tilt = 90 + pitch, clamped to [0, 85]
-          //
-          // CAP arrival tilt at 60°: the cinematic poses were framed for a
-          // horizon-level SCREENSHOT (Vegas pitch -14 → tilt 76, near flat).
-          // Arriving that flat in a tall, dense city (Vegas strip) drops you
-          // effectively at street level looking down the road — and gamepad
-          // flight then can't climb out ("stuck in the ground"; Lemoore is
-          // low-rise so it never showed). Landing looking DOWN at the city
-          // (≤60°) keeps you safely above the 3D geometry everywhere.
-          // memory/project_open_threads (flight recovery).
-          const tilt = Math.max(0, Math.min(60, 90 + match.pose.pitch));
-          resolvedDestinationTilt = tilt;
+          // Fly to the pose's REAL altitude (meters above ground) — never
+          // below a safe floor so you always arrive clearly above the city's
+          // 3D geometry (Vegas strip included). The authored altitude is the
+          // sky-arrival height; clamp up if a pose was tuned lower.
+          const ARRIVAL_ALTITUDE_FLOOR = 350; // meters
+          destinationPose = {
+            lat: match.pose.lat,
+            lng: match.pose.lng,
+            altitude: Math.max(ARRIVAL_ALTITUDE_FLOOR, match.pose.altitude),
+            heading: match.pose.heading,
+            pitch: match.pose.pitch,
+            range: match.pose.range,
+          };
           // FORCE 3D MODE on destination arrival. The whole point of
           // clicking a destination card is the cinematic 3D approach;
           // landing in 2D is dead-on-arrival. Locked 2026-05-30 after
@@ -692,28 +692,32 @@ export default function MapPage() {
     if (hasCoords) {
       setMapCenter({ lat, lng });
       setHasUserPanned(true);
-      const zoomFromQuery = zoomStr ? parseInt(zoomStr, 10) : NaN;
-      const zoom = !Number.isNaN(zoomFromQuery)
-        ? zoomFromQuery
-        : (resolvedDestinationZoom ?? 19);
-      // Smooth fly-in instead of an instant snap. Slightly slower than
-      // search picks (1100ms) since this is the user's "I just landed
-      // here from somewhere else" moment and deserves a beat of context.
-      dispatchFlight({
-        center: { lat, lng },
-        zoom,
-        // When arriving from a destination card, also align the camera
-        // heading + tilt to the authored pose so the visitor lands in
-        // exactly the framing the destination screenshot promised.
-        ...(resolvedDestinationHeading !== null
-          ? { heading: resolvedDestinationHeading }
-          : {}),
-        ...(resolvedDestinationTilt !== null
-          ? { tilt: resolvedDestinationTilt }
-          : {}),
-        duration: 1100,
-        easing: 'easeInOutCubic',
-      });
+      if (destinationPose) {
+        // Destination arrival → fly the FIRST-PERSON camera (altitude / pitch
+        // / range), the same system the gamepad uses. This lands you at a real
+        // altitude above the city, so gamepad flight starts in the air, not in
+        // the ground. This is the fix for the Vegas "stuck in the ground" bug.
+        setFlyToTarget({ ...destinationPose, durationMs: 2200 });
+      } else {
+        // Plain lat/lng arrival (search-bar Places hit) → the choreographer's
+        // zoom-based fly is fine; there's no authored altitude pose to honor.
+        const zoomFromQuery = zoomStr ? parseInt(zoomStr, 10) : NaN;
+        const zoom = !Number.isNaN(zoomFromQuery)
+          ? zoomFromQuery
+          : (resolvedDestinationZoom ?? 19);
+        dispatchFlight({
+          center: { lat, lng },
+          zoom,
+          ...(resolvedDestinationHeading !== null
+            ? { heading: resolvedDestinationHeading }
+            : {}),
+          ...(resolvedDestinationTilt !== null
+            ? { tilt: resolvedDestinationTilt }
+            : {}),
+          duration: 1100,
+          easing: 'easeInOutCubic',
+        });
+      }
     }
 
     if (prospectParam === '1') {
@@ -1091,6 +1095,75 @@ export default function MapPage() {
   // Live altitude from the 3D path's per-frame loop. Drives the
   // AltitudeGauge HUD. Reported ~5×/sec from MapView3D.
   const [currentAltitudeM, setCurrentAltitudeM] = useState<number>(0);
+
+  // ── PlotMaps SET — the camera run-through ───────────────────────────
+  // ?territory=<uuid>&set=1 → fetch the auto-generated mission sequence
+  // (establishing sweep + drops over the target parcels) and fly the camera
+  // through each keyframe in turn. The welcome that lowers prospecting
+  // friction. memory/the_thesis (the daily hunt).
+  type SeqStep = {
+    kind: string; lat: number; lng: number; altitude: number;
+    heading: number; pitch: number; range: number; durationMs: number; address: string | null;
+  };
+  const [setStop, setSetStop] = useState<{ n: number; total: number; address: string | null } | null>(null);
+  const setStepsRef = useRef<SeqStep[] | null>(null);   // fetched sequence, waiting for map
+  const setFetchedRef = useRef(false);
+  const setPlayedRef = useRef(false);
+
+  // 1) On ?set=1&territory=… → fetch the sequence + seed the map at the
+  //    neighborhood. Don't fly yet — the map isn't mounted (flyToTarget is
+  //    dropped with no retry if it fires before Map3D is live).
+  useEffect(() => {
+    const territory = searchParams.get('territory');
+    if (searchParams.get('set') !== '1' || !territory || setFetchedRef.current) return;
+    setFetchedRef.current = true;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/set/sequence?territory=${territory}&n=3`);
+        const data = await res.json();
+        const steps: SeqStep[] = Array.isArray(data.steps) ? data.steps : [];
+        if (cancelled || steps.length === 0) return;
+        requestEnter3D();
+        setMapCenter({ lat: steps[0].lat, lng: steps[0].lng });
+        setHasUserPanned(true);
+        setStepsRef.current = steps;   // hand off to the readiness effect below
+      } catch { /* silent — sequence is a bonus, not a blocker */ }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+  // 2) Once the map is actually LIVE (it reports altitude > 0), play the
+  //    sequence — chain flyToTarget through each keyframe. This gates the
+  //    flight on real readiness instead of a fixed guess.
+  useEffect(() => {
+    if (setPlayedRef.current || currentAltitudeM <= 0) return;
+    const steps = setStepsRef.current;
+    if (!steps || steps.length === 0) return;
+    setPlayedRef.current = true;
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    const parcelSteps = steps.filter((s) => s.kind === 'parcel');
+    let t = 400; // brief settle after the map goes live
+    steps.forEach((s) => {
+      timers.push(setTimeout(() => {
+        setFlyToTarget({
+          lat: s.lat, lng: s.lng, altitude: s.altitude,
+          heading: s.heading, pitch: s.pitch, range: s.range, durationMs: s.durationMs,
+        });
+        if (s.kind === 'parcel') {
+          setSetStop({ n: parcelSteps.indexOf(s) + 1, total: parcelSteps.length, address: s.address });
+        } else {
+          setSetStop(null);
+        }
+      }, t));
+      t += s.durationMs + 300;
+    });
+    // clear the HUD after the last stop
+    timers.push(setTimeout(() => setSetStop(null), t + 1500));
+    return () => timers.forEach(clearTimeout);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentAltitudeM]);
 
   // Pause per-frame GPU writes when the user walks away with a
   // controller plugged in. 8s of no input on any surface (mouse,
@@ -1774,6 +1847,15 @@ export default function MapPage() {
           cover. Tune from the CSS vars in globals.css (--map-aspect,
           --map-frame-gap, --map-card-w, --map-shrink, --map-frame-radius). */}
       <div className={`map-shell__body ${cardOpen ? 'is-carded' : ''}`}>
+        {/* PlotMaps SET — run-through stop indicator. Shows which of the ~3
+            target homes you're over + the ask prompt. memory/the_thesis */}
+        {setStop && (
+          <div className="mssn-hud">
+            <span className="mssn-hud__n">Stop {setStop.n} of {setStop.total}</span>
+            <span className="mssn-hud__addr">{setStop.address?.split('/')[0]?.trim() || 'This home'}</span>
+            <span className="mssn-hud__ask">Ask: staying for good? what would have to be true to move?</span>
+          </div>
+        )}
         {/* CARD COLUMN — lives in the freed LEFT matte when a card is open.
             Never crosses the map glass; the map shrank to make room. */}
         {cardOpen && (

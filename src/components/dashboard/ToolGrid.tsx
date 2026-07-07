@@ -44,10 +44,13 @@ export const TOOLS: Tool[] = [
       { src: '/dashboard/icons/map-2d_pin.png', anim: 'ic-bob' },
     ],
   },
-  // CAR/NAR sidestep MOAT — contracts, disclosures + make an offer.
+  // The document platform (client view). CAR/NAR sidestep MOAT — the offer +
+  // every disclosure, review + sign, all in one place. Title is inclusive
+  // ("Your documents") since it opens the whole hub, not just the offer; the
+  // offer-writing lives inside. Routes to the client /documents review-and-sign.
   {
-    href: '/forms', icon: 'description', art: 'forms', title: 'Write your own offer',
-    sub: 'Draft offers, disclosures & contracts in plain English — no legalese, no borrowed forms.', flagship: true,
+    href: '/documents', icon: 'description', art: 'forms', title: 'Your documents',
+    sub: 'Write your own offer, review disclosures & sign — plain English, no legalese, no borrowed forms.', flagship: true,
     assemble: {
       full: '/dashboard/icons/forms_full.png',
       pieces: [

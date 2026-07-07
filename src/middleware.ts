@@ -100,6 +100,17 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(cleanUrl);
   }
 
+  // Signed-in users don't see the marketing front door — send them to their
+  // dashboard (/home). Logged-out visitors get the FrontPage at /. Standard
+  // pattern: marketing for strangers, workspace for members. Only bounce the
+  // bare root (not ?code= callbacks — those are handled above).
+  if (pathname === '/' && user && !searchParams.has('code')) {
+    const homeUrl = request.nextUrl.clone();
+    homeUrl.pathname = '/home';
+    homeUrl.search = '';
+    return NextResponse.redirect(homeUrl);
+  }
+
   // The root / is PUBLIC — the new FrontPage marketing door, reachable
   // logged-out. Sign-in happens from the front page's buttons (Google OAuth
   // → /auth/callback), so the old /landing is no longer needed.

@@ -177,7 +177,13 @@ export default function ProspectSearch({ compact = false, onSelect, placeholder,
     return () => clearTimeout(timer);
   }, [query, googleReady]);
 
-  const results: Result[] = [...leads, ...places];
+  // Interleave so a DESTINATION (Google place) always surfaces even when the
+  // user's own leads also match — otherwise 6 leads fill every slot and "Lemoore"
+  // (the city) never appears. Lead with the top place (what "jump anywhere"
+  // means), then leads, then remaining places. If no places, just leads.
+  const results: Result[] = places.length > 0
+    ? [places[0], ...leads.slice(0, 4), ...places.slice(1)]
+    : [...leads];
 
   function navigateToCoords(args: { lat: number; lng: number; address: string; leadId?: string }) {
     bumpSearchCount();

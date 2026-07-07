@@ -49,6 +49,7 @@ export default function AppHeader({ variant = 'public' }: { variant?: 'public' |
             <div className="fp-navlinks">
               <a className="fp-navlink" href="/">Home</a>
               <a className="fp-navlink" href="/map?view=3d">Map</a>
+              <a className="fp-navlink" href="/documents">Documents</a>
             </div>
           )}
 

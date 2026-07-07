@@ -104,9 +104,10 @@ export async function GET(request: Request) {
       } else if (nextFromQuery) {
         destination = nextFromQuery;
       } else {
-        // Default post-login home = / (the front page IS the home now; the
-        // tool grid lives there). The separate dashboard is retired.
-        destination = '/';
+        // Default post-login home = /home — the signed-in dashboard / workspace
+        // (the desk the map backs out onto). Destination/search sign-ins above
+        // still fly straight to the map. memory/project_desk_surface_backout_ui
+        destination = '/home';
       }
 
       const response = NextResponse.redirect(`${origin}${destination}`);

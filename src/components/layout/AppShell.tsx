@@ -46,7 +46,7 @@ const MAP_PAGES = ['/map'];
 // AppShell must NOT add a second header for these. The front page (/) and
 // the forms surface bring their own. As old pages are rebuilt to the new
 // theme + their own header, add them here.
-const SELF_HEADERED = ['/forms'];
+const SELF_HEADERED: string[] = [];
 
 // Public marketing pages that should NOT get the app header for logged-out
 // visitors (they're their own surfaces). The front page handles its own

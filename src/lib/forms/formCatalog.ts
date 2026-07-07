@@ -114,3 +114,48 @@ export const PLOT_FORMS: PlotForm[] = [
 export function findForm(slug: string): PlotForm | undefined {
   return PLOT_FORMS.find((f) => f.slug === slug);
 }
+
+// ── Client-facing document checklist ──────────────────────────────────
+//
+// The CLIENT's (buyer's) view of the SAME instruments — a review-and-sign
+// checklist tied to their real deal, not the agent's build library. Each doc
+// carries a client status + a plain-language "what this is for you" line.
+// (The agent authors via /forms; the client reviews + signs via /documents.)
+// Status here is the SHAPE — a real client's statuses come from their live
+// transaction once that's wired.
+
+export type ClientDocStatus =
+  | 'needs-review'
+  | 'in-progress'
+  | 'completed'
+  | 'ready-to-sign';
+
+export interface ClientDoc {
+  slug: string;               // ties to /forms/<slug> when that doc is built
+  name: string;               // client-friendly title
+  blurb: string;              // plain-language "what this is for you"
+  icon: string;
+  status: ClientDocStatus;
+  mostImportant?: boolean;    // the Offer — starred + emphasized row
+}
+
+export const CLIENT_DOC_STATUS: Record<
+  ClientDocStatus,
+  { label: string; tint: string; bg: string; action: string }
+> = {
+  'needs-review': { label: 'Needs review', tint: '#b6791b', bg: 'rgba(255,194,77,0.16)', action: 'Review' },
+  'in-progress':  { label: 'In progress',  tint: '#1349d4', bg: 'rgba(19,73,212,0.10)',  action: 'Continue' },
+  'completed':    { label: 'Completed',    tint: '#0f8a5f', bg: 'rgba(15,138,95,0.12)',  action: 'View' },
+  'ready-to-sign':{ label: 'Ready to sign',tint: '#5b34d4', bg: 'rgba(91,52,212,0.12)',  action: 'Review & sign' },
+};
+
+// The 7 documents in the client mockup, in order.
+export const CLIENT_DOCS: ClientDoc[] = [
+  { slug: 'fair-housing',          name: 'Fair Housing Disclosure',                     blurb: 'Learn about fair housing laws and your rights as a buyer.',            icon: 'home_work',   status: 'needs-review' },
+  { slug: 'buyer-advisory',        name: 'Buyer Advisory to Investigate the Property',  blurb: "Understand your role in investigating the property's condition and value.", icon: 'search',      status: 'needs-review' },
+  { slug: 'prbs',                  name: 'PRBS — Possible Representation of More Than One Buyer or Seller', blurb: 'Learn how dual agency works and your options.',    icon: 'groups',      status: 'in-progress' },
+  { slug: 'agency-disclosure',     name: 'AD — Agency Disclosure',                      blurb: 'See who represents whom in this transaction.',                         icon: 'person',      status: 'completed' },
+  { slug: 'rpa',                   name: 'Offer',                                       blurb: "Review the terms you're offering and add any contingencies.",          icon: 'edit_document', status: 'ready-to-sign', mostImportant: true },
+  { slug: 'wire-fraud-advisory',   name: 'Wire Fraud Advisory',                         blurb: 'Helpful tips to protect yourself from wire fraud.',                    icon: 'gpp_maybe',   status: 'needs-review' },
+  { slug: 'market-conditions',     name: 'Market Conditions Advisory',                  blurb: 'Review important market conditions information.',                      icon: 'bar_chart',   status: 'completed' },
+];

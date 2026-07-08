@@ -110,7 +110,9 @@ const VERIFY_METHODS: {
 ];
 
 export default function MoveRequestWizard() {
-  const [mode, setMode] = useState<'intro' | 'chat' | 'steps' | 'posted'>('intro');
+  // The chat IS the front door (no intro page); the step wizard survives as
+  // the "prefer a form?" alternative and as the editor.
+  const [mode, setMode] = useState<'chat' | 'steps' | 'posted'>('chat');
   const [step, setStep] = useState(0);
 
   // ── the move request state (mirrors the wants table) ──
@@ -265,54 +267,9 @@ export default function MoveRequestWizard() {
     setContactSaved(true);
   };
 
-  // ── INTRO MODE — earn trust before asking anything ──
-  if (mode === 'intro') {
-    return (
-      <div className="mrq">
-        <span className="mrq-badge"><MaterialIcon icon="hub" className="text-[14px]" /> Real Estate Interconnector</span>
-        <h1 className="mrq-h1">Post a move request.<br />Let the map check for real connections.</h1>
-        <p className="mrq-sub">
-          Enter concrete criteria — location, property needs, payment range, timing,
-          and what you may have to offer. PlotMaps compares your request with other
-          real requests to find possible matches.
-        </p>
-        <div className="mrq-trust">
-          <div className="mrq-trust__c">
-            <MaterialIcon icon="do_not_touch" className="text-[20px]" />
-            <b>Not a lead form</b>
-            <span>Your info is not dropped into someone&apos;s private contact list.</span>
-          </div>
-          <div className="mrq-trust__c">
-            <MaterialIcon icon="lock" className="text-[20px]" />
-            <b>Private at first</b>
-            <span>You control what becomes visible.</span>
-          </div>
-          <div className="mrq-trust__c">
-            <MaterialIcon icon="verified_user" className="text-[20px]" />
-            <b>Verified before public</b>
-            <span>A property only appears on the map after authorization is confirmed.</span>
-          </div>
-        </div>
-        <p className="mrq-line">Concrete criteria in. Possible connections out.</p>
-        <div className="mrq-ctarow">
-          <button className="mrq-btn mrq-btn--primary" onClick={() => setMode('chat')}>
-            <MaterialIcon icon="forum" className="text-[17px]" /> Just tell us
-          </button>
-          <button className="mrq-btn" onClick={() => setMode('steps')}>
-            Use the steps <MaterialIcon icon="arrow_forward" className="text-[17px]" />
-          </button>
-        </div>
-        <p className="mrq-help" style={{ marginTop: 10 }}>
-          Talk it through like you would with a person — ask how it works, say it
-          your way — or take the guided steps. Same request either way.
-        </p>
-      </div>
-    );
-  }
-
-  // ── CHAT MODE — Claude at the front door (conversational intake) ──
+  // ── CHAT MODE — the front door (AI-style greeting + one big input) ──
   if (mode === 'chat') {
-    return <IntakeChat onBack={() => setMode('intro')} />;
+    return <IntakeChat onSteps={() => setMode('steps')} />;
   }
 
   // ── POSTED MODE — the after-post soft ask (no account wall) ──
@@ -691,7 +648,7 @@ export default function MoveRequestWizard() {
 
       {/* nav */}
       <div className="mrq-ctarow">
-        <button className="mrq-btn" onClick={() => (step === 0 ? setMode('intro') : setStep(step - 1))}>
+        <button className="mrq-btn" onClick={() => (step === 0 ? setMode('chat') : setStep(step - 1))}>
           <MaterialIcon icon="arrow_back" className="text-[17px]" /> Back
         </button>
         {step < 6 ? (

@@ -30,7 +30,7 @@ export async function GET() {
   const connections = (connRes.data ?? []) as Array<{
     a_id: string; a_label: string; a_lat: number; a_lng: number; a_to_label: string;
     b_id: string; b_label: string; b_lat: number; b_lng: number; b_to_label: string;
-    match_pct: number; status: string; mutual: boolean;
+    match_pct: number; status: string; mutual: boolean; shared_tags: string[] | null;
   }>;
 
   // Dedupe symmetric pairs (A↔B and B↔A) — keep the higher match.

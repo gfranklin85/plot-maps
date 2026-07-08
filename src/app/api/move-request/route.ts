@@ -1,0 +1,144 @@
+import { NextResponse } from 'next/server';
+import { supabaseAdmin } from '@/lib/supabase-server';
+import { getAuthUser } from '@/lib/auth';
+
+// POST /api/move-request
+//
+// The onramp save: an ad visitor completes "Post a move request" (/post) with
+// NO account, and this persists it — a `wants` row (visibility='private': the
+// trust sequence is private draft → verified → public) plus `want_amenities`
+// tag rows from the amenity vocabulary. No auth required (bullpen pattern);
+// if a session exists we stamp user_id. Contact is a soft optional ask so a
+// match can reach them. Returns { id } — the client keeps it for the later
+// claim/verification (Prompt 2). memory/the_thesis (the want-map; Commercial
+// #1 "Post What You Want").
+
+export const dynamic = 'force-dynamic';
+
+export async function POST(req: Request) {
+  let body: Record<string, unknown>;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: 'invalid body' }, { status: 400 });
+  }
+
+  const str = (v: unknown, max = 400) => {
+    const s = typeof v === 'string' ? v.trim() : '';
+    return s ? s.slice(0, max) : null;
+  };
+  const num = (v: unknown) => {
+    const n = typeof v === 'number' ? v : parseFloat(String(v ?? ''));
+    return Number.isFinite(n) ? n : null;
+  };
+  const bool = (v: unknown) => v === true;
+
+  // The one hard requirement: a destination (the dream leads — step 1).
+  const toLabel = str(body.toLabel);
+  if (!toLabel) {
+    return NextResponse.json({ error: 'destination is required' }, { status: 400 });
+  }
+
+  // Best-effort session stamp.
+  let userId: string | null = null;
+  try {
+    const user = await getAuthUser();
+    userId = user?.id ?? null;
+  } catch {
+    userId = null;
+  }
+
+  const row = {
+    user_id: userId,
+    owner_name: str(body.name),
+    owner_contact: str(body.contact),
+    // where they are now (step 4)
+    from_label: str(body.fromLabel),
+    from_lat: num(body.fromLat),
+    from_lng: num(body.fromLng),
+    // where they want to go (step 1 — can be fuzzy: "Closer to family")
+    to_label: toLabel,
+    to_lat: num(body.toLat),
+    to_lng: num(body.toLng),
+    to_is_fuzzy: bool(body.toFuzzy) || num(body.toLat) === null,
+    // quantified criteria (step 1 "make it concrete" + step 2)
+    acres_min: num(body.acresMin),
+    beds_min: num(body.bedsMin) !== null ? Math.round(num(body.bedsMin)!) : null,
+    criteria_notes: str(body.criteriaNotes, 2000),
+    // payment (step 3)
+    target_monthly: num(body.targetMonthly),
+    down_payment: num(body.downPayment),
+    max_price: num(body.maxPrice),
+    financing_type: str(body.financingType),
+    // what they have (step 5)
+    has_current_home: bool(body.hasCurrentHome),
+    current_home_value: num(body.currentHomeValue),
+    equity: num(body.equity),
+    open_to_seller_carry: bool(body.openToSellerCarry),
+    open_to_trade: bool(body.openToTrade),
+    timing: str(body.timing),
+    // THE question — "I'd move if X" (the gathering thesis)
+    move_condition: str(body.moveCondition, 1000),
+    status: 'new',
+    visibility: 'private', // private draft; verification gates public
+    source: 'owner',
+  };
+
+  const { data: inserted, error } = await supabaseAdmin
+    .from('wants')
+    .insert(row)
+    .select('id')
+    .single();
+  if (error || !inserted) {
+    console.error('move-request insert error:', error?.message);
+    return NextResponse.json({ error: 'could not post' }, { status: 500 });
+  }
+
+  // Amenity tags — validate against the vocabulary so junk slugs can't land.
+  const requested = Array.isArray(body.amenities)
+    ? Array.from(new Set(body.amenities.map((v) => String(v).toLowerCase().trim()).filter(Boolean)))
+    : [];
+  if (requested.length > 0) {
+    const { data: valid } = await supabaseAdmin
+      .from('amenities')
+      .select('slug')
+      .in('slug', requested);
+    const slugs = (valid ?? []).map((a: { slug: string }) => a.slug);
+    if (slugs.length > 0) {
+      const { error: tagErr } = await supabaseAdmin
+        .from('want_amenities')
+        .insert(slugs.map((slug) => ({ want_id: inserted.id, amenity_slug: slug })));
+      if (tagErr) console.error('want_amenities insert error:', tagErr.message);
+    }
+  }
+
+  return NextResponse.json({ id: inserted.id });
+}
+
+// PATCH /api/move-request — the AFTER-post soft ask: "Where should we send
+// matches?" Attaches contact (email/phone) + optional name to a just-posted
+// move request. The uuid is the bearer credential (only the poster's browser
+// has it — it was returned by their POST). No account wall.
+export async function PATCH(req: Request) {
+  let body: Record<string, unknown>;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: 'invalid body' }, { status: 400 });
+  }
+  const id = typeof body.id === 'string' ? body.id : '';
+  const contact = typeof body.contact === 'string' ? body.contact.trim().slice(0, 200) : '';
+  const name = typeof body.name === 'string' ? body.name.trim().slice(0, 120) : null;
+  if (!id || !contact) {
+    return NextResponse.json({ error: 'id and contact required' }, { status: 400 });
+  }
+  const { error } = await supabaseAdmin
+    .from('wants')
+    .update({ owner_contact: contact, ...(name ? { owner_name: name } : {}) })
+    .eq('id', id);
+  if (error) {
+    console.error('move-request contact error:', error.message);
+    return NextResponse.json({ error: 'could not save contact' }, { status: 500 });
+  }
+  return NextResponse.json({ ok: true });
+}

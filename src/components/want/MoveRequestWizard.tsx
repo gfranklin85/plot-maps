@@ -289,8 +289,10 @@ export default function MoveRequestWizard() {
           </div>
         )}
         <div className="mrq-ctarow">
-          <a className="mrq-btn mrq-btn--primary" href="/connections">See the connection board <MaterialIcon icon="arrow_forward" className="text-[17px]" /></a>
-          <a className="mrq-btn" href="/">Continue anonymously</a>
+          <a className="mrq-btn mrq-btn--primary" href={postedId ? `/my-request?id=${postedId}` : '/my-request'}>
+            Open My Move Request <MaterialIcon icon="arrow_forward" className="text-[17px]" />
+          </a>
+          <a className="mrq-btn" href="/connections">See the connection board</a>
         </div>
       </div>
     );

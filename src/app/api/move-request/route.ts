@@ -14,6 +14,60 @@ import { getAuthUser } from '@/lib/auth';
 // #1 "Post What You Want").
 
 export const dynamic = 'force-dynamic';
+// supabase-js .select() is a GET under Next's patched fetch — force no-store
+// so this route never serves stale data (see the_facts gotcha).
+export const fetchCache = 'force-no-store';
+
+// GET /api/move-request?id=<uuid>
+//
+// The My Move Request page's data: the want (the uuid is the bearer credential)
+// + its amenity tags + DIRECT connections + multi-party MOVE PATHS (webs, not
+// swaps) + the live active-request count. The want joins the match graph even
+// while private — "private at first, structured for matching."
+export async function GET(req: Request) {
+  const id = new URL(req.url).searchParams.get('id');
+  if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
+
+  const [wantRes, tagRes, directRes, pathsRes, countRes] = await Promise.all([
+    supabaseAdmin.from('wants').select('*').eq('id', id).maybeSingle(),
+    supabaseAdmin.from('want_amenities')
+      .select('amenity_slug, amenities(label, icon)')
+      .eq('want_id', id),
+    supabaseAdmin.rpc('connections_for_want', { _want_id: id, _radius_km: 1200 }),
+    supabaseAdmin.rpc('paths_for_want', { _want_id: id, _radius_km: 400, _max_len: 4 }),
+    supabaseAdmin.from('wants').select('id', { count: 'exact', head: true }).eq('visibility', 'public'),
+  ]);
+
+  if (wantRes.error || !wantRes.data) {
+    return NextResponse.json({ error: 'not found' }, { status: 404 });
+  }
+
+  // Dedupe direct connections by the other poster (a person can appear
+  // inbound AND outbound) — keep the strongest, note mutuality.
+  type Direct = {
+    other_id: string; other_label: string; other_to_label: string;
+    other_move_condition: string | null; direction: string;
+    match_pct: number; mutual: boolean; shared_tags: string[] | null;
+  };
+  const best = new Map<string, Direct>();
+  for (const d of ((directRes.data ?? []) as Direct[])) {
+    const prev = best.get(d.other_id);
+    if (!prev || d.match_pct > prev.match_pct) best.set(d.other_id, d);
+  }
+
+  return NextResponse.json({
+    want: wantRes.data,
+    // Supabase types the joined relation as an array; it's a to-one join.
+    tags: (tagRes.data ?? []).map((t) => {
+      const rel = Array.isArray(t.amenities) ? t.amenities[0] : t.amenities;
+      const a = rel as { label?: string; icon?: string | null } | null;
+      return { slug: t.amenity_slug as string, label: a?.label ?? (t.amenity_slug as string), icon: a?.icon ?? null };
+    }),
+    direct: Array.from(best.values()).sort((a, b) => b.match_pct - a.match_pct),
+    paths: (pathsRes.data ?? []) as Array<{ chain: string[]; labels: string[]; chain_len: number }>,
+    activeCount: countRes.count ?? 0,
+  });
+}
 
 export async function POST(req: Request) {
   let body: Record<string, unknown>;
@@ -135,12 +189,22 @@ export async function PATCH(req: Request) {
   const id = typeof body.id === 'string' ? body.id : '';
   const contact = typeof body.contact === 'string' ? body.contact.trim().slice(0, 200) : '';
   const name = typeof body.name === 'string' ? body.name.trim().slice(0, 120) : null;
-  if (!id || !contact) {
-    return NextResponse.json({ error: 'id and contact required' }, { status: 400 });
+  // My Move Request page controls: pause/resume + switch verification method.
+  const status = typeof body.status === 'string' && ['new', 'paused'].includes(body.status) ? body.status : null;
+  const method = typeof body.verificationMethod === 'string'
+    && ['mail', 'document', 'agent', 'representative', 'later'].includes(body.verificationMethod)
+    ? body.verificationMethod : null;
+  if (!id || (!contact && !status && !method)) {
+    return NextResponse.json({ error: 'id and a field required' }, { status: 400 });
   }
   const { error } = await supabaseAdmin
     .from('wants')
-    .update({ owner_contact: contact, ...(name ? { owner_name: name } : {}) })
+    .update({
+      ...(contact ? { owner_contact: contact } : {}),
+      ...(name ? { owner_name: name } : {}),
+      ...(status ? { status } : {}),
+      ...(method ? { verification_method: method } : {}),
+    })
     .eq('id', id);
   if (error) {
     console.error('move-request contact error:', error.message);

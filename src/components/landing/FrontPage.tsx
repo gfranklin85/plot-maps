@@ -135,6 +135,75 @@ export default function FrontPage() {
         </div>
       </section>
 
+      {/* ════ THE INTERCONNECTOR — "Claim your home. Name your next one." ════
+          PROMOTED to first section under the hero (2026-07-08): this IS the
+          outreach plan's front door — the FB/TikTok ads point at this idea, and
+          both cards route to /post (the move-request onramp). Webs, not swaps:
+          direct connections AND multi-step move paths. Anchor #intent gets its
+          own nav link ("The Network"). memory/the_thesis */}
+      <section id="intent" className="fp-section fp-intent">
+        <div className="fp__wrap">
+          <div className="fp-intent__head">
+            <div className="fp-intent__eyebrow">The Real Estate Interconnector</div>
+            <h2 className="fp-intent__h">Claim your home. Name your next one.</h2>
+            <p className="fp-intent__lede">
+              Owners and buyers post what they actually want — and the map
+              compares every request to find <b>direct connections and
+              multi-step move paths</b>. You don&apos;t need to find your exact
+              opposite: your request may connect directly with one person, or
+              become part of a larger path where everyone moves. No cold calls.
+              No guessing. Your terms.
+            </p>
+          </div>
+
+          <div className="fp-intent__paths">
+            {/* OWNER side */}
+            <div className="fp-intent__card fp-intent__card--owner">
+              <span className="fp-intent__icon"><MaterialIcon icon="home" /></span>
+              <div className="fp-intent__kicker">I own a home</div>
+              <h3 className="fp-intent__card-h">Claim your house. Set your status.</h3>
+              <p className="fp-intent__card-p">
+                Post a move request — private at first, structured for matching.
+                Tell the map your real plan: staying for good, heading to Florida
+                after retirement, or &ldquo;I&apos;d move if…&rdquo;
+              </p>
+              <ul className="fp-intent__list">
+                <li><span className="chk" aria-hidden>✓</span> The pesky cold calls stop — agents stop guessing.</li>
+                <li><span className="chk" aria-hidden>✓</span> Your request joins the map&apos;s move paths — verified before anything goes public.</li>
+                <li><span className="chk" aria-hidden>✓</span> Fly your own neighborhood — and anywhere in the world.</li>
+              </ul>
+              <a href="/post" className="fp-cta fp-cta--primary fp-intent__btn">
+                Claim your home <span aria-hidden>→</span>
+              </a>
+            </div>
+
+            {/* BUYER side */}
+            <div className="fp-intent__card fp-intent__card--buyer">
+              <span className="fp-intent__icon"><MaterialIcon icon="travel_explore" /></span>
+              <div className="fp-intent__kicker">I&apos;m looking to buy</div>
+              <h3 className="fp-intent__card-h">Put the whole map to work.</h3>
+              <p className="fp-intent__card-p">
+                State your destination and criteria — the map compares your
+                request against every active request to find who connects.
+              </p>
+              <ul className="fp-intent__list">
+                <li><span className="chk" aria-hidden>✓</span> Your criteria + destination, matched to real owners.</li>
+                <li><span className="chk" aria-hidden>✓</span> Reach homes that aren&apos;t even listed yet.</li>
+                <li><span className="chk" aria-hidden>✓</span> Direct connection or 3-person move path — either way, you move.</li>
+              </ul>
+              <a href="/post" className="fp-cta fp-cta--primary fp-intent__btn">
+                Find your next place <span aria-hidden>→</span>
+              </a>
+            </div>
+          </div>
+
+          <p className="fp-intent__note">
+            Free to post. No account needed. Private until you say otherwise —
+            <a href="/post" style={{ fontWeight: 700, marginLeft: 4 }}>post a move request →</a>
+          </p>
+        </div>
+      </section>
+
       {/* ════ THE REPOSITION — the buyer-elevation platform ════
           Right under the hero: explain + show how the dynamic gets put back
           where it belongs — balanced toward the one buying. Steel-calm,
@@ -242,70 +311,6 @@ export default function FrontPage() {
           The working tool lives HERE on the landing page (not a lonely page).
           memory/project_orbit_property_agent_magnet */}
       <OrbitSection />
-
-      {/* ════ THE INTENT NETWORK — "Claim your home. Name your next one." ════
-          The two-sided moat: owners claim their house + post status/sell
-          criteria (kills cold calls, feeds the right agents); buyers post
-          buy-box + destination; Plot matches them nationwide. Two paths.
-          memory/project_intent_network_two_sided */}
-      <section id="intent" className="fp-section fp-intent">
-        <div className="fp__wrap">
-          <div className="fp-intent__head">
-            <div className="fp-intent__eyebrow">The PlotMaps owner + buyer network</div>
-            <h2 className="fp-intent__h">Claim your home. Name your next one.</h2>
-            <p className="fp-intent__lede">
-              Owners and buyers post what they actually want — and Plot&apos;s
-              growing nationwide network turns that into real matches. No cold
-              calls. No guessing. Your terms.
-            </p>
-          </div>
-
-          <div className="fp-intent__paths">
-            {/* OWNER side */}
-            <div className="fp-intent__card fp-intent__card--owner">
-              <span className="fp-intent__icon"><MaterialIcon icon="home" /></span>
-              <div className="fp-intent__kicker">I own a home</div>
-              <h3 className="fp-intent__card-h">Claim your house. Set your status.</h3>
-              <p className="fp-intent__card-p">
-                Put your home on the map and tell agents your real plan —
-                staying for good, heading to Florida after retirement, leaving
-                it to the kids. Two things happen at once:
-              </p>
-              <ul className="fp-intent__list">
-                <li><span className="chk" aria-hidden>✓</span> The pesky cold calls stop — agents stop guessing.</li>
-                <li><span className="chk" aria-hidden>✓</span> The right agents bring you your ideal next place, at your price.</li>
-                <li><span className="chk" aria-hidden>✓</span> Fly your own neighborhood — and anywhere in the world.</li>
-              </ul>
-              <button type="button" className="fp-cta fp-cta--primary fp-intent__btn" onClick={() => signInWithGoogle()}>
-                Claim your home <span aria-hidden>→</span>
-              </button>
-            </div>
-
-            {/* BUYER side */}
-            <div className="fp-intent__card fp-intent__card--buyer">
-              <span className="fp-intent__icon"><MaterialIcon icon="travel_explore" /></span>
-              <div className="fp-intent__kicker">I&apos;m looking to buy</div>
-              <h3 className="fp-intent__card-h">Put the whole map to work.</h3>
-              <p className="fp-intent__card-p">
-                State your buy-box and the city you want — Plot puts a nationwide
-                network of agents and self-posting owners to work finding it.
-              </p>
-              <ul className="fp-intent__list">
-                <li><span className="chk" aria-hidden>✓</span> Your criteria + destination, matched to real owners.</li>
-                <li><span className="chk" aria-hidden>✓</span> Reach homes that aren&apos;t even listed yet.</li>
-                <li><span className="chk" aria-hidden>✓</span> Make your next home a reality.</li>
-              </ul>
-              <button type="button" className="fp-cta fp-cta--primary fp-intent__btn" onClick={() => signInWithGoogle()}>
-                Find your next place <span aria-hidden>→</span>
-              </button>
-            </div>
-          </div>
-
-          <p className="fp-intent__note">
-            Free to post. Your plan is stored and worked on — not just browsed.
-          </p>
-        </div>
-      </section>
 
       {/* ════ THE TOOL GRID — the dashboard, right on the front page ════
           Everything is gated at the action (try-before-buy), so the full

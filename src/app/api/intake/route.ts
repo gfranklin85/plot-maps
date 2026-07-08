@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { supabaseAdmin } from '@/lib/supabase-server';
+import { logCost } from '@/lib/cost-tracker';
 
 // POST /api/intake — Claude at the front door.
 //
@@ -23,6 +24,16 @@ export const fetchCache = 'force-no-store';
 export const maxDuration = 60;
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
+
+// Model choice (Greg, 2026-07-08: "no token-heavy model for easy stuff"):
+// Sonnet — near-Opus quality on exactly this kind of conversational work at
+// a fraction of the price, run at LOW effort (snappy) with prompt caching on
+// the growing transcript. Intake turns are easy work; Opus stays reserved
+// for jobs that need it.
+const INTAKE_MODEL = 'claude-sonnet-5';
+// Sonnet 5 intro pricing per token: $2/M in, $10/M out, cache read ~$0.20/M,
+// cache write ~$2.50/M — for the cost_events estimate only.
+const PRICE = { in: 2e-6, out: 10e-6, cacheRead: 0.2e-6, cacheWrite: 2.5e-6 };
 
 const MAX_TURNS = 60; // transcript message cap — nudge to post past this
 
@@ -112,10 +123,21 @@ WHAT PLOTMAPS IS (so you can answer "how does this work?" right there):
 - Privacy: their request saves as a PRIVATE DRAFT, visible only to them, but structured for matching from minute one. Nothing goes public without verification, and posting a want never requires verification — only placing a property on the public map does. "Verify privately. Choose how you appear publicly."
 - It's free to post. A licensed brokerage (Position) stands behind it.
 
+YOUR MISSION — every conversation works toward these goals, in rough order:
+G1. At least one REAL destination — a place with coordinates, never an unresolved wish. Wide sets welcome.
+G2. Their current position: city + own/rent/helping.
+G3. Occupation — and tailor the conversation to it.
+G4. One matchable constraint: payment comfort, land/size need, or timing.
+G5. The one-liner: "I'd move if…"
+G6. At close: contact (email or phone) so we can reach them when a connection appears.
+Each turn, aim your ONE question at the highest unmet goal — unless their last message opens a door worth walking through (an aside about kids, work, why now: take it, note it, come back to the goals). When G1–G3 are met and the momentum fades, close warm — don't drag a finished conversation. Set status "complete" and tell them to post the card.
+
 HOW TO BE:
 - Warm, real, brief. 1–3 short sentences, then ONE question. Never a list of questions. Never form-speak.
 - Meet the person, not the data. React to what they actually said before asking the next thing.
 - If they ask how it works, answer plainly right there, then pick the thread back up.
+
+WEB SEARCH: you can search the web, but it costs money and time — at most one search per turn, and ONLY when a current, local fact would materially improve their match or their trust (who's hiring in their trade near a destination, a base's current status, whether a market's actually cheaper). Never search for small talk or anything you already know well. Most turns need no search.
 
 WHAT YOU'RE LISTENING FOR (extract via update_move_request as you go — resend the full picture each call):
 1. DESTINATIONS — the set of everywhere they'd truly go. Wide is fine: "Florida, Georgia, Tennessee, maybe the Carolinas" = multiple destinations, each matchable. Include your best approximate lat/lng for each.
@@ -213,45 +235,76 @@ export async function POST(req: Request) {
 
   transcript.push({ role: 'user', content: message });
 
+  // Sonnet at LOW effort (snappy conversational turns), a CAPPED web search
+  // (≤2 uses/turn; the prompt says use it rarely), and top-level prompt
+  // caching so the growing transcript is served from cache each turn.
+  const params = {
+    model: INTAKE_MODEL,
+    max_tokens: 4096,
+    thinking: { type: 'adaptive' as const },
+    output_config: { effort: 'low' as const },
+    cache_control: { type: 'ephemeral' as const },
+    system: systemPrompt(await amenityList()),
+    tools: [
+      EXTRACT_TOOL,
+      { type: 'web_search_20260209', name: 'web_search', max_uses: 2 } as unknown as Anthropic.Tool,
+    ],
+  };
+
   let response: Anthropic.Message;
+  const allText: string[] = [];
+  let allToolUses: Anthropic.ToolUseBlock[] = [];
+  const usage = { in: 0, out: 0, cacheRead: 0, cacheWrite: 0 };
   try {
-    response = await anthropic.messages.create({
-      model: 'claude-opus-4-8',
-      max_tokens: 4096,
-      // adaptive thinking + low effort: this is a chat — snappy replies matter,
-      // and Opus at low effort is more than enough for resolving follow-ups
-      thinking: { type: 'adaptive' },
-      output_config: { effort: 'low' },
-      system: systemPrompt(await amenityList()),
-      tools: [EXTRACT_TOOL],
-      messages: transcript,
-    });
+    response = await anthropic.messages.create({ ...params, messages: transcript });
+    // Server tools (web search) can pause the turn — append the assistant
+    // content and re-send to let it finish (no extra user message).
+    let rounds = 0;
+    for (;;) {
+      usage.in += response.usage.input_tokens;
+      usage.out += response.usage.output_tokens;
+      usage.cacheRead += response.usage.cache_read_input_tokens ?? 0;
+      usage.cacheWrite += response.usage.cache_creation_input_tokens ?? 0;
+      allText.push(...response.content
+        .filter((b): b is Anthropic.TextBlock => b.type === 'text')
+        .map((b) => b.text));
+      allToolUses = allToolUses.concat(response.content.filter(
+        (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use' && b.name === 'update_move_request',
+      ));
+      if (response.stop_reason !== 'pause_turn' || rounds >= 3) break;
+      transcript.push({ role: 'assistant', content: response.content });
+      response = await anthropic.messages.create({ ...params, messages: transcript });
+      rounds++;
+    }
   } catch (e) {
     console.error('intake anthropic error:', e instanceof Error ? e.message : e);
     return NextResponse.json({ error: 'the intake is busy — try again in a moment' }, { status: 502 });
   }
 
-  // Pull the conversational reply + fold in any extraction.
-  const reply = response.content
-    .filter((b): b is Anthropic.TextBlock => b.type === 'text')
-    .map((b) => b.text)
-    .join('')
-    .trim();
-  const toolUses = response.content.filter(
-    (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use' && b.name === 'update_move_request',
-  );
+  // Fire-and-forget cost telemetry (cost_events) — Greg watches spend.
+  logCost(null, 'anthropic', 'intake-turn',
+    usage.in * PRICE.in + usage.out * PRICE.out
+    + usage.cacheRead * PRICE.cacheRead + usage.cacheWrite * PRICE.cacheWrite,
+    1, { conversationId: convId, model: INTAKE_MODEL, ...usage });
+
+  const reply = allText.join('').trim();
+  const toolUses = allToolUses;
   for (const t of toolUses) {
     extracted = mergeExtraction(extracted, t.input as Extracted);
   }
 
   // Keep the transcript API-valid: append the assistant content verbatim, and
-  // if the model called the tool, answer it in a user turn so the next request
-  // continues cleanly (all tool_results in ONE user message).
+  // if the FINAL message called the extraction tool, answer it in a user turn
+  // so the next request continues cleanly (all tool_results in ONE user
+  // message; intermediate pause_turn rounds were already appended above).
   transcript.push({ role: 'assistant', content: response.content });
-  if (toolUses.length > 0) {
+  const finalToolUses = response.content.filter(
+    (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use' && b.name === 'update_move_request',
+  );
+  if (finalToolUses.length > 0) {
     transcript.push({
       role: 'user',
-      content: toolUses.map((t) => ({
+      content: finalToolUses.map((t) => ({
         type: 'tool_result' as const,
         tool_use_id: t.id,
         content: 'Saved.',

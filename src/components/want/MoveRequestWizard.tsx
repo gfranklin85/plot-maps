@@ -258,8 +258,11 @@ export default function MoveRequestWizard() {
   }
 
   // ── INTAKE MODE — the six steps ──
+  // Desktop (per the locked desktop mockup): two columns — the step card left,
+  // a PERSISTENT "Your move request" position card + Private explainer in a
+  // right sidebar. Mobile: sidebar stacks below the step card.
   return (
-    <div className="mrq">
+    <div className="mrq mrq--wide">
       {/* soft progress rail */}
       <div className="mrq-rail">
         {STEPS.map((s, i) => (
@@ -270,6 +273,8 @@ export default function MoveRequestWizard() {
         ))}
       </div>
 
+      <div className="mrq-cols">
+      <div className="mrq-main">
       <div className="mrq-card">
         {step === 0 && (
           <>
@@ -450,16 +455,6 @@ export default function MoveRequestWizard() {
         )}
       </div>
 
-      {/* live position card — builds as they answer */}
-      {step < 5 && (toLabel || fromLabel) && (
-        <div className="mrq-live">
-          <div className="mrq-live__h"><MaterialIcon icon="description" className="text-[15px]" /> Your move request</div>
-          <div className="mrq-live__row"><MaterialIcon icon="location_on" className="text-[14px]" /> To: {toLabel || '—'}</div>
-          <div className="mrq-live__row"><MaterialIcon icon="landscape" className="text-[14px]" /> Needs: {needsSummary}</div>
-          <div className="mrq-live__row"><MaterialIcon icon="lock" className="text-[14px]" /> Visibility: Private draft</div>
-        </div>
-      )}
-
       {/* nav */}
       <div className="mrq-ctarow">
         <button className="mrq-btn" onClick={() => (step === 0 ? setMode('intro') : setStep(step - 1))}>
@@ -474,6 +469,25 @@ export default function MoveRequestWizard() {
             {posting ? 'Posting…' : 'Post my move request'} <MaterialIcon icon="send" className="text-[17px]" />
           </button>
         )}
+      </div>
+      </div>
+
+      {/* the persistent position card + Private explainer (desktop sidebar;
+          stacks below on mobile) */}
+      <aside className="mrq-side">
+        <div className="mrq-live">
+          <div className="mrq-live__h"><MaterialIcon icon="description" className="text-[15px]" /> Your move request</div>
+          <div className="mrq-live__row"><MaterialIcon icon="location_on" className="text-[14px]" /> To: {toLabel || '—'}</div>
+          <div className="mrq-live__row"><MaterialIcon icon="landscape" className="text-[14px]" /> Needs: {needsSummary}</div>
+          {fromLabel && <div className="mrq-live__row"><MaterialIcon icon="home" className="text-[14px]" /> From: {fromLabel}</div>}
+          {targetMonthly && <div className="mrq-live__row"><MaterialIcon icon="payments" className="text-[14px]" /> ~${Number(targetMonthly).toLocaleString()}/mo</div>}
+          <div className="mrq-live__row"><MaterialIcon icon="lock" className="text-[14px]" /> Visibility: Private draft</div>
+        </div>
+        <div className="mrq-privcard">
+          <div className="mrq-privcard__h"><MaterialIcon icon="lock" className="text-[16px]" /> Private</div>
+          <p>Your request is private and only shared with verified matches. You control what goes public.</p>
+        </div>
+      </aside>
       </div>
     </div>
   );

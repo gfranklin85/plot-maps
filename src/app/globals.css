@@ -2994,27 +2994,52 @@ gmp-popover-3d-element[plot-card-popover],
 .mrq-help { font-size: 13px; color: #6b7689; line-height: 1.5; margin-top: 6px; }
 .mrq-search { margin-top: 14px; }
 .mrq-picked { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; font-weight: 700; color: #1349d4; margin-top: 10px; }
-/* ── the conversational intake — ONE page (Greg's mockup 2026-07-08) ────
-   Pitch up top (headline + trust row), then the chat and the position card
-   SIDE BY SIDE from second zero — the card filling as you talk is the
-   "not a lead form" proof. */
-.mrq-onepage .mrq-trust { margin-top: 20px; }
-.mrq-chatgrid { display: grid; grid-template-columns: 1fr; gap: 18px; align-items: start; margin-top: 22px; }
-@media (min-width: 1000px) { .mrq-chatgrid { grid-template-columns: minmax(0, 1fr) 380px; } }
-.mrq-chatcard { display: flex; flex-direction: column; height: min(70vh, 620px); padding: 14px; }
-.mrq-chathead { display: flex; align-items: center; gap: 10px; padding: 2px 4px 12px; border-bottom: 1px solid rgba(19,73,212,0.08); }
-.mrq-chathead__icon { display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: 12px; background: #1349d4; color: #fff; }
-.mrq-chathead__t { display: flex; flex-direction: column; line-height: 1.2; }
-.mrq-chathead__t b { font-size: 14px; font-weight: 800; color: #1349d4; }
-.mrq-chathead__t span { font-size: 12px; color: #8a93a3; }
-.mrq-chatchips { display: flex; flex-wrap: wrap; gap: 7px; padding: 0 4px 10px; }
-.mrq-chatchips .mrq-chip { padding: 7px 12px; font-size: 12.5px; border-radius: 999px; }
-.mrq-chatfoot { display: flex; align-items: center; gap: 5px; font-size: 11.5px; color: #8a93a3; padding: 8px 4px 0; }
-.mrq-chatfoot .material-symbols-rounded { color: #1349d4; }
-.mrq-chatfoot__steps { margin-left: auto; font-size: 11.5px; font-weight: 600; color: #6b7689; transition: color .13s; }
-.mrq-chatfoot__steps:hover { color: #1349d4; }
+/* ── the conversational intake — the pure AI open (locked 2026-07-08) ───
+   One question in the middle of an empty screen; the conversation reads
+   like a PAGE (plain text turns, no DM bubbles); the position card only
+   APPEARS once there's data to populate it. */
 
-/* position card as labeled rows (mockup) */
+/* fresh — question + box + chips, nothing else */
+.mrq-front { max-width: 680px; margin: 0 auto; padding: 20px; min-height: calc(100vh - 220px); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+.mrq-front__h { font-weight: 800; letter-spacing: -0.03em; line-height: 1.08; font-size: clamp(28px, 5.4vw, 42px); color: #0c1322; }
+.mrq-front__spark { color: #1349d4; margin-right: 4px; }
+.mrq-front__chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 18px; }
+.mrq-front__chips .mrq-chip { border-radius: 999px; padding: 8px 15px; font-size: 13px; background: #fff; }
+.mrq-front__trust { display: inline-flex; align-items: center; flex-wrap: wrap; justify-content: center; gap: 6px; font-size: 12.5px; color: #8a93a3; margin-top: 26px; }
+.mrq-front__trust .material-symbols-rounded { color: #1349d4; }
+.mrq-front__steps { font-size: 12.5px; font-weight: 600; color: #6b7689; margin-left: 10px; text-decoration: underline; text-underline-offset: 3px; transition: color .13s; }
+.mrq-front__steps:hover { color: #1349d4; }
+
+/* the big rounded box (both states) */
+.mrq-box { position: relative; width: 100%; margin-top: 26px; background: #fff; border: 1.5px solid rgba(19,73,212,0.16); border-radius: 22px; padding: 16px 62px 16px 20px; box-shadow: 0 18px 50px -30px rgba(20,50,120,0.5); transition: border-color .15s, box-shadow .15s; text-align: left; }
+.mrq-box:focus-within { border-color: #1349d4; box-shadow: 0 18px 50px -26px rgba(19,73,212,0.4); }
+.mrq-box__input { width: 100%; border: none; outline: none; resize: none; background: transparent; font-size: 16px; line-height: 1.5; color: #0c1322; font-family: inherit; display: block; }
+.mrq-box__input::placeholder { color: #9aa4b5; }
+.mrq-box__send { position: absolute; right: 12px; bottom: 12px; display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: 12px; background: #1349d4; color: #fff; transition: all .13s; }
+.mrq-box__send:hover { background: #0f3cb0; }
+.mrq-box__send:disabled { background: rgba(19,73,212,0.18); }
+
+/* talking — the conversation as a page + the card appearing beside it */
+.mrq-talk { max-width: 720px; margin: 0 auto; padding: 28px 20px 72px; display: grid; grid-template-columns: 1fr; gap: 26px; align-items: start; }
+@media (min-width: 1080px) {
+  .mrq-talk.has-card { max-width: 1120px; grid-template-columns: minmax(0, 1fr) 350px; }
+}
+.mrq-stream { min-width: 0; }
+.mrq-stream .mrq-box { margin-top: 22px; padding: 12px 58px 12px 18px; border-radius: 18px; }
+.mrq-turn { white-space: pre-wrap; line-height: 1.62; }
+.mrq-turn + .mrq-turn { margin-top: 18px; }
+.mrq-turn--user { font-size: 14px; font-weight: 650; color: #4a5568; border-left: 3px solid rgba(19,73,212,0.35); padding-left: 12px; }
+.mrq-turn--ai { font-size: 15.5px; color: #0c1322; }
+.mrq-turn--thinking { display: inline-flex; gap: 5px; margin-top: 18px; }
+.mrq-turn--thinking span { width: 7px; height: 7px; border-radius: 50%; background: rgba(19,73,212,0.45); animation: mrqThink 1.1s infinite; }
+.mrq-turn--thinking span:nth-child(2) { animation-delay: .18s; }
+.mrq-turn--thinking span:nth-child(3) { animation-delay: .36s; }
+@keyframes mrqThink { 0%, 60%, 100% { transform: translateY(0); opacity: .5; } 30% { transform: translateY(-4px); opacity: 1; } }
+
+/* the position card — appears (fades in) only once it has data */
+.mrq-sidecard { animation: mrqCardIn .35s ease-out; }
+@media (min-width: 1080px) { .mrq-sidecard { position: sticky; top: 20px; } }
+@keyframes mrqCardIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 .mrq-live--rows { padding-bottom: 6px; }
 .mrq-liverow { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 9px 0; border-bottom: 1px solid rgba(19,73,212,0.07); }
 .mrq-liverow:last-of-type { border-bottom: none; }
@@ -3023,16 +3048,6 @@ gmp-popover-3d-element[plot-card-popover],
 .mrq-liverow > b { font-size: 13px; font-weight: 700; color: #0c1322; text-align: right; }
 .mrq-livequote { display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-style: italic; color: #4a5568; padding-top: 8px; }
 .mrq-livequote .material-symbols-rounded { color: #1349d4; }
-.mrq-chatlog { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 14px 4px; }
-.mrq-msg { max-width: 85%; align-self: flex-start; background: #f2f6fc; border: 1px solid rgba(19,73,212,0.08); color: #0c1322; font-size: 14.5px; line-height: 1.5; padding: 10px 14px; border-radius: 4px 16px 16px 16px; white-space: pre-wrap; }
-.mrq-msg.is-user { align-self: flex-end; background: #1349d4; border-color: #1349d4; color: #fff; border-radius: 16px 4px 16px 16px; }
-.mrq-msg.is-typing { display: inline-flex; gap: 5px; padding: 14px 16px; }
-.mrq-msg.is-typing span { width: 7px; height: 7px; border-radius: 50%; background: rgba(19,73,212,0.45); animation: mrqTyping 1.1s infinite; }
-.mrq-msg.is-typing span:nth-child(2) { animation-delay: .18s; }
-.mrq-msg.is-typing span:nth-child(3) { animation-delay: .36s; }
-@keyframes mrqTyping { 0%, 60%, 100% { transform: translateY(0); opacity: .5; } 30% { transform: translateY(-4px); opacity: 1; } }
-.mrq-chatrow { display: flex; gap: 8px; padding-top: 10px; border-top: 1px solid rgba(19,73,212,0.08); }
-.mrq-chatrow .mrq-input { margin-top: 0; }
 .mrq-postbtn { width: 100%; justify-content: center; margin-top: 14px; flex: none; height: auto; }
 
 /* the destination SET — removable pills (wide + narrow wants); family-

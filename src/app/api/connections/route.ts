@@ -2,6 +2,10 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-server';
 
 export const dynamic = 'force-dynamic';
+// Next patches global fetch and can cache the PostgREST GET behind supabase-js
+// (.select is a GET; .rpc is a POST — which is why chains were fresh while the
+// wants list served stale). Force every fetch in this route to skip the cache.
+export const fetchCache = 'force-no-store';
 
 // GET /api/connections
 //
@@ -11,7 +15,7 @@ export const dynamic = 'force-dynamic';
 // #1 "Post What You Want").
 
 export async function GET() {
-  const [wantsRes, connRes] = await Promise.all([
+  const [wantsRes, connRes, chainsRes] = await Promise.all([
     supabaseAdmin
       .from('wants')
       .select('id, owner_name, from_label, from_lat, from_lng, to_label, status, ' +
@@ -19,6 +23,10 @@ export async function GET() {
         'target_monthly, max_price, beds_min, move_condition')
       .eq('visibility', 'public'),
     supabaseAdmin.rpc('wants_connections', { _radius_km: 1200 }),
+    // Multi-party WEBS (connections are webs, not swaps): closed loops of 3-4
+    // people where no two directly matched but everyone can move. Tighter
+    // radius — a chain hop should be a real "that's where I'm going."
+    supabaseAdmin.rpc('connection_chains', { _radius_km: 400, _max_len: 4 }),
   ]);
 
   if (wantsRes.error) {
@@ -54,5 +62,9 @@ export async function GET() {
     total: deduped.length,
   };
 
-  return NextResponse.json({ wants, connections: deduped, counts });
+  const chains = (chainsRes.data ?? []) as Array<{
+    chain: string[]; labels: string[]; chain_len: number; avg_hop_km: number;
+  }>;
+
+  return NextResponse.json({ wants, connections: deduped, chains, counts });
 }

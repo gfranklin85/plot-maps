@@ -185,7 +185,7 @@ export default function IntakeChat({ onSteps }: { onSteps: () => void }) {
       <textarea
         ref={boxRef}
         className="mrq-box__input"
-        placeholder={talking ? 'Reply…' : 'Say it like you’d say it to a person'}
+        placeholder={talking ? 'Reply…' : 'e.g. “We keep thinking about moving somewhere with more land, closer to family…”'}
         rows={talking ? 1 : 2}
         maxLength={2000}
         value={input}
@@ -204,9 +204,12 @@ export default function IntakeChat({ onSteps }: { onSteps: () => void }) {
   if (!talking) {
     return (
       <div className="mrq-front">
-        <h1 className="mrq-front__h">
-          <span className="mrq-front__spark">✳</span> {greeting()} Where would you go?
-        </h1>
+        <h1 className="mrq-front__h">{greeting()} Where would you go?</h1>
+        <p className="mrq-front__lead">
+          Tell me the move you&apos;ve been thinking about — where you&apos;d go and what
+          would make it worth it. I&apos;ll turn it into a request and check the map
+          for people you could connect with. Not sure yet? Just ask me how it works.
+        </p>
         {box}
         <div className="mrq-front__chips">
           {STARTERS.map((s) => (

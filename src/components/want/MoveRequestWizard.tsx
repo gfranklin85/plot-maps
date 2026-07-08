@@ -67,7 +67,29 @@ const BRINGS = [
 
 interface Amenity { slug: string; label: string; icon: string | null; category: string | null }
 
-const STEPS = ['Destination', 'Property Needs', 'Payment & Timing', 'Current Position', 'Property', 'Preview'];
+const STEPS = ['Destination', 'Property Needs', 'Payment & Timing', 'Current Position', 'Property', 'Verify & Secure', 'Preview & Post'];
+
+// Verification methods (step 6). Verification is PRIVATE — only used to
+// confirm the right to post a property. "Verify privately. Choose how you
+// appear publicly." Mail = PostGrid code to the property address.
+const VERIFY_METHODS: {
+  v: string; icon: string; title: string; desc: string; badge?: string; chips?: string[];
+}[] = [
+  { v: 'mail', icon: 'mail', title: 'Verify by Mail (Recommended)',
+    desc: "We'll mail a verification code to the property address. You enter the code here to confirm.",
+    badge: 'Most Secure' },
+  { v: 'document', icon: 'cloud_upload', title: 'Upload a Document',
+    desc: 'Upload one or more documents that show you have authority over this property.',
+    chips: ['Tax Bill', 'Utility Bill', 'Mortgage Statement', 'Insurance', 'Other'] },
+  { v: 'agent', icon: 'person', title: 'Verify Through an Agent',
+    desc: 'A licensed real estate agent (you or someone else) confirms your authority.',
+    chips: ['Agent or Brokerage Confirmation'] },
+  { v: 'representative', icon: 'groups', title: 'Verify as a Representative',
+    desc: 'For heirs, trustees, attorneys, or property managers. Provide documents that establish your authority.',
+    chips: ['Trust Document', 'POA', 'Estate Docs', 'Mgmt Agreement'] },
+  { v: 'later', icon: 'schedule', title: "I'll Do This Later",
+    desc: 'Save your request as a private draft. You can verify and publish to the map anytime.' },
+];
 
 export default function MoveRequestWizard() {
   const [mode, setMode] = useState<'intro' | 'steps' | 'posted'>('intro');
@@ -93,6 +115,7 @@ export default function MoveRequestWizard() {
   const [ownership, setOwnership] = useState<string | null>(null);
   const [brings, setBrings] = useState<string[]>([]);
   const [moveCondition, setMoveCondition] = useState('');
+  const [verifyMethod, setVerifyMethod] = useState<string>('mail');
   const [posting, setPosting] = useState(false);
   const [postedId, setPostedId] = useState<string | null>(null);
   const [contact, setContact] = useState('');
@@ -127,8 +150,23 @@ export default function MoveRequestWizard() {
   const canNext = () => {
     if (step === 0) return !!toLabel;
     if (step === 3) return !!fromLabel && !!ownership;
-    return true; // needs/payment/property are optional depth
+    return true; // needs/payment/property/verify are optional depth
   };
+
+  // A property is involved when they own (or are helping someone who does) —
+  // that's what verification is FOR. Wants alone never need it.
+  const hasProperty = ownership === 'own' || ownership === 'helping';
+
+  // Per-step answer summaries for the desktop rail (the rail teaches progress).
+  const railSummary = [
+    toLabel || null,
+    needsSummary !== 'Not set yet' ? needsSummary : null,
+    [targetMonthly ? `~$${Number(targetMonthly).toLocaleString()}/mo` : null, timing].filter(Boolean).join(' · ') || null,
+    fromLabel || null,
+    ownership ? (OWNERSHIP.find((o) => o.v === ownership)?.label ?? null) : null,
+    hasProperty ? (VERIFY_METHODS.find((m) => m.v === verifyMethod)?.title.replace(' (Recommended)', '') ?? null) : 'Nothing to verify',
+    null,
+  ];
 
   const post = async () => {
     setPosting(true);
@@ -154,6 +192,7 @@ export default function MoveRequestWizard() {
           timing,
           fromLabel, fromLat, fromLng,
           hasCurrentHome: ownership === 'own',
+          verificationMethod: hasProperty ? verifyMethod : null,
           openToSellerCarry: brings.includes('seller-carry') || financing === 'Seller financing',
           openToTrade: brings.includes('trade'),
           moveCondition,
@@ -274,6 +313,22 @@ export default function MoveRequestWizard() {
       </div>
 
       <div className="mrq-cols">
+      {/* desktop vertical rail — each step shows its ANSWER as you go */}
+      <aside className="mrq-vrail">
+        <div className="mrq-vrail__h">Post Your Move Request</div>
+        {STEPS.map((s, i) => (
+          <button key={s} type="button"
+            className={`mrq-vrail__s ${i === step ? 'is-on' : ''} ${i < step ? 'is-done' : ''}`}
+            onClick={() => { if (i < step) setStep(i); }}>
+            <span className="mrq-vrail__n">{i < step ? <MaterialIcon icon="check" className="text-[12px]" /> : i + 1}</span>
+            <span className="mrq-vrail__body">
+              <b>{s}</b>
+              {railSummary[i] && <span>{railSummary[i]}</span>}
+            </span>
+          </button>
+        ))}
+      </aside>
+
       <div className="mrq-main">
       <div className="mrq-card">
         {step === 0 && (
@@ -438,6 +493,60 @@ export default function MoveRequestWizard() {
 
         {step === 5 && (
           <>
+            <div className="mrq-banner">
+              <MaterialIcon icon="verified_user" className="text-[18px]" />
+              <span><b>Verification keeps the map real.</b> You stay in control of what&apos;s public.</span>
+            </div>
+            {hasProperty ? (
+              <>
+                <h2 className="mrq-q">How would you like to verify?</h2>
+                <p className="mrq-help">
+                  Choose the method that works best for you. Verification is private
+                  and only used to confirm you have the right to post this property
+                  on PlotMaps.
+                </p>
+                <div className="mrq-methods">
+                  {VERIFY_METHODS.map((m) => (
+                    <button key={m.v} type="button"
+                      className={`mrq-method ${verifyMethod === m.v ? 'is-on' : ''}`}
+                      onClick={() => setVerifyMethod(m.v)}>
+                      <span className="mrq-method__icon"><MaterialIcon icon={m.icon} className="text-[22px]" /></span>
+                      <span className="mrq-method__body">
+                        <b>{m.title}</b>
+                        <span>{m.desc}</span>
+                        {m.badge && <em className="mrq-method__badge">{m.badge}</em>}
+                        {m.chips && (
+                          <span className="mrq-method__chips">
+                            {m.chips.map((c) => <i key={c}>{c}</i>)}
+                          </span>
+                        )}
+                      </span>
+                      <span className={`mrq-method__radio ${verifyMethod === m.v ? 'is-on' : ''}`}>
+                        {verifyMethod === m.v && <MaterialIcon icon="check" className="text-[13px]" />}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                <p className="mrq-help" style={{ marginTop: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <MaterialIcon icon="lock" className="text-[14px]" />
+                  Your information is encrypted and never sold or shared.
+                </p>
+              </>
+            ) : (
+              <>
+                <h2 className="mrq-q">Nothing to verify.</h2>
+                <p className="mrq-help">
+                  You didn&apos;t attach a property, and posting a want never requires
+                  verification. If you add a property later, we&apos;ll confirm your
+                  authority privately before it appears on the public map.
+                </p>
+              </>
+            )}
+          </>
+        )}
+
+        {step === 6 && (
+          <>
             <h2 className="mrq-q">Preview your move request</h2>
             <div className="mrq-preview">
               <div className="mrq-preview__route">
@@ -449,7 +558,10 @@ export default function MoveRequestWizard() {
               {targetMonthly && <div className="mrq-preview__row"><span>Payment</span><b>~${Number(targetMonthly).toLocaleString()}/mo</b></div>}
               {timing && <div className="mrq-preview__row"><span>Timeline</span><b>{timing}</b></div>}
               {moveCondition && <div className="mrq-preview__row"><span>I&apos;d move if</span><b>{moveCondition}</b></div>}
-              <div className="mrq-preview__row"><span>Visibility</span><b className="mrq-private"><MaterialIcon icon="lock" className="text-[13px]" /> Private draft</b></div>
+              {hasProperty && (
+                <div className="mrq-preview__row"><span>Property involved</span><b>Yes — {verifyMethod === 'later' ? 'not yet verified' : `verify by ${verifyMethod}`}</b></div>
+              )}
+              <div className="mrq-preview__row"><span>Visibility</span><b className="mrq-private"><MaterialIcon icon="lock" className="text-[13px]" /> Private until verified</b></div>
             </div>
           </>
         )}
@@ -460,9 +572,9 @@ export default function MoveRequestWizard() {
         <button className="mrq-btn" onClick={() => (step === 0 ? setMode('intro') : setStep(step - 1))}>
           <MaterialIcon icon="arrow_back" className="text-[17px]" /> Back
         </button>
-        {step < 5 ? (
+        {step < 6 ? (
           <button className="mrq-btn mrq-btn--primary" disabled={!canNext()} onClick={() => setStep(step + 1)}>
-            Continue <MaterialIcon icon="arrow_forward" className="text-[17px]" />
+            {step === 5 ? 'Continue to Preview' : 'Continue'} <MaterialIcon icon="arrow_forward" className="text-[17px]" />
           </button>
         ) : (
           <button className="mrq-btn mrq-btn--primary" disabled={posting} onClick={post}>
@@ -476,17 +588,32 @@ export default function MoveRequestWizard() {
           stacks below on mobile) */}
       <aside className="mrq-side">
         <div className="mrq-live">
-          <div className="mrq-live__h"><MaterialIcon icon="description" className="text-[15px]" /> Your move request</div>
+          <div className="mrq-live__h">
+            <MaterialIcon icon="description" className="text-[15px]" /> Your move request
+            <em className="mrq-live__pill"><MaterialIcon icon="lock" className="text-[11px]" /> Private Draft</em>
+          </div>
           <div className="mrq-live__row"><MaterialIcon icon="location_on" className="text-[14px]" /> To: {toLabel || '—'}</div>
           <div className="mrq-live__row"><MaterialIcon icon="landscape" className="text-[14px]" /> Needs: {needsSummary}</div>
           {fromLabel && <div className="mrq-live__row"><MaterialIcon icon="home" className="text-[14px]" /> From: {fromLabel}</div>}
           {targetMonthly && <div className="mrq-live__row"><MaterialIcon icon="payments" className="text-[14px]" /> ~${Number(targetMonthly).toLocaleString()}/mo</div>}
           <div className="mrq-live__row"><MaterialIcon icon="lock" className="text-[14px]" /> Visibility: Private draft</div>
         </div>
-        <div className="mrq-privcard">
-          <div className="mrq-privcard__h"><MaterialIcon icon="lock" className="text-[16px]" /> Private</div>
-          <p>Your request is private and only shared with verified matches. You control what goes public.</p>
-        </div>
+        {step === 5 && hasProperty ? (
+          <div className="mrq-privcard mrq-privcard--why">
+            <div className="mrq-privcard__h"><MaterialIcon icon="verified_user" className="text-[16px]" /> Why verify?</div>
+            <ul className="mrq-why">
+              <li><MaterialIcon icon="check" className="text-[14px]" /> Keeps the map accurate</li>
+              <li><MaterialIcon icon="check" className="text-[14px]" /> Builds trust with other users</li>
+              <li><MaterialIcon icon="check" className="text-[14px]" /> Prevents scams and duplicates</li>
+              <li><MaterialIcon icon="check" className="text-[14px]" /> You control what&apos;s shared</li>
+            </ul>
+          </div>
+        ) : (
+          <div className="mrq-privcard">
+            <div className="mrq-privcard__h"><MaterialIcon icon="lock" className="text-[16px]" /> Private</div>
+            <p>Your request is private and only shared with verified matches. You control what goes public.</p>
+          </div>
+        )}
       </aside>
       </div>
     </div>

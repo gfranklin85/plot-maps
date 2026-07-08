@@ -79,6 +79,12 @@ export async function POST(req: Request) {
     timing: str(body.timing),
     // THE question — "I'd move if X" (the gathering thesis)
     move_condition: str(body.moveCondition, 1000),
+    // verification: the CHOSEN method (step 6); execution follows later.
+    // Status stays 'unverified' until a method actually completes.
+    verification_method: ['mail', 'document', 'agent', 'representative', 'later'].includes(String(body.verificationMethod))
+      ? String(body.verificationMethod)
+      : null,
+    verification_status: 'unverified',
     status: 'new',
     visibility: 'private', // private draft; verification gates public
     source: 'owner',

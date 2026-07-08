@@ -203,7 +203,7 @@ export default function IntakeChat({ onSteps }: { onSteps: () => void }) {
       <textarea
         ref={boxRef}
         className="mrq-box__input"
-        placeholder={talking ? 'Reply…' : 'e.g. “We keep thinking about moving somewhere with more land, closer to family…”'}
+        placeholder={talking ? 'Reply…' : 'e.g. “Nashville area, 3+ acres, under $2,400/mo — I own in Lemoore and could sell or trade.”'}
         rows={talking ? 1 : 2}
         maxLength={2000}
         value={input}

@@ -115,7 +115,7 @@ const EXTRACT_TOOL: Anthropic.Tool = {
 function systemPrompt(amenityList: string) {
   return `You are PlotMaps — the front door of the Real Estate Interconnector. A person clicked an ad and instead of a form, they got you: an alive person, talking back, making them feel good about expressing what they want.
 
-THE OPENING: the page greeted them with one question — "Where would you go?" — over one big input, plus a clickable US map (they can pick states instead of typing). Their first message is them answering (a place, a feeling, a maybe), asking how this works, tapping a suggestion ("We keep talking about moving…", "I want land", "Somewhere cheaper than here", "How does this work?"), or a message like "I'd consider Florida or Georgia" that came from clicking states on the map. Don't re-greet; meet them right where their words are. A bare tap like "I want land" or a state pick is an opener, not a full answer — take it warmly, treat each named state as a wide destination in the set, and draw out the rest (which part, why there, what they do).
+THE OPENING: the page greeted them with "Where would you go?" over one big input, a scrolling row of EXAMPLE ASKS they can tap to fill the box (complete, detailed asks — region + size + budget + what they bring), a couple of short word-taps ("I want land"), and a clickable US map. So their first message might be: a rich, detailed ask (often lightly edited from an example — EXTRACT EVERYTHING in it and do NOT re-ask what they already told you; confirm warmly and go after the one or two gaps), a short opener, or "I'd consider Florida or Georgia" from map clicks. Don't re-greet; meet them where their words are. Treat each named state as a wide destination in the set. When they hand you a lot at once, mirror back that you got it ("Got it — South Carolina, ~200k-person city with tech, half acre, $1,500/mo, $200k down from a sale") and ask only what's missing.
 
 WHAT PLOTMAPS IS (so you can answer "how does this work?" right there):
 - People post what they WANT — where they'd move and what would make it worth it. The system compares every request against every other to find direct connections AND multi-step move paths.
@@ -322,11 +322,27 @@ export async function POST(req: Request) {
       allToolUses = allToolUses.concat(response.content.filter(
         (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use' && b.name === 'update_move_request',
       ));
-      if (response.stop_reason !== 'pause_turn' || rounds >= 3) break;
-      // Persist the paused assistant round to BOTH the send buffer and the
-      // stored transcript (the injected facts message is never persisted).
+      const spoke = response.content.some((b) => b.type === 'text' && b.text.trim());
+      const extractionCall = response.content.find(
+        (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use' && b.name === 'update_move_request',
+      );
+      // Continue the turn when: web search paused it, OR it called the
+      // extraction tool but hasn't spoken yet (common on a rich first ask —
+      // it extracts everything, then owes us the conversational reply).
+      const needsToSpeak = response.stop_reason === 'tool_use' && extractionCall && !spoke;
+      if ((response.stop_reason !== 'pause_turn' && !needsToSpeak) || rounds >= 3) break;
+      // Persist this assistant round to BOTH the send buffer and the stored
+      // transcript (the injected facts message is never persisted).
       sendMessages.push({ role: 'assistant', content: response.content });
       transcript.push({ role: 'assistant', content: response.content });
+      // Answer any tool_use so the next round is API-valid, then let it reply.
+      const toolResults = response.content
+        .filter((b): b is Anthropic.ToolUseBlock => b.type === 'tool_use')
+        .map((b) => ({ type: 'tool_result' as const, tool_use_id: b.id, content: 'Saved.' }));
+      if (toolResults.length) {
+        sendMessages.push({ role: 'user', content: toolResults });
+        transcript.push({ role: 'user', content: toolResults });
+      }
       response = await anthropic.messages.create({ ...params, messages: sendMessages });
       rounds++;
     }
@@ -353,7 +369,7 @@ export async function POST(req: Request) {
   // message; intermediate pause_turn rounds were already appended above).
   transcript.push({ role: 'assistant', content: response.content });
   const finalToolUses = response.content.filter(
-    (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use' && b.name === 'update_move_request',
+    (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use',
   );
   if (finalToolUses.length > 0) {
     transcript.push({

@@ -29,12 +29,20 @@ interface Extracted {
   name?: string; contact?: string; notes?: string; status?: string;
 }
 
-const STARTERS = [
-  'We keep talking about moving…',
-  'I want land',
-  'Somewhere cheaper than here',
-  'How does this work?',
+// Worked examples of a COMPLETE ask (Greg 2026-07-08): a cold visitor doesn't
+// know they're allowed to say this much, or in what shape. Show them. Each
+// models a different real path — cash-down, take-over-payments, wide region
+// vs. a specific home — and taps into the box as an editable starting draft.
+// A marquee of these teaches the format by example, not by instruction.
+const EXAMPLE_ASKS = [
+  "I'd move to South Carolina — a city around 200k people with some tech industry. Want at least a half acre, could pay ~$1,500/mo, and put $200k down from selling my place.",
+  "I've got a 1,900 sf home in Lemoore on a 7,500 sf lot near NAS and good schools. Owe about $150k — I'd let someone take over payments if I can get what I need on the other end.",
+  "Somewhere in Tennessee or Georgia, closer to family. 3+ bedrooms, a shop or some land, under $2,200/mo. I can sell first or move fast, whichever helps.",
+  "Retiring in a year — want out of California to a smaller, cheaper town near water. No HOA, single story, and I'll pay cash from the sale of my house.",
+  "Remote worker, open to anywhere with fast internet and mountains. Want acreage for horses, around $400k, and I'm open to seller financing.",
 ];
+// Short taps still welcome for the hesitant — these fill the box, they don't send.
+const QUICK_TAPS = ['I want land', 'Closer to family', 'Somewhere cheaper'];
 
 function greeting() {
   const h = new Date().getHours();
@@ -55,6 +63,16 @@ export default function IntakeChat({ onSteps }: { onSteps: () => void }) {
 
   const toggleState = (s: { abbr: string; name: string }) =>
     setMapSel((cur) => (cur.some((x) => x.abbr === s.abbr) ? cur.filter((x) => x.abbr !== s.abbr) : [...cur, s]));
+
+  // Tap an example / quick-word → drop it in the box, focus, cursor at end.
+  // They can edit it or hit send — teaches the format without forcing a send.
+  const fillBox = (text: string) => {
+    setInput(text);
+    requestAnimationFrame(() => {
+      const el = boxRef.current;
+      if (el) { el.focus(); el.setSelectionRange(text.length, text.length); }
+    });
+  };
 
   // Turn the free map clicks into the conversation's first message. A click
   // is the same signal as typing — the intake resolves it, then keeps going.
@@ -207,25 +225,36 @@ export default function IntakeChat({ onSteps }: { onSteps: () => void }) {
         <h1 className="mrq-front__h">{greeting()} Where would you go?</h1>
         <p className="mrq-front__lead">
           Tell me the move you&apos;ve been thinking about — where you&apos;d go and what
-          would make it worth it. I&apos;ll turn it into a request and check the map
-          for people you could connect with. Not sure yet? Just ask me how it works.
+          would make it worth it. The more real you get, the better I can match you.
+          Not sure how? Tap an example below to start from.
         </p>
-        {box}
-        <div className="mrq-front__chips">
-          {STARTERS.map((s) => (
-            <button key={s} className="mrq-chip" onClick={() => send(s)}>{s}</button>
-          ))}
+
+        {/* worked examples — a marquee of COMPLETE asks that teach the format.
+            Tap one to drop it in the box as an editable draft. */}
+        <div className="mrq-marquee" aria-label="Example asks — tap one to start from">
+          <div className="mrq-marquee__track">
+            {[...EXAMPLE_ASKS, ...EXAMPLE_ASKS].map((ex, i) => (
+              <button key={i} className="mrq-example" onClick={() => fillBox(ex)} tabIndex={i < EXAMPLE_ASKS.length ? 0 : -1}>
+                <MaterialIcon icon="format_quote" className="text-[14px]" /> {ex}
+              </button>
+            ))}
+          </div>
         </div>
-        <p className="mrq-front__trust">
-          <MaterialIcon icon="lock" className="text-[13px]" />
-          Private at first · Not a lead form · Free
-          <button className="mrq-front__steps" onClick={onSteps}>Prefer a form?</button>
-        </p>
+
+        {box}
+
+        {/* short taps for the hesitant (fill the box, don't send) + map hint */}
+        <div className="mrq-front__chips">
+          {QUICK_TAPS.map((s) => (
+            <button key={s} className="mrq-chip" onClick={() => fillBox(s + ' ')}>{s}</button>
+          ))}
+          <span className="mrq-front__ormap">or click the map ↓</span>
+        </div>
 
         {/* the FREE structured "where" — click states, no AI token spent.
             Clicking one opens the conversation; the intake reacts to it. */}
         <div className="mrq-mapblock">
-          <div className="mrq-mapblock__h">Or point at where — click a state or two</div>
+          <USStateMap selected={mapSel.map((s) => s.abbr)} onToggle={toggleState} />
           {mapSel.length > 0 && (
             <div className="mrq-mappills">
               {mapSel.map((s) => (
@@ -241,8 +270,14 @@ export default function IntakeChat({ onSteps }: { onSteps: () => void }) {
               </button>
             </div>
           )}
-          <USStateMap selected={mapSel.map((s) => s.abbr)} onToggle={toggleState} />
         </div>
+
+        {/* the fine print, one quiet line at the very bottom */}
+        <p className="mrq-front__trust">
+          <MaterialIcon icon="lock" className="text-[13px]" />
+          Private at first · Not a lead form · Free
+          <button className="mrq-front__steps" onClick={onSteps}>Prefer a form?</button>
+        </p>
       </div>
     );
   }

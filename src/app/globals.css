@@ -2994,6 +2994,24 @@ gmp-popover-3d-element[plot-card-popover],
 .mrq-help { font-size: 13px; color: #6b7689; line-height: 1.5; margin-top: 6px; }
 .mrq-search { margin-top: 14px; }
 .mrq-picked { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; font-weight: 700; color: #1349d4; margin-top: 10px; }
+/* ── the conversational intake ("Just tell us" — Claude at the front door) ── */
+.mrq-cols--chat { align-items: stretch; }
+.mrq-chatcard { display: flex; flex-direction: column; height: min(72vh, 640px); padding: 14px; }
+.mrq-chathead { display: flex; align-items: center; gap: 10px; padding-bottom: 10px; border-bottom: 1px solid rgba(19,73,212,0.08); }
+.mrq-chatback { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 10px; color: #4a5568; background: #f2f6fc; transition: all .13s; }
+.mrq-chatback:hover { color: #1349d4; }
+.mrq-chatlog { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 14px 4px; }
+.mrq-msg { max-width: 85%; align-self: flex-start; background: #f2f6fc; border: 1px solid rgba(19,73,212,0.08); color: #0c1322; font-size: 14.5px; line-height: 1.5; padding: 10px 14px; border-radius: 4px 16px 16px 16px; white-space: pre-wrap; }
+.mrq-msg.is-user { align-self: flex-end; background: #1349d4; border-color: #1349d4; color: #fff; border-radius: 16px 4px 16px 16px; }
+.mrq-msg.is-typing { display: inline-flex; gap: 5px; padding: 14px 16px; }
+.mrq-msg.is-typing span { width: 7px; height: 7px; border-radius: 50%; background: rgba(19,73,212,0.45); animation: mrqTyping 1.1s infinite; }
+.mrq-msg.is-typing span:nth-child(2) { animation-delay: .18s; }
+.mrq-msg.is-typing span:nth-child(3) { animation-delay: .36s; }
+@keyframes mrqTyping { 0%, 60%, 100% { transform: translateY(0); opacity: .5; } 30% { transform: translateY(-4px); opacity: 1; } }
+.mrq-chatrow { display: flex; gap: 8px; padding-top: 10px; border-top: 1px solid rgba(19,73,212,0.08); }
+.mrq-chatrow .mrq-input { margin-top: 0; }
+.mrq-postbtn { width: 100%; justify-content: center; margin-top: 12px; }
+
 /* the destination SET — removable pills (wide + narrow wants); family-
    resolved cities get their own tint */
 .mrq-dests { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }

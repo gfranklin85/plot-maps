@@ -25,6 +25,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import MaterialIcon from '@/components/ui/MaterialIcon';
 import ProspectSearch from '@/components/dashboard/ProspectSearch';
+import IntakeChat from '@/components/want/IntakeChat';
 import { supabase } from '@/lib/supabase';
 
 // ── quick chips (Navy-town audience) ──────────────────────────────────
@@ -109,7 +110,7 @@ const VERIFY_METHODS: {
 ];
 
 export default function MoveRequestWizard() {
-  const [mode, setMode] = useState<'intro' | 'steps' | 'posted'>('intro');
+  const [mode, setMode] = useState<'intro' | 'chat' | 'steps' | 'posted'>('intro');
   const [step, setStep] = useState(0);
 
   // ── the move request state (mirrors the wants table) ──
@@ -294,13 +295,24 @@ export default function MoveRequestWizard() {
         </div>
         <p className="mrq-line">Concrete criteria in. Possible connections out.</p>
         <div className="mrq-ctarow">
-          <button className="mrq-btn mrq-btn--primary" onClick={() => setMode('steps')}>
-            Start my move request <MaterialIcon icon="arrow_forward" className="text-[17px]" />
+          <button className="mrq-btn mrq-btn--primary" onClick={() => setMode('chat')}>
+            <MaterialIcon icon="forum" className="text-[17px]" /> Just tell us
           </button>
-          <button className="mrq-btn">See how it works <MaterialIcon icon="play_circle" className="text-[17px]" /></button>
+          <button className="mrq-btn" onClick={() => setMode('steps')}>
+            Use the steps <MaterialIcon icon="arrow_forward" className="text-[17px]" />
+          </button>
         </div>
+        <p className="mrq-help" style={{ marginTop: 10 }}>
+          Talk it through like you would with a person — ask how it works, say it
+          your way — or take the guided steps. Same request either way.
+        </p>
       </div>
     );
+  }
+
+  // ── CHAT MODE — Claude at the front door (conversational intake) ──
+  if (mode === 'chat') {
+    return <IntakeChat onBack={() => setMode('intro')} />;
   }
 
   // ── POSTED MODE — the after-post soft ask (no account wall) ──

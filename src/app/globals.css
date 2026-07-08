@@ -3010,6 +3010,17 @@ gmp-popover-3d-element[plot-card-popover],
 .mrq-front__steps { font-size: 12.5px; font-weight: 600; color: #6b7689; margin-left: 10px; text-decoration: underline; text-underline-offset: 3px; transition: color .13s; }
 .mrq-front__steps:hover { color: #1349d4; }
 
+/* the FREE structured "where" — click-a-state map (no AI token) */
+.mrq-mapblock { width: 100%; max-width: 640px; margin-top: 40px; }
+.mrq-mapblock__h { font-size: 13px; font-weight: 700; color: #6b7689; text-align: center; }
+.mrq-mappills { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 8px; margin: 14px 0 4px; }
+.mrq-mapgo { padding: 8px 14px; height: auto; }
+.usmap { width: 100%; height: auto; margin-top: 12px; display: block; }
+.usmap__st { fill: #e8eef8; stroke: #fff; stroke-width: 1; cursor: pointer; transition: fill .12s; }
+.usmap__st.is-hover { fill: #c3d4f2; }
+.usmap__st.is-on { fill: #1349d4; }
+.usmap__st.is-on.is-hover { fill: #0f3cb0; }
+
 /* the big rounded box (both states) */
 .mrq-box { position: relative; width: 100%; margin-top: 26px; background: #fff; border: 1.5px solid rgba(19,73,212,0.16); border-radius: 22px; padding: 16px 62px 16px 20px; box-shadow: 0 18px 50px -30px rgba(20,50,120,0.5); transition: border-color .15s, box-shadow .15s; text-align: left; }
 .mrq-box:focus-within { border-color: #1349d4; box-shadow: 0 18px 50px -26px rgba(19,73,212,0.4); }

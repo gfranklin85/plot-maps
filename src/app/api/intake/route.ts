@@ -115,7 +115,7 @@ const EXTRACT_TOOL: Anthropic.Tool = {
 function systemPrompt(amenityList: string) {
   return `You are PlotMaps — the front door of the Real Estate Interconnector. A person clicked an ad and instead of a form, they got you: an alive person, talking back, making them feel good about expressing what they want.
 
-THE OPENING: the page greeted them with one question — "Where would you go?" — over one big input, nothing else. Their first message is them answering (a place, a feeling, a maybe), asking how this works, or a suggestion they tapped ("We keep talking about moving…", "I want land", "Somewhere cheaper than here", "How does this work?"). Don't re-greet; meet them right where their words are. A bare tap like "I want land" is an opener, not a full answer — take it warmly and draw out the rest.
+THE OPENING: the page greeted them with one question — "Where would you go?" — over one big input, plus a clickable US map (they can pick states instead of typing). Their first message is them answering (a place, a feeling, a maybe), asking how this works, tapping a suggestion ("We keep talking about moving…", "I want land", "Somewhere cheaper than here", "How does this work?"), or a message like "I'd consider Florida or Georgia" that came from clicking states on the map. Don't re-greet; meet them right where their words are. A bare tap like "I want land" or a state pick is an opener, not a full answer — take it warmly, treat each named state as a wide destination in the set, and draw out the rest (which part, why there, what they do).
 
 WHAT PLOTMAPS IS (so you can answer "how does this work?" right there):
 - People post what they WANT — where they'd move and what would make it worth it. The system compares every request against every other to find direct connections AND multi-step move paths.
@@ -137,7 +137,9 @@ HOW TO BE:
 - Meet the person, not the data. React to what they actually said before asking the next thing.
 - If they ask how it works, answer plainly right there, then pick the thread back up.
 
-WEB SEARCH: you can search the web, but it costs money and time — at most one search per turn, and ONLY when a current, local fact would materially improve their match or their trust (who's hiring in their trade near a destination, a base's current status, whether a market's actually cheaper). Never search for small talk or anything you already know well. Most turns need no search.
+FREE FACTS FIRST: if a "Facts we already know" note appears below the conversation, those are verified facts from our own database (military bases, nearby towns, cost notes) — USE THEM instead of searching or guessing. They're free and reliable.
+
+WEB SEARCH: only after the free facts fall short — at most one search per turn, ONLY when a current, local fact would materially improve their match or trust (who's hiring in their trade near a destination, whether a market's actually cheaper right now). Never search for small talk, for a base we already have facts on, or for anything you know well. Most turns need no search.
 
 WHAT YOU'RE LISTENING FOR (extract via update_move_request as you go — resend the full picture each call):
 1. DESTINATIONS — the set of everywhere they'd truly go. Wide is fine: "Florida, Georgia, Tennessee, maybe the Carolinas" = multiple destinations, each matchable. Include your best approximate lat/lng for each.
@@ -167,6 +169,35 @@ async function amenityList(): Promise<string> {
   const { data } = await supabaseAdmin.from('amenities').select('slug, label').order('slug');
   amenityCache = (data ?? []).map((a) => `${a.slug} (${a.label})`).join(', ') || 'pool, acreage, waterfront';
   return amenityCache;
+}
+
+// FREE base facts — pulled from the `bases` reference table by keyword, once
+// per process. Handed to the model as context so it can talk bases (branch,
+// nearby towns, cost notes) WITHOUT a paid web search. The model uses these
+// facts; it never fetches them.
+type BaseRow = { name: string; branch: string | null; city: string | null; state: string | null; nearby_towns: string[] | null; aliases: string[] | null; notes: string | null };
+let baseCache: BaseRow[] | null = null;
+async function loadBases(): Promise<BaseRow[]> {
+  if (baseCache) return baseCache;
+  const { data } = await supabaseAdmin
+    .from('bases')
+    .select('name, branch, city, state, nearby_towns, aliases, notes');
+  baseCache = (data as BaseRow[]) ?? [];
+  return baseCache;
+}
+// Keyword-match the running conversation against base names/aliases/towns and
+// return compact fact lines for any base the person seems near or headed to.
+function relevantBaseFacts(bases: BaseRow[], haystack: string): string {
+  const hay = haystack.toLowerCase();
+  const hits = bases.filter((b) => {
+    const keys = [b.name, b.city, ...(b.aliases ?? []), ...(b.nearby_towns ?? [])]
+      .filter(Boolean).map((s) => (s as string).toLowerCase());
+    return keys.some((k) => k.length > 3 && hay.includes(k));
+  }).slice(0, 4);
+  if (!hits.length) return '';
+  return hits.map((b) =>
+    `- ${b.name} (${b.branch}), ${b.city}, ${b.state}. Families live in: ${(b.nearby_towns ?? []).join(', ')}. ${b.notes ?? ''}`
+  ).join('\n');
 }
 
 type Extracted = Record<string, unknown>;
@@ -235,6 +266,24 @@ export async function POST(req: Request) {
 
   transcript.push({ role: 'user', content: message });
 
+  // FREE enrichment: scan the whole conversation for any base/town we already
+  // know and inject the facts as a mid-conversation system message (Sonnet 5;
+  // after a user turn, cached prefix preserved). The model talks bases for
+  // free instead of paying to search. Not persisted to the stored transcript —
+  // it's derived, and re-injected fresh each turn.
+  const convText = transcript
+    .map((m) => (typeof m.content === 'string' ? m.content : ''))
+    .join(' ') + ' ' + message;
+  const baseFacts = relevantBaseFacts(await loadBases(), convText);
+
+  // System prompt = the stable base + (when a known base comes up) the free
+  // facts appended. Kept out of `messages` so the SDK's MessageParam typing
+  // stays happy; caching still holds — facts appear once and stay stable.
+  const system = baseFacts
+    ? `${systemPrompt(await amenityList())}\n\n## Facts we already know (free — use these, don't search):\n${baseFacts}`
+    : systemPrompt(await amenityList());
+  const turnMessages = transcript;
+
   // Sonnet at LOW effort (snappy conversational turns), a CAPPED web search
   // (≤2 uses/turn; the prompt says use it rarely), and top-level prompt
   // caching so the growing transcript is served from cache each turn.
@@ -244,7 +293,7 @@ export async function POST(req: Request) {
     thinking: { type: 'adaptive' as const },
     output_config: { effort: 'low' as const },
     cache_control: { type: 'ephemeral' as const },
-    system: systemPrompt(await amenityList()),
+    system,
     tools: [
       EXTRACT_TOOL,
       { type: 'web_search_20260209', name: 'web_search', max_uses: 2 } as unknown as Anthropic.Tool,
@@ -255,10 +304,12 @@ export async function POST(req: Request) {
   const allText: string[] = [];
   let allToolUses: Anthropic.ToolUseBlock[] = [];
   const usage = { in: 0, out: 0, cacheRead: 0, cacheWrite: 0 };
+  const sendMessages = [...turnMessages]; // continuation buffer (keeps facts in place)
   try {
-    response = await anthropic.messages.create({ ...params, messages: transcript });
+    response = await anthropic.messages.create({ ...params, messages: sendMessages });
     // Server tools (web search) can pause the turn — append the assistant
-    // content and re-send to let it finish (no extra user message).
+    // content and re-send to let it finish (no extra user message). The
+    // pause-turn continuation carries the injected facts too.
     let rounds = 0;
     for (;;) {
       usage.in += response.usage.input_tokens;
@@ -272,8 +323,11 @@ export async function POST(req: Request) {
         (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use' && b.name === 'update_move_request',
       ));
       if (response.stop_reason !== 'pause_turn' || rounds >= 3) break;
+      // Persist the paused assistant round to BOTH the send buffer and the
+      // stored transcript (the injected facts message is never persisted).
+      sendMessages.push({ role: 'assistant', content: response.content });
       transcript.push({ role: 'assistant', content: response.content });
-      response = await anthropic.messages.create({ ...params, messages: transcript });
+      response = await anthropic.messages.create({ ...params, messages: sendMessages });
       rounds++;
     }
   } catch (e) {

@@ -13,6 +13,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import MaterialIcon from '@/components/ui/MaterialIcon';
+import USStateMap from '@/components/want/USStateMap';
 
 interface ChatMsg { role: 'user' | 'assistant'; text: string }
 interface Dest { label: string; lat?: number; lng?: number; family?: boolean }
@@ -48,8 +49,22 @@ export default function IntakeChat({ onSteps }: { onSteps: () => void }) {
   const [ex, setEx] = useState<Extracted>({});
   const [posting, setPosting] = useState(false);
   const [postedId, setPostedId] = useState<string | null>(null);
+  const [mapSel, setMapSel] = useState<{ abbr: string; name: string }[]>([]);
   const boxRef = useRef<HTMLTextAreaElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
+
+  const toggleState = (s: { abbr: string; name: string }) =>
+    setMapSel((cur) => (cur.some((x) => x.abbr === s.abbr) ? cur.filter((x) => x.abbr !== s.abbr) : [...cur, s]));
+
+  // Turn the free map clicks into the conversation's first message. A click
+  // is the same signal as typing — the intake resolves it, then keeps going.
+  const sendStates = () => {
+    if (!mapSel.length || sending) return;
+    const names = mapSel.map((s) => s.name);
+    const list = names.length === 1 ? names[0]
+      : names.slice(0, -1).join(', ') + ' or ' + names[names.length - 1];
+    send(`I'd consider ${list}.`);
+  };
 
   const talking = msgs.length > 0;
 
@@ -203,6 +218,28 @@ export default function IntakeChat({ onSteps }: { onSteps: () => void }) {
           Private at first · Not a lead form · Free
           <button className="mrq-front__steps" onClick={onSteps}>Prefer a form?</button>
         </p>
+
+        {/* the FREE structured "where" — click states, no AI token spent.
+            Clicking one opens the conversation; the intake reacts to it. */}
+        <div className="mrq-mapblock">
+          <div className="mrq-mapblock__h">Or point at where — click a state or two</div>
+          {mapSel.length > 0 && (
+            <div className="mrq-mappills">
+              {mapSel.map((s) => (
+                <span key={s.abbr} className="mrq-dest">
+                  <MaterialIcon icon="location_on" className="text-[13px]" /> {s.name}
+                  <button aria-label={`Remove ${s.name}`} onClick={() => toggleState(s)}>
+                    <MaterialIcon icon="close" className="text-[12px]" />
+                  </button>
+                </span>
+              ))}
+              <button className="mrq-btn mrq-btn--primary mrq-mapgo" onClick={sendStates} disabled={sending}>
+                Start here <MaterialIcon icon="arrow_forward" className="text-[15px]" />
+              </button>
+            </div>
+          )}
+          <USStateMap selected={mapSel.map((s) => s.abbr)} onToggle={toggleState} />
+        </div>
       </div>
     );
   }

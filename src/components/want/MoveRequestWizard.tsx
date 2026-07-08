@@ -9,7 +9,13 @@
 // teaching "I'm building a matchable position, not filling a form."
 //
 // Fuzzy → concrete: vague choices (near water, more land) immediately get a
-// small quantifier so the map gets matchable criteria, not wishes.
+// small quantifier so the map gets matchable criteria, not wishes. NO wish
+// data survives: "Closer to family" is not a destination — it RESOLVES into
+// the real cities where family lives (the resolver panel). Destinations are
+// a SET (wide + narrow wants: FL + GA + TN all matchable at once), and
+// occupation + comparative town-size anchoring ride along — what somebody
+// does means everything for where they can actually go. (the_thesis: THE
+// INTAKE IS A CONVERSATION.)
 //
 // Contact is asked AFTER posting (no account wall): POST saves the want as a
 // PRIVATE DRAFT (visibility gates: private → verified anonymous → public,
@@ -32,10 +38,21 @@ const CITY_CHIPS: { label: string; lat: number; lng: number }[] = [
   { label: 'Jacksonville', lat: 30.3322, lng: -81.6557 },
   { label: 'Fallon', lat: 39.4735, lng: -118.7774 },
 ];
-const FUZZY_CHIPS: { label: string; tag?: string }[] = [
+// Qualifiers ride on TOP of real destinations (they're amenity tags, never a
+// destination themselves). "Closer to family" is handled by the resolver —
+// family is only matchable once it's a place.
+const QUALIFIER_CHIPS: { label: string; tag: string }[] = [
   { label: 'Near a Navy base', tag: 'near-base' },
   { label: 'Near water', tag: 'waterfront' },
-  { label: 'Closer to family' },
+];
+
+// Comparative population anchoring — people know "as big as Lemoore," not
+// census numbers. Anchored to wherever they are now.
+const POP_ANCHORS: { v: string; label: (home: string) => string }[] = [
+  { v: 'smaller', label: (h) => `Smaller than ${h}` },
+  { v: 'same', label: (h) => `About the size of ${h}` },
+  { v: 'bigger', label: () => 'Bigger — more city' },
+  { v: 'any', label: () => "Size doesn't matter" },
 ];
 
 const ACRES = [
@@ -96,10 +113,11 @@ export default function MoveRequestWizard() {
   const [step, setStep] = useState(0);
 
   // ── the move request state (mirrors the wants table) ──
-  const [toLabel, setToLabel] = useState('');
-  const [toLat, setToLat] = useState<number | null>(null);
-  const [toLng, setToLng] = useState<number | null>(null);
-  const [toFuzzy, setToFuzzy] = useState(false);
+  // Destinations are a SET — every region they'd truly consider, each one
+  // matchable ("wide wants and narrow wants"). First = primary (wants.to_*),
+  // the rest land in want_destinations.
+  const [dests, setDests] = useState<{ label: string; lat: number | null; lng: number | null; family?: boolean }[]>([]);
+  const [familyOpen, setFamilyOpen] = useState(false);
   const [acresMin, setAcresMin] = useState<number | null>(null);
   const [water, setWater] = useState<string | null>(null);
   const [tags, setTags] = useState<string[]>([]);
@@ -113,6 +131,9 @@ export default function MoveRequestWizard() {
   const [fromLat, setFromLat] = useState<number | null>(null);
   const [fromLng, setFromLng] = useState<number | null>(null);
   const [ownership, setOwnership] = useState<string | null>(null);
+  // what somebody does means everything — it decides where they CAN go
+  const [occupation, setOccupation] = useState('');
+  const [popAnchor, setPopAnchor] = useState<string | null>(null);
   const [brings, setBrings] = useState<string[]>([]);
   const [moveCondition, setMoveCondition] = useState('');
   const [verifyMethod, setVerifyMethod] = useState<string>('mail');
@@ -133,6 +154,13 @@ export default function MoveRequestWizard() {
 
   const toggleTag = (slug: string) =>
     setTags((t) => (t.includes(slug) ? t.filter((s) => s !== slug) : [...t, slug]));
+  const addDest = (d: { label: string; lat: number | null; lng: number | null; family?: boolean }) =>
+    setDests((ds) => (ds.some((x) => x.label === d.label) ? ds : [...ds, d].slice(0, 12)));
+  const removeDest = (label: string) => setDests((ds) => ds.filter((d) => d.label !== label));
+  const primary = dests[0] ?? null;
+  const destSummary = dests.length
+    ? dests.slice(0, 3).map((d) => d.label).join(' · ') + (dests.length > 3 ? ` +${dests.length - 3}` : '')
+    : '';
   const toggleBring = (v: string) =>
     setBrings((b) => (b.includes(v) ? b.filter((s) => s !== v) : [...b, v]));
 
@@ -148,7 +176,7 @@ export default function MoveRequestWizard() {
   }, [acresMin, bedsMin, tags, amenities]);
 
   const canNext = () => {
-    if (step === 0) return !!toLabel;
+    if (step === 0) return dests.length > 0;
     if (step === 3) return !!fromLabel && !!ownership;
     return true; // needs/payment/property/verify are optional depth
   };
@@ -159,10 +187,10 @@ export default function MoveRequestWizard() {
 
   // Per-step answer summaries for the desktop rail (the rail teaches progress).
   const railSummary = [
-    toLabel || null,
+    destSummary || null,
     needsSummary !== 'Not set yet' ? needsSummary : null,
     [targetMonthly ? `~$${Number(targetMonthly).toLocaleString()}/mo` : null, timing].filter(Boolean).join(' · ') || null,
-    fromLabel || null,
+    [fromLabel, occupation].filter(Boolean).join(' · ') || null,
     ownership ? (OWNERSHIP.find((o) => o.v === ownership)?.label ?? null) : null,
     hasProperty ? (VERIFY_METHODS.find((m) => m.v === verifyMethod)?.title.replace(' (Recommended)', '') ?? null) : 'Nothing to verify',
     null,
@@ -182,7 +210,15 @@ export default function MoveRequestWizard() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          toLabel, toLat, toLng, toFuzzy,
+          // primary destination → wants.to_*; the REST of the set →
+          // want_destinations (every one matchable)
+          toLabel: primary?.label,
+          toLat: primary?.lat ?? null,
+          toLng: primary?.lng ?? null,
+          toFuzzy: primary ? primary.lat === null : true,
+          destinations: dests.slice(1),
+          occupation: occupation || null,
+          populationAnchor: popAnchor,
           acresMin, bedsMin,
           amenities: allTags,
           targetMonthly: targetMonthly || null,
@@ -200,6 +236,10 @@ export default function MoveRequestWizard() {
             water ? `water: ${water}` : null,
             ownership ? `ownership: ${ownership}` : null,
             brings.length ? `brings: ${brings.join(', ')}` : null,
+            // keep WHY a destination is in the set — family context matters
+            dests.some((d) => d.family)
+              ? `family in: ${dests.filter((d) => d.family).map((d) => d.label).join(', ')}`
+              : null,
           ].filter(Boolean).join('; ') || null,
         }),
       });
@@ -336,35 +376,78 @@ export default function MoveRequestWizard() {
         {step === 0 && (
           <>
             <h2 className="mrq-q">Where would you seriously consider moving?</h2>
+            <p className="mrq-help">
+              Add every place you&apos;d truly go — one city or six states. Each one
+              gets matched.
+            </p>
             <div className="mrq-search">
               <ProspectSearch
                 compact
                 placeholder="City, base, region, or service area"
                 onSelect={({ lat, lng, address }) => {
-                  setToLabel(address.split(',').slice(0, 2).join(',').trim());
-                  setToLat(lat); setToLng(lng); setToFuzzy(false);
+                  addDest({ label: address.split(',').slice(0, 2).join(',').trim(), lat, lng });
                 }}
               />
             </div>
+
+            {/* the destination SET — removable pills */}
+            {dests.length > 0 && (
+              <div className="mrq-dests">
+                {dests.map((d) => (
+                  <span key={d.label} className={`mrq-dest ${d.family ? 'is-family' : ''}`}>
+                    <MaterialIcon icon={d.family ? 'family_restroom' : 'location_on'} className="text-[14px]" />
+                    {d.label}
+                    <button type="button" aria-label={`Remove ${d.label}`} onClick={() => removeDest(d.label)}>
+                      <MaterialIcon icon="close" className="text-[13px]" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+
             <div className="mrq-chips">
               {CITY_CHIPS.map((c) => (
                 <button key={c.label}
-                  className={`mrq-chip ${toLabel === c.label ? 'is-on' : ''}`}
-                  onClick={() => { setToLabel(c.label); setToLat(c.lat); setToLng(c.lng); setToFuzzy(false); }}>
+                  className={`mrq-chip ${dests.some((d) => d.label === c.label) ? 'is-on' : ''}`}
+                  onClick={() => (dests.some((d) => d.label === c.label)
+                    ? removeDest(c.label)
+                    : addDest({ label: c.label, lat: c.lat, lng: c.lng }))}>
                   {c.label}
                 </button>
               ))}
-              {FUZZY_CHIPS.map((c) => (
+              {QUALIFIER_CHIPS.map((c) => (
                 <button key={c.label}
-                  className={`mrq-chip is-fuzzy ${toLabel === c.label ? 'is-on' : ''}`}
-                  onClick={() => {
-                    setToLabel(c.label); setToLat(null); setToLng(null); setToFuzzy(true);
-                    if (c.tag && !tags.includes(c.tag)) setTags((t) => [...t, c.tag!]);
-                  }}>
+                  className={`mrq-chip is-fuzzy ${tags.includes(c.tag) ? 'is-on' : ''}`}
+                  onClick={() => toggleTag(c.tag)}>
                   {c.label}
                 </button>
               ))}
+              <button
+                className={`mrq-chip is-fuzzy ${familyOpen || dests.some((d) => d.family) ? 'is-on' : ''}`}
+                onClick={() => setFamilyOpen((o) => !o)}>
+                Closer to family
+              </button>
             </div>
+
+            {/* the family RESOLVER — family only matches once it's a place */}
+            {familyOpen && (
+              <div className="mrq-concrete">
+                <div className="mrq-concrete__h"><MaterialIcon icon="family_restroom" className="text-[17px]" /> Where&apos;s family?</div>
+                <p className="mrq-help">
+                  &quot;Closer to family&quot; can&apos;t be matched — but their cities can.
+                  Add the places where your people are.
+                </p>
+                <div className="mrq-search">
+                  <ProspectSearch
+                    compact
+                    placeholder="Their city or town"
+                    onSelect={({ lat, lng, address }) => {
+                      addDest({ label: address.split(',').slice(0, 2).join(',').trim(), lat, lng, family: true });
+                    }}
+                  />
+                </div>
+              </div>
+            )}
 
             {/* fuzzy → concrete */}
             <div className="mrq-concrete">
@@ -376,7 +459,7 @@ export default function MoveRequestWizard() {
                     onClick={() => setAcresMin(a.v)}>{a.label}</button>
                 ))}
               </div>
-              {(toLabel === 'Near water' || tags.includes('waterfront')) && (
+              {tags.includes('waterfront') && (
                 <>
                   <div className="mrq-flabel">How close to water counts?</div>
                   <div className="mrq-chips">
@@ -470,6 +553,27 @@ export default function MoveRequestWizard() {
                   onClick={() => setOwnership(o.v)}>{o.label}</button>
               ))}
             </div>
+
+            {/* occupation — what somebody does means everything for where
+                they can actually go */}
+            <div className="mrq-flabel">What do you do for work?</div>
+            <input className="mrq-input" placeholder="e.g. Navy aviation mechanic, nurse, remote software"
+              maxLength={160} value={occupation} onChange={(e) => setOccupation(e.target.value)} />
+            <p className="mrq-help" style={{ marginTop: 6 }}>
+              Your work shapes which destinations actually fit — bases, hospitals,
+              industries, remote-friendly towns.
+            </p>
+
+            {/* comparative population anchoring — "as big as Lemoore?" */}
+            <div className="mrq-flabel">How big a town are you after?</div>
+            <div className="mrq-chips">
+              {POP_ANCHORS.map((p) => (
+                <button key={p.v} className={`mrq-chip ${popAnchor === p.v ? 'is-on' : ''}`}
+                  onClick={() => setPopAnchor(popAnchor === p.v ? null : p.v)}>
+                  {p.label(fromLabel ? fromLabel.split(',')[0] : 'where you are')}
+                </button>
+              ))}
+            </div>
           </>
         )}
 
@@ -554,9 +658,13 @@ export default function MoveRequestWizard() {
               <div className="mrq-preview__route">
                 <b>{fromLabel || 'Somewhere'}</b>
                 <MaterialIcon icon="trending_flat" className="text-[20px]" />
-                <b>{toLabel || 'Somewhere better'}</b>
+                <b>{primary?.label || 'Somewhere better'}{dests.length > 1 ? ` +${dests.length - 1} more` : ''}</b>
               </div>
+              {dests.length > 1 && (
+                <div className="mrq-preview__row"><span>Open to</span><b>{dests.map((d) => d.label).join(' · ')}</b></div>
+              )}
               <div className="mrq-preview__row"><span>Needs</span><b>{needsSummary}</b></div>
+              {occupation && <div className="mrq-preview__row"><span>Work</span><b>{occupation}</b></div>}
               {targetMonthly && <div className="mrq-preview__row"><span>Payment</span><b>~${Number(targetMonthly).toLocaleString()}/mo</b></div>}
               {timing && <div className="mrq-preview__row"><span>Timeline</span><b>{timing}</b></div>}
               {moveCondition && <div className="mrq-preview__row"><span>I&apos;d move if</span><b>{moveCondition}</b></div>}
@@ -594,9 +702,10 @@ export default function MoveRequestWizard() {
             <MaterialIcon icon="description" className="text-[15px]" /> Your move request
             <em className="mrq-live__pill"><MaterialIcon icon="lock" className="text-[11px]" /> Private Draft</em>
           </div>
-          <div className="mrq-live__row"><MaterialIcon icon="location_on" className="text-[14px]" /> To: {toLabel || '—'}</div>
+          <div className="mrq-live__row"><MaterialIcon icon="location_on" className="text-[14px]" /> To: {destSummary || '—'}</div>
           <div className="mrq-live__row"><MaterialIcon icon="landscape" className="text-[14px]" /> Needs: {needsSummary}</div>
           {fromLabel && <div className="mrq-live__row"><MaterialIcon icon="home" className="text-[14px]" /> From: {fromLabel}</div>}
+          {occupation && <div className="mrq-live__row"><MaterialIcon icon="work" className="text-[14px]" /> Work: {occupation}</div>}
           {targetMonthly && <div className="mrq-live__row"><MaterialIcon icon="payments" className="text-[14px]" /> ~${Number(targetMonthly).toLocaleString()}/mo</div>}
           <div className="mrq-live__row"><MaterialIcon icon="lock" className="text-[14px]" /> Visibility: Private draft</div>
         </div>

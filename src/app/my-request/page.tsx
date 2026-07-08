@@ -17,8 +17,10 @@ interface Tag { slug: string; label: string; icon: string | null }
 interface Direct {
   other_id: string; other_label: string; other_to_label: string;
   other_move_condition: string | null; direction: string;
+  matched_destination: string | null;
   match_pct: number; mutual: boolean; shared_tags: string[] | null;
 }
+interface Dest { id: string; label: string; is_fuzzy: boolean }
 interface Path { chain: string[]; labels: string[]; chain_len: number }
 interface Want {
   id: string; from_label: string | null; to_label: string | null;
@@ -40,6 +42,7 @@ export default function MyMoveRequestPage() {
   const [id, setId] = useState<string | null>(null);
   const [want, setWant] = useState<Want | null>(null);
   const [tags, setTags] = useState<Tag[]>([]);
+  const [destinations, setDestinations] = useState<Dest[]>([]);
   const [direct, setDirect] = useState<Direct[]>([]);
   const [paths, setPaths] = useState<Path[]>([]);
   const [activeCount, setActiveCount] = useState(0);
@@ -60,6 +63,7 @@ export default function MyMoveRequestPage() {
       if (!res.ok) { setNotFound(true); return; }
       const d = await res.json();
       setWant(d.want); setTags(d.tags ?? []);
+      setDestinations(d.destinations ?? []);
       setDirect(d.direct ?? []); setPaths(d.paths ?? []);
       setActiveCount(d.activeCount ?? 0);
     } finally { setLoading(false); }
@@ -131,9 +135,15 @@ export default function MyMoveRequestPage() {
                 <span className="mymr-route__arrow"><MaterialIcon icon="arrow_forward" className="text-[18px]" /></span>
                 <div className="mymr-route__end">
                   <span>To</span>
-                  <b>{want.to_label || '—'}</b>
+                  <b>{want.to_label || '—'}{destinations.length > 0 ? ` +${destinations.length} more` : ''}</b>
                 </div>
               </div>
+              {destinations.length > 0 && (
+                <div className="mymr-destset">
+                  <span>Also open to</span>
+                  {destinations.map((d) => <b key={d.id}>{d.label}</b>)}
+                </div>
+              )}
               <div className="mymr-facts">
                 <div><span>Property needs</span><b>{needs}</b></div>
                 <div><span>Payment</span><b>{want.target_monthly ? `~$${Number(want.target_monthly).toLocaleString()}/mo` : '—'}</b></div>
@@ -213,7 +223,11 @@ export default function MyMoveRequestPage() {
                   <div className="mymr-why">
                     <span className="mymr-why__h">Why it matched</span>
                     <ul>
-                      <li><MaterialIcon icon="check" className="text-[13px]" /> {d.direction === 'inbound' ? 'One poster wants your current area' : 'Another poster has your target area'}</li>
+                      <li><MaterialIcon icon="check" className="text-[13px]" /> {d.direction === 'inbound'
+                        ? 'One poster wants your current area'
+                        : d.matched_destination
+                          ? <>Matched on your <b>{d.matched_destination}</b> destination</>
+                          : 'Another poster has your target area'}</li>
                       {(d.shared_tags ?? []).map((t) => (
                         <li key={t}><MaterialIcon icon="check" className="text-[13px]" /> You both want: {t.replace(/-/g, ' ')}</li>
                       ))}

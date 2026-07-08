@@ -28,11 +28,15 @@ export async function GET(req: Request) {
   const id = new URL(req.url).searchParams.get('id');
   if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
 
-  const [wantRes, tagRes, directRes, pathsRes, countRes] = await Promise.all([
+  const [wantRes, tagRes, destRes, directRes, pathsRes, countRes] = await Promise.all([
     supabaseAdmin.from('wants').select('*').eq('id', id).maybeSingle(),
     supabaseAdmin.from('want_amenities')
       .select('amenity_slug, amenities(label, icon)')
       .eq('want_id', id),
+    supabaseAdmin.from('want_destinations')
+      .select('id, label, lat, lng, is_fuzzy, priority')
+      .eq('want_id', id)
+      .order('priority', { ascending: true }),
     supabaseAdmin.rpc('connections_for_want', { _want_id: id, _radius_km: 1200 }),
     supabaseAdmin.rpc('paths_for_want', { _want_id: id, _radius_km: 400, _max_len: 4 }),
     supabaseAdmin.from('wants').select('id', { count: 'exact', head: true }).eq('visibility', 'public'),
@@ -47,6 +51,7 @@ export async function GET(req: Request) {
   type Direct = {
     other_id: string; other_label: string; other_to_label: string;
     other_move_condition: string | null; direction: string;
+    matched_destination: string | null;
     match_pct: number; mutual: boolean; shared_tags: string[] | null;
   };
   const best = new Map<string, Direct>();
@@ -63,6 +68,7 @@ export async function GET(req: Request) {
       const a = rel as { label?: string; icon?: string | null } | null;
       return { slug: t.amenity_slug as string, label: a?.label ?? (t.amenity_slug as string), icon: a?.icon ?? null };
     }),
+    destinations: destRes.data ?? [],
     direct: Array.from(best.values()).sort((a, b) => b.match_pct - a.match_pct),
     paths: (pathsRes.data ?? []) as Array<{ chain: string[]; labels: string[]; chain_len: number }>,
     activeCount: countRes.count ?? 0,
@@ -110,11 +116,19 @@ export async function POST(req: Request) {
     from_label: str(body.fromLabel),
     from_lat: num(body.fromLat),
     from_lng: num(body.fromLng),
-    // where they want to go (step 1 — can be fuzzy: "Closer to family")
+    // where they want to go (step 1). to_* = the PRIMARY destination; the
+    // full set (wide + narrow wants: FL/GA/TN…) lands in want_destinations.
     to_label: toLabel,
     to_lat: num(body.toLat),
     to_lng: num(body.toLng),
     to_is_fuzzy: bool(body.toFuzzy) || num(body.toLat) === null,
+    // occupation means everything — it determines where someone CAN go
+    occupation: str(body.occupation, 160),
+    industry: str(body.industry, 160),
+    // comparative population anchoring ("as big as Lemoore?")
+    population_anchor: ['smaller', 'same', 'bigger', 'any'].includes(String(body.populationAnchor))
+      ? String(body.populationAnchor)
+      : null,
     // quantified criteria (step 1 "make it concrete" + step 2)
     acres_min: num(body.acresMin),
     beds_min: num(body.bedsMin) !== null ? Math.round(num(body.bedsMin)!) : null,
@@ -152,6 +166,33 @@ export async function POST(req: Request) {
   if (error || !inserted) {
     console.error('move-request insert error:', error?.message);
     return NextResponse.json({ error: 'could not post' }, { status: 500 });
+  }
+
+  // The destination SET — every additional acceptable region ("Florida,
+  // Georgia, Tennessee…", the resolved "closer to family" cities). Each row
+  // is matchable; the RPCs test ANY of them. No coords = not matchable yet
+  // (is_fuzzy) — but never silently dropped.
+  const destinations = Array.isArray(body.destinations) ? body.destinations.slice(0, 12) : [];
+  const destRows = destinations
+    .map((d: unknown, i: number) => {
+      const o = (d ?? {}) as Record<string, unknown>;
+      const label = str(o.label, 200);
+      if (!label || label === toLabel) return null;
+      const lat = num(o.lat);
+      const lng = num(o.lng);
+      return {
+        want_id: inserted.id,
+        label,
+        lat,
+        lng,
+        is_fuzzy: lat === null || lng === null,
+        priority: i + 1,
+      };
+    })
+    .filter(Boolean);
+  if (destRows.length > 0) {
+    const { error: destErr } = await supabaseAdmin.from('want_destinations').insert(destRows);
+    if (destErr) console.error('want_destinations insert error:', destErr.message);
   }
 
   // Amenity tags — validate against the vocabulary so junk slugs can't land.

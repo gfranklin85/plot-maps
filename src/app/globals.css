@@ -2994,6 +2994,13 @@ gmp-popover-3d-element[plot-card-popover],
 .mrq-help { font-size: 13px; color: #6b7689; line-height: 1.5; margin-top: 6px; }
 .mrq-search { margin-top: 14px; }
 .mrq-picked { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; font-weight: 700; color: #1349d4; margin-top: 10px; }
+/* the destination SET — removable pills (wide + narrow wants); family-
+   resolved cities get their own tint */
+.mrq-dests { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.mrq-dest { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; font-weight: 700; color: #1349d4; background: rgba(19,73,212,0.08); border: 1.5px solid rgba(19,73,212,0.5); padding: 8px 10px 8px 12px; border-radius: 999px; }
+.mrq-dest.is-family { color: #7a3fb8; background: rgba(122,63,184,0.08); border-color: rgba(122,63,184,0.45); }
+.mrq-dest button { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; color: inherit; opacity: .65; transition: all .13s; }
+.mrq-dest button:hover { opacity: 1; background: rgba(19,73,212,0.12); }
 .mrq-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .mrq-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 13.5px; font-weight: 600; color: #0c1322; background: #f2f6fc; border: 1.5px solid rgba(19,73,212,0.12); padding: 10px 15px; border-radius: 11px; transition: all .13s; }
 .mrq-chip:hover { border-color: rgba(19,73,212,0.35); }
@@ -3059,6 +3066,10 @@ gmp-popover-3d-element[plot-card-popover],
 .mymr-facts > div { display: flex; flex-direction: column; gap: 3px; }
 .mymr-facts span { font-size: 11px; color: #8a93a3; font-weight: 700; }
 .mymr-facts b { font-size: 12.5px; color: #0c1322; line-height: 1.35; }
+/* the destination SET on the command room card */
+.mymr-destset { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; margin-top: 10px; }
+.mymr-destset > span { font-size: 12px; font-weight: 700; color: #8a93a3; }
+.mymr-destset > b { font-size: 12.5px; font-weight: 700; color: #1349d4; background: rgba(19,73,212,0.08); border: 1px solid rgba(19,73,212,0.25); padding: 4px 10px; border-radius: 999px; }
 .mymr-movecond { display: flex; align-items: center; gap: 7px; font-size: 13px; font-style: italic; color: #4a5568; margin-top: 14px; }
 .mymr-movecond .material-symbols-rounded { color: #1349d4; }
 .mymr-note { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #4a5568; background: rgba(19,73,212,0.05); border-radius: 10px; padding: 10px 13px; margin-top: 14px; }

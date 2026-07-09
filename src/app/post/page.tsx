@@ -20,12 +20,12 @@ import { useAuth } from '@/lib/auth-context';
 import MaterialIcon from '@/components/ui/MaterialIcon';
 
 export default function PostMoveRequestPage() {
-  const { user, loading } = useAuth();
+  const { user, loading, signOut } = useAuth();
 
   return (
     <div className="dsh min-h-screen">
       <header className="mrq-chrome">
-        <a href="/" className="mrq-chrome__logo">
+        <a href={user ? '/home' : '/'} className="mrq-chrome__logo">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/brand/plotmaps-logo.svg" alt="PlotMaps" />
           <span>
@@ -34,14 +34,27 @@ export default function PostMoveRequestPage() {
             <img src="/brand/position-logo.svg" alt="Position" />
           </span>
         </a>
-        <nav className="mrq-chrome__nav">
-          <span className="mrq-chrome__link is-soon" title="Coming soon">How it works</span>
-          <span className="mrq-chrome__link is-soon" title="Coming soon">For Service Members</span>
-          <a className="mrq-chrome__link" href="/position">For Agents</a>
-          <span className="mrq-chrome__link is-soon" title="Coming soon">About</span>
-        </nav>
+        {/* signed-in sellers get a REAL nav (their surfaces); signed-out
+            visitors get the marketing nav. */}
+        {user ? (
+          <nav className="mrq-chrome__nav">
+            <a className="mrq-chrome__link" href="/home">Home</a>
+            <a className="mrq-chrome__link" href="/my-request">My Requests</a>
+            <a className="mrq-chrome__link" href="/connections">Connections</a>
+            <a className="mrq-chrome__link" href="/map?view=3d">Map</a>
+          </nav>
+        ) : (
+          <nav className="mrq-chrome__nav">
+            <span className="mrq-chrome__link is-soon" title="Coming soon">How it works</span>
+            <span className="mrq-chrome__link is-soon" title="Coming soon">For Service Members</span>
+            <a className="mrq-chrome__link" href="/position">For Agents</a>
+            <span className="mrq-chrome__link is-soon" title="Coming soon">About</span>
+          </nav>
+        )}
         <div className="mrq-chrome__auth">
-          {!user && (
+          {user ? (
+            <button type="button" className="mrq-chrome__login" onClick={() => { signOut(); window.location.href = '/'; }}>Sign out</button>
+          ) : (
             <button type="button" className="mrq-chrome__login" onClick={() => signInWithGoogle('/post')}>Log in</button>
           )}
         </div>

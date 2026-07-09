@@ -3075,6 +3075,51 @@ gmp-popover-3d-element[plot-card-popover],
 .cxs__loaderlbl { margin-top: 12px; font-size: 13px; color: #6b7689; }
 @media (prefers-reduced-motion: reduce) { .cxs__arc, .cxs__node, .cxs__dot { animation: none; } .cxs__arc { opacity: .5; stroke-dasharray: none; } .cxs__node { opacity: .8; } }
 
+/* ── EmptyStateGrowth — the "nobody's home yet" growth loop ────────────
+   Three participant-building paths: seed postcards / share link / notify. */
+.esg { margin-top: 8px; }
+.esg-head { text-align: center; }
+.esg-head .material-symbols-rounded { color: var(--plot-brand); }
+.esg-head h3 { font-size: 20px; font-weight: 800; color: #0c1322; margin-top: 6px; }
+.esg-head p { font-size: 14px; color: #6b7689; line-height: 1.55; margin-top: 8px; max-width: 460px; margin-left: auto; margin-right: auto; }
+.esg-cards { display: grid; grid-template-columns: 1fr; gap: 12px; margin-top: 20px; }
+@media (min-width: 760px) { .esg-cards { grid-template-columns: 1fr 1fr 1fr; align-items: start; } }
+.esg-card { text-align: left; display: flex; flex-direction: column; gap: 8px; padding: 18px; border-radius: 16px; background: #fff; border: 1.5px solid rgba(19,73,212,0.12); transition: all .14s; }
+.esg-card:hover { border-color: rgba(19,73,212,0.32); transform: translateY(-2px); }
+.esg-card--primary { border-color: rgba(19,73,212,0.4); background: rgba(19,73,212,0.03); }
+.esg-card__ic { display: inline-flex; align-items: center; justify-content: center; width: 42px; height: 42px; border-radius: 12px; background: rgba(19,73,212,0.08); color: var(--plot-brand); }
+.esg-card b { font-size: 15px; font-weight: 800; color: #0c1322; }
+.esg-card__d { font-size: 13px; line-height: 1.5; color: #6b7689; }
+.esg-card__go { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; font-weight: 700; color: var(--plot-brand); margin-top: 2px; }
+.esg-notify { display: flex; gap: 8px; margin-top: 6px; }
+.esg-notify .sp-input { padding: 10px 12px; font-size: 14px; }
+.esg-notify .mrq-btn { flex: none; white-space: nowrap; }
+.esg-saved { display: inline-flex; align-items: center; gap: 6px; color: #0f8a5f; font-weight: 600; }
+.esg-saved .material-symbols-rounded { color: #0f8a5f; }
+
+/* ── /seed — pick homes in the target area, send postcards ─────────────*/
+.seed { max-width: 640px; margin: 0 auto; padding: clamp(20px, 5vh, 48px) 20px 60px; }
+.seed-head { text-align: center; }
+.seed-head h1 { font-size: clamp(24px, 4vw, 32px); font-weight: 800; letter-spacing: -0.02em; color: #0c1322; margin-top: 12px; }
+.seed-head p { font-size: 14.5px; line-height: 1.55; color: #6b7689; margin-top: 10px; max-width: 460px; margin-left: auto; margin-right: auto; }
+.seed-loading, .seed-nodata { display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; padding: 48px 20px; color: #6b7689; }
+.seed-nodata .material-symbols-rounded { color: var(--plot-brand); }
+.seed-nodata b { font-size: 16px; color: #0c1322; }
+.seed-nodata p { font-size: 14px; max-width: 400px; line-height: 1.5; }
+.seed-bar { display: flex; align-items: center; justify-content: space-between; margin-top: 24px; padding-bottom: 10px; border-bottom: 1px solid rgba(19,73,212,0.1); }
+.seed-selall { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: var(--plot-brand); }
+.seed-count { font-size: 13px; font-weight: 600; color: #6b7689; }
+.seed-list { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; max-height: 52vh; overflow-y: auto; }
+.seed-row { display: flex; align-items: center; gap: 10px; text-align: left; padding: 11px 12px; border-radius: 11px; border: 1px solid rgba(19,73,212,0.1); background: #fff; transition: all .12s; }
+.seed-row:hover { border-color: rgba(19,73,212,0.3); }
+.seed-row.is-on { border-color: var(--plot-brand); background: rgba(19,73,212,0.05); }
+.seed-row .material-symbols-rounded { color: var(--plot-brand); flex: none; }
+.seed-row__addr { font-size: 14px; font-weight: 600; color: #0c1322; flex: 1; }
+.seed-row__city { font-size: 12.5px; color: #8a93a3; }
+.seed-foot { display: flex; align-items: center; gap: 16px; margin-top: 20px; }
+.seed-foot .mrq-btn { flex: none; }
+.seed-skip { font-size: 13px; font-weight: 600; color: #8a93a3; }
+
 /* the seller sign-in gate — auth before the intake appears */
 .mrq-gate { max-width: 520px; margin: 0 auto; padding: clamp(40px, 10vh, 110px) 24px 60px; display: flex; flex-direction: column; align-items: center; text-align: center; min-height: 50vh; }
 .mrq-gate__h { font-weight: 800; letter-spacing: -0.03em; line-height: 1.06; font-size: clamp(32px, 6vw, 46px); color: #0c1322; margin-top: 18px; }

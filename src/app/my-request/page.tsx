@@ -12,6 +12,8 @@
 import { useEffect, useState, useCallback } from 'react';
 import MaterialIcon from '@/components/ui/MaterialIcon';
 import { signInWithGoogle } from '@/lib/signIn';
+import ConnectionSearch from '@/components/want/ConnectionSearch';
+import EmptyStateGrowth from '@/components/want/EmptyStateGrowth';
 
 interface Tag { slug: string; label: string; icon: string | null }
 interface Direct {
@@ -24,6 +26,7 @@ interface Dest { id: string; label: string; is_fuzzy: boolean }
 interface Path { chain: string[]; labels: string[]; chain_len: number }
 interface Want {
   id: string; from_label: string | null; to_label: string | null;
+  to_lat: number | null; to_lng: number | null;
   acres_min: number | null; beds_min: number | null;
   target_monthly: number | null; timing: string | null;
   has_current_home: boolean; move_condition: string | null;
@@ -48,12 +51,20 @@ export default function MyMoveRequestPage() {
   const [activeCount, setActiveCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  // The airline-style search: after a fresh post (?searching=1) OR on first
+  // load, play the ConnectionSearch animation for a beat, THEN reveal the
+  // results (found or the empty-state growth loop). A minimum-duration timer
+  // makes it feel like a real search, not a flash.
+  const [searching, setSearching] = useState(true);
 
   useEffect(() => {
     const fromUrl = new URLSearchParams(window.location.search).get('id');
     const fromStore = window.localStorage.getItem('plotmaps.moveRequestId');
     setId(fromUrl || fromStore);
-    if (!fromUrl && !fromStore) { setLoading(false); setNotFound(true); }
+    if (!fromUrl && !fromStore) { setLoading(false); setNotFound(true); setSearching(false); }
+    // keep the search on screen at least ~2.4s so it reads as a real hunt
+    const t = setTimeout(() => setSearching(false), 2400);
+    return () => clearTimeout(t);
   }, []);
 
   const load = useCallback(async (wid: string) => {
@@ -81,6 +92,17 @@ export default function MyMoveRequestPage() {
   };
 
   if (loading) return <div className="dsh min-h-screen"><div className="mymr__load">Loading your move request…</div></div>;
+
+  // The airline-style search — plays before results resolve on screen.
+  if (searching && want) {
+    return (
+      <div className="dsh min-h-screen">
+        <div className="mrq" style={{ paddingTop: 20 }}>
+          <ConnectionSearch mode="search" activeCount={activeCount} />
+        </div>
+      </div>
+    );
+  }
 
   if (notFound || !want) {
     return (
@@ -242,17 +264,22 @@ export default function MyMoveRequestPage() {
               ))}
 
               {paths.length === 0 && direct.length === 0 && (
-                <div className="mymr-empty">
-                  <MaterialIcon icon="radar" className="text-[22px]" />
-                  <b>No path yet — the map is listening.</b>
-                  <span>New requests are added every day. We&apos;ll reach you when a direct connection or a move path appears.</span>
-                </div>
+                <EmptyStateGrowth
+                  wantId={want.id}
+                  toLabel={want.to_label}
+                  toLat={want.to_lat}
+                  toLng={want.to_lng}
+                  contact={want.owner_contact}
+                  onContactSaved={(c) => patch({ contact: c })}
+                />
               )}
 
-              <div className="mymr-invite">
-                <span><b>No perfect path yet?</b> Every new request makes more paths possible.</span>
-                <a className="mrq-btn" href="/post">Invite Someone <MaterialIcon icon="ios_share" className="text-[15px]" /></a>
-              </div>
+              {(paths.length > 0 || direct.length > 0) && (
+                <div className="mymr-invite">
+                  <span><b>Want even more paths?</b> Every new request makes more possible.</span>
+                  <a className="mrq-btn" href="/post">Invite Someone <MaterialIcon icon="ios_share" className="text-[15px]" /></a>
+                </div>
+              )}
             </section>
 
             {/* ── dormant hooks ── */}

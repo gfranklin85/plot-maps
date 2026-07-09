@@ -124,7 +124,7 @@ export default function SellerIntake() {
           <h2 className="sp-q">Your position is on the map.</h2>
           <p className="sp-help">Saved as a private draft — structured for matching, visible only to you until you choose otherwise. We&apos;ll work the map for a connection.</p>
           <div className="sp-nav">
-            <a className="sp-next" href={`/my-request?id=${postedId}`}>Find my connections <MaterialIcon icon="arrow_forward" className="text-[16px]" /></a>
+            <a className="sp-next" href={`/my-request?id=${postedId}&searching=1`}>Find my connections <MaterialIcon icon="arrow_forward" className="text-[16px]" /></a>
           </div>
         </div>
       </div>

@@ -36,6 +36,8 @@ const PUBLIC_PATHS = [
   '/post', // "Post your move" — seller intake; reachable signed-out so the page
            // can show its own Google sign-in gate (auth required before intake).
   '/my-request', // the poster's command room (uuid is the bearer credential)
+  '/join', // shared recruit landing (empty-search growth loop) → routes to /post
+  '/seed', // seed-your-area postcards; self-gates its own Google sign-in
   '/deal/', // the buyer's home base hub (make an offer)
   '/b/', // shared bullpen link view — openable by anyone (lenders, family, friends)
 ];

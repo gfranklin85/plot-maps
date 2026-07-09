@@ -3,6 +3,8 @@
 import { useRouter } from 'next/navigation';
 import ProspectSearch from '@/components/dashboard/ProspectSearch';
 import { LANDING_DESTINATIONS } from '@/lib/destinations';
+import { useAuth } from '@/lib/auth-context';
+import { signInWithGoogle } from '@/lib/signIn';
 
 // ── HeroCitySearch ────────────────────────────────────────────────────
 //
@@ -19,9 +21,19 @@ const DEST_IMG = '/assets/landing/destinations';
 
 export default function HeroCitySearch() {
   const router = useRouter();
+  const { user } = useAuth();
   const chips = CHIP_SLUGS
     .map((slug) => LANDING_DESTINATIONS.find((d) => d.slug === slug))
     .filter((d): d is NonNullable<typeof d> => !!d);
+
+  // Auth-aware fly: signed-in → straight to the map; signed-OUT → Google
+  // OAuth carrying the destination as ?next=, so after login they land on the
+  // map already flying there (the callback honors next incl. its query).
+  // Before this, chips/search pushed straight to /map and hung at the gate.
+  const fly = (mapPath: string) => {
+    if (user) router.push(mapPath);
+    else signInWithGoogle(mapPath);
+  };
 
   return (
     <div className="hcs">
@@ -34,7 +46,7 @@ export default function HeroCitySearch() {
             const p = new URLSearchParams({
               lat: String(lat), lng: String(lng), view: '3d', address,
             });
-            router.push(`/map?${p.toString()}`);
+            fly(`/map?${p.toString()}`);
           }}
         />
       </div>
@@ -44,7 +56,7 @@ export default function HeroCitySearch() {
             key={d.slug}
             type="button"
             className="hcs__chip"
-            onClick={() => router.push(`/map?destination=${d.slug}&view=3d`)}
+            onClick={() => fly(`/map?destination=${d.slug}&view=3d`)}
             title={`Fly to ${d.name}`}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}

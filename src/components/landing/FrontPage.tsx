@@ -47,7 +47,7 @@ export default function FrontPage() {
   // a logged-out user goes through Google sign-in first.
   const goMap = (view: '2d' | '3d') => {
     if (user) window.location.href = `/map?view=${view}`;
-    else signInWithGoogle();
+    else signInWithGoogle(`/map?view=${view}`); // carry the map through OAuth
   };
 
   return (

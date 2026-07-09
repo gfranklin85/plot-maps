@@ -12,8 +12,6 @@
 // programmatically later; this computes the shape once they're in.
 // memory/the_thesis (the HAVE side / no-boot envelope).
 
-import { monthlyPI } from '@/lib/offer/costEngine';
-
 export interface CurrentProperty {
   value: number | null;        // est. market value ("worth at least $415k")
   owed: number | null;         // remaining loan balance ("owe about $145k")

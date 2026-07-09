@@ -13,7 +13,7 @@
 // and no AI spend on unqualified visitors. plan: lazy-bubbling-dragon.
 
 import { APIProvider } from '@vis.gl/react-google-maps';
-import MoveRequestWizard from '@/components/want/MoveRequestWizard';
+import SellerIntake from '@/components/want/SellerIntake';
 import { GOOGLE_MAPS_API_KEY, GOOGLE_MAPS_LIBRARIES } from '@/lib/googleMapsConfig';
 import { signInWithGoogle } from '@/lib/signIn';
 import { useAuth } from '@/lib/auth-context';
@@ -51,7 +51,7 @@ export default function PostMoveRequestPage() {
         <div className="mrq-gate"><div className="mrq-gate__spin" /></div>
       ) : user ? (
         <APIProvider apiKey={GOOGLE_MAPS_API_KEY} libraries={GOOGLE_MAPS_LIBRARIES}>
-          <MoveRequestWizard />
+          <div className="sp-page"><SellerIntake /></div>
         </APIProvider>
       ) : (
         <SignInGate />

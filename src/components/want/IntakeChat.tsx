@@ -300,8 +300,15 @@ export default function IntakeChat({ onSteps }: { onSteps: () => void }) {
   if (ex.ownership) rows.push({ icon: 'house', label: 'Property involved', value: ex.ownership === 'own' ? 'Yes — verify later' : 'No' });
   const hasData = rows.length > 0;
 
+  // The intake sets status "complete" when it's done asking. Until then the
+  // conversation is the ONLY focus and the card is a quiet running summary
+  // (no competing CTA). When ready, the card promotes itself and invites the
+  // post — one clear next step, not two.
+  const ready = ex.status === 'complete';
+
   return (
-    <div className={`mrq-talk ${hasData ? 'has-card' : ''}`}>
+    <div className="mrq-talk">
+      {/* conversation FIRST, centered, the single focus */}
       <div className="mrq-stream">
         {msgs.map((m, i) => (
           m.role === 'user'
@@ -313,27 +320,38 @@ export default function IntakeChat({ onSteps }: { onSteps: () => void }) {
         <div ref={endRef} />
       </div>
 
+      {/* the running summary sits UNDERNEATH the conversation — a quiet
+          receipt while we talk, promoting to a clear CTA only when ready */}
       {hasData && (
-        <aside className="mrq-sidecard">
-          <div className="mrq-live mrq-live--rows">
-            <div className="mrq-live__h">
-              <MaterialIcon icon="description" className="text-[15px]" /> Your move request
-              <em className="mrq-live__pill"><MaterialIcon icon="lock" className="text-[11px]" /> Private Draft</em>
-            </div>
+        <div className={`mrq-summary ${ready ? 'is-ready' : ''}`}>
+          <div className="mrq-summary__h">
+            <MaterialIcon icon="description" className="text-[15px]" />
+            <span>{ready ? 'Your move request is ready' : 'Your move request so far'}</span>
+            <em className="mrq-live__pill"><MaterialIcon icon="lock" className="text-[11px]" /> Private Draft</em>
+          </div>
+          <div className="mrq-summary__rows">
             {rows.map((r) => (
               <div key={r.label} className="mrq-liverow">
                 <span><MaterialIcon icon={r.icon} className="text-[15px]" /> {r.label}</span>
                 <b>{r.value}</b>
               </div>
             ))}
-            {ex.moveCondition && (
-              <div className="mrq-livequote"><MaterialIcon icon="format_quote" className="text-[14px]" /> {ex.moveCondition}</div>
-            )}
-            <button className="mrq-btn mrq-btn--primary mrq-postbtn" onClick={post} disabled={!canPost || posting}>
-              {posting ? 'Posting…' : 'Post my move request'} <MaterialIcon icon="send" className="text-[16px]" />
-            </button>
           </div>
-        </aside>
+          {ex.moveCondition && (
+            <div className="mrq-livequote"><MaterialIcon icon="format_quote" className="text-[14px]" /> {ex.moveCondition}</div>
+          )}
+          <div className="mrq-summary__foot">
+            {ready ? (
+              <button className="mrq-btn mrq-btn--primary mrq-postbtn" onClick={post} disabled={!canPost || posting}>
+                {posting ? 'Posting…' : 'Post my move request'} <MaterialIcon icon="send" className="text-[16px]" />
+              </button>
+            ) : (
+              <button className="mrq-summary__post" onClick={post} disabled={!canPost || posting}>
+                {posting ? 'Posting…' : 'Looks right? Post it now'} <MaterialIcon icon="arrow_forward" className="text-[14px]" />
+              </button>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );

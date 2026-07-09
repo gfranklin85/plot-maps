@@ -1,33 +1,16 @@
-// /join-position — the quiet agent doorway into Position Realty.
-//
-// Locked 2026-05-29. Tone is deliberately UN-prestige. See:
-//   memory/project_operator_tier_culture_thesis.md (anti-prestige posture)
-//   memory/project_plot_maps_position_hierarchy.md (sits below /position)
-//   memory/project_landing_search_first_no_gate.md (never headlined on /)
-//
-// What this page is NOT:
-//   - A recruiting machine
-//   - A splits negotiation
-//   - A top-producer leaderboard pitch
-//   - A "join the prestigious next-generation brokerage" manifesto
-//
-// What it IS:
-//   - A controlled doorway for licensed CA agents who already understand
-//     the operator-tier framing and want a conversation
-//   - A soft intake that captures enough signal to evaluate the agent
-//     without committing either side to anything
-//
-// Form posts to /api/public/agent-inquiry (built separately). For
-// initial launch, the endpoint can write to a simple table and email
-// Greg; the full agent CRM is post-launch work.
-
 'use client';
 
+// /join-position — Join Position: the doorway for licensed CA agents.
+//
+// Rewritten 2026-07-09 to the brand palette (fp / --plot-brand) + AppHeader,
+// plain confident voice (never crusading — memory/the_facts VOICE lock).
+// Position is a licensed CA brokerage now (Corp #02446130). The form logic
+// is unchanged (posts to /api/public/agent-inquiry → Greg). This is a real
+// intake, not a recruiting machine.
+
 import { useState } from 'react';
-import Link from 'next/link';
-import PlotMapsLogo from '@/components/brand/PlotMapsLogo';
-import PositionFooter from '@/components/public/PositionFooter';
-import ThemeToggle from '@/components/public/ThemeToggle';
+import AppHeader from '@/components/layout/AppHeader';
+import MaterialIcon from '@/components/ui/MaterialIcon';
 
 export default function JoinPositionPage() {
   const [status, setStatus] = useState<'idle' | 'sending' | 'sent' | 'failed'>('idle');
@@ -37,10 +20,7 @@ export default function JoinPositionPage() {
     e.preventDefault();
     setStatus('sending');
     setError(null);
-
-    const formData = new FormData(e.currentTarget);
-    const payload = Object.fromEntries(formData.entries());
-
+    const payload = Object.fromEntries(new FormData(e.currentTarget).entries());
     try {
       const res = await fetch('/api/public/agent-inquiry', {
         method: 'POST',
@@ -61,78 +41,35 @@ export default function JoinPositionPage() {
   };
 
   return (
-    <div className="plot-page min-h-screen bg-zinc-950 text-zinc-100 flex flex-col">
-      <header className="absolute top-0 left-0 right-0 z-30 px-6 md:px-10 pt-6 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-3">
-          <PlotMapsLogo color="var(--plot-text)" className="h-7 w-auto" />
-        </Link>
-        <div className="flex items-center gap-5">
-          <nav className="hidden md:flex items-center gap-7 text-sm text-zinc-300">
-            <Link href="/map" className="hover:text-white transition-colors">Enter Map</Link>
-            <Link href="/position" className="hover:text-white transition-colors">Position Realty</Link>
-            <Link href="/contact" className="hover:text-white transition-colors">Contact</Link>
-          </nav>
-          <ThemeToggle />
-        </div>
-      </header>
+    <div className="fp">
+      <AppHeader variant="public" />
 
-      <section className="relative flex-1 px-6 md:px-10 pt-32 pb-20">
-        <div className="absolute inset-0 -z-10 pointer-events-none">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_15%,rgba(255,214,107,0.08),transparent_55%)]" />
-        </div>
-
-        <div className="max-w-3xl mx-auto">
-          <div className="text-xs uppercase tracking-[0.32em] text-amber-300/80">
-            Agent inquiries
-          </div>
-          <h1 className="mt-4 font-headline text-4xl md:text-5xl font-light tracking-tight text-zinc-50 leading-[1.05]">
-            Join Position
-          </h1>
-          <p className="mt-6 text-lg text-zinc-300 leading-relaxed">
-            A brokerage for real-estate operators building with better
-            tools, clearer data, and fewer old industry habits.
+      <section className="pos-hero">
+        <div className="pos-wrap" style={{ maxWidth: 760 }}>
+          <div className="fp-eyebrow" style={{ textAlign: 'left' }}>Join Position</div>
+          <h1 className="pos-h1">Hang your license somewhere that hands you the tools.</h1>
+          <p className="pos-lede">
+            Position Realty is a licensed California brokerage that runs on the
+            PlotMaps platform: map-based prospecting, a team that competes for
+            every client, guided disclosures, and offers built with the real
+            numbers. If that&apos;s the way you want to work, let&apos;s talk.
           </p>
 
-          <div className="mt-10 space-y-5 text-sm text-zinc-300 leading-relaxed border-l-2 border-amber-300/35 pl-5">
-            <p>
-              Position Realty operates inside Plot Maps — a spatial
-              real-estate platform built for search, prospecting,
-              property intelligence, and client experience.
-            </p>
-            <p>
-              We&apos;re building for agents who want more than a desk, a
-              logo, and another production meeting. Position is for
-              operators, builders, local experts, and agents who want
-              to work with better infrastructure.
-            </p>
-            <p className="text-zinc-400 text-xs">
-              Position Realty is currently accepting conversations with
-              select California agents as Plot Maps expands.
-            </p>
-          </div>
+          <ul className="pos-list" style={{ marginTop: 22 }}>
+            <li><MaterialIcon icon="check" className="text-[16px]" /> Prospect from the map — see a house, reach the owner, send a real letter.</li>
+            <li><MaterialIcon icon="check" className="text-[16px]" /> Build a competing team for each client — lenders and pros come to you.</li>
+            <li><MaterialIcon icon="check" className="text-[16px]" /> Disclosures and offers flow through the platform, not hand-built forms.</li>
+          </ul>
 
-          {/* ── form ──────────────────────────────────────── */}
           {status === 'sent' ? (
-            <div className="mt-12 rounded-2xl bg-zinc-900/60 border border-amber-300/35 p-8 text-center space-y-3">
-              <div className="text-amber-200 text-sm font-medium tracking-wide uppercase">
-                Inquiry received
-              </div>
-              <p className="text-zinc-300">
-                Thanks — Greg will be in touch directly. There&apos;s no
-                automated follow-up sequence; this goes to a real person.
-              </p>
-              <div className="pt-2">
-                <Link
-                  href="/map"
-                  className="inline-flex items-center gap-2 rounded-full border border-zinc-700 text-zinc-300 hover:text-amber-200 hover:border-amber-300/40 px-5 py-2.5 text-sm transition-colors"
-                >
-                  Explore Plot Maps →
-                </Link>
-              </div>
+            <div className="pos-license" style={{ marginTop: 32, textAlign: 'center' }}>
+              <b>Thanks — we got it.</b>
+              <span style={{ marginTop: 8 }}>Greg will reach out directly. No automated drip, no leaderboard pitch — a real conversation.</span>
+              <div style={{ marginTop: 16 }}><a className="fp-cta fp-cta--primary" href="/map?view=3d">Explore PlotMaps</a></div>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="mt-12 space-y-5">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <form onSubmit={handleSubmit} className="pos-form">
+              <div className="pos-form__grid">
                 <Field name="name" label="Name" required />
                 <Field name="email" label="Email" type="email" required />
                 <Field name="phone" label="Phone" type="tel" />
@@ -140,85 +77,33 @@ export default function JoinPositionPage() {
                 <Field name="market" label="Primary market / county" placeholder="e.g. Kings County" />
                 <Field name="current_brokerage" label="Current brokerage" />
               </div>
-              <FieldArea
-                name="what_building"
-                label="What are you trying to build?"
-                placeholder="Short is fine. Tell us what kind of real-estate practice you're operating or want to operate."
-              />
-              {error && (
-                <p className="text-xs text-rose-300">{error}</p>
-              )}
-              <div className="flex items-center gap-3 pt-2">
-                <button
-                  type="submit"
-                  disabled={status === 'sending'}
-                  className="rounded-full bg-amber-300 text-zinc-950 px-5 py-2.5 text-sm font-semibold tracking-wide hover:bg-amber-200 disabled:opacity-50 transition-colors"
-                >
-                  {status === 'sending' ? 'Sending…' : 'Request a Conversation'}
+              <label className="pos-field">
+                <span>What are you looking for in a brokerage?</span>
+                <textarea name="what_building" rows={4} className="sp-input"
+                  placeholder="Short is fine — what kind of practice you run or want to run." />
+              </label>
+              {error && <p style={{ color: '#c0392b', fontSize: 13 }}>{error}</p>}
+              <div className="pos-form__foot">
+                <button type="submit" disabled={status === 'sending'} className="fp-cta fp-cta--primary">
+                  {status === 'sending' ? 'Sending…' : 'Request a conversation'}
                 </button>
-                <p className="text-[11px] text-zinc-500 leading-relaxed">
-                  Goes directly to Greg. No automated drip campaign.
-                </p>
+                <span>Goes straight to Greg — a real person, no drip campaign.</span>
               </div>
             </form>
           )}
         </div>
       </section>
-
-      <PositionFooter />
     </div>
   );
 }
 
-function Field({
-  name,
-  label,
-  type = 'text',
-  required,
-  placeholder,
-}: {
-  name: string;
-  label: string;
-  type?: string;
-  required?: boolean;
-  placeholder?: string;
+function Field({ name, label, type = 'text', required, placeholder }: {
+  name: string; label: string; type?: string; required?: boolean; placeholder?: string;
 }) {
   return (
-    <label className="block">
-      <span className="block text-xs uppercase tracking-[0.18em] text-zinc-400 mb-1.5">
-        {label}{required && <span className="text-amber-300/90"> *</span>}
-      </span>
-      <input
-        name={name}
-        type={type}
-        required={required}
-        placeholder={placeholder}
-        className="w-full rounded-lg bg-zinc-900/70 border border-zinc-800 px-4 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-600 outline-none focus:border-amber-300/60 focus:ring-1 focus:ring-amber-300/30 transition-colors"
-      />
-    </label>
-  );
-}
-
-function FieldArea({
-  name,
-  label,
-  placeholder,
-}: {
-  name: string;
-  label: string;
-  placeholder?: string;
-}) {
-  return (
-    <label className="block">
-      <span className="block text-xs uppercase tracking-[0.18em] text-zinc-400 mb-1.5">
-        {label}
-      </span>
-      <textarea
-        name={name}
-        rows={4}
-        placeholder={placeholder}
-        className="w-full rounded-lg bg-zinc-900/70 border border-zinc-800 px-4 py-3 text-sm text-zinc-100 placeholder:text-zinc-600 outline-none focus:border-amber-300/60 focus:ring-1 focus:ring-amber-300/30 transition-colors resize-y"
-      />
+    <label className="pos-field">
+      <span>{label}{required && <em> *</em>}</span>
+      <input name={name} type={type} required={required} placeholder={placeholder} className="sp-input" />
     </label>
   );
 }

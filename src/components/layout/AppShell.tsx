@@ -51,7 +51,12 @@ const SELF_HEADERED: string[] = [];
 // Public marketing pages that should NOT get the app header for logged-out
 // visitors (they're their own surfaces). The front page handles its own
 // header for everyone.
-const OWN_SURFACE = ['/', '/position', '/contact', '/privacy', '/terms', '/cookies', '/support', '/join-position', '/bullpen', '/buyers-first', '/buyers', '/invite', '/orbit', '/compare', '/statement', '/post', '/my-request'];
+// NOTE: /post, /my-request, /seed, /join were removed here so a SIGNED-IN user
+// gets the unified AppHeader on them (one consistent header everywhere). A
+// signed-OUT visitor on those falls through to the raw render below, and the
+// page's own gate/chrome handles it. memory/the_platform_inventory (nav = one
+// header, shared spine).
+const OWN_SURFACE = ['/', '/position', '/contact', '/privacy', '/terms', '/cookies', '/support', '/join-position', '/join', '/bullpen', '/buyers-first', '/buyers', '/invite', '/orbit', '/compare', '/statement'];
 
 export default function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();

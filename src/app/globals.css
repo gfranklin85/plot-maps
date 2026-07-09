@@ -3075,6 +3075,43 @@ gmp-popover-3d-element[plot-card-popover],
 .cxs__loaderlbl { margin-top: 12px; font-size: 13px; color: #6b7689; }
 @media (prefers-reduced-motion: reduce) { .cxs__arc, .cxs__node, .cxs__dot { animation: none; } .cxs__arc { opacity: .5; stroke-dasharray: none; } .cxs__node { opacity: .8; } }
 
+/* ── /position — the licensed brokerage front (brand palette, plain) ───*/
+.pos-wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+.pos-hero { padding: clamp(48px, 8vh, 96px) 0 40px; }
+.pos-h1 { font-weight: 800; letter-spacing: -0.03em; line-height: 1.06; font-size: clamp(30px, 5.5vw, 50px); color: #0c1322; margin-top: 14px; max-width: 780px; }
+.pos-lede { font-size: 17px; line-height: 1.6; color: #4a5568; margin-top: 18px; max-width: 620px; }
+.pos-h2 { font-weight: 800; letter-spacing: -0.025em; line-height: 1.12; font-size: clamp(24px, 3.6vw, 34px); color: #0c1322; margin-top: 8px; }
+.pos-body { font-size: 15.5px; line-height: 1.6; color: #4a5568; margin-top: 14px; }
+.pos-band { background: #fafbff; border-top: 1px solid rgba(19,73,212,0.07); border-bottom: 1px solid rgba(19,73,212,0.07); }
+.pos-grid { display: grid; grid-template-columns: 1fr; gap: 16px; margin-top: 30px; }
+@media (min-width: 700px) { .pos-grid { grid-template-columns: 1fr 1fr; } }
+@media (min-width: 1000px) { .pos-grid { grid-template-columns: 1fr 1fr 1fr; } }
+.pos-card { background: #fff; border: 1px solid rgba(19,73,212,0.1); border-radius: 16px; padding: 22px; box-shadow: 0 12px 30px -22px rgba(20,50,120,0.4); }
+.pos-card__ic { display: inline-flex; align-items: center; justify-content: center; width: 46px; height: 46px; border-radius: 13px; background: rgba(19,73,212,0.08); color: var(--plot-brand); }
+.pos-card b { display: block; font-size: 16px; font-weight: 800; color: #0c1322; margin-top: 12px; }
+.pos-card p { font-size: 14px; line-height: 1.55; color: #6b7689; margin-top: 8px; }
+.pos-agents { display: grid; grid-template-columns: 1fr; gap: 32px; align-items: center; }
+@media (min-width: 900px) { .pos-agents { grid-template-columns: 1.3fr 1fr; } }
+.pos-list { margin-top: 16px; display: flex; flex-direction: column; gap: 10px; }
+.pos-list li { display: flex; align-items: flex-start; gap: 9px; font-size: 14.5px; line-height: 1.5; color: #3a4553; }
+.pos-list .material-symbols-rounded { color: var(--plot-brand); flex: none; margin-top: 1px; }
+.pos-license { background: linear-gradient(160deg, #eef4ff, #e6eefc); border: 1px solid rgba(19,73,212,0.16); border-radius: 18px; padding: 26px; }
+.pos-license__seal { display: inline-flex; align-items: center; justify-content: center; width: 52px; height: 52px; border-radius: 14px; background: #fff; color: var(--plot-brand); box-shadow: 0 8px 18px -10px rgba(19,73,212,0.5); }
+.pos-license b { display: block; font-size: 18px; font-weight: 800; color: #0c1322; margin-top: 14px; }
+.pos-license > span { display: block; font-size: 13px; color: #6b7689; margin-top: 4px; }
+.pos-license dl { margin-top: 16px; display: flex; flex-direction: column; gap: 12px; }
+.pos-license dl > div { display: flex; flex-direction: column; gap: 2px; }
+.pos-license dt { font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: #8a93a3; }
+.pos-license dd { font-size: 14px; font-weight: 700; color: #0c1322; }
+.pos-form { margin-top: 30px; display: flex; flex-direction: column; gap: 16px; }
+.pos-form__grid { display: grid; grid-template-columns: 1fr; gap: 14px; }
+@media (min-width: 640px) { .pos-form__grid { grid-template-columns: 1fr 1fr; } }
+.pos-field { display: flex; flex-direction: column; gap: 6px; }
+.pos-field > span { font-size: 12px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: #6b7689; }
+.pos-field em { color: var(--plot-brand); font-style: normal; }
+.pos-form__foot { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 4px; }
+.pos-form__foot > span { font-size: 12px; color: #9aa4b5; }
+
 /* ── EmptyStateGrowth — the "nobody's home yet" growth loop ────────────
    Three participant-building paths: seed postcards / share link / notify. */
 .esg { margin-top: 8px; }

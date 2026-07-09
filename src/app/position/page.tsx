@@ -1,220 +1,119 @@
-// /position — Position Realty's brokerage identity page inside Plot Maps.
-//
-// Locked 2026-05-29. See:
-//   memory/project_plot_maps_position_hierarchy.md
-//   memory/project_brokerage_position.md
-//   memory/project_operator_tier_culture_thesis.md
-//
-// Job of this page:
-//   1. Make clear who is responsible for the brokerage activity inside
-//      Plot Maps (Position Realty, Gregory Franklin, CA DRE)
-//   2. Give consumers a path to reach Greg directly for buyer/seller help
-//   3. Provide a quiet "agent inquiries" link to /join-position for
-//      operator-tier agents (NOT a prestige recruiting pitch)
-//
-// Tone: professional, direct, not prestige-gimmicky. "We help people
-// transact real estate with better tools and clearer data" — not
-// "We are an elite boutique brokerage."
+'use client';
 
-import type { Metadata } from 'next';
-import Link from 'next/link';
-import PlotMapsLogo from '@/components/brand/PlotMapsLogo';
-import PositionWordmark from '@/components/brand/PositionWordmark';
-import PositionFooter from '@/components/public/PositionFooter';
-import ThemeToggle from '@/components/public/ThemeToggle';
+// /position — Position Realty, Inc.: the licensed California brokerage front.
+//
+// Rewritten 2026-07-09: Position is now a REAL, licensed CA corporation
+// (DRE Corp License #02446130, Greg = Real Estate Officer #02090737, issued
+// 2026-07-08). Copy says so plainly. Brand palette (--plot-brand, the fp
+// design system), NOT the old dark/amber theme. Voice: confident and plain,
+// never crusading (memory/the_facts VOICE lock). Two jobs: introduce Position
+// to consumers, and give licensed agents a clear path to Join Us.
+// memory/the_platform_inventory (Position = product line #2).
 
-export const metadata: Metadata = {
-  title: 'Position Realty — Plot Maps',
-  description:
-    'Position Realty is the California-licensed brokerage operating inside Plot Maps. Buyer and seller representation, listing services, and land/commercial advisory — all built around better tools, clearer data, and direct operator-level service.',
-};
+import AppHeader from '@/components/layout/AppHeader';
+import MaterialIcon from '@/components/ui/MaterialIcon';
 
 export default function PositionPage() {
   return (
-    <div className="plot-page min-h-screen bg-zinc-950 text-zinc-100 flex flex-col">
+    <div className="fp">
+      <AppHeader variant="public" />
 
-      {/* ── Top bar ──────────────────────────────────────────── */}
-      <header className="absolute top-0 left-0 right-0 z-30 px-6 md:px-10 pt-6 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-3">
-          <PlotMapsLogo color="var(--plot-text)" className="h-7 w-auto" />
-        </Link>
-        <div className="flex items-center gap-5">
-          <nav className="hidden md:flex items-center gap-7 text-sm text-zinc-300">
-            <Link href="/map" className="hover:text-white transition-colors">Enter Map</Link>
-            <Link href="/position" className="text-amber-200 transition-colors">Position Realty</Link>
-            <Link href="/contact" className="hover:text-white transition-colors">Contact</Link>
-          </nav>
-          <ThemeToggle />
-        </div>
-      </header>
-
-      {/* ── HERO ─────────────────────────────────────────────── */}
-      <section className="relative px-6 md:px-10 pt-32 pb-16">
-        <div className="absolute inset-0 -z-10 pointer-events-none">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_20%,rgba(255,214,107,0.08),transparent_55%)]" />
-        </div>
-        <div className="max-w-4xl mx-auto">
-          <div className="text-xs uppercase tracking-[0.32em] text-amber-300/80">
-            Operated by · CA DRE #02090737
-          </div>
-          {/* Position wordmark replaces the typeset h1 so the locked
-              logomark IS the page's headline. Accessible name on the
-              SVG covers what an h1 would have given screen readers.
-              Color tied to --plot-text so it inverts with the theme. */}
-          <h1 className="mt-5 leading-none">
-            <span className="sr-only">Position Realty</span>
-            <PositionWordmark
-              color="var(--plot-text)"
-              className="h-12 md:h-16 w-auto"
-            />
-          </h1>
-          <p className="mt-7 text-lg md:text-xl text-zinc-300 leading-relaxed max-w-2xl">
-            A California brokerage built around better tools, clearer
-            data, and direct operator-level service. We help buyers,
-            sellers, landowners, and investors navigate real estate
-            through the Plot Maps experience.
+      {/* ── HERO ── */}
+      <section className="pos-hero">
+        <div className="pos-wrap">
+          <div className="fp-eyebrow" style={{ textAlign: 'left' }}>The brokerage behind PlotMaps</div>
+          <h1 className="pos-h1">A California brokerage that runs on better tools.</h1>
+          <p className="pos-lede">
+            Position Realty is a licensed California brokerage. We help people buy,
+            sell, and move — with the PlotMaps platform doing the heavy lifting:
+            a real map, streamlined paperwork, and a team that competes for you.
           </p>
-          <div className="mt-8 flex flex-wrap items-center gap-3">
-            <Link
-              href="/contact"
-              className="inline-flex items-center gap-2 rounded-full bg-amber-300 text-zinc-950 px-5 py-3 text-sm font-semibold hover:bg-amber-200 transition-colors"
-            >
-              Contact Greg
-            </Link>
-            <Link
-              href="/map"
-              className="inline-flex items-center gap-2 rounded-full border border-amber-300/45 text-amber-200 px-5 py-3 text-sm font-medium hover:bg-amber-300/10 transition-colors"
-            >
-              Open Plot Maps →
-            </Link>
+          <div className="fp-cta-row" style={{ maxWidth: 460 }}>
+            <a href="/post" className="fp-cta fp-cta--primary">Post a move <MaterialIcon icon="arrow_forward" className="text-[17px]" /></a>
+            <a href="/map?view=3d" className="fp-cta">Open the map</a>
           </div>
         </div>
       </section>
 
-      {/* ── BROKER IDENTITY ─────────────────────────────────── */}
-      <section className="px-6 md:px-10 py-14 border-t border-zinc-900">
-        <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8">
-          <div className="md:col-span-1 space-y-2">
-            <div className="text-xs uppercase tracking-[0.28em] text-amber-300/80">Broker</div>
-            <h2 className="text-2xl font-light text-zinc-50 tracking-tight">Gregory M. Franklin</h2>
-            <div className="text-sm text-zinc-400 leading-relaxed">
-              California Real Estate Broker<br />
-              DRE #02090737
-            </div>
-            <div className="pt-3 text-xs text-zinc-500 leading-relaxed">
-              Naval Aviation Air Operations Center background.
-              Builds the platform that the brokerage operates on.
-            </div>
-          </div>
-          <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-6 text-sm text-zinc-300 leading-relaxed">
-            <Detail label="Entity" value="Position Realty LLC" sub="California LLC (pending SOS post-amendment from Franklin Equities LLC, 05/28/2026)" />
-            <Detail label="Office" value="Lemoore, California" sub="Serving Kings, Tulare, Fresno counties — expanding" />
-            <Detail label="Operates inside" value="Plot Maps" sub="Spatial real-estate platform — search, fly, discover" />
-            <Detail label="Infrastructure" value="Plot Solutions LLC" sub="The operator company behind the platform" />
+      {/* ── WHAT YOU GET ── */}
+      <section className="fp-section pos-band">
+        <div className="pos-wrap">
+          <div className="fp-eyebrow">What working with Position gives you</div>
+          <div className="pos-grid">
+            <PosCard icon="map" title="The map"
+              body="Fly a real 3D map of any market before you ever drive it — the commute, the schools, the actual feel of the neighborhood." />
+            <PosCard icon="groups" title="A team that competes for you"
+              body="Post the roles you need — lender, inspector, title — and qualified pros compete for your business. You pick who to work with." />
+            <PosCard icon="calculate" title="Your offer, with the real numbers"
+              body="Build your own offer and see your closing costs and monthly payment as you go — insurance, loan fees, and escrow pre-filled by your team." />
+            <PosCard icon="description" title="Paperwork that walks you through it"
+              body="Disclosures and documents run through clean, guided steps in plain English — not dense PDFs you sign without reading." />
+            <PosCard icon="hub" title="Connections, not just listings"
+              body="Post where you'd go and what you've got. The map checks for a real connection — a direct match, or a multi-home move path." />
+            <PosCard icon="smart_display" title="A 3D video of any property"
+              body="Order a cinematic 3D orbit of a home and it renders in a couple of hours — great for listings, shareable anywhere." />
           </div>
         </div>
       </section>
 
-      {/* ── SERVICES ─────────────────────────────────────────── */}
-      <section className="px-6 md:px-10 py-16 border-t border-zinc-900 bg-zinc-925/30">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-xs uppercase tracking-[0.32em] text-amber-300/70 text-center">
-            What we do
+      {/* ── FOR AGENTS ── */}
+      <section className="fp-section">
+        <div className="pos-wrap pos-agents">
+          <div>
+            <div className="fp-eyebrow" style={{ textAlign: 'left' }}>For licensed agents</div>
+            <h2 className="pos-h2">Hang your license somewhere that gives you the tools.</h2>
+            <p className="pos-body">
+              Position agents work off the PlotMaps platform: map-based prospecting,
+              skip-trace and mail from the screen, build-a-team for every client,
+              and paperwork that flows through the system — so more of the
+              transaction is handled for you, and less rides on hand-built forms.
+            </p>
+            <ul className="pos-list">
+              <li><MaterialIcon icon="check" className="text-[16px]" /> Prospect from the map — see a house, reach the owner, send a real letter.</li>
+              <li><MaterialIcon icon="check" className="text-[16px]" /> Guided disclosures and offers built into the platform.</li>
+              <li><MaterialIcon icon="check" className="text-[16px]" /> Order 3D property videos in a couple of hours.</li>
+            </ul>
+            <a href="/join-position" className="fp-cta fp-cta--primary" style={{ marginTop: 8 }}>
+              Join Position <MaterialIcon icon="arrow_forward" className="text-[17px]" />
+            </a>
           </div>
-          <h2 className="mt-3 text-3xl md:text-4xl font-light tracking-tight text-zinc-50 text-center">
-            Real estate services, operator-grade.
-          </h2>
-          <div className="mt-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-            <ServiceCard
-              title="Buyer representation"
-              body="Find homes spatially. Tour neighborhoods from the air before flying to see them in person."
-            />
-            <ServiceCard
-              title="Seller / listing services"
-              body="List with a broker who renders your property in 3D and reaches buyers through Plot Maps and the MLS."
-            />
-            <ServiceCard
-              title="Land & commercial advisory"
-              body="Parcel-level intelligence, zoning context, and aerial framing for land and commercial transactions."
-            />
-            <ServiceCard
-              title="Relocation scouting"
-              body="Moving to a new area? Scout your future neighborhood, commute, schools, and base from your couch first."
-            />
+          <div className="pos-license">
+            <div className="pos-license__seal"><MaterialIcon icon="verified" className="text-[26px]" /></div>
+            <b>Position Realty, Inc.</b>
+            <span>Licensed California real estate corporation</span>
+            <dl>
+              <div><dt>DRE Corporation License</dt><dd>#02446130</dd></div>
+              <div><dt>Designated Officer</dt><dd>Gregory M. Franklin · DRE #02090737</dd></div>
+              <div><dt>Office</dt><dd>Lemoore, CA — serving Kings, Tulare &amp; Fresno counties</dd></div>
+            </dl>
           </div>
         </div>
       </section>
 
-      {/* ── HOW PLOT MAPS CHANGES THE EXPERIENCE ─────────────── */}
-      <section className="px-6 md:px-10 py-20 border-t border-zinc-900">
-        <div className="max-w-4xl mx-auto space-y-6 text-zinc-300 leading-relaxed">
-          <div className="text-xs uppercase tracking-[0.32em] text-amber-300/70">
-            How Plot Maps changes the client experience
-          </div>
-          <h2 className="text-3xl md:text-4xl font-light tracking-tight text-zinc-50">
-            Better tools mean better decisions.
-          </h2>
-          <p className="text-lg">
-            Most real estate platforms show you photos and floor plans.
-            Plot Maps gives you the lived experience of the neighborhood
-            — the actual commute, the actual schools, the actual vibe
-            — in a spatial 3D world you can fly through with a controller
-            or a mouse.
+      {/* ── CLOSE ── */}
+      <section className="fp-section pos-band">
+        <div className="pos-wrap" style={{ textAlign: 'center' }}>
+          <h2 className="pos-h2" style={{ margin: '0 auto', maxWidth: 640 }}>Ready when you are.</h2>
+          <p className="pos-body" style={{ margin: '14px auto 0', maxWidth: 520 }}>
+            Whether you&apos;re making a move or looking for a brokerage that
+            actually equips you, start here.
           </p>
-          <p>
-            When you find a property you want help with, you reach a
-            real California-licensed broker — not a faceless inquiry form.
-            That broker is Greg Franklin, the same person who built the
-            platform. The tooling and the representation are the same operation.
-          </p>
-        </div>
-      </section>
-
-      {/* ── AGENT INQUIRIES (quiet doorway, not headline) ───── */}
-      <section className="px-6 md:px-10 py-14 border-t border-zinc-900 bg-zinc-925/30">
-        <div className="max-w-3xl mx-auto text-center space-y-4">
-          <div className="text-xs uppercase tracking-[0.28em] text-zinc-500">
-            Agent inquiries
-          </div>
-          <h3 className="text-xl md:text-2xl font-light text-zinc-100 tracking-tight">
-            Position Realty is preparing a selective expansion as Plot Maps develops.
-          </h3>
-          <p className="text-sm text-zinc-400 leading-relaxed max-w-xl mx-auto">
-            Licensed California agents interested in future opportunities
-            may request a conversation. We&apos;re not running a recruiting
-            machine; we&apos;re choosing operators carefully.
-          </p>
-          <div className="pt-2">
-            <Link
-              href="/join-position"
-              className="inline-flex items-center gap-2 rounded-full border border-amber-300/45 text-amber-200 px-5 py-2.5 text-sm font-medium hover:bg-amber-300/10 transition-colors"
-            >
-              Join Position →
-            </Link>
+          <div className="fp-cta-row" style={{ maxWidth: 460, margin: '22px auto 0' }}>
+            <a href="/post" className="fp-cta fp-cta--primary">Post a move</a>
+            <a href="/contact" className="fp-cta">Talk to Greg</a>
           </div>
         </div>
       </section>
-
-      <PositionFooter />
     </div>
   );
 }
 
-function Detail({ label, value, sub }: { label: string; value: string; sub?: string }) {
+function PosCard({ icon, title, body }: { icon: string; title: string; body: string }) {
   return (
-    <div>
-      <div className="text-[10px] uppercase tracking-[0.22em] text-zinc-500">{label}</div>
-      <div className="mt-1 text-zinc-100 font-medium">{value}</div>
-      {sub && <div className="mt-1 text-xs text-zinc-500 leading-relaxed">{sub}</div>}
-    </div>
-  );
-}
-
-function ServiceCard({ title, body }: { title: string; body: string }) {
-  return (
-    <div className="rounded-2xl bg-zinc-900/60 border border-zinc-800 p-6 hover:border-amber-300/40 transition-colors">
-      <div className="text-sm font-semibold text-amber-200 tracking-tight">{title}</div>
-      <p className="mt-2 text-sm text-zinc-400 leading-relaxed">{body}</p>
+    <div className="pos-card">
+      <span className="pos-card__ic"><MaterialIcon icon={icon} className="text-[22px]" /></span>
+      <b>{title}</b>
+      <p>{body}</p>
     </div>
   );
 }

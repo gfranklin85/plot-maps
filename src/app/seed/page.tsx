@@ -86,7 +86,9 @@ export default function SeedPage() {
     } finally { setSending(false); }
   };
 
-  const chrome = (
+  // Signed-in users get the unified AppHeader from AppShell; only the
+  // signed-out gate needs this lightweight logo bar.
+  const chrome = !user ? (
     <header className="mrq-chrome">
       <a href="/" className="mrq-chrome__logo">
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -94,7 +96,7 @@ export default function SeedPage() {
         <span>by{/* eslint-disable-next-line @next/next/no-img-element */}<img src="/brand/position-logo.svg" alt="Position" /></span>
       </a>
     </header>
-  );
+  ) : null;
 
   if (loading) return <div className="dsh min-h-screen">{chrome}<div className="mrq-gate"><div className="mrq-gate__spin" /></div></div>;
 

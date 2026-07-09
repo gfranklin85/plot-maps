@@ -25,7 +25,9 @@ export default function AppHeader({ variant = 'public' }: { variant?: 'public' |
     <header className="fp-header">
       <div className="fp__wrap">
         <nav className="fp-nav">
-          <a href="/" className="fp-logo">
+          {/* Logo = home. Signed-in → the dashboard (/home); public → the
+              landing (/). This is the ONLY "home" affordance — no text link. */}
+          <a href={user ? '/home' : '/'} className="fp-logo">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/brand/plotmaps-logo.svg" alt="PlotMaps" className="fp-logo__img" />
             <span className="fp-logo__by">
@@ -47,9 +49,12 @@ export default function AppHeader({ variant = 'public' }: { variant?: 'public' |
               <a className="fp-navlink" href="/position">Position</a>
             </div>
           ) : (
+            // The logo IS the home button — no redundant "Home" text link.
+            // These are the shared destinations every role reaches; personal
+            // stuff (My Requests, Settings) lives in the account menu.
             <div className="fp-navlinks">
-              <a className="fp-navlink" href="/">Home</a>
               <a className="fp-navlink" href="/map?view=3d">Map</a>
+              <a className="fp-navlink" href="/post">Post a Move</a>
               <a className="fp-navlink" href="/connections">Connections</a>
               <a className="fp-navlink" href="/documents">Documents</a>
             </div>
@@ -112,6 +117,9 @@ function AccountMenu({ onSignOut }: { onSignOut: () => void }) {
       {open && (
         <div className="fp-account__menu">
           {name && <div className="fp-account__name">{name}</div>}
+          <a className="fp-account__item" href="/my-request">
+            <MaterialIcon icon="explore" className="text-[18px]" /> My Requests
+          </a>
           <a className="fp-account__item" href="/settings">
             <MaterialIcon icon="settings" className="text-[18px]" /> Settings
           </a>

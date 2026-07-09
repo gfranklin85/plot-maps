@@ -1,23 +1,29 @@
 'use client';
 
-// ── /post — the ad landing: "Post a move request" ─────────────────────
+// ── /post — the SELLER intake: "Post your move" ───────────────────────
 //
-// PUBLIC (the FB/TikTok ad points here). Minimal chrome: just the logo — no
-// app nav, nothing to wander off into. Mounts the Google Maps APIProvider so
-// ProspectSearch works for an anonymous visitor (pure Places autocomplete).
-// The wizard does the rest. plan: lazy-bubbling-dragon (Prompt 1, locked).
+// This page is for SELLERS — people who OWN a property and want to make a
+// move (Greg 2026-07-08). They post what they want AND show what they've got;
+// the property is the tradeable asset that makes a match possible. Renters
+// "dreaming about where they'd buy" have nothing to put in the web — they go
+// through the buyers platform, not here.
+//
+// AUTH FIRST: you must sign in with Google before the intake appears. No
+// anonymous daydreamers, every want tied to a real account from turn one,
+// and no AI spend on unqualified visitors. plan: lazy-bubbling-dragon.
 
 import { APIProvider } from '@vis.gl/react-google-maps';
 import MoveRequestWizard from '@/components/want/MoveRequestWizard';
 import { GOOGLE_MAPS_API_KEY, GOOGLE_MAPS_LIBRARIES } from '@/lib/googleMapsConfig';
 import { signInWithGoogle } from '@/lib/signIn';
+import { useAuth } from '@/lib/auth-context';
+import MaterialIcon from '@/components/ui/MaterialIcon';
 
 export default function PostMoveRequestPage() {
+  const { user, loading } = useAuth();
+
   return (
     <div className="dsh min-h-screen">
-      {/* Desktop: the designed marketing header. Nav items whose pages don't
-          exist yet render disabled (no fake pages) — For Agents goes to the
-          real /position surface. Mobile: collapses to the logo. */}
       <header className="mrq-chrome">
         <a href="/" className="mrq-chrome__logo">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -35,13 +41,49 @@ export default function PostMoveRequestPage() {
           <span className="mrq-chrome__link is-soon" title="Coming soon">About</span>
         </nav>
         <div className="mrq-chrome__auth">
-          <button type="button" className="mrq-chrome__login" onClick={() => signInWithGoogle()}>Log in</button>
-          <button type="button" className="mrq-chrome__signup" onClick={() => signInWithGoogle()}>Sign up</button>
+          {!user && (
+            <button type="button" className="mrq-chrome__login" onClick={() => signInWithGoogle('/post')}>Log in</button>
+          )}
         </div>
       </header>
-      <APIProvider apiKey={GOOGLE_MAPS_API_KEY} libraries={GOOGLE_MAPS_LIBRARIES}>
-        <MoveRequestWizard />
-      </APIProvider>
+
+      {loading ? (
+        <div className="mrq-gate"><div className="mrq-gate__spin" /></div>
+      ) : user ? (
+        <APIProvider apiKey={GOOGLE_MAPS_API_KEY} libraries={GOOGLE_MAPS_LIBRARIES}>
+          <MoveRequestWizard />
+        </APIProvider>
+      ) : (
+        <SignInGate />
+      )}
+    </div>
+  );
+}
+
+// ── the seller-framed sign-in gate ──
+// Auth before the intake. Framed for the audience: you own, you want to move,
+// post it. Sets the expectation (this is for sellers with a property) and
+// filters daydreamers before a single AI token is spent.
+function SignInGate() {
+  return (
+    <div className="mrq-gate">
+      <span className="mrq-badge"><MaterialIcon icon="hub" className="text-[14px]" /> Real Estate Interconnector</span>
+      <h1 className="mrq-gate__h">Post your move.</h1>
+      <p className="mrq-gate__sub">
+        For owners ready to make a move: tell us where you&apos;d go and what
+        you&apos;ve got, and we&apos;ll work the map for a real connection — a direct
+        match or a multi-home move path. Private until you say otherwise.
+      </p>
+      <button className="mrq-btn mrq-btn--primary mrq-gate__btn" onClick={() => signInWithGoogle('/post')}>
+        <MaterialIcon icon="login" className="text-[18px]" /> Continue with Google
+      </button>
+      <p className="mrq-gate__fine">
+        <MaterialIcon icon="lock" className="text-[13px]" />
+        We ask you to sign in so every request is real — no spam, no selling your info.
+      </p>
+      <p className="mrq-gate__buyer">
+        Looking to buy but don&apos;t own yet? <a href="/position">That&apos;s the buyers path →</a>
+      </p>
     </div>
   );
 }

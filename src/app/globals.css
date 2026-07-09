@@ -3000,6 +3000,18 @@ gmp-popover-3d-element[plot-card-popover],
    like a PAGE (plain text turns, no DM bubbles); the position card only
    APPEARS once there's data to populate it. */
 
+/* the seller sign-in gate — auth before the intake appears */
+.mrq-gate { max-width: 520px; margin: 0 auto; padding: clamp(40px, 10vh, 110px) 24px 60px; display: flex; flex-direction: column; align-items: center; text-align: center; min-height: 50vh; }
+.mrq-gate__h { font-weight: 800; letter-spacing: -0.03em; line-height: 1.06; font-size: clamp(32px, 6vw, 46px); color: #0c1322; margin-top: 18px; }
+.mrq-gate__sub { font-size: 15.5px; line-height: 1.55; color: #5a6472; max-width: 440px; margin: 14px auto 0; }
+.mrq-gate__btn { margin-top: 26px; flex: none; padding: 14px 26px; height: auto; font-size: 15.5px; }
+.mrq-gate__fine { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: #9aa4b5; margin-top: 16px; max-width: 400px; }
+.mrq-gate__fine .material-symbols-rounded { color: #1349d4; flex: none; }
+.mrq-gate__buyer { font-size: 13px; color: #6b7689; margin-top: 22px; }
+.mrq-gate__buyer a { color: #1349d4; font-weight: 700; }
+.mrq-gate__spin { width: 32px; height: 32px; border-radius: 50%; border: 3px solid rgba(19,73,212,0.18); border-top-color: #1349d4; animation: mrqSpin .8s linear infinite; margin-top: 40px; }
+@keyframes mrqSpin { to { transform: rotate(360deg); } }
+
 /* fresh — box + one row of chips + map, tight rhythm (no dead middle; box
    and map sit close, fine print quiet at the bottom) */
 .mrq-front { max-width: 620px; margin: 0 auto; padding: clamp(18px, 4vh, 44px) 20px 28px; display: flex; flex-direction: column; align-items: center; text-align: center; }
@@ -3015,9 +3027,8 @@ gmp-popover-3d-element[plot-card-popover],
 .mrq-marquee__track { display: flex; gap: 12px; width: max-content; padding: 4px 16px; animation: mrqMarquee 60s linear infinite; }
 .mrq-marquee:hover .mrq-marquee__track { animation-play-state: paused; }
 @keyframes mrqMarquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
-.mrq-example { flex: none; width: min(340px, 78vw); text-align: left; display: flex; gap: 7px; font-size: 13px; line-height: 1.42; color: #3a4553; background: #fff; border: 1px solid rgba(19,73,212,0.14); border-radius: 14px; padding: 12px 14px; box-shadow: 0 6px 16px -12px rgba(20,50,120,0.4); transition: border-color .13s, transform .13s; }
+.mrq-example { flex: none; width: min(340px, 78vw); text-align: left; font-size: 13px; line-height: 1.42; color: #3a4553; background: #fff; border: 1px solid rgba(19,73,212,0.14); border-radius: 14px; padding: 12px 14px; box-shadow: 0 6px 16px -12px rgba(20,50,120,0.4); transition: border-color .13s, transform .13s; }
 .mrq-example:hover { border-color: var(--plot-brand); transform: translateY(-2px); }
-.mrq-example .material-symbols-rounded { color: var(--plot-brand); flex: none; margin-top: 1px; }
 @media (prefers-reduced-motion: reduce) { .mrq-marquee__track { animation: none; } .mrq-marquee { overflow-x: auto; } }
 .mrq-front__trust { display: inline-flex; align-items: center; flex-wrap: wrap; justify-content: center; gap: 6px; font-size: 12px; color: #9aa4b5; margin-top: 16px; }
 .mrq-front__trust .material-symbols-rounded { color: #1349d4; }

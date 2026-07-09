@@ -33,7 +33,8 @@ const PUBLIC_PATHS = [
   '/orbit',
   '/compare',
   '/statement', // the live pre-close Buyer's Statement (offer builder)
-  '/post', // "Post a move request" — the ad landing onramp (anonymous by design)
+  '/post', // "Post your move" — seller intake; reachable signed-out so the page
+           // can show its own Google sign-in gate (auth required before intake).
   '/my-request', // the poster's command room (uuid is the bearer credential)
   '/deal/', // the buyer's home base hub (make an offer)
   '/b/', // shared bullpen link view — openable by anyone (lenders, family, friends)

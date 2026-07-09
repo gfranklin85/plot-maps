@@ -21,16 +21,20 @@ function canonicalAuthOrigin(): string {
   return isProdDomain ? CANONICAL_APP_ORIGIN : origin;
 }
 
-export async function signInWithGoogle() {
+export async function signInWithGoogle(next?: string) {
   // signInWithOAuth does a FULL-PAGE redirect to Google (no popup). If the
   // current origin isn't in Supabase's allowed redirect URLs, it resolves
   // WITHOUT navigating and the tap looks dead. Surface the error + origin so
   // failures aren't silent, and drive the redirect ourselves.
+  // `next` (e.g. "/post") lands the user back where they started after auth —
+  // the callback honors ?next=. It rides on redirectTo's own query string,
+  // which Supabase preserves (unlike arbitrary params Google would strip).
   const origin = canonicalAuthOrigin();
+  const nextParam = next ? `?next=${encodeURIComponent(next)}` : '';
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
-      redirectTo: `${origin}/auth/callback`,
+      redirectTo: `${origin}/auth/callback${nextParam}`,
       // skipBrowserRedirect lets us navigate deterministically below — some
       // mobile browsers drop the auto-redirect from an async handler.
       skipBrowserRedirect: true,

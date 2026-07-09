@@ -35,14 +35,15 @@ interface Extracted {
 // vs. a specific home — and taps into the box as an editable starting draft.
 // A marquee of these teaches the format by example, not by instruction.
 const EXAMPLE_ASKS = [
-  "I'd move to South Carolina — a city around 200k people with some tech industry. Want at least a half acre, could pay ~$1,500/mo, and put $200k down from selling my place.",
+  "I'd move to South Carolina — a city around 200k people with some tech industry. At least a half acre, could pay ~$1,500/mo, and put $200k down from selling my place.",
   "I've got a 1,900 sf home in Lemoore on a 7,500 sf lot near NAS and good schools. Owe about $150k — I'd let someone take over payments if I can get what I need on the other end.",
-  "Somewhere in Tennessee or Georgia, closer to family. 3+ bedrooms, a shop or some land, under $2,200/mo. I can sell first or move fast, whichever helps.",
-  "Retiring in a year — want out of California to a smaller, cheaper town near water. No HOA, single story, and I'll pay cash from the sale of my house.",
-  "Remote worker, open to anywhere with fast internet and mountains. Want acreage for horses, around $400k, and I'm open to seller financing.",
+  "Nashville or Chattanooga, TN — 3+ bedrooms and a shop or some land, under $2,200/mo. I own here and can sell first or move fast, whichever helps.",
+  "Pensacola or Jacksonville, FL — single story, no HOA, near a base. Around $350k, paying cash from the sale of my house.",
+  "Boise area, remote worker. An acre or more for horses, up to $500k, and I'm open to seller financing or a trade.",
+  "Norfolk / Virginia Beach — 4 bed near good schools, under $2,800/mo. Renting now, need to be in by summer, VA loan.",
 ];
-// Short taps still welcome for the hesitant — these fill the box, they don't send.
-const QUICK_TAPS = ['I want land', 'Closer to family', 'Somewhere cheaper'];
+// Short taps that still lead somewhere matchable — fill the box, don't send.
+const QUICK_TAPS = ['I want acreage', 'Near a base', 'Cheaper than California'];
 
 function greeting() {
   const h = new Date().getHours();
@@ -203,7 +204,7 @@ export default function IntakeChat({ onSteps }: { onSteps: () => void }) {
       <textarea
         ref={boxRef}
         className="mrq-box__input"
-        placeholder={talking ? 'Reply…' : 'e.g. “Nashville area, 3+ acres, under $2,400/mo — I own in Lemoore and could sell or trade.”'}
+        placeholder={talking ? 'Reply…' : 'e.g. “I own a 3-bed in Lemoore, owe ~$180k. Want Nashville area, 3+ acres, under $2,400/mo — could sell or trade.”'}
         rows={talking ? 1 : 2}
         maxLength={2000}
         value={input}
@@ -222,11 +223,11 @@ export default function IntakeChat({ onSteps }: { onSteps: () => void }) {
   if (!talking) {
     return (
       <div className="mrq-front">
-        <h1 className="mrq-front__h">{greeting()} Where would you go?</h1>
+        <h1 className="mrq-front__h">{greeting()} What&apos;s the move?</h1>
         <p className="mrq-front__lead">
-          Tell me the move you&apos;ve been thinking about — where you&apos;d go and what
-          would make it worth it. The more real you get, the better I can match you.
-          Not sure how? Tap an example below to start from.
+          Tell me where you&apos;d go and what you&apos;ve got to work with — your place now,
+          and what would make the move worth it. The more real you get, the better I
+          can match you. Not sure how? Tap an example below to start from.
         </p>
 
         {/* worked examples — a marquee of COMPLETE asks that teach the format.
@@ -235,7 +236,7 @@ export default function IntakeChat({ onSteps }: { onSteps: () => void }) {
           <div className="mrq-marquee__track">
             {[...EXAMPLE_ASKS, ...EXAMPLE_ASKS].map((ex, i) => (
               <button key={i} className="mrq-example" onClick={() => fillBox(ex)} tabIndex={i < EXAMPLE_ASKS.length ? 0 : -1}>
-                <MaterialIcon icon="format_quote" className="text-[14px]" /> {ex}
+                {ex}
               </button>
             ))}
           </div>

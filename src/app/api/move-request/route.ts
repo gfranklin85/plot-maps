@@ -25,7 +25,25 @@ export const fetchCache = 'force-no-store';
 // swaps) + the live active-request count. The want joins the match graph even
 // while private — "private at first, structured for matching."
 export async function GET(req: Request) {
-  const id = new URL(req.url).searchParams.get('id');
+  const url = new URL(req.url);
+  const id = url.searchParams.get('id');
+
+  // ?mine=1 — the signed-in user's OWN move requests (for the adaptive
+  // dashboard: surface "Your Move Request" when they have one). Lightweight:
+  // just the headline fields, newest first.
+  if (url.searchParams.get('mine') === '1') {
+    let userId: string | null = null;
+    try { userId = (await getAuthUser())?.id ?? null; } catch { userId = null; }
+    if (!userId) return NextResponse.json({ requests: [] });
+    const { data } = await supabaseAdmin
+      .from('wants')
+      .select('id, to_label, from_label, status, visibility, created_at')
+      .or(`user_id.eq.${userId},gathered_by.eq.${userId}`)
+      .order('created_at', { ascending: false })
+      .limit(5);
+    return NextResponse.json({ requests: data ?? [] });
+  }
+
   if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
 
   const [wantRes, tagRes, destRes, directRes, pathsRes, countRes] = await Promise.all([

@@ -13,11 +13,19 @@
 // workflows. Panels use realistic placeholder data for now; wire to real
 // sources (route history, recent searches, active campaigns) as a follow-up.
 
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useProfile } from '@/lib/profile-context';
 import MaterialIcon from '@/components/ui/MaterialIcon';
 import ToolGrid from '@/components/dashboard/ToolGrid';
 import QuickDestinations from '@/components/dashboard/QuickDestinations';
+
+// The adaptive band: surface what THIS person is actually doing. If they've
+// posted a move, their Move Request leads; everyone still gets the shared
+// tools below. A person can be multiple roles — this is content that adapts,
+// not a walled-off role dashboard. memory/the_platform_inventory (one
+// adaptive dashboard).
+interface MyRequest { id: string; to_label: string | null; from_label: string | null; status: string; visibility: string }
 
 // ── Placeholder data (swap for real sources later) ──────────────────────
 const CONTINUE = [
@@ -43,6 +51,15 @@ export default function DashboardSurface() {
   const router = useRouter();
   const { profile } = useProfile();
   const first = (profile.fullName || '').trim().split(/\s+/)[0] || '';
+
+  // Fetch the user's own posted move requests → the adaptive lead card.
+  const [myRequests, setMyRequests] = useState<MyRequest[]>([]);
+  useEffect(() => {
+    fetch('/api/move-request?mine=1')
+      .then((r) => r.json())
+      .then((d) => setMyRequests(d.requests ?? []))
+      .catch(() => {});
+  }, []);
 
   const flyTo = (lat: number, lng: number) =>
     router.push(`/map?lat=${lat}&lng=${lng}&view=3d`);
@@ -70,7 +87,36 @@ export default function DashboardSurface() {
           </button>
         </div>
 
-        {/* ── the 7 tool cards ── */}
+        {/* ── adaptive band: your move requests (only when you have any) ──
+            This is what makes the dashboard role-aware — if you posted a move,
+            it leads here; if you didn't, this whole band is absent and the
+            tools lead. */}
+        {myRequests.length > 0 && (
+          <section className="dsh-mine">
+            <header className="dsh-mine__head">
+              <h2><MaterialIcon icon="explore" className="text-[18px]" /> Your move {myRequests.length === 1 ? 'request' : 'requests'}</h2>
+              <a className="dsh-mine__new" href="/post">Post another <MaterialIcon icon="add" className="text-[15px]" /></a>
+            </header>
+            <div className="dsh-mine__cards">
+              {myRequests.map((r) => (
+                <a key={r.id} className="dsh-mine__card" href={`/my-request?id=${r.id}`}>
+                  <div className="dsh-mine__route">
+                    <span>{r.from_label?.split(',')[0] || 'Your place'}</span>
+                    <MaterialIcon icon="arrow_forward" className="text-[15px]" />
+                    <b>{r.to_label || '—'}</b>
+                  </div>
+                  <div className="dsh-mine__meta">
+                    <em className={`dsh-mine__pill ${r.status === 'paused' ? 'is-paused' : ''}`}>{r.status === 'paused' ? 'Paused' : 'Active'}</em>
+                    <span>{r.visibility === 'private' ? 'Private draft' : 'Public'}</span>
+                    <span className="dsh-mine__go">Open <MaterialIcon icon="arrow_forward" className="text-[13px]" /></span>
+                  </div>
+                </a>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* ── the tool cards ── */}
         <ToolGrid />
 
         {/* ── three live panels ── */}

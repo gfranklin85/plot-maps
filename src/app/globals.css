@@ -2781,6 +2781,24 @@ gmp-popover-3d-element[plot-card-popover],
 .dsh-top { display: grid; gap: 26px; grid-template-columns: 1fr; align-items: stretch; }
 @media (min-width: 980px) { .dsh-top { grid-template-columns: 1fr 1.05fr; } }
 .dsh-intro { display: flex; flex-direction: column; }
+
+/* the adaptive band — your posted move requests lead when you have them */
+.dsh-mine { margin-top: 30px; }
+.dsh-mine__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.dsh-mine__head h2 { display: inline-flex; align-items: center; gap: 8px; font-size: 18px; font-weight: 800; color: #0c1322; }
+.dsh-mine__head h2 .material-symbols-rounded { color: var(--plot-brand); }
+.dsh-mine__new { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 700; color: var(--plot-brand); }
+.dsh-mine__cards { display: grid; grid-template-columns: 1fr; gap: 14px; }
+@media (min-width: 720px) { .dsh-mine__cards { grid-template-columns: 1fr 1fr; } }
+.dsh-mine__card { display: flex; flex-direction: column; gap: 12px; padding: 18px; border-radius: 16px; background: #fff; border: 1px solid rgba(19,73,212,0.12); box-shadow: 0 12px 30px -22px rgba(20,50,120,0.4); transition: all .14s; }
+.dsh-mine__card:hover { border-color: var(--plot-brand); transform: translateY(-2px); }
+.dsh-mine__route { display: flex; align-items: center; gap: 8px; font-size: 15px; color: #6b7689; }
+.dsh-mine__route b { color: #0c1322; font-weight: 800; }
+.dsh-mine__route .material-symbols-rounded { color: var(--plot-brand); }
+.dsh-mine__meta { display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: #8a93a3; }
+.dsh-mine__pill { font-style: normal; font-weight: 700; font-size: 11px; color: #0f8a5f; background: rgba(15,138,95,0.1); border: 1px solid rgba(15,138,95,0.3); padding: 3px 9px; border-radius: 999px; }
+.dsh-mine__pill.is-paused { color: #b6791b; background: rgba(182,121,27,0.1); border-color: rgba(182,121,27,0.3); }
+.dsh-mine__go { margin-left: auto; display: inline-flex; align-items: center; gap: 3px; font-weight: 700; color: var(--plot-brand); }
 .dsh-intro__eyebrow { font-size: 12.5px; font-weight: 800; letter-spacing: 0.12em; color: var(--d-blue); text-transform: uppercase; }
 .dsh-intro__h { font-weight: 800; letter-spacing: -0.028em; line-height: 1.02; font-size: clamp(28px,3.2vw,42px); color: var(--d-ink); margin-top: 12px; }
 

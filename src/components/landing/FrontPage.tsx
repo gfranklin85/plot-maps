@@ -3,6 +3,7 @@
 import AppHeader from '@/components/layout/AppHeader';
 import BullpenBoardMock from '@/components/landing/BullpenBoardMock';
 import HeroCitySearch from '@/components/landing/HeroCitySearch';
+import MobileHero from '@/components/landing/MobileHero';
 import PlotPadHeroChip from '@/components/landing/PlotPadHeroChip';
 import OrbitSection from '@/components/landing/OrbitSection';
 import ToolGrid from '@/components/dashboard/ToolGrid';
@@ -52,15 +53,16 @@ export default function FrontPage() {
 
   return (
     <div className="fp">
+      {/* MOBILE (< 640px): the flying-world hero from Greg's design handoff —
+          self-contained (its own topbar + logo + login). Desktop keeps the
+          AppHeader + fp-hero below. Only one renders per breakpoint. */}
+      <div className="fp-mobilehero"><MobileHero /></div>
+
       {/* ════ HEADER (shared with the dashboard for one consistent chrome) ════ */}
-      <AppHeader variant="public" />
+      <div className="fp-desktophead"><AppHeader variant="public" /></div>
 
-      {/* Plot Pad blue strip REMOVED from the top 2026-07-03 — the gamepad
-          download shouldn't be the first thing; the fused hero (flight +
-          brokerage) leads now. memory/project_fused_hero_flight_brokerage */}
-
-      {/* ════ HERO ════ */}
-      <section className="fp-hero">
+      {/* ════ HERO (desktop) ════ */}
+      <section className="fp-hero fp-desktophead">
         {/* real sky fills the whole hero band (edge to edge) so it reads as
             open sky, not a boxed blue card. Falls back to the gradient. */}
         {SKY_SRC ? (

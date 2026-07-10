@@ -1313,9 +1313,16 @@ gmp-popover-3d-element[plot-card-popover],
 /* ── header ── */
 .fp-header {
   position: sticky; top: 0; z-index: 50;
-  background: rgba(255,255,255,0.82);
-  backdrop-filter: saturate(140%) blur(12px);
-  border-bottom: 1px solid rgba(12,19,34,0.06);
+  /* Clean white footing so the logo + CTA read crisp and the blue hero
+     starts BELOW the bar (not bleeding up through a translucent header). */
+  background: #ffffff;
+  border-bottom: 1px solid rgba(12,19,34,0.07);
+  box-shadow: 0 1px 0 rgba(12,19,34,0.02), 0 8px 24px -20px rgba(20,50,120,0.25);
+}
+@supports (backdrop-filter: blur(1px)) {
+  /* On scroll the near-white translucency + blur keeps it clean over content
+     without a hard edge; still reads white, not blue. */
+  .fp-header { background: rgba(255,255,255,0.94); backdrop-filter: saturate(120%) blur(10px); }
 }
 .fp-nav { display: flex; align-items: center; gap: 28px; height: 68px; }
 .fp-logo { display: flex; align-items: center; gap: 9px; font-weight: 800; font-size: 20px; letter-spacing: -0.02em; }
@@ -2115,8 +2122,18 @@ gmp-popover-3d-element[plot-card-popover],
 .hcs__bar .material-symbols-outlined,
 .hcs__bar .material-symbols-rounded { color: #1349d4 !important; left: 16px !important; font-size: 22px !important; }
 
-.hcs__chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+/* ONE line, horizontal-scroll (never wraps to two rows) — edge-faded so it
+   reads as a marquee of destinations on both desktop and mobile. */
+.hcs__chips {
+  display: flex; gap: 8px; margin-top: 10px;
+  overflow-x: auto; flex-wrap: nowrap; scroll-snap-type: x proximity;
+  padding-bottom: 2px; scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(90deg, #000 88%, transparent);
+  mask-image: linear-gradient(90deg, #000 88%, transparent);
+}
+.hcs__chips::-webkit-scrollbar { display: none; }
 .hcs__chip {
+  flex: none; scroll-snap-align: start;
   display: inline-flex; align-items: center; gap: 7px;
   padding: 4px 12px 4px 4px; border-radius: 999px;
   background: #fff; border: 1px solid rgba(19,73,212,0.16);
@@ -3092,6 +3109,77 @@ gmp-popover-3d-element[plot-card-popover],
 .cxs__line { margin-left: 4px; }
 .cxs__loaderlbl { margin-top: 12px; font-size: 13px; color: #6b7689; }
 @media (prefers-reduced-motion: reduce) { .cxs__arc, .cxs__node, .cxs__dot { animation: none; } .cxs__arc { opacity: .5; stroke-dasharray: none; } .cxs__node { opacity: .8; } }
+
+/* ── MobileHero — 1b full-bleed flying world + bottom sheet ─────────────
+   From Greg's Claude Design handoff. Only shown < 640px (see the swap at
+   the bottom). Pixel-matched to the mock. */
+/* breakpoint swap: mobile hero < 640px, desktop header+hero ≥ 640px */
+.fp-mobilehero { display: block; }
+.fp-desktophead { display: none; }
+@media (min-width: 640px) {
+  .fp-mobilehero { display: none; }
+  .fp-desktophead { display: block; }
+  section.fp-hero.fp-desktophead { display: block; }
+}
+.mh {
+  position: relative; width: 100%; height: 100svh; min-height: 620px;
+  overflow: hidden; font-family: 'Geist', var(--font-geist-sans), Inter, sans-serif;
+  background: linear-gradient(180deg, #e9f0fb 0%, #cfdff3 100%);
+}
+/* the flying world */
+.mh-world { position: absolute; inset: 0; }
+.mh-island { position: absolute; left: 0; top: 0; width: 190%; transition: transform 1.3s cubic-bezier(.45,.05,.2,1); }
+.mh-island__img { width: 100%; display: block; }
+.mh-pin { position: absolute; width: 0; height: 0; }
+.mh-pin__ring { position: absolute; left: -9px; top: -9px; width: 18px; height: 18px; border-radius: 50%; background: rgba(19,73,212,.3); animation: mhPinRing 1.8s ease-out infinite; }
+.mh-pin__dot { position: absolute; left: -5px; top: -5px; width: 10px; height: 10px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 2px 6px rgba(12,19,34,.35); transition: background .3s; }
+@keyframes mhPinRing { 0% { transform: scale(.5); opacity: .8; } 100% { transform: scale(2.6); opacity: 0; } }
+
+/* top scrim + brand + headline (staged entrance) */
+.mh-top { position: absolute; top: 0; left: 0; right: 0; padding: 54px 18px 44px; background: linear-gradient(180deg, rgba(233,240,251,.97) 30%, rgba(233,240,251,.85) 62%, transparent 100%); z-index: 6; }
+.mh-topbar { display: flex; align-items: center; justify-content: space-between; animation: mhUp .5s cubic-bezier(.2,.7,.3,1) both; }
+.mh-logo { height: 20px; display: block; }
+.mh-login { border: none; background: #1349d4; color: #fff; font-family: inherit; font-size: 12.5px; font-weight: 600; padding: 8px 16px; border-radius: 999px; }
+.mh-pill { display: inline-block; margin-top: 14px; font-size: 9.5px; font-weight: 700; letter-spacing: .09em; color: #0c1322; background: #fff; border: 1px solid rgba(19,73,212,.14); border-radius: 999px; padding: 6px 12px; animation: mhUp .55s cubic-bezier(.2,.7,.3,1) .08s both; }
+.mh-head { margin: 12px 0 0; font-size: 31px; line-height: 1.05; font-weight: 800; letter-spacing: -.02em; color: #0c1322; animation: mhUp .6s cubic-bezier(.2,.7,.3,1) .16s both; }
+.mh-head span { color: #1349d4; }
+@keyframes mhUp { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
+
+/* the floating active-city card, pops in per city */
+.mh-card { position: absolute; left: 50%; top: 34%; transform: translateX(-50%); z-index: 5; animation: mhPop .55s cubic-bezier(.34,1.56,.64,1) both; }
+.mh-card__inner { display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,.94); backdrop-filter: blur(8px); border-radius: 14px; padding: 8px 14px 8px 8px; box-shadow: 0 14px 34px -10px rgba(12,19,34,.32); cursor: pointer; }
+.mh-card__thumb { width: 42px; height: 42px; border-radius: 10px; object-fit: cover; display: block; }
+.mh-card__t { display: flex; flex-direction: column; gap: 1px; }
+.mh-card__t b { font-size: 13.5px; font-weight: 700; color: #0c1322; white-space: nowrap; }
+.mh-card__t span { font-size: 10.5px; color: rgba(68,80,98,.72); font-weight: 500; white-space: nowrap; }
+.mh-card__go { margin-left: 6px; font-size: 11.5px; font-weight: 700; color: #1349d4; white-space: nowrap; }
+@keyframes mhPop { 0% { opacity: 0; transform: translateX(-50%) translateY(10px) scale(.82); } 60% { opacity: 1; transform: translateX(-50%) translateY(-2px) scale(1.04); } 100% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); } }
+
+/* bottom sheet */
+.mh-sheet { position: absolute; left: 0; right: 0; bottom: 0; background: #fff; border-radius: 22px 22px 0 0; box-shadow: 0 -14px 40px -12px rgba(12,19,34,.25); height: 216px; transition: height .45s cubic-bezier(.3,.9,.3,1); z-index: 10; display: flex; flex-direction: column; overflow: hidden; }
+.mh-sheet.is-open { height: 348px; }
+.mh-sheet__grip { padding: 10px 0 5px; display: flex; justify-content: center; flex: none; background: none; border: none; }
+.mh-sheet__grip span { width: 38px; height: 4.5px; border-radius: 999px; background: rgba(12,19,34,.16); display: block; }
+.mh-sheet__body { padding: 2px 18px 20px; display: flex; flex-direction: column; gap: 11px; }
+.mh-search { display: flex; align-items: center; gap: 10px; background: #f2f6fd; border-radius: 999px; padding: 12px 16px; border: 1.5px solid rgba(12,19,34,.08); transition: border-color .25s; }
+.mh-search.is-focus { border-color: #1349d4; }
+.mh-search svg { flex: none; }
+.mh-search input { border: none; outline: none; background: transparent; font-family: inherit; font-size: 13.5px; color: #0c1322; width: 100%; padding: 0; }
+.mh-chips { display: flex; gap: 8px; overflow-x: auto; margin: 0 -18px; padding: 2px 18px 4px; scrollbar-width: none; }
+.mh-chips::-webkit-scrollbar { display: none; }
+.mh-chip { flex: none; display: flex; align-items: center; gap: 7px; border: 1.5px solid rgba(12,19,34,.12); background: #f7fafd; border-radius: 999px; padding: 6px 13px 6px 6px; font-family: inherit; transition: border-color .2s, background .2s; }
+.mh-chip.is-on { border-color: #1349d4; background: #e0e7fb; }
+.mh-chip img { width: 24px; height: 24px; border-radius: 50%; object-fit: cover; display: block; }
+.mh-chip span { font-size: 12.5px; font-weight: 600; color: #0c1322; white-space: nowrap; }
+.mh-cta { display: flex; align-items: center; justify-content: center; gap: 9px; width: 100%; border: none; background: #1349d4; color: #fff; font-family: inherit; font-size: 15px; font-weight: 700; padding: 15px; border-radius: 14px; box-shadow: 0 10px 24px -8px rgba(19,73,212,.5); transition: transform .15s, background .15s; }
+.mh-cta:active { transform: scale(.97); background: #122d8d; }
+.mh-cta span { font-size: 17px; }
+.mh-pitch { margin: 0; font-size: 12.5px; line-height: 1.55; color: #445062; }
+.mh-pitch strong { color: #0c1322; }
+.mh-fine { display: flex; align-items: flex-start; gap: 9px; }
+.mh-fine__ck { flex: none; width: 18px; height: 18px; border-radius: 50%; background: #1349d4; color: #fff; display: inline-flex; align-items: center; justify-content: center; font-size: 10px; }
+.mh-fine p { margin: 0; font-size: 10.5px; line-height: 1.5; color: rgba(68,80,98,.72); }
+.mh-fine strong { color: #0c1322; }
 
 /* ── /position — the licensed brokerage front (brand palette, plain) ───*/
 .pos-wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }

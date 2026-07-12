@@ -10,7 +10,7 @@ import { Lead, LeadStatus, Priority } from "@/types";
 import MapDynamic from "@/components/map/MapDynamic";
 import type { PinMode } from "@/components/map/MapView";
 import StreetViewProspecting from "@/components/map/StreetViewProspecting";
-import TouchZonePad from "@/components/map/TouchZonePad";
+import TouchJoysticks from "@/components/map/TouchJoysticks";
 import { installTouchPad } from "@/lib/touchPadBridge";
 import ProspectSearch from "@/components/dashboard/ProspectSearch";
 import { PRIORITIES } from "@/lib/constants";
@@ -2146,7 +2146,7 @@ export default function MapPage() {
           card. memory/project_phone_as_controller */}
       {touchFly && !walkMode && (
         <div className="map-touchpad">
-          <TouchZonePad
+          <TouchJoysticks
             onButton={(k, downNow) => {
               if (k === 'b' && downNow && selectedLead) setSelectedLead(null);
             }}

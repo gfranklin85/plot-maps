@@ -2150,17 +2150,26 @@ gmp-popover-3d-element[plot-card-popover],
 /* ── MOBILE TOUCH FLIGHT — portrait: condensed landscape map on top,
       zone pad below (the YouTube-video-over-controls layout Greg locked) ── */
 :root { --tzp-h: 42vh; }
+/* FIXED 2026-07-11 (diagnosed live via phone CDP): the map was rendering at
+   ZERO height on mobile. --tzp-h (42vh) was subtracted on THREE nested
+   absolute levels (body → region → frame), each inside the already-shrunk
+   parent, so the pad's height was cut 2-3× over and the map collapsed to 0px
+   tall (a fully-loaded 3D map, 1012 tiles, invisible). The pad band must be
+   carved out ONCE — on the outermost body — and the inner region/frame fill
+   their parent (inset:0). */
 .map-shell--touchfly .map-shell__body {
-  /* map region gets the TOP portion; the pad owns the bottom band */
+  /* map region gets the TOP portion; the pad owns the bottom band. This is
+     the ONLY place the pad height is subtracted. */
   bottom: var(--tzp-h);
 }
-.map-shell--touchfly .map-shell__region { bottom: var(--tzp-h); }
+.map-shell--touchfly .map-shell__region { inset: 0; }
 /* keep the map a landscape rectangle (letterboxed, YouTube-style) */
 .map-shell--touchfly .map-frame {
-  bottom: var(--tzp-h);
+  inset: 0;
   background: #0a1020; /* letterbox matte behind the landscape map */
 }
-/* dock (search + modes) sits just above the pad, not at the very bottom */
+/* dock (search + modes) is a SIBLING of the body, so it keeps the pad-height
+   offset to sit just above the pad band. */
 .map-shell--touchfly .map-shell__dock { bottom: var(--tzp-h); }
 
 /* the zone pad band */
@@ -2172,6 +2181,38 @@ gmp-popover-3d-element[plot-card-popover],
   touch-action: none; /* we own all touch — no browser scroll/zoom hijack */
   user-select: none; -webkit-user-select: none;
 }
+
+/* ── TouchJoysticks — two circle-in-circle thumbsticks ─────────────────
+   Left = pan, right = look, both outer rings = climb/descend. */
+.tjs { position: absolute; inset: 0; touch-action: none; user-select: none; -webkit-user-select: none; }
+.tjs__side { position: absolute; bottom: 0; top: 0; width: 50%; display: flex; align-items: center; justify-content: center; }
+.tjs__side--left { left: 0; }
+.tjs__side--right { right: 0; }
+.tjs__base {
+  position: relative; width: 124px; height: 124px; border-radius: 50%;
+  background: radial-gradient(circle at 50% 42%, rgba(125,168,255,0.10), rgba(10,16,32,0.55));
+  border: 2px solid rgba(125,168,255,0.4);
+  box-shadow: inset 0 2px 14px rgba(0,0,0,0.5), 0 6px 20px -8px rgba(0,0,0,0.6);
+  display: grid; place-items: center;
+}
+.tjs__knob {
+  width: 60px; height: 60px; border-radius: 50%;
+  background: radial-gradient(circle at 50% 38%, #2a6fe0, #14346d);
+  border: 2px solid rgba(160,196,255,0.9);
+  box-shadow: 0 4px 14px -3px rgba(0,0,0,0.6), inset 0 2px 6px rgba(255,255,255,0.18);
+  display: grid; place-items: center; will-change: transform;
+  transition: transform .06s linear;
+}
+.tjs__knob span { font-size: 10px; font-weight: 800; letter-spacing: 1.5px; color: rgba(255,255,255,0.85); pointer-events: none; }
+/* climb/dip hints on the ring, top + bottom */
+.tjs__ringlabel { position: absolute; left: 0; right: 0; text-align: center; font-size: 9px; font-weight: 800; letter-spacing: 2px; color: rgba(160,196,255,0.55); pointer-events: none; }
+.tjs__ringlabel--top { top: 7px; }
+.tjs__ringlabel--bot { bottom: 7px; }
+/* A / B buttons — top corners, above the sticks */
+.tjs__btn { position: absolute; top: 12px; display: grid; place-items: center; border-radius: 999px; font-weight: 800; color: rgba(125,168,255,0.95); border: 2px solid rgba(125,168,255,0.55); background: rgba(10,16,32,0.5); touch-action: none; }
+.tjs__btn:active { background: rgba(125,168,255,0.25); }
+.tjs__btn--a { right: 20px; width: 56px; height: 56px; font-size: 19px; border-color: rgba(125,168,255,0.9); }
+.tjs__btn--b { left: 20px; width: 48px; height: 48px; font-size: 16px; }
 .tzp { position: absolute; inset: 0; touch-action: none; }
 .tzp__row { position: absolute; inset: 0; display: flex; }
 .tzp__zone {

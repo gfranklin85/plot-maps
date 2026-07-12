@@ -6,9 +6,10 @@
 // glass, PlotMaps palette. Two selectable styles (choice saved to
 // localStorage):
 //
-//   • 'sticks' (the mockup): PAN joystick (left) · CLIMB/DIP vertical slider
-//     (center) · LOOK joystick (right). Left knob = pan, right knob = look,
-//     center slider = climb/descend.
+//   • 'sticks' (the mockup): PAN joystick (left) · LOOK joystick (right).
+//     Left knob = strafe/forward, its OUTER RING = climb/dip (the center
+//     slider was removed 2026-07-11 — it sat dead-center in the sightline;
+//     tilt-fly will own climb+bank next). Right knob = look (yaw/pitch).
 //   • 'zones' (the original zone pad, kept — it works well): full-width
 //     floating-elastic strips, restyled to the same glass palette.
 //
@@ -23,7 +24,7 @@ import { NEUTRAL, pushTouchFrame, type PadFrame } from '@/lib/touchPadBridge';
 import TouchZonePad from './TouchZonePad';
 
 const KNOB_RANGE = 42;   // px knob deflection = full stick
-const CLIMB_RANGE = 66;  // px slider travel = full climb/descend
+const CLIMB_RANGE = 66;  // px ring drag = full climb/descend
 
 export type ControlStyle = 'sticks' | 'zones';
 
@@ -31,10 +32,9 @@ interface Props {
   style: ControlStyle;
 }
 
-// ── the stick+slider panel (mockup) ──
-// PAN (left) · CLIMB/DIP (center slider) · LOOK (right). No A/B buttons —
-// selection is handled by the HUD's Tap/Laser mode, not floating buttons
-// that collided with the stick labels (Greg, 2026-07-11).
+// ── the stick panel (mockup) ──
+// PAN (left, ring = climb) · LOOK (right). No A/B buttons — selection is
+// just TAP now. No center slider — it was in the sightline (Greg, 2026-07-11).
 function StickPanel() {
   const frame = useRef<PadFrame>({ ...NEUTRAL });
   const root = useRef<HTMLDivElement | null>(null);
@@ -42,9 +42,11 @@ function StickPanel() {
   const rightBase = useRef<HTMLDivElement | null>(null);
   const leftKnob = useRef<HTMLDivElement | null>(null);
   const rightKnob = useRef<HTMLDivElement | null>(null);
-  const slider = useRef<HTMLDivElement | null>(null);
-  const sliderKnob = useRef<HTMLDivElement | null>(null);
-  const grabs = useRef<Map<number, { kind: 'knob' | 'slider'; side?: 'left' | 'right'; cx: number; cy: number }>>(new Map());
+  // grab kinds: 'knob' = the inner thumbstick (strafe/forward on left,
+  // yaw/pitch on right). 'climb' = the LEFT base's OUTER RING — drag it
+  // up/down to climb/dip (replaces the old center slider that sat in the
+  // sightline; Greg 2026-07-11). Tilt-fly will own climb+bank soon.
+  const grabs = useRef<Map<number, { kind: 'knob' | 'climb'; side?: 'left' | 'right'; cx: number; cy: number }>>(new Map());
 
   const push = useCallback(() => pushTouchFrame(frame.current), []);
 
@@ -53,7 +55,7 @@ function StickPanel() {
     const rd = (el: HTMLDivElement | null) =>
       el ? { x: +(el.dataset.kx || 0), y: +(el.dataset.ky || 0) } : { x: 0, y: 0 };
     const l = rd(leftKnob.current), r = rd(rightKnob.current);
-    const climb = +(sliderKnob.current?.dataset.c || 0); // +up climb, −down dip
+    const climb = +(leftBase.current?.dataset.c || 0); // +up climb, −down dip
     f.lx = l.x; f.ly = -l.y;
     f.rx = r.x; f.ry = -r.y;
     f.rt = climb > 0 ? climb : 0;
@@ -70,10 +72,10 @@ function StickPanel() {
   }, [recompute]);
 
   const setClimb = useCallback((c: number) => {
-    const k = sliderKnob.current;
-    if (!k) return;
-    k.dataset.c = String(c);
-    k.style.transform = `translateY(${(-c * CLIMB_RANGE).toFixed(1)}px)`;
+    const b = leftBase.current;
+    if (!b) return;
+    b.dataset.c = String(c);
+    b.classList.toggle('fc-base--climbing', c !== 0);
     recompute();
   }, [recompute]);
 
@@ -84,15 +86,20 @@ function StickPanel() {
       const r = base.getBoundingClientRect();
       return { cx: r.left + r.width / 2, cy: r.top + r.height / 2, r };
     };
+    // Hit-test: inner radius (≤ knob range) → knob; the LEFT base's outer
+    // ring (between the knob and the base edge) → climb.
     const hit = (x: number, y: number) => {
       for (const side of ['left', 'right'] as const) {
         const c = centerOf(side === 'left' ? leftBase.current : rightBase.current);
-        if (c && Math.hypot(x - c.cx, y - c.cy) <= c.r.width / 2 + 12)
-          return { kind: 'knob' as const, side, cx: c.cx, cy: c.cy };
+        if (!c) continue;
+        const dist = Math.hypot(x - c.cx, y - c.cy);
+        const outerR = c.r.width / 2 + 12;
+        if (dist > outerR) continue;
+        // Left base outer ring = climb (drag up/down). Everything else = knob.
+        if (side === 'left' && dist > KNOB_RANGE + 14)
+          return { kind: 'climb' as const, cx: c.cx, cy: c.cy };
+        return { kind: 'knob' as const, side, cx: c.cx, cy: c.cy };
       }
-      const s = slider.current?.getBoundingClientRect();
-      if (s && x >= s.left - 16 && x <= s.right + 16 && y >= s.top - 8 && y <= s.bottom + 8)
-        return { kind: 'slider' as const, cx: s.left + s.width / 2, cy: s.top + s.height / 2 };
       return null;
     };
     const onDown = (e: PointerEvent) => {
@@ -129,28 +136,18 @@ function StickPanel() {
 
   return (
     <div ref={root} className="fc-sticks">
-      {/* PAN */}
+      {/* PAN (knob) + CLIMB (outer ring). Drag the knob to strafe/forward;
+          drag the RING up/down to climb/dip — no more center slider in the
+          sightline. */}
       <div className="fc-stick">
-        <div className="fc-stick__label">PAN</div>
-        <div ref={leftBase} className="fc-base">
+        <div className="fc-stick__label">PAN <span className="fc-stick__sub">· ring climbs</span></div>
+        <div ref={leftBase} className="fc-base fc-base--ring" data-c="0">
           <MaterialIcon icon="keyboard_arrow_up" className="fc-arrow fc-arrow--up" />
           <MaterialIcon icon="keyboard_arrow_down" className="fc-arrow fc-arrow--down" />
           <MaterialIcon icon="keyboard_arrow_left" className="fc-arrow fc-arrow--left" />
           <MaterialIcon icon="keyboard_arrow_right" className="fc-arrow fc-arrow--right" />
           <div ref={leftKnob} className="fc-knob" data-kx="0" data-ky="0" />
         </div>
-      </div>
-
-      {/* CLIMB / DIP slider */}
-      <div className="fc-climb">
-        <div className="fc-climb__label">CLIMB</div>
-        <div ref={slider} className="fc-slider">
-          <MaterialIcon icon="keyboard_arrow_up" className="fc-slider__cap fc-slider__cap--top" />
-          <div className="fc-slider__track" />
-          <div ref={sliderKnob} className="fc-slider__knob" data-c="0" />
-          <MaterialIcon icon="keyboard_arrow_down" className="fc-slider__cap fc-slider__cap--bot" />
-        </div>
-        <div className="fc-climb__label fc-climb__label--bot">DIP</div>
       </div>
 
       {/* LOOK */}

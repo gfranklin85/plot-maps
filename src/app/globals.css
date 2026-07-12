@@ -2248,11 +2248,14 @@ gmp-popover-3d-element[plot-card-popover],
    PlotMaps palette. Sits in the (also-glass) control sheet. */
 .fc-sticks {
   position: absolute; inset: 0; touch-action: none; user-select: none; -webkit-user-select: none;
-  display: flex; align-items: center; justify-content: space-around; gap: 8px;
-  padding: 6px 18px 14px;
+  /* center is now FREE (slider gone) — push the two sticks to the edges so
+     the middle of the screen is unobstructed. */
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 6px 20px 14px;
 }
 .fc-stick { display: flex; flex-direction: column; align-items: center; gap: 8px; }
 .fc-stick__label { font-size: 11px; font-weight: 800; letter-spacing: 2px; color: rgba(19,73,212,0.75); }
+.fc-stick__sub { font-weight: 700; letter-spacing: 1px; color: rgba(19,73,212,0.45); }
 .fc-base {
   position: relative; width: 124px; height: 124px; border-radius: 50%;
   background: radial-gradient(circle at 50% 40%, rgba(255,255,255,0.55), rgba(214,228,250,0.35));
@@ -2260,6 +2263,15 @@ gmp-popover-3d-element[plot-card-popover],
   box-shadow: inset 0 2px 12px rgba(255,255,255,0.5), inset 0 -3px 12px rgba(19,73,212,0.1), 0 8px 22px -10px rgba(20,50,120,0.35);
   display: grid; place-items: center;
 }
+/* PAN base doubles as the CLIMB ring — a faint dashed outer ring hints the
+   draggable ring; it lights up while climbing/dipping. */
+.fc-base--ring { border-style: solid; }
+.fc-base--ring::before {
+  content: ''; position: absolute; inset: 9px; border-radius: 50%;
+  border: 1.5px dashed rgba(19,73,212,0.28); pointer-events: none;
+  transition: border-color .12s;
+}
+.fc-base--climbing::before { border-color: rgba(19,73,212,0.7); }
 .fc-arrow { position: absolute; color: rgba(19,73,212,0.5); font-size: 22px !important; pointer-events: none; }
 .fc-arrow--up { top: 6px; left: 50%; transform: translateX(-50%); }
 .fc-arrow--down { bottom: 6px; left: 50%; transform: translateX(-50%); }
@@ -2272,25 +2284,9 @@ gmp-popover-3d-element[plot-card-popover],
   box-shadow: 0 5px 16px -3px rgba(19,73,212,0.6), inset 0 2px 7px rgba(255,255,255,0.35);
   will-change: transform; transition: transform .06s linear;
 }
-/* CLIMB / DIP center slider */
-.fc-climb { display: flex; flex-direction: column; align-items: center; gap: 6px; }
-.fc-climb__label { font-size: 10px; font-weight: 800; letter-spacing: 1.5px; color: rgba(19,73,212,0.7); }
-.fc-slider {
-  position: relative; width: 44px; height: 150px; border-radius: 999px;
-  background: rgba(255,255,255,0.4); border: 1.5px solid rgba(255,255,255,0.7);
-  box-shadow: inset 0 2px 10px rgba(19,73,212,0.12); display: grid; place-items: center;
-}
-.fc-slider__track { position: absolute; left: 50%; top: 20px; bottom: 20px; width: 3px; transform: translateX(-50%); background: rgba(19,73,212,0.35); border-radius: 999px; }
-.fc-slider__cap { position: absolute; color: rgba(19,73,212,0.55); font-size: 20px !important; pointer-events: none; }
-.fc-slider__cap--top { top: 4px; } .fc-slider__cap--bot { bottom: 4px; }
-.fc-slider__knob {
-  width: 34px; height: 34px; border-radius: 50%;
-  background: radial-gradient(circle at 50% 36%, #ffffff, #dbe6fb);
-  border: 2px solid rgba(19,73,212,0.85);
-  box-shadow: 0 3px 10px -2px rgba(19,73,212,0.5); z-index: 2;
-  will-change: transform; transition: transform .06s linear;
-}
-/* (A/B glass buttons removed 2026-07-11 — selection is Tap/Laser now.) */
+/* (center CLIMB/DIP slider removed 2026-07-11 — it sat dead-center in the
+   sightline. Climb moved to the PAN base's outer ring; tilt-fly next.) */
+/* (A/B glass buttons removed 2026-07-11 — selection is just tap now.) */
 
 /* ── TouchJoysticks — two circle-in-circle thumbsticks ─────────────────
    Left = pan, right = look, both outer rings = climb/descend. */

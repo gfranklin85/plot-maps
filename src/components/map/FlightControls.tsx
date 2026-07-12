@@ -29,14 +29,16 @@ const KNOB_RANGE = 42;      // px knob deflection = full stick
 const DOUBLE_TAP_MS = 320;  // knob double-tap window → (re)calibrate tilt
 
 export type FlightStyle = 'two-stick' | 'one-hand' | 'zones';
+export type Hand = 'right' | 'left';
 
 interface Props {
   flightStyle: FlightStyle;
   tilt?: TiltFly;
+  hand?: Hand;
 }
 
 // ── stick panel: two-stick OR one-hand (tilt) ──
-function StickPanel({ oneHand, tilt }: { oneHand: boolean; tilt?: TiltFly }) {
+function StickPanel({ oneHand, tilt, hand = 'right' }: { oneHand: boolean; tilt?: TiltFly; hand?: Hand }) {
   const frame = useRef<PadFrame>({ ...NEUTRAL });
   const root = useRef<HTMLDivElement | null>(null);
   const leftBase = useRef<HTMLDivElement | null>(null);
@@ -134,7 +136,7 @@ function StickPanel({ oneHand, tilt }: { oneHand: boolean; tilt?: TiltFly }) {
     : '';
 
   return (
-    <div ref={root} className={`fc-sticks ${oneHand ? 'fc-sticks--one' : ''}`}>
+    <div ref={root} className={`fc-sticks ${oneHand ? `fc-sticks--one fc-sticks--${hand}` : ''}`}>
       {/* PAN (always present) */}
       <div className="fc-stick">
         <div className="fc-stick__label">PAN <span className="fc-stick__sub">{hint}</span></div>
@@ -166,7 +168,7 @@ function StickPanel({ oneHand, tilt }: { oneHand: boolean; tilt?: TiltFly }) {
 
 const clamp = (v: number) => Math.max(-1, Math.min(1, v));
 
-export default function FlightControls({ flightStyle, tilt }: Props) {
+export default function FlightControls({ flightStyle, tilt, hand }: Props) {
   if (flightStyle === 'zones') return <TouchZonePad />;
-  return <StickPanel oneHand={flightStyle === 'one-hand'} tilt={tilt} />;
+  return <StickPanel oneHand={flightStyle === 'one-hand'} tilt={tilt} hand={hand} />;
 }

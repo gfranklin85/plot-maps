@@ -39,20 +39,29 @@ const STYLES: { id: FlightStyle; icon: string; label: string; sub: string }[] = 
 ];
 
 const LS_STYLE = 'plotmaps.mobileFlightStyle';
+const LS_HAND = 'plotmaps.mobileHand';
+type Hand = 'right' | 'left';
 
 export default function MobileFlightHUD() {
   const [menu, setMenu] = useState(false);
   const [flightStyle, setFlightStyle] = useState<FlightStyle>('two-stick');
+  const [hand, setHand] = useState<Hand>('right');
 
   useEffect(() => {
     try {
       const s = localStorage.getItem(LS_STYLE);
       if (s === 'two-stick' || s === 'one-hand' || s === 'zones') setFlightStyle(s);
+      const h = localStorage.getItem(LS_HAND);
+      if (h === 'right' || h === 'left') setHand(h);
     } catch { /* ignore */ }
   }, []);
   const chooseStyle = (s: FlightStyle) => {
     setFlightStyle(s);
     try { localStorage.setItem(LS_STYLE, s); } catch { /* ignore */ }
+  };
+  const chooseHand = (h: Hand) => {
+    setHand(h);
+    try { localStorage.setItem(LS_HAND, h); } catch { /* ignore */ }
   };
 
   // Tilt-fly is active only in one-hand style; its RAF owns the pad frame then.
@@ -105,6 +114,27 @@ export default function MobileFlightHUD() {
                 {flightStyle === s.id && <MaterialIcon icon="check" className="text-[18px] mtb-menu__check" />}
               </button>
             ))}
+
+            {/* Handedness — which side the one-hand stick sits on */}
+            {flightStyle === 'one-hand' && (
+              <>
+                <div className="mtb-menu__section">Stick side</div>
+                <div className="mtb-menu__hand">
+                  <button
+                    className={`mtb-menu__handbtn ${hand === 'left' ? 'is-on' : ''}`}
+                    onClick={() => chooseHand('left')}
+                  >
+                    <MaterialIcon icon="back_hand" className="text-[18px] mtb-menu__handbtn-flip" /> Left
+                  </button>
+                  <button
+                    className={`mtb-menu__handbtn ${hand === 'right' ? 'is-on' : ''}`}
+                    onClick={() => chooseHand('right')}
+                  >
+                    <MaterialIcon icon="back_hand" className="text-[18px]" /> Right
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -115,7 +145,7 @@ export default function MobileFlightHUD() {
       {/* ── BOTTOM CONTROLS (transparent over the full-bleed map) ── */}
       <div className="mfh">
         <div className="mfh-controls">
-          <FlightControls flightStyle={flightStyle} tilt={tilt} />
+          <FlightControls flightStyle={flightStyle} tilt={tilt} hand={hand} />
         </div>
       </div>
 

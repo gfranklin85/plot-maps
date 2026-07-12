@@ -2173,7 +2173,8 @@ gmp-popover-3d-element[plot-card-popover],
 @media (orientation: landscape) and (max-height: 500px) {
   :root { --tzp-h: 168px; }
   .fc-sticks { align-items: flex-end; padding: 4px 26px 10px; }
-  .fc-sticks--one { justify-content: flex-start; padding-left: 30px; }
+  .fc-sticks--one.fc-sticks--right { padding: 4px 30px 10px 0; }
+  .fc-sticks--one.fc-sticks--left { padding: 4px 0 10px 30px; }
   /* the calibration card shouldn't dominate a short screen */
   .mfh-tiltcal__card { padding: 14px 22px; }
   .mfh-tiltcal__num { font-size: 34px; }
@@ -2253,6 +2254,16 @@ gmp-popover-3d-element[plot-card-popover],
 .mtb-menu__style-txt { display: flex; flex-direction: column; gap: 1px; flex: 1; }
 .mtb-menu__style-sub { font-size: 12px; font-weight: 600; color: rgba(19,73,212,0.55); }
 .mtb-menu__check { color: #1349d4; margin-left: auto; }
+
+/* handedness toggle (right / left stick side) */
+.mtb-menu__hand { display: flex; gap: 8px; padding: 2px 12px 4px; }
+.mtb-menu__handbtn {
+  flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  height: 44px; border-radius: 14px; font-size: 15px; font-weight: 700; color: #1349d4;
+  background: rgba(19,73,212,0.06); border: 1.5px solid transparent;
+}
+.mtb-menu__handbtn.is-on { background: rgba(19,73,212,0.13); border-color: rgba(19,73,212,0.5); }
+.mtb-menu__handbtn-flip { transform: scaleX(-1); }
 
 /* ── Bottom controls (.mfh) — TRANSPARENT; the map shows through ───────
    Greg 2026-07-11: "make the control panel transparent, we should see the
@@ -2341,9 +2352,10 @@ gmp-popover-3d-element[plot-card-popover],
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
   padding: 6px 20px 14px;
 }
-/* one-hand style: a single PAN stick, off to one side (thumb-reachable),
-   tilt does climb + turn. Left-anchored for right thumb; the rest is map. */
-.fc-sticks--one { justify-content: flex-start; padding-left: 24px; }
+/* one-hand style: a single PAN stick on the thumb side (handedness setting),
+   tilt does climb + turn. The rest of the band is clear map. */
+.fc-sticks--one.fc-sticks--right { justify-content: flex-end; padding: 6px 24px 14px 0; }
+.fc-sticks--one.fc-sticks--left  { justify-content: flex-start; padding: 6px 0 14px 24px; }
 .fc-stick { display: flex; flex-direction: column; align-items: center; gap: 8px; }
 .fc-stick__label { font-size: 11px; font-weight: 800; letter-spacing: 2px; color: rgba(19,73,212,0.75); }
 .fc-stick__sub { font-weight: 700; letter-spacing: 1px; color: rgba(19,73,212,0.45); }

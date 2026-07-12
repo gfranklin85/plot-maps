@@ -26,9 +26,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type React from 'react';
 import { NEUTRAL, pushTouchFrame, type PadFrame } from '@/lib/touchPadBridge';
 
-const DEAD_DEG = 3.5;   // ±3.5° of neutral = no motion (rest jitter)
-const FULL_DEG = 26;    // ~26° tilt from neutral = full deflection
-const EMA = 0.2;        // low-pass smoothing
+// Sensitivity (Greg 2026-07-12: "react off the most subtle movements" — no
+// cranking the wrist). SMALL full-tilt angle + tiny dead-zone + a curve that
+// is RESPONSIVE near center (not squashed), so a gentle tilt already moves
+// you. Gentle SPEED comes from the flight loop's rate caps, not from making
+// the input hard to trigger.
+const DEAD_DEG = 1.2;   // ±1.2° = no motion (just enough for rest jitter)
+const FULL_DEG = 11;    // ~11° tilt = full deflection (was 26 — way too much)
+const EMA = 0.28;       // low-pass (a touch snappier so subtle tilts register)
 const CLIMB_INVERT = false; // nose-up climbs; flip if backwards
 const YAW_INVERT = false;   // tilt-right turns right; flip if backwards
 const COUNTDOWN_FROM = 3;
@@ -41,8 +46,12 @@ const clamp = (v: number) => Math.max(-1, Math.min(1, v));
 function shape(deg: number): number {
   const a = Math.abs(deg);
   if (a <= DEAD_DEG) return 0;
-  const n = clamp((a - DEAD_DEG) / (FULL_DEG - DEAD_DEG)) * Math.sign(deg);
-  return n * Math.abs(n); // ease near center, firm at the edges
+  const n = clamp((a - DEAD_DEG) / (FULL_DEG - DEAD_DEG));
+  // RESPONSIVE-near-center curve (sqrt-ish): amplifies subtle tilts instead of
+  // squashing them, so movement starts right after the dead-zone. Firms toward
+  // the edge. (Opposite of the old x*|x| which killed small inputs.)
+  const curved = Math.pow(n, 0.65);
+  return curved * Math.sign(deg);
 }
 
 export interface StickAxes { lx: number; ly: number; rx: number; ry: number; }

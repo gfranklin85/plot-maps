@@ -137,6 +137,10 @@ export interface MapViewProps {
    *  synthetic pointermove events at this position. */
   gamepadReticleXFraction?: number;
   gamepadReticleYFraction?: number;
+  /** Show the fixed aiming reticle. Defaults true (desktop/controller always
+   *  aim). On mobile it's false in TAP select-mode (tap the map directly) and
+   *  true in LASER mode (reticle + shoot). memory/project_phone_as_controller */
+  reticleVisible?: boolean;
   /** LB-held + right stick moves the fixed reticle. Per-frame deltas in
    *  viewport fractions; the page applies them via useReticlePosition.
    *  [[controller-cursor-model]] */

@@ -29,11 +29,13 @@ export type ControlStyle = 'sticks' | 'zones';
 
 interface Props {
   style: ControlStyle;
-  onButton?: (k: 'a' | 'b', down: boolean) => void;
 }
 
 // ── the stick+slider panel (mockup) ──
-function StickPanel({ onButton }: { onButton?: (k: 'a' | 'b', down: boolean) => void }) {
+// PAN (left) · CLIMB/DIP (center slider) · LOOK (right). No A/B buttons —
+// selection is handled by the HUD's Tap/Laser mode, not floating buttons
+// that collided with the stick labels (Greg, 2026-07-11).
+function StickPanel() {
   const frame = useRef<PadFrame>({ ...NEUTRAL });
   const root = useRef<HTMLDivElement | null>(null);
   const leftBase = useRef<HTMLDivElement | null>(null);
@@ -56,7 +58,6 @@ function StickPanel({ onButton }: { onButton?: (k: 'a' | 'b', down: boolean) => 
     f.rx = r.x; f.ry = -r.y;
     f.rt = climb > 0 ? climb : 0;
     f.lt = climb < 0 ? -climb : 0;
-    f.a = frame.current.a; f.b = frame.current.b;
     frame.current = f; push();
   }, [push]);
 
@@ -75,10 +76,6 @@ function StickPanel({ onButton }: { onButton?: (k: 'a' | 'b', down: boolean) => 
     k.style.transform = `translateY(${(-c * CLIMB_RANGE).toFixed(1)}px)`;
     recompute();
   }, [recompute]);
-
-  const setBtn = useCallback((key: 'a' | 'b', down: boolean) => {
-    frame.current[key] = down; pushTouchFrame(frame.current); onButton?.(key, down);
-  }, [onButton]);
 
   useEffect(() => {
     const el = root.current; if (!el) return;
@@ -167,24 +164,12 @@ function StickPanel({ onButton }: { onButton?: (k: 'a' | 'b', down: boolean) => 
           <div ref={rightKnob} className="fc-knob" data-kx="0" data-ky="0" />
         </div>
       </div>
-
-      {/* A / B — A selects the parcel under the reticle, B clears */}
-      <button type="button" className="fc-ab fc-ab--b"
-        onPointerDown={(e) => { e.stopPropagation(); setBtn('b', true); }}
-        onPointerUp={(e) => { e.stopPropagation(); setBtn('b', false); }}
-        onPointerCancel={() => setBtn('b', false)}>B</button>
-      <button type="button" className="fc-ab fc-ab--a"
-        onPointerDown={(e) => { e.stopPropagation(); setBtn('a', true); }}
-        onPointerUp={(e) => { e.stopPropagation(); setBtn('a', false); }}
-        onPointerCancel={() => setBtn('a', false)}>A</button>
     </div>
   );
 }
 
 const clamp = (v: number) => Math.max(-1, Math.min(1, v));
 
-export default function FlightControls({ style, onButton }: Props) {
-  return style === 'sticks'
-    ? <StickPanel onButton={onButton} />
-    : <TouchZonePad onButton={onButton} />;
+export default function FlightControls({ style }: Props) {
+  return style === 'sticks' ? <StickPanel /> : <TouchZonePad />;
 }

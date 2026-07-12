@@ -10,7 +10,7 @@ import { Lead, LeadStatus, Priority } from "@/types";
 import MapDynamic from "@/components/map/MapDynamic";
 import type { PinMode } from "@/components/map/MapView";
 import StreetViewProspecting from "@/components/map/StreetViewProspecting";
-import MobileFlightHUD from "@/components/map/MobileFlightHUD";
+import MobileFlightHUD, { type SelectMode } from "@/components/map/MobileFlightHUD";
 import { installTouchPad } from "@/lib/touchPadBridge";
 import ProspectSearch from "@/components/dashboard/ProspectSearch";
 import { PRIORITIES } from "@/lib/constants";
@@ -152,6 +152,18 @@ export default function MapPage() {
   // ZONE PAD. Portrait layout: condensed landscape map on top, zone pad
   // below. memory/project_phone_as_controller, project_2d_work_mode
   const [touchFly, setTouchFly] = useState(false);
+  // Mobile select mode: 'tap' (tap the map → trusted gmp-click) or 'laser'
+  // (fixed reticle + shoot button → fireOpenParcel). Persisted per device.
+  const [selectMode, setSelectMode] = useState<SelectMode>('tap');
+  useEffect(() => {
+    try {
+      const s = localStorage.getItem('plotmaps.mobileSelectMode');
+      if (s === 'tap' || s === 'laser') setSelectMode(s);
+    } catch { /* ignore */ }
+  }, []);
+  useEffect(() => {
+    try { localStorage.setItem('plotmaps.mobileSelectMode', selectMode); } catch { /* ignore */ }
+  }, [selectMode]);
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const coarse = window.matchMedia('(pointer: coarse)').matches;
@@ -2047,6 +2059,7 @@ export default function MapPage() {
               }
             }}
             gamepadEnabled={flightMode === 'airplane' && !debugUnmountController}
+            reticleVisible={!touchFly || selectMode === 'laser'}
             gamepadActions={gamepadActions}
             gamepadMode={flightMode}
             gamepadDebugSuspendMoveCamera={debugSuspendMoveCamera}
@@ -2148,7 +2161,9 @@ export default function MapPage() {
           The map frame ends exactly at the top of this dock; it can never
           cover the map. Move this to a rail / top bar later by re-slotting
           MapSidebar and adjusting --map-rail-w / --map-top-h. ═══ */}
-      {!walkMode && <div className="map-shell__dock">{dashEl}</div>}
+      {/* touchFly gets its own lean top bar (.mtb) instead of this desktop
+          dock — hide the dock on mobile flight so they don't stack. */}
+      {!walkMode && !touchFly && <div className="map-shell__dock">{dashEl}</div>}
 
       {/* ═══ MOBILE ZONE PAD — on-screen touch flight (portrait) ═══
           Drives the injected touch gamepad → Plot's flight loop. Tap the
@@ -2156,13 +2171,7 @@ export default function MapPage() {
           card. memory/project_phone_as_controller */}
       {touchFly && (
         <div className="map-touchpad">
-          <MobileFlightHUD
-            walkMode={walkMode}
-            onSetWalk={(walk) => mapModeDispatch({ type: walk ? 'ENTER_WALK' : 'ENTER_3D' })}
-            onButton={(k, downNow) => {
-              if (k === 'b' && downNow && selectedLead) setSelectedLead(null);
-            }}
-          />
+          <MobileFlightHUD selectMode={selectMode} onSelectMode={setSelectMode} />
         </div>
       )}
 

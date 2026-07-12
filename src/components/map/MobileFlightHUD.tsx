@@ -2,124 +2,123 @@
 
 // ── MobileFlightHUD ───────────────────────────────────────────────────
 //
-// The mobile flight control sheet (Greg's mockups, 2026-07-11). A single
-// translucent glass sheet at the bottom holding:
-//   • a DRAG-GRIP (the map/control divider) — drag up for taller controls +
-//     a shorter wider (landscape) map; drag down for a bigger map. The split
-//     is saved to localStorage. This is the resizable-map control Greg asked
-//     for — a wide letterbox map is often better than cramped full-portrait.
-//   • the MODE ROW: Flight · Explore · (center fly) · Layers · Saved.
-//   • the CONTROL STYLE toggle: sticks+slider (mockup) ⇄ zone pad (kept).
-//   • the flight controls (FlightControls), whichever style is chosen.
+// The mobile flight HUD, leaned out (Greg, 2026-07-11 — "lean it out, not
+// full of half-ass shit"). Two pieces, nothing else:
 //
-// It writes the map/control split as a CSS var (--tzp-h) on the shell so the
-// existing touch-fly layout re-flows live. All prefs persist per device.
+//   • TOP BAR (floats over the map): a hamburger menu (holds the app nav —
+//     Map / Post a Move / Connections / Documents / account) + a search
+//     field + a Tap/Laser SELECT-MODE chip.
+//   • BOTTOM CONTROLS: the two sticks (PAN · CLIMB/DIP · LOOK). That's it.
+//
+// SELECT on mobile (two modes):
+//   • Tap  — tap the map like normal. A real touch fires a trusted
+//            gmp-click → the parcel awakens and its card opens. No buttons.
+//   • Laser — the fixed reticle + a single centered SHOOT button. Shoot
+//            dispatches the synthetic gamepad A (buttons[0]) so the flight
+//            loop's justPressed('a') runs fireOpenParcel at the reticle,
+//            exactly like the controller/desktop path.
+//
+// CUT (were clutter): the Flight/Explore/fly/Layers/Saved mode row, the
+// stick⇄zone-pad style toggle, the drag-grip divider, the floating A/B
+// buttons, the PlotMaps bar. Walk mode is parked (design TBD).
+// memory/project_phone_as_controller
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import MaterialIcon from '@/components/ui/MaterialIcon';
-import FlightControls, { type ControlStyle } from './FlightControls';
+import { NEUTRAL, pushTouchFrame } from '@/lib/touchPadBridge';
+import FlightControls from './FlightControls';
 
-// Sheet height clamps (as a fraction of viewport height).
-const MIN_FRAC = 0.30;
-const MAX_FRAC = 0.60;
-const DEFAULT_FRAC = 0.42;
+export type SelectMode = 'tap' | 'laser';
 
-const LS_HEIGHT = 'plotmaps.mobileControlFrac';
-const LS_STYLE = 'plotmaps.mobileControlStyle';
-
+// The controls own a fixed band at the bottom (--tzp-h). No longer resizable
+// — one clean height. 42vh gives the sticks room without eating the map.
 interface Props {
-  onButton?: (k: 'a' | 'b', down: boolean) => void;
-  walkMode?: boolean;
-  onSetWalk?: (walk: boolean) => void;
-  onLayers?: () => void;
-  onSaved?: () => void;
+  selectMode: SelectMode;
+  onSelectMode: (m: SelectMode) => void;
 }
 
-export default function MobileFlightHUD({ onButton, walkMode, onSetWalk, onLayers, onSaved }: Props) {
-  const [frac, setFrac] = useState(DEFAULT_FRAC);
-  const [style, setStyle] = useState<ControlStyle>('sticks');
-  const dragging = useRef(false);
-  const startY = useRef(0);
-  const startFrac = useRef(DEFAULT_FRAC);
+const NAV = [
+  { href: '/home', icon: 'home', label: 'Home' },
+  { href: '/map?view=3d', icon: 'map', label: 'Map' },
+  { href: '/post', icon: 'add_location_alt', label: 'Post a Move' },
+  { href: '/connections', icon: 'hub', label: 'Connections' },
+  { href: '/documents', icon: 'description', label: 'Documents' },
+  { href: '/my-request', icon: 'explore', label: 'My Requests' },
+  { href: '/settings', icon: 'settings', label: 'Settings' },
+];
 
-  // restore saved prefs
-  useEffect(() => {
-    try {
-      const h = parseFloat(localStorage.getItem(LS_HEIGHT) || '');
-      if (Number.isFinite(h)) setFrac(Math.min(MAX_FRAC, Math.max(MIN_FRAC, h)));
-      const s = localStorage.getItem(LS_STYLE);
-      if (s === 'sticks' || s === 'zones') setStyle(s);
-    } catch { /* ignore */ }
-  }, []);
+export default function MobileFlightHUD({ selectMode, onSelectMode }: Props) {
+  const [menu, setMenu] = useState(false);
 
-  // push the split to the shell so the map re-flows (--tzp-h drives the layout)
-  useEffect(() => {
-    document.documentElement.style.setProperty('--tzp-h', `${(frac * 100).toFixed(1)}vh`);
-    try { localStorage.setItem(LS_HEIGHT, String(frac)); } catch { /* ignore */ }
-  }, [frac]);
-
-  const chooseStyle = useCallback((s: ControlStyle) => {
-    setStyle(s);
-    try { localStorage.setItem(LS_STYLE, s); } catch { /* ignore */ }
-  }, []);
-
-  // drag-grip → resize the split
-  const onGripDown = (e: React.PointerEvent) => {
-    dragging.current = true;
-    startY.current = e.clientY;
-    startFrac.current = frac;
-    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
-    e.preventDefault();
+  // SHOOT (laser mode) — pulse the synthetic A so the flight loop's
+  // justPressed('a') fires fireOpenParcel at the reticle, then release.
+  const shoot = () => {
+    pushTouchFrame({ ...NEUTRAL, a: true });
+    // release next frame so the edge-trigger sees a down→up
+    requestAnimationFrame(() => pushTouchFrame({ ...NEUTRAL, a: false }));
   };
-  const onGripMove = (e: React.PointerEvent) => {
-    if (!dragging.current) return;
-    const dy = startY.current - e.clientY;              // up = grow controls
-    const next = startFrac.current + dy / window.innerHeight;
-    setFrac(Math.min(MAX_FRAC, Math.max(MIN_FRAC, next)));
-    e.preventDefault();
-  };
-  const onGripUp = () => { dragging.current = false; };
 
   return (
-    <div className="mfh">
-      {/* drag-grip — the map/control divider */}
-      <div className="mfh-grip" onPointerDown={onGripDown} onPointerMove={onGripMove} onPointerUp={onGripUp} onPointerCancel={onGripUp}>
-        <MaterialIcon icon="unfold_more" className="mfh-grip__ic" />
+    <>
+      {/* ── TOP BAR (floats over the map) ── */}
+      <div className="mtb">
+        <button className="mtb-burger" aria-label="Menu" onClick={() => setMenu(true)}>
+          <MaterialIcon icon="menu" className="text-[22px]" />
+        </button>
+
+        <div className="mtb-search">
+          <MaterialIcon icon="search" className="text-[18px] mtb-search__ic" />
+          <input className="mtb-search__in" placeholder="Search a place" inputMode="search" />
+        </div>
+
+        {/* select-mode chip: Tap ⇄ Laser */}
+        <button
+          className="mtb-mode"
+          onClick={() => onSelectMode(selectMode === 'tap' ? 'laser' : 'tap')}
+          aria-label="Toggle select mode"
+        >
+          <MaterialIcon icon={selectMode === 'laser' ? 'my_location' : 'touch_app'} className="text-[18px]" />
+          <span>{selectMode === 'laser' ? 'Laser' : 'Tap'}</span>
+        </button>
       </div>
 
-      {/* mode row */}
-      <div className="mfh-modes">
-        <button className={`mfh-mode ${!walkMode ? 'is-on' : ''}`} onClick={() => onSetWalk?.(false)}>
-          <MaterialIcon icon="flight" className="text-[20px]" /><span>Flight</span>
-        </button>
-        <button className={`mfh-mode ${walkMode ? 'is-on' : ''}`} onClick={() => onSetWalk?.(true)}>
-          <MaterialIcon icon="directions_walk" className="text-[20px]" /><span>Explore</span>
-        </button>
-        <button className="mfh-fly" aria-label="Fly"><MaterialIcon icon="navigation" className="text-[22px]" /></button>
-        <button className="mfh-mode" onClick={() => onLayers?.()}>
-          <MaterialIcon icon="layers" className="text-[20px]" /><span>Layers</span>
-        </button>
-        <button className="mfh-mode" onClick={() => onSaved?.()}>
-          <MaterialIcon icon="bookmark" className="text-[20px]" /><span>Saved</span>
-        </button>
-      </div>
-
-      {/* control-style toggle (sticks ⇄ zone pad) */}
-      <button
-        className="mfh-styletoggle"
-        onClick={() => chooseStyle(style === 'sticks' ? 'zones' : 'sticks')}
-        aria-label="Switch control style"
-      >
-        <MaterialIcon icon={style === 'sticks' ? 'grid_view' : 'gamepad'} className="text-[16px]" />
-        {style === 'sticks' ? 'Zone pad' : 'Sticks'}
-      </button>
-
-      {/* the flight controls */}
-      {!walkMode && (
-        <div className="mfh-controls">
-          <FlightControls style={style} onButton={onButton} />
+      {/* ── slide-down nav menu ── */}
+      {menu && (
+        <div className="mtb-menu" onClick={() => setMenu(false)}>
+          <div className="mtb-menu__sheet" onClick={(e) => e.stopPropagation()}>
+            <div className="mtb-menu__head">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/brand/plotmaps-logo.svg" alt="PlotMaps" className="mtb-menu__logo" />
+              <button className="mtb-menu__x" aria-label="Close" onClick={() => setMenu(false)}>
+                <MaterialIcon icon="close" className="text-[22px]" />
+              </button>
+            </div>
+            {NAV.map((n) => (
+              <a key={n.href} href={n.href} className="mtb-menu__item">
+                <MaterialIcon icon={n.icon} className="text-[20px]" />
+                <span>{n.label}</span>
+              </a>
+            ))}
+          </div>
         </div>
       )}
-    </div>
+
+      {/* ── BOTTOM CONTROLS ── */}
+      <div className="mfh">
+        {/* shoot button — only in laser mode; tap mode taps the map directly */}
+        {selectMode === 'laser' && (
+          <button
+            className="mfh-shoot"
+            aria-label="Select parcel at reticle"
+            onPointerDown={(e) => { e.stopPropagation(); shoot(); }}
+          >
+            <MaterialIcon icon="my_location" className="text-[24px]" />
+          </button>
+        )}
+        <div className="mfh-controls">
+          <FlightControls style="sticks" />
+        </div>
+      </div>
+    </>
   );
 }

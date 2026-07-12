@@ -262,6 +262,7 @@ function Inner({
   ritualTetherForwardRef,
   gamepadReticleXFraction,
   gamepadReticleYFraction,
+  reticleVisible = true,
   onMoveReticle,
 }: {
   center?: { lat: number; lng: number } | null;
@@ -277,6 +278,9 @@ function Inner({
    *  [[controller-cursor-model]] */
   gamepadReticleXFraction?: number;
   gamepadReticleYFraction?: number;
+  /** Show the fixed aiming reticle. Defaults true; mobile TAP mode passes
+   *  false so the map is tapped directly. */
+  reticleVisible?: boolean;
   /** LB-held + right stick moves the reticle: dxFrac/dyFrac are per-frame
    *  deltas in viewport fractions. The page applies them via setPosition. */
   onMoveReticle?: (dxFrac: number, dyFrac: number) => void;
@@ -1413,13 +1417,15 @@ function Inner({
             parcel opens IDENTICALLY to a mouse click. The cursor is the
             single source of truth; no separate fire-resolve to drift out of
             sync. memory/project_plot_pad_os_click_helper, controller-cursor-model */}
-        <CustomReticle
-          hoverActive={hoverActive}
-          followCursor
-          fixedXFraction={gamepadReticleXFraction ?? 0.5}
-          fixedYFraction={gamepadReticleYFraction ?? 0.42}
-          placing={placingReticle}
-        />
+        {reticleVisible && (
+          <CustomReticle
+            hoverActive={hoverActive}
+            followCursor
+            fixedXFraction={gamepadReticleXFraction ?? 0.5}
+            fixedYFraction={gamepadReticleYFraction ?? 0.42}
+            placing={placingReticle}
+          />
+        )}
         {/* The old ?calibrate=1 reticle-projection harness was removed: we
             no longer reverse-engineer the pixel→ground math (it drifted
             ~700m near the horizon). Selection now uses a REAL OS click via
@@ -1458,6 +1464,7 @@ export default function MapView3D(props: MapViewProps) {
         ritualTetherForwardRef={props.ritualTetherForwardRef}
         gamepadReticleXFraction={props.gamepadReticleXFraction}
         gamepadReticleYFraction={props.gamepadReticleYFraction}
+        reticleVisible={props.reticleVisible}
         onMoveReticle={props.onMoveReticle}
       />
     </APIProvider>

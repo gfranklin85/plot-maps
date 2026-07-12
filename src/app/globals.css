@@ -2157,20 +2157,13 @@ gmp-popover-3d-element[plot-card-popover],
    tall (a fully-loaded 3D map, 1012 tiles, invisible). The pad band must be
    carved out ONCE — on the outermost body — and the inner region/frame fill
    their parent (inset:0). */
-.map-shell--touchfly .map-shell__body {
-  /* map region gets the TOP portion; the pad owns the bottom band. This is
-     the ONLY place the pad height is subtracted. */
-  bottom: var(--tzp-h);
-}
+/* FULL-BLEED map (Greg 2026-07-11: "I want to see this whole thing"). The
+   map now fills the ENTIRE viewport; the transparent control band floats
+   OVER the bottom of it, so terrain shows through behind the sticks. No
+   bottom carve-out, no letterbox matte. */
+.map-shell--touchfly .map-shell__body { inset: 0; }
 .map-shell--touchfly .map-shell__region { inset: 0; }
-/* keep the map a landscape rectangle (letterboxed, YouTube-style) */
-.map-shell--touchfly .map-frame {
-  inset: 0;
-  background: #0a1020; /* letterbox matte behind the landscape map */
-}
-/* dock (search + modes) is a SIBLING of the body, so it keeps the pad-height
-   offset to sit just above the pad band. */
-.map-shell--touchfly .map-shell__dock { bottom: var(--tzp-h); }
+.map-shell--touchfly .map-frame { inset: 0; }
 
 /* the control sheet band — now a TRANSLUCENT GLASS sheet (Greg's mockup) */
 .map-touchpad {
@@ -2180,27 +2173,75 @@ gmp-popover-3d-element[plot-card-popover],
   user-select: none; -webkit-user-select: none;
 }
 
-/* ── MobileFlightHUD — the glass control sheet ─────────────────────────*/
+/* ── Mobile TOP BAR (.mtb) — floats over the map ───────────────────────
+   Leaned out (Greg 2026-07-11): hamburger (nav) + search + Tap/Laser chip.
+   Fixed to the viewport top; escapes the .map-touchpad bottom band. */
+.mtb {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 60;
+  display: flex; align-items: center; gap: 8px;
+  padding: calc(env(safe-area-inset-top, 0px) + 8px) 10px 8px;
+  pointer-events: none; /* let map taps through the gaps */
+}
+.mtb > * { pointer-events: auto; }
+.mtb-burger {
+  flex: 0 0 auto; width: 44px; height: 44px; display: grid; place-items: center;
+  border-radius: 14px; color: #1349d4;
+  background: rgba(255,255,255,0.82); backdrop-filter: saturate(160%) blur(14px); -webkit-backdrop-filter: saturate(160%) blur(14px);
+  border: 1.5px solid rgba(255,255,255,0.9); box-shadow: 0 6px 18px -8px rgba(20,50,120,0.4);
+}
+.mtb-search {
+  flex: 1 1 auto; min-width: 0; height: 44px; display: flex; align-items: center; gap: 7px;
+  padding: 0 12px; border-radius: 14px;
+  background: rgba(255,255,255,0.82); backdrop-filter: saturate(160%) blur(14px); -webkit-backdrop-filter: saturate(160%) blur(14px);
+  border: 1.5px solid rgba(255,255,255,0.9); box-shadow: 0 6px 18px -8px rgba(20,50,120,0.4);
+}
+.mtb-search__ic { color: rgba(19,73,212,0.6); flex: 0 0 auto; }
+.mtb-search__in { flex: 1 1 auto; min-width: 0; border: none; background: transparent; outline: none; font-size: 15px; color: #0f2b6b; }
+.mtb-search__in::placeholder { color: rgba(19,73,212,0.45); }
+.mtb-mode {
+  flex: 0 0 auto; height: 44px; display: inline-flex; align-items: center; gap: 5px;
+  padding: 0 13px; border-radius: 14px; font-size: 13px; font-weight: 700; color: #1349d4;
+  background: rgba(255,255,255,0.82); backdrop-filter: saturate(160%) blur(14px); -webkit-backdrop-filter: saturate(160%) blur(14px);
+  border: 1.5px solid rgba(255,255,255,0.9); box-shadow: 0 6px 18px -8px rgba(20,50,120,0.4);
+}
+
+/* slide-down nav menu */
+.mtb-menu { position: fixed; inset: 0; z-index: 70; background: rgba(10,20,40,0.35); backdrop-filter: blur(2px); }
+.mtb-menu__sheet {
+  position: absolute; top: 0; left: 0; right: 0;
+  padding: calc(env(safe-area-inset-top, 0px) + 12px) 12px 16px;
+  background: rgba(238,245,254,0.96); backdrop-filter: saturate(160%) blur(18px); -webkit-backdrop-filter: saturate(160%) blur(18px);
+  border-radius: 0 0 22px 22px; box-shadow: 0 16px 40px -14px rgba(20,50,120,0.45);
+}
+.mtb-menu__head { display: flex; align-items: center; justify-content: space-between; padding: 4px 6px 12px; }
+.mtb-menu__logo { height: 26px; width: auto; }
+.mtb-menu__x { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 12px; color: #1349d4; }
+.mtb-menu__item {
+  display: flex; align-items: center; gap: 12px; padding: 13px 12px; border-radius: 14px;
+  font-size: 16px; font-weight: 600; color: #0f2b6b;
+}
+.mtb-menu__item:active { background: rgba(19,73,212,0.08); }
+.mtb-menu__item .material-symbols-rounded, .mtb-menu__item .material-icons { color: #1349d4; }
+
+/* ── Bottom controls (.mfh) — TRANSPARENT; the map shows through ───────
+   Greg 2026-07-11: "make the control panel transparent, we should see the
+   map behind it." Only a whisper of tint + a soft top fade so the sticks
+   read against bright terrain; the map is fully visible underneath. */
 .mfh {
   position: absolute; inset: 0; display: flex; flex-direction: column;
-  background: linear-gradient(180deg, rgba(230,240,253,0.72) 0%, rgba(207,223,243,0.82) 100%);
-  backdrop-filter: saturate(150%) blur(18px); -webkit-backdrop-filter: saturate(150%) blur(18px);
-  border-top: 1.5px solid rgba(255,255,255,0.8);
-  border-radius: 22px 22px 0 0;
-  box-shadow: 0 -16px 40px -18px rgba(20,50,120,0.35);
+  background: linear-gradient(180deg, rgba(226,238,253,0) 0%, rgba(214,230,250,0.14) 55%, rgba(200,220,248,0.22) 100%);
+  border-top: none;
 }
-/* drag-grip — sits ABOVE the sheet (the divider tab), like the mockup */
-.mfh-grip { position: absolute; top: -22px; left: 50%; transform: translateX(-50%); width: 84px; height: 30px; display: grid; place-items: center; border-radius: 16px 16px 0 0; background: linear-gradient(180deg, rgba(230,240,253,0.9), rgba(230,240,253,0.72)); backdrop-filter: blur(12px); border: 1.5px solid rgba(255,255,255,0.8); border-bottom: none; box-shadow: 0 -6px 16px -8px rgba(20,50,120,0.25); cursor: ns-resize; touch-action: none; }
-.mfh-grip__ic { color: rgba(19,73,212,0.6); font-size: 20px !important; }
-/* mode row */
-.mfh-modes { display: flex; align-items: center; justify-content: space-around; gap: 6px; padding: 14px 16px 6px; }
-.mfh-mode { display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 11.5px; font-weight: 600; color: rgba(19,73,212,0.55); padding: 6px 10px; border-radius: 12px; transition: all .13s; }
-.mfh-mode.is-on { color: #1349d4; background: rgba(255,255,255,0.7); box-shadow: 0 4px 12px -6px rgba(20,50,120,0.35); }
-.mfh-fly { display: grid; place-items: center; width: 58px; height: 58px; border-radius: 50%; color: #fff; background: radial-gradient(circle at 50% 36%, #4d84ea, #1349d4); border: 2.5px solid rgba(255,255,255,0.85); box-shadow: 0 8px 20px -6px rgba(19,73,212,0.6); margin-top: -8px; }
-/* control-style toggle */
-.mfh-styletoggle { position: absolute; top: 14px; right: 14px; display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; color: rgba(19,73,212,0.7); background: rgba(255,255,255,0.6); border: 1px solid rgba(255,255,255,0.8); border-radius: 999px; padding: 5px 11px; backdrop-filter: blur(6px); }
-/* the controls region fills the rest of the sheet */
-.mfh-controls { position: relative; flex: 1; }
+/* SHOOT button (laser mode) — centered, straddles the sheet's top edge */
+.mfh-shoot {
+  position: absolute; top: -26px; left: 50%; transform: translateX(-50%); z-index: 2;
+  width: 60px; height: 60px; display: grid; place-items: center; border-radius: 50%;
+  color: #fff; background: radial-gradient(circle at 50% 36%, #4d84ea, #1349d4);
+  border: 3px solid rgba(255,255,255,0.9); box-shadow: 0 10px 24px -8px rgba(19,73,212,0.65);
+}
+.mfh-shoot:active { transform: translateX(-50%) scale(0.92); }
+/* the controls region fills the sheet */
+.mfh-controls { position: relative; flex: 1; padding-top: 12px; }
 
 /* ── FlightControls (glass, Greg's mockup 2026-07-11) ──────────────────
    PAN joystick · CLIMB/DIP slider · LOOK joystick, translucent glass in the
@@ -2249,11 +2290,7 @@ gmp-popover-3d-element[plot-card-popover],
   box-shadow: 0 3px 10px -2px rgba(19,73,212,0.5); z-index: 2;
   will-change: transform; transition: transform .06s linear;
 }
-/* A / B */
-.fc-ab { position: absolute; top: -22px; display: grid; place-items: center; border-radius: 999px; font-weight: 800; color: #1349d4; border: 1.5px solid rgba(19,73,212,0.55); background: rgba(255,255,255,0.55); backdrop-filter: blur(6px); touch-action: none; box-shadow: 0 6px 16px -8px rgba(20,50,120,0.4); }
-.fc-ab:active { background: rgba(19,73,212,0.18); }
-.fc-ab--a { right: 22px; width: 52px; height: 52px; font-size: 18px; border-color: rgba(19,73,212,0.9); }
-.fc-ab--b { left: 22px; width: 44px; height: 44px; font-size: 15px; }
+/* (A/B glass buttons removed 2026-07-11 — selection is Tap/Laser now.) */
 
 /* ── TouchJoysticks — two circle-in-circle thumbsticks ─────────────────
    Left = pan, right = look, both outer rings = climb/descend. */

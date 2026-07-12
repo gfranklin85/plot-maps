@@ -19,6 +19,7 @@
 import { useEffect, useState } from 'react';
 import MaterialIcon from '@/components/ui/MaterialIcon';
 import FlightControls, { type FlightStyle } from './FlightControls';
+import TiltEdgeIndicator from './TiltEdgeIndicator';
 import { useTiltFly } from '@/lib/useTiltFly';
 
 const NAV = [
@@ -107,6 +108,9 @@ export default function MobileFlightHUD() {
           </div>
         </div>
       )}
+
+      {/* ── edge-line tilt feedback (one-hand only) ── */}
+      {flightStyle === 'one-hand' && tilt.calibrated && <TiltEdgeIndicator tilt={tilt} />}
 
       {/* ── BOTTOM CONTROLS (transparent over the full-bleed map) ── */}
       <div className="mfh">

@@ -23,6 +23,7 @@
 // memory/project_tilt_to_fly, project_phone_as_controller
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type React from 'react';
 import { NEUTRAL, pushTouchFrame, type PadFrame } from '@/lib/touchPadBridge';
 
 const DEAD_DEG = 3.5;   // ±3.5° of neutral = no motion (rest jitter)
@@ -57,6 +58,9 @@ export interface TiltFly {
   setStickAxes: (a: StickAxes) => void;
   /** kick the 3·2·1 calibration (double-tap a stick). */
   calibrate: () => Promise<void>;
+  /** live shaped output (−1..1 each), read per-frame by the edge indicator.
+   *  climb = tilt fwd/back, yaw = tilt left/right. 0 when not calibrated. */
+  live: React.MutableRefObject<{ climb: number; yaw: number }>;
 }
 
 export function useTiltFly(enabled: boolean): TiltFly {
@@ -67,6 +71,7 @@ export function useTiltFly(enabled: boolean): TiltFly {
   const neutral = useRef<{ beta: number; gamma: number } | null>(null);
   const smooth = useRef<{ beta: number; gamma: number } | null>(null);
   const stick = useRef<StickAxes>({ lx: 0, ly: 0, rx: 0, ry: 0 });
+  const live = useRef<{ climb: number; yaw: number }>({ climb: 0, yaw: 0 });
   const listening = useRef(false);
   const permission = useRef<'unknown' | 'granted' | 'denied'>('unknown');
   const cdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -80,11 +85,22 @@ export function useTiltFly(enabled: boolean): TiltFly {
     if (D && typeof D.requestPermission !== 'function') permission.current = 'granted';
   }, []);
 
+  // Remap raw device beta/gamma into the USER's frame based on screen
+  // orientation, so "tilt forward/back = climb" and "tilt left/right = yaw"
+  // hold whether the phone is portrait or landscape. We store the remapped
+  // values as {beta: climbAxis, gamma: yawAxis} so the rest of the hook is
+  // orientation-agnostic. Greg 2026-07-12.
   const onOrient = useCallback((e: DeviceOrientationEvent) => {
-    const beta = e.beta ?? 0, gamma = e.gamma ?? 0;
-    const s = smooth.current ?? { beta, gamma };
-    s.beta = s.beta + (beta - s.beta) * EMA;
-    s.gamma = s.gamma + (gamma - s.gamma) * EMA;
+    const rawB = e.beta ?? 0, rawG = e.gamma ?? 0;
+    const angle = (typeof window !== 'undefined'
+      && (window.screen?.orientation?.angle ?? (window as unknown as { orientation?: number }).orientation ?? 0)) || 0;
+    let climbAxis = rawB, yawAxis = rawG;
+    if (angle === 90) { climbAxis = -rawG; yawAxis = rawB; }        // rotated left
+    else if (angle === 270 || angle === -90) { climbAxis = rawG; yawAxis = -rawB; } // rotated right
+    else if (angle === 180) { climbAxis = -rawB; yawAxis = -rawG; } // upside down
+    const s = smooth.current ?? { beta: climbAxis, gamma: yawAxis };
+    s.beta = s.beta + (climbAxis - s.beta) * EMA;
+    s.gamma = s.gamma + (yawAxis - s.gamma) * EMA;
     smooth.current = s;
   }, []);
 
@@ -149,9 +165,13 @@ export function useTiltFly(enabled: boolean): TiltFly {
         if (YAW_INVERT) dGamma = -dGamma;
         const climb = shape(dBeta);
         const yaw = shape(dGamma);
+        live.current.climb = climb;
+        live.current.yaw = yaw;
         f.rt = climb > 0 ? climb : 0;
         f.lt = climb < 0 ? -climb : 0;
         f.rx = clamp(f.rx + yaw); // tilt-yaw folds onto the (usually 0) rx
+      } else {
+        live.current.climb = 0; live.current.yaw = 0;
       }
       pushTouchFrame(f);
       raf = requestAnimationFrame(loop);
@@ -168,5 +188,5 @@ export function useTiltFly(enabled: boolean): TiltFly {
     if (cdTimer.current) clearTimeout(cdTimer.current);
   }, [onOrient]);
 
-  return { supported, countdown, calibrated, enabled, setStickAxes, calibrate };
+  return { supported, countdown, calibrated, enabled, setStickAxes, calibrate, live };
 }

@@ -2166,6 +2166,18 @@ gmp-popover-3d-element[plot-card-popover],
 /* ── MOBILE TOUCH FLIGHT — portrait: condensed landscape map on top,
       zone pad below (the YouTube-video-over-controls layout Greg locked) ── */
 :root { --tzp-h: 42vh; }
+/* LANDSCAPE: the viewport is short + wide. The control band can't eat 42% of
+   a ~390px height, so slim it and let the sticks sit in the bottom corners
+   with the map filling the width. The edge indicator + burger reflow for
+   free (they're viewport-anchored). Greg 2026-07-12. */
+@media (orientation: landscape) and (max-height: 500px) {
+  :root { --tzp-h: 168px; }
+  .fc-sticks { align-items: flex-end; padding: 4px 26px 10px; }
+  .fc-sticks--one { justify-content: flex-start; padding-left: 30px; }
+  /* the calibration card shouldn't dominate a short screen */
+  .mfh-tiltcal__card { padding: 14px 22px; }
+  .mfh-tiltcal__num { font-size: 34px; }
+}
 /* FIXED 2026-07-11 (diagnosed live via phone CDP): the map was rendering at
    ZERO height on mobile. --tzp-h (42vh) was subtracted on THREE nested
    absolute levels (body → region → frame), each inside the already-shrunk
@@ -2253,6 +2265,53 @@ gmp-popover-3d-element[plot-card-popover],
 }
 /* the controls region fills the sheet */
 .mfh-controls { position: relative; flex: 1; padding-top: 12px; }
+
+/* ── TiltEdgeIndicator (.tei) — "liquid border" tilt feedback ───────────
+   Thin edge lines that grow from center to show live climb/turn. Nearly
+   invisible at neutral; extend + brighten proportionally as you tilt.
+   Driven by CSS vars set per-frame: --tei-climb / --tei-yaw (−1..1), their
+   *-abs magnitudes, and *-sign. memory/project_tilt_to_fly */
+.tei {
+  position: fixed; inset: 0; z-index: 55; pointer-events: none;
+  --tei-climb: 0; --tei-climb-abs: 0; --tei-climb-sign: 1;
+  --tei-yaw: 0;   --tei-yaw-abs: 0;   --tei-yaw-sign: 1;
+  --tei-ink: 19,73,212;   /* brand blue */
+  --tei-thick: 3px;
+}
+.tei-edge { position: absolute; overflow: visible; }
+.tei-edge--left   { left: 0;  top: 0; bottom: 0; width: var(--tei-thick); }
+.tei-edge--right  { right: 0; top: 0; bottom: 0; width: var(--tei-thick); }
+.tei-edge--top    { top: 0;    left: 0; right: 0; height: var(--tei-thick); }
+.tei-edge--bottom { bottom: 0; left: 0; right: 0; height: var(--tei-thick); }
+
+/* the fill sits centered on its edge and grows outward from center. A tiny
+   neutral nub (the min in max()) keeps it barely visible at rest. */
+.tei-fill {
+  position: absolute; border-radius: 999px;
+  background: rgba(var(--tei-ink), calc(0.12 + 0.75 * var(--tei-mag, 0)));
+  box-shadow: 0 0 10px rgba(var(--tei-ink), calc(0.4 * var(--tei-mag, 0)));
+  transition: none;
+}
+/* VERTICAL edges (climb): fill grows from vertical center. climb +1 (up) →
+   occupy center→top; climb −1 (down) → center→bottom. Anchor top:50%, then
+   translateY 0% (down) or −100% (up) via the sign. */
+.tei-fill--v {
+  --tei-mag: var(--tei-climb-abs);
+  left: 0; right: 0; width: 100%;
+  height: max(9px, calc(var(--tei-climb-abs) * 50%));
+  top: 50%;
+  transform: translateY(calc((var(--tei-climb-sign) + 1) * -50%));
+}
+/* HORIZONTAL edges (turn): fill grows from horizontal center. yaw +1 (right)
+   → center→right (translateX 0); yaw −1 (left) → center→left (translateX
+   −100%). Anchor left:50%. */
+.tei-fill--h {
+  --tei-mag: var(--tei-yaw-abs);
+  top: 0; bottom: 0; height: 100%;
+  width: max(9px, calc(var(--tei-yaw-abs) * 50%));
+  left: 50%;
+  transform: translateX(calc((var(--tei-yaw-sign) - 1) * 50%));
+}
 
 /* TILT CALIBRATION overlay — the 3·2·1·Set "set your level" countdown, shown
    center-screen over the map while calibrating. Climb comes from tilt-fly

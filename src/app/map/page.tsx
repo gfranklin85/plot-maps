@@ -487,6 +487,16 @@ export default function MapPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pageGamepadConnected]);
 
+  // FIX 2026-07-11 (found via live phone CDP): when touch flight is active the
+  // synthetic pad IS present, but the real gamepadconnected event can be
+  // missed (fired before the listener mounts). Without pageGamepadConnected,
+  // flightMode stays 'overhead' and MapView3D's pad loop is DISABLED
+  // (gamepadEnabled = flightMode==='airplane') — the on-screen sticks moved
+  // NOTHING. Force it true so the loop reads the touch pad and the camera flies.
+  useEffect(() => {
+    if (touchFly) setPageGamepadConnected(true);
+  }, [touchFly]);
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
 

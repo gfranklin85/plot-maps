@@ -10,7 +10,7 @@ import { Lead, LeadStatus, Priority } from "@/types";
 import MapDynamic from "@/components/map/MapDynamic";
 import type { PinMode } from "@/components/map/MapView";
 import StreetViewProspecting from "@/components/map/StreetViewProspecting";
-import TouchJoysticks from "@/components/map/TouchJoysticks";
+import MobileFlightHUD from "@/components/map/MobileFlightHUD";
 import { installTouchPad } from "@/lib/touchPadBridge";
 import ProspectSearch from "@/components/dashboard/ProspectSearch";
 import { PRIORITIES } from "@/lib/constants";
@@ -2144,9 +2144,11 @@ export default function MapPage() {
           Drives the injected touch gamepad → Plot's flight loop. Tap the
           map to select (a real touch = a trusted gmp-click). B closes a
           card. memory/project_phone_as_controller */}
-      {touchFly && !walkMode && (
+      {touchFly && (
         <div className="map-touchpad">
-          <TouchJoysticks
+          <MobileFlightHUD
+            walkMode={walkMode}
+            onSetWalk={(walk) => mapModeDispatch({ type: walk ? 'ENTER_WALK' : 'ENTER_3D' })}
             onButton={(k, downNow) => {
               if (k === 'b' && downNow && selectedLead) setSelectedLead(null);
             }}

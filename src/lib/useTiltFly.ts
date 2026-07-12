@@ -2,42 +2,38 @@
 
 // ── useTiltFly ────────────────────────────────────────────────────────
 //
-// Fly the 3D map by TILTING the phone (a yoke), staying seated. Absolute
-// phone POSITION is unmeasurable (accelerometer integration drifts in ~1s),
-// but DeviceOrientation (gyro+accel fused, absolute) gives rock-solid tilt.
-// So: tilt forward/back = climb/dip, tilt left/right = bank/yaw.
+// Fly the 3D map's CLIMB by TILTING the phone forward/back, hands already on
+// the sticks. Absolute phone POSITION is unmeasurable (accelerometer drifts in
+// ~1s); DeviceOrientation (gyro+accel fused, absolute) tilt is rock-solid.
 //
-// Model (Greg, 2026-07-11): FULL ATTITUDE + hold-to-tilt DEAD-MAN switch.
-//   • beginHold() captures your CURRENT pose as neutral (recline/flat/propped
-//     all fine) and starts steering.
-//   • while held, tilt from neutral drives the synthetic gamepad via
-//     pushTouchFrame → the existing FLY_3D loop flies, unchanged.
-//   • endHold() writes NEUTRAL and drops calibration, so the NEXT hold
-//     re-captures a fresh neutral. Set the phone down → it stops. No drift.
+// Model (Greg, 2026-07-11 — refined):
+//   • CLIMB ONLY. Tilt forward (nose down) = dip, tilt back (nose up) = climb.
+//     Left/right tilt is ignored (the LOOK stick owns yaw).
+//   • Neutral ("level") is CALIBRATED ONCE via a 3-2-1 countdown, then LOCKED.
+//     It never moves on its own. First stick touch of the session kicks the
+//     first calibration; a double-tap on a stick re-calibrates to your current
+//     pose. No on-screen button.
+//   • ARM by touch: while a thumb is on a stick, tilt drives climb (rides on
+//     top of the stick frame — see FlightControls). Fingers off = paused;
+//     neutral stays put, so re-gripping resumes from the same level.
 //
-// Comfort: dead-zone (small tilts ignored), range normalize (~FULL_DEG = full
-// deflection), low-pass EMA (kills jitter), rate stays gentle. iOS 13+ needs
-// a one-time DeviceOrientationEvent.requestPermission() from a user gesture —
-// beginHold() is called from a pointerdown, so it can carry the grant.
-// memory/project_tilt_to_fly, project_phone_as_controller
+// This hook owns the SENSOR + calibration + climb value. FlightControls reads
+// `climbValue()` inside its frame recompute so climb merges with the stick
+// axes (one writer to pushTouchFrame, no clobber). memory/project_tilt_to_fly
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { NEUTRAL, pushTouchFrame, type PadFrame } from '@/lib/touchPadBridge';
 
-// ── tuning ──
-const DEAD_DEG = 4;     // tilt within ±4° of neutral = no motion (rest jitter)
-const FULL_DEG = 28;    // ~28° tilt from neutral = full deflection
-const EMA = 0.22;       // low-pass smoothing (0..1; lower = smoother/laggier)
-const CLIMB_INVERT = false; // tilt BACK (nose up) climbs; flip if it feels wrong
-const YAW_INVERT = false;   // tilt RIGHT yaws right; flip if it feels wrong
+const DEAD_DEG = 3.5;   // ±3.5° of neutral = no climb (rest jitter)
+const FULL_DEG = 26;    // ~26° tilt from neutral = full climb/dip
+const EMA = 0.2;        // low-pass smoothing
+const INVERT = false;   // nose-up climbs; flip if it feels backwards
+const COUNTDOWN_FROM = 3;
 
-type DOE = DeviceOrientationEvent & {
-  // iOS-only permission gate
+type DOE = typeof DeviceOrientationEvent & {
   requestPermission?: () => Promise<'granted' | 'denied'>;
 };
 
 const clamp = (v: number) => Math.max(-1, Math.min(1, v));
-// dead-zone + normalize + gentle center curve (x*|x|)
 function shape(deg: number): number {
   const a = Math.abs(deg);
   if (a <= DEAD_DEG) return 0;
@@ -47,115 +43,104 @@ function shape(deg: number): number {
 
 export interface TiltFly {
   supported: boolean;
-  permission: 'unknown' | 'granted' | 'denied';
-  active: boolean;
-  /** Live shaped output while held (for a HUD indicator): -1..1 each. */
-  readonly climb: number;
-  readonly bank: number;
-  beginHold: () => Promise<void>;
-  endHold: () => void;
+  /** null = not calibrating; 3..1 = countdown number; 0 = just "Set". */
+  countdown: number | null;
+  /** true once neutral is locked (first calibration done). */
+  calibrated: boolean;
+  /** whether the sticks are currently being touched (tilt-climb armed). */
+  setArmed: (armed: boolean) => void;
+  /** kick the 3-2-1 calibration (first touch, or double-tap re-cal). */
+  calibrate: () => Promise<void>;
+  /** current shaped climb value, -1..1 (read by FlightControls each frame). */
+  climbValue: () => number;
 }
 
 export function useTiltFly(): TiltFly {
   const [supported, setSupported] = useState(false);
-  const [permission, setPermission] = useState<'unknown' | 'granted' | 'denied'>('unknown');
-  const [active, setActive] = useState(false);
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const [calibrated, setCalibrated] = useState(false);
 
-  const neutral = useRef<{ beta: number; gamma: number } | null>(null);
-  const smooth = useRef<{ beta: number; gamma: number } | null>(null);
-  const live = useRef<{ climb: number; bank: number }>({ climb: 0, bank: 0 });
+  const neutralBeta = useRef<number | null>(null); // locked "level"
+  const smoothBeta = useRef<number>(0);            // low-passed live beta
+  const armed = useRef(false);
+  const listening = useRef(false);
+  const permission = useRef<'unknown' | 'granted' | 'denied'>('unknown');
+  const cdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
     setSupported('DeviceOrientationEvent' in window);
-    // Android grants implicitly; iOS needs the requestPermission() gate.
-    const D = (window as unknown as { DeviceOrientationEvent?: DOE }).DeviceOrientationEvent;
-    if (D && typeof (D as unknown as DOE).requestPermission !== 'function') {
-      setPermission('granted');
-    }
+    const D = window.DeviceOrientationEvent as unknown as DOE | undefined;
+    if (D && typeof D.requestPermission !== 'function') permission.current = 'granted';
   }, []);
 
   const onOrient = useCallback((e: DeviceOrientationEvent) => {
-    if (!neutral.current) return;
-    const beta = e.beta ?? 0;   // front/back tilt (deg)
-    const gamma = e.gamma ?? 0;  // left/right tilt (deg)
-    // low-pass
-    const s = smooth.current ?? { beta, gamma };
-    s.beta = s.beta + (beta - s.beta) * EMA;
-    s.gamma = s.gamma + (gamma - s.gamma) * EMA;
-    smooth.current = s;
-
-    let dBeta = s.beta - neutral.current.beta;   // + = nose up (tilt back)
-    let dGamma = s.gamma - neutral.current.gamma; // + = tilt right
-    if (CLIMB_INVERT) dBeta = -dBeta;
-    if (YAW_INVERT) dGamma = -dGamma;
-
-    const climb = shape(dBeta);  // -1..1
-    const bank = shape(dGamma);  // -1..1
-    live.current = { climb, bank };
-
-    // Map to the synthetic pad (same axes the sticks use): climb → rt/lt,
-    // bank/yaw → rx. Everything else neutral while tilting.
-    const f: PadFrame = { ...NEUTRAL };
-    f.rt = climb > 0 ? climb : 0;
-    f.lt = climb < 0 ? -climb : 0;
-    f.rx = bank;
-    pushTouchFrame(f);
+    const beta = e.beta ?? 0; // front/back tilt (deg)
+    smoothBeta.current = smoothBeta.current + (beta - smoothBeta.current) * EMA;
   }, []);
 
-  const beginHold = useCallback(async () => {
-    if (typeof window === 'undefined') return;
-    const D = (window as unknown as { DeviceOrientationEvent?: DOE }).DeviceOrientationEvent;
-    // iOS permission gate (must be called from a user gesture — this is one)
-    if (D && typeof (D as unknown as DOE).requestPermission === 'function' && permission !== 'granted') {
+  const startListening = useCallback(() => {
+    if (listening.current || typeof window === 'undefined') return;
+    window.addEventListener('deviceorientation', onOrient, { passive: true });
+    listening.current = true;
+  }, [onOrient]);
+
+  const ensurePermission = useCallback(async () => {
+    if (permission.current === 'granted') return true;
+    if (permission.current === 'denied') return false;
+    const D = (typeof window !== 'undefined' ? window.DeviceOrientationEvent : undefined) as unknown as DOE | undefined;
+    if (D && typeof D.requestPermission === 'function') {
       try {
-        const res = await (D as unknown as DOE).requestPermission!();
-        setPermission(res);
-        if (res !== 'granted') return;
+        const res = await D.requestPermission!();
+        permission.current = res;
+        return res === 'granted';
       } catch {
-        setPermission('denied');
-        return;
+        permission.current = 'denied';
+        return false;
       }
     }
-    // capture neutral on the first frame after we start listening
-    neutral.current = null;
-    smooth.current = null;
-    const capture = (e: DeviceOrientationEvent) => {
-      const beta = e.beta ?? 0, gamma = e.gamma ?? 0;
-      neutral.current = { beta, gamma };
-      smooth.current = { beta, gamma };
-      window.removeEventListener('deviceorientation', capture);
-    };
-    window.addEventListener('deviceorientation', capture, { passive: true });
-    window.addEventListener('deviceorientation', onOrient, { passive: true });
-    setActive(true);
-  }, [onOrient, permission]);
+    permission.current = 'granted';
+    return true;
+  }, []);
 
-  const endHold = useCallback(() => {
+  // 3-2-1 countdown → lock neutral to the current (settled) pose at "Set".
+  const calibrate = useCallback(async () => {
     if (typeof window === 'undefined') return;
-    window.removeEventListener('deviceorientation', onOrient);
-    neutral.current = null;
-    smooth.current = null;
-    live.current = { climb: 0, bank: 0 };
-    pushTouchFrame({ ...NEUTRAL }); // dead-man: freeze immediately
-    setActive(false);
-  }, [onOrient]);
+    if (!(await ensurePermission())) return;
+    startListening();
+    if (cdTimer.current) clearTimeout(cdTimer.current);
 
-  // safety: on unmount, release
+    let n = COUNTDOWN_FROM;
+    setCountdown(n);
+    const tick = () => {
+      n -= 1;
+      if (n > 0) {
+        setCountdown(n);
+        cdTimer.current = setTimeout(tick, 1000);
+      } else {
+        // "Set": lock neutral to the current smoothed beta.
+        neutralBeta.current = smoothBeta.current;
+        setCalibrated(true);
+        setCountdown(0);                       // flash "Set"
+        cdTimer.current = setTimeout(() => setCountdown(null), 700);
+      }
+    };
+    cdTimer.current = setTimeout(tick, 1000);
+  }, [ensurePermission, startListening]);
+
+  const setArmed = useCallback((a: boolean) => { armed.current = a; }, []);
+
+  const climbValue = useCallback(() => {
+    if (!armed.current || neutralBeta.current == null) return 0;
+    let d = smoothBeta.current - neutralBeta.current; // + = nose up
+    if (INVERT) d = -d;
+    return shape(d);
+  }, []);
+
   useEffect(() => () => {
-    if (typeof window !== 'undefined') {
-      window.removeEventListener('deviceorientation', onOrient);
-      pushTouchFrame({ ...NEUTRAL });
-    }
+    if (typeof window !== 'undefined') window.removeEventListener('deviceorientation', onOrient);
+    if (cdTimer.current) clearTimeout(cdTimer.current);
   }, [onOrient]);
 
-  return {
-    supported,
-    permission,
-    active,
-    get climb() { return live.current.climb; },
-    get bank() { return live.current.bank; },
-    beginHold,
-    endHold,
-  };
+  return { supported, countdown, calibrated, setArmed, calibrate, climbValue };
 }

@@ -72,30 +72,23 @@ export default function MobileFlightHUD() {
       {/* ── BOTTOM CONTROLS (transparent over the full-bleed map) ── */}
       <div className="mfh">
         <div className="mfh-controls">
-          <FlightControls style="sticks" />
-
-          {/* HOLD-TO-TILT pad (center, where the slider used to be). Hold it
-              and tilt the phone to fly (forward/back = climb/dip, left/right
-              = bank). Dead-man: release = freeze + re-neutral. Only shown
-              where the sensor exists and permission isn't denied. */}
-          {tilt.supported && tilt.permission !== 'denied' && (
-            <button
-              className={`mfh-tilt ${tilt.active ? 'is-active' : ''}`}
-              aria-label="Hold to tilt-fly"
-              onPointerDown={(e) => {
-                e.preventDefault(); e.stopPropagation();
-                try { (e.target as HTMLElement).setPointerCapture(e.pointerId); } catch { /* ignore */ }
-                void tilt.beginHold();
-              }}
-              onPointerUp={(e) => { e.stopPropagation(); tilt.endHold(); }}
-              onPointerCancel={() => tilt.endHold()}
-            >
-              <MaterialIcon icon="screen_rotation_alt" className="text-[22px]" />
-              <span className="mfh-tilt__lbl">{tilt.active ? 'TILTING' : 'HOLD · TILT'}</span>
-            </button>
-          )}
+          <FlightControls style="sticks" tilt={tilt} />
         </div>
       </div>
+
+      {/* ── TILT CALIBRATION countdown ("set your level": 3 · 2 · 1 · Set) ──
+          Fires on first stick touch, or a double-tap on a knob. */}
+      {tilt.countdown !== null && (
+        <div className="mfh-tiltcal">
+          <div className="mfh-tiltcal__card">
+            <MaterialIcon icon="screen_rotation_alt" className="text-[26px]" />
+            <div className="mfh-tiltcal__num">{tilt.countdown === 0 ? 'Set' : tilt.countdown}</div>
+            <div className="mfh-tiltcal__hint">
+              {tilt.countdown === 0 ? 'Level locked — tilt to climb' : 'Hold your phone comfortably…'}
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

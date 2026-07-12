@@ -2243,24 +2243,23 @@ gmp-popover-3d-element[plot-card-popover],
 /* the controls region fills the sheet */
 .mfh-controls { position: relative; flex: 1; padding-top: 12px; }
 
-/* HOLD-TO-TILT pad — centered in the freed middle (where the slider was).
-   Translucent glass so the map still reads; lights up while tilting. */
-.mfh-tilt {
-  position: absolute; left: 50%; bottom: 40px; transform: translateX(-50%);
-  display: flex; flex-direction: column; align-items: center; gap: 4px;
-  width: 92px; padding: 12px 8px 10px; border-radius: 20px; color: #1349d4;
-  background: rgba(255,255,255,0.32);
-  border: 1.5px solid rgba(255,255,255,0.7);
-  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
-  box-shadow: 0 8px 22px -10px rgba(20,50,120,0.4);
-  touch-action: none; transition: background .12s, transform .08s;
+/* TILT CALIBRATION overlay — the 3·2·1·Set "set your level" countdown, shown
+   center-screen over the map while calibrating. Climb comes from tilt-fly
+   (memory/project_tilt_to_fly); this is how you lock neutral. */
+.mfh-tiltcal {
+  position: fixed; inset: 0; z-index: 65; display: grid; place-items: center;
+  pointer-events: none; background: rgba(10,20,40,0.18);
 }
-.mfh-tilt:active { transform: translateX(-50%) scale(0.96); }
-.mfh-tilt.is-active {
-  color: #fff; background: radial-gradient(circle at 50% 36%, #4d84ea, #1349d4);
-  border-color: rgba(255,255,255,0.9); box-shadow: 0 10px 26px -8px rgba(19,73,212,0.6);
+.mfh-tiltcal__card {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 22px 30px; border-radius: 24px; color: #1349d4;
+  background: rgba(255,255,255,0.9); backdrop-filter: saturate(160%) blur(16px); -webkit-backdrop-filter: saturate(160%) blur(16px);
+  border: 1.5px solid rgba(255,255,255,0.95); box-shadow: 0 20px 50px -18px rgba(20,50,120,0.55);
+  animation: tiltcalPop .16s cubic-bezier(0.22,1,0.36,1);
 }
-.mfh-tilt__lbl { font-size: 9.5px; font-weight: 800; letter-spacing: 1px; }
+.mfh-tiltcal__num { font-size: 46px; font-weight: 900; line-height: 1; letter-spacing: -1px; }
+.mfh-tiltcal__hint { font-size: 12px; font-weight: 700; color: rgba(19,73,212,0.6); }
+@keyframes tiltcalPop { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: none; } }
 
 /* ── FlightControls (glass, Greg's mockup 2026-07-11) ──────────────────
    PAN joystick · CLIMB/DIP slider · LOOK joystick, translucent glass in the
@@ -2282,15 +2281,6 @@ gmp-popover-3d-element[plot-card-popover],
   box-shadow: inset 0 2px 12px rgba(255,255,255,0.5), inset 0 -3px 12px rgba(19,73,212,0.1), 0 8px 22px -10px rgba(20,50,120,0.35);
   display: grid; place-items: center;
 }
-/* PAN base doubles as the CLIMB ring — a faint dashed outer ring hints the
-   draggable ring; it lights up while climbing/dipping. */
-.fc-base--ring { border-style: solid; }
-.fc-base--ring::before {
-  content: ''; position: absolute; inset: 9px; border-radius: 50%;
-  border: 1.5px dashed rgba(19,73,212,0.28); pointer-events: none;
-  transition: border-color .12s;
-}
-.fc-base--climbing::before { border-color: rgba(19,73,212,0.7); }
 .fc-arrow { position: absolute; color: rgba(19,73,212,0.5); font-size: 22px !important; pointer-events: none; }
 .fc-arrow--up { top: 6px; left: 50%; transform: translateX(-50%); }
 .fc-arrow--down { bottom: 6px; left: 50%; transform: translateX(-50%); }

@@ -19,6 +19,7 @@
 import { useState } from 'react';
 import MaterialIcon from '@/components/ui/MaterialIcon';
 import FlightControls from './FlightControls';
+import { useTiltFly } from '@/lib/useTiltFly';
 
 const NAV = [
   { href: '/home', icon: 'home', label: 'Home' },
@@ -32,6 +33,7 @@ const NAV = [
 
 export default function MobileFlightHUD() {
   const [menu, setMenu] = useState(false);
+  const tilt = useTiltFly();
 
   return (
     <>
@@ -71,6 +73,27 @@ export default function MobileFlightHUD() {
       <div className="mfh">
         <div className="mfh-controls">
           <FlightControls style="sticks" />
+
+          {/* HOLD-TO-TILT pad (center, where the slider used to be). Hold it
+              and tilt the phone to fly (forward/back = climb/dip, left/right
+              = bank). Dead-man: release = freeze + re-neutral. Only shown
+              where the sensor exists and permission isn't denied. */}
+          {tilt.supported && tilt.permission !== 'denied' && (
+            <button
+              className={`mfh-tilt ${tilt.active ? 'is-active' : ''}`}
+              aria-label="Hold to tilt-fly"
+              onPointerDown={(e) => {
+                e.preventDefault(); e.stopPropagation();
+                try { (e.target as HTMLElement).setPointerCapture(e.pointerId); } catch { /* ignore */ }
+                void tilt.beginHold();
+              }}
+              onPointerUp={(e) => { e.stopPropagation(); tilt.endHold(); }}
+              onPointerCancel={() => tilt.endHold()}
+            >
+              <MaterialIcon icon="screen_rotation_alt" className="text-[22px]" />
+              <span className="mfh-tilt__lbl">{tilt.active ? 'TILTING' : 'HOLD · TILT'}</span>
+            </button>
+          )}
         </div>
       </div>
     </>

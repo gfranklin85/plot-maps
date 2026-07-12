@@ -2334,14 +2334,18 @@ export default function MapPage() {
         <Mobile3DCoachOverlay onDismiss={dismiss3DCoach} />
       )}
 
-      {/* Expand map — hides mobile browser chrome */}
-      <button
-        onClick={expandMap}
-        className="md:hidden fixed bottom-20 right-4 z-30 w-9 h-9 rounded-full bg-surface-container/80 backdrop-blur border border-card-border shadow-lg flex items-center justify-center text-on-surface-variant active:scale-90 transition-transform"
-        aria-label="Expand map"
-      >
-        <MaterialIcon icon="fullscreen" className="text-[20px]" />
-      </button>
+      {/* Expand map — hides mobile browser chrome. Hidden in touch-fly: the
+          map is already full-bleed and the button would sit on the LOOK
+          stick. */}
+      {!touchFly && (
+        <button
+          onClick={expandMap}
+          className="md:hidden fixed bottom-20 right-4 z-30 w-9 h-9 rounded-full bg-surface-container/80 backdrop-blur border border-card-border shadow-lg flex items-center justify-center text-on-surface-variant active:scale-90 transition-transform"
+          aria-label="Expand map"
+        >
+          <MaterialIcon icon="fullscreen" className="text-[20px]" />
+        </button>
+      )}
 
       {/* Market-request prompt — graceful state for unsupported markets
           and geocoder misses arriving from the search-first landing. */}

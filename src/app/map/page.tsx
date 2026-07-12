@@ -80,7 +80,7 @@ const FILTER_TABS: { label: string; key: string; statuses: LeadStatus[] }[] = [
 
 export default function MapPage() {
   const { profile, updateProfile } = useProfile();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("all");
@@ -1095,6 +1095,23 @@ export default function MapPage() {
   // Live altitude from the 3D path's per-frame loop. Drives the
   // AltitudeGauge HUD. Reported ~5×/sec from MapView3D.
   const [currentAltitudeM, setCurrentAltitudeM] = useState<number>(0);
+
+  // ── BLANK-MAP WATCHDOG (mobile stale-session fix, 2026-07-11) ────────
+  // Diagnosed live: a half-dead Supabase session let middleware render /map
+  // but the client never hydrated, stranding the user on the white loading
+  // pulse. auth-context now clears a bad token; this is the belt-and-braces:
+  // if auth has RESOLVED to no user (loading done, user null), don't sit on a
+  // blank gated map — send them to a clean sign-in that returns to the map.
+  useEffect(() => {
+    if (authLoading || user) return;
+    const t = setTimeout(() => {
+      if (!user) {
+        const here = window.location.pathname + window.location.search;
+        window.location.href = `/?next=${encodeURIComponent(here)}`;
+      }
+    }, 1200);
+    return () => clearTimeout(t);
+  }, [authLoading, user]);
 
   // ── PlotMaps SET — the camera run-through ───────────────────────────
   // ?territory=<uuid>&set=1 → fetch the auto-generated mission sequence

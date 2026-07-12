@@ -2,23 +2,23 @@
 
 // ── MobileFlightHUD ───────────────────────────────────────────────────
 //
-// The mobile flight HUD, leaned all the way out (Greg, 2026-07-11). Two
-// pieces, nothing else:
+// The mobile flight HUD, leaned all the way out (Greg, 2026-07-11/12):
 //
-//   • a single HAMBURGER button (top-left) → a slide-down menu holding
-//     SEARCH + the app nav. The always-on search bar was eating the map,
-//     so it lives in the menu now.
-//   • the BOTTOM CONTROLS: the two sticks (PAN · CLIMB/DIP · LOOK),
-//     transparent so the map shows through.
+//   • a single HAMBURGER (top-left) → menu with SEARCH, the app nav, and the
+//     FLIGHT STYLE picker (kept off the map surface, remembered per device).
+//   • the BOTTOM CONTROLS: FlightControls in the chosen style, transparent
+//     over the full-bleed map.
 //
-// SELECT is just TAP — people know to tap. A real touch on the map fires a
-// trusted gmp-click → the parcel awakens, the blue polygon draws, and the
-// property card opens (same path desktop uses). No reticle, no laser, no
-// shoot button, no mode chip. memory/project_phone_as_controller
+// Flight styles: 'two-stick' (PAN + LOOK) · 'one-hand' (one PAN stick + TILT
+// for climb/turn, hands-free after a touch calibration) · 'zones' (zone pad).
+//
+// SELECT is just TAP — a real touch on the map fires a trusted gmp-click → the
+// parcel awakens, the blue polygon draws, the card opens.
+// memory/project_phone_as_controller, project_tilt_to_fly
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import MaterialIcon from '@/components/ui/MaterialIcon';
-import FlightControls from './FlightControls';
+import FlightControls, { type FlightStyle } from './FlightControls';
 import { useTiltFly } from '@/lib/useTiltFly';
 
 const NAV = [
@@ -31,9 +31,31 @@ const NAV = [
   { href: '/settings', icon: 'settings', label: 'Settings' },
 ];
 
+const STYLES: { id: FlightStyle; icon: string; label: string; sub: string }[] = [
+  { id: 'two-stick', icon: 'sports_esports', label: 'Two sticks', sub: 'Pan + Look' },
+  { id: 'one-hand', icon: 'front_hand', label: 'One hand', sub: 'Pan + tilt to climb & turn' },
+  { id: 'zones', icon: 'grid_view', label: 'Zone pad', sub: 'Full-width strips' },
+];
+
+const LS_STYLE = 'plotmaps.mobileFlightStyle';
+
 export default function MobileFlightHUD() {
   const [menu, setMenu] = useState(false);
-  const tilt = useTiltFly();
+  const [flightStyle, setFlightStyle] = useState<FlightStyle>('two-stick');
+
+  useEffect(() => {
+    try {
+      const s = localStorage.getItem(LS_STYLE);
+      if (s === 'two-stick' || s === 'one-hand' || s === 'zones') setFlightStyle(s);
+    } catch { /* ignore */ }
+  }, []);
+  const chooseStyle = (s: FlightStyle) => {
+    setFlightStyle(s);
+    try { localStorage.setItem(LS_STYLE, s); } catch { /* ignore */ }
+  };
+
+  // Tilt-fly is active only in one-hand style; its RAF owns the pad frame then.
+  const tilt = useTiltFly(flightStyle === 'one-hand');
 
   return (
     <>
@@ -42,7 +64,7 @@ export default function MobileFlightHUD() {
         <MaterialIcon icon="menu" className="text-[22px]" />
       </button>
 
-      {/* ── slide-down menu: search + nav ── */}
+      {/* ── slide-down menu: search + nav + flight style ── */}
       {menu && (
         <div className="mtb-menu" onClick={() => setMenu(false)}>
           <div className="mtb-menu__sheet" onClick={(e) => e.stopPropagation()}>
@@ -65,6 +87,23 @@ export default function MobileFlightHUD() {
                 <span>{n.label}</span>
               </a>
             ))}
+
+            {/* Flight style picker */}
+            <div className="mtb-menu__section">Flying</div>
+            {STYLES.map((s) => (
+              <button
+                key={s.id}
+                className={`mtb-menu__item mtb-menu__style ${flightStyle === s.id ? 'is-on' : ''}`}
+                onClick={() => { chooseStyle(s.id); setMenu(false); }}
+              >
+                <MaterialIcon icon={s.icon} className="text-[20px]" />
+                <span className="mtb-menu__style-txt">
+                  <span>{s.label}</span>
+                  <span className="mtb-menu__style-sub">{s.sub}</span>
+                </span>
+                {flightStyle === s.id && <MaterialIcon icon="check" className="text-[18px] mtb-menu__check" />}
+              </button>
+            ))}
           </div>
         </div>
       )}
@@ -72,19 +111,18 @@ export default function MobileFlightHUD() {
       {/* ── BOTTOM CONTROLS (transparent over the full-bleed map) ── */}
       <div className="mfh">
         <div className="mfh-controls">
-          <FlightControls style="sticks" tilt={tilt} />
+          <FlightControls flightStyle={flightStyle} tilt={tilt} />
         </div>
       </div>
 
-      {/* ── TILT CALIBRATION countdown ("set your level": 3 · 2 · 1 · Set) ──
-          Fires on first stick touch, or a double-tap on a knob. */}
+      {/* ── TILT CALIBRATION countdown (one-hand): 3 · 2 · 1 · Set ── */}
       {tilt.countdown !== null && (
         <div className="mfh-tiltcal">
           <div className="mfh-tiltcal__card">
             <MaterialIcon icon="screen_rotation_alt" className="text-[26px]" />
             <div className="mfh-tiltcal__num">{tilt.countdown === 0 ? 'Set' : tilt.countdown}</div>
             <div className="mfh-tiltcal__hint">
-              {tilt.countdown === 0 ? 'Level locked — tilt to climb' : 'Hold your phone comfortably…'}
+              {tilt.countdown === 0 ? 'Level locked — tilt to fly' : 'Hold your phone comfortably…'}
             </div>
           </div>
         </div>

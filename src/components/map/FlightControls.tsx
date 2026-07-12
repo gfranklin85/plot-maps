@@ -2,21 +2,22 @@
 
 // ── FlightControls ────────────────────────────────────────────────────
 //
-// The mobile flight-control panel (Greg's mockups, 2026-07-11). Translucent
-// glass, PlotMaps palette. Two styles:
+// The mobile flight controls. Translucent glass, PlotMaps palette. The
+// FLIGHT STYLE (chosen in the hamburger, remembered per device) decides the
+// layout:
 //
-//   • 'sticks': PAN joystick (left, strafe/forward) · LOOK joystick (right,
-//     yaw/pitch). CLIMB comes from TILT-FLY (tilt the phone forward/back)
-//     while a thumb is on a stick — no center slider, no ring (both removed;
-//     they sat in the sightline / conflicted). memory/project_tilt_to_fly.
-//   • 'zones' (the original zone pad, kept — it works well).
+//   • 'two-stick': PAN (left, strafe/forward) + LOOK (right, yaw/pitch).
+//     Classic two-thumb. FlightControls writes the pad frame; tilt is off.
+//   • 'one-hand': a SINGLE PAN stick (thumb = strafe/forward). CLIMB + YAW
+//     come from TILTING the phone (tilt-fly), hands-free after a touch
+//     calibration. FlightControls only PUBLISHES the stick axes to the tilt
+//     hook (setStickAxes); the tilt hook's RAF owns the pad frame and merges
+//     stick + tilt. memory/project_tilt_to_fly.
+//   • 'zones': the original zone pad (kept — flies well).
 //
-// Tilt calibration (a 3-2-1 "set your level" countdown, LOCKED after): first
-// stick touch of the session kicks it once; a DOUBLE-TAP on a knob re-runs it
-// for your current pose. Neutral never moves on its own.
-//
-// Both write the synthetic gamepad via pushTouchFrame() so Plot's existing
-// flight loop drives FLY_3D unchanged. memory/project_phone_as_controller.
+// Tilt calibration (one-hand): DOUBLE-TAP the PAN knob → a 3·2·1·Set countdown
+// locks "level" to your current pose. After that tilt is always live until you
+// re-calibrate. memory/project_phone_as_controller.
 
 import { useCallback, useEffect, useRef } from 'react';
 import MaterialIcon from '@/components/ui/MaterialIcon';
@@ -25,19 +26,17 @@ import type { TiltFly } from '@/lib/useTiltFly';
 import TouchZonePad from './TouchZonePad';
 
 const KNOB_RANGE = 42;      // px knob deflection = full stick
-const DOUBLE_TAP_MS = 320;  // knob double-tap window → re-calibrate tilt
+const DOUBLE_TAP_MS = 320;  // knob double-tap window → (re)calibrate tilt
 
-export type ControlStyle = 'sticks' | 'zones';
+export type FlightStyle = 'two-stick' | 'one-hand' | 'zones';
 
 interface Props {
-  style: ControlStyle;
+  flightStyle: FlightStyle;
   tilt?: TiltFly;
 }
 
-// ── the stick panel (mockup) ──
-// PAN (left) · LOOK (right). Climb = tilt-fly while a stick is held. No A/B
-// (selection is tap), no center slider, no ring (Greg, 2026-07-11).
-function StickPanel({ tilt }: { tilt?: TiltFly }) {
+// ── stick panel: two-stick OR one-hand (tilt) ──
+function StickPanel({ oneHand, tilt }: { oneHand: boolean; tilt?: TiltFly }) {
   const frame = useRef<PadFrame>({ ...NEUTRAL });
   const root = useRef<HTMLDivElement | null>(null);
   const leftBase = useRef<HTMLDivElement | null>(null);
@@ -45,50 +44,35 @@ function StickPanel({ tilt }: { tilt?: TiltFly }) {
   const leftKnob = useRef<HTMLDivElement | null>(null);
   const rightKnob = useRef<HTMLDivElement | null>(null);
   const grabs = useRef<Map<number, { side: 'left' | 'right'; cx: number; cy: number }>>(new Map());
-  // stable tilt ref so the pointer effect doesn't re-bind when `tilt` changes
+  const oneHandRef = useRef(oneHand);
+  oneHandRef.current = oneHand;
   const tiltRef = useRef<TiltFly | undefined>(tilt);
   tiltRef.current = tilt;
-  const firstTouchDone = useRef(false);
   const lastTapAt = useRef(0);
 
-  const push = useCallback(() => pushTouchFrame(frame.current), []);
-
-  // Build the frame from the two knobs + the current tilt-climb value.
-  const recompute = useCallback(() => {
-    const f: PadFrame = { ...NEUTRAL };
+  // Publish the current knob axes. In one-hand mode we hand them to the tilt
+  // hook (it owns the frame + merges tilt). In two-stick mode we write the
+  // frame ourselves (tilt off).
+  const publish = useCallback(() => {
     const rd = (el: HTMLDivElement | null) =>
       el ? { x: +(el.dataset.kx || 0), y: +(el.dataset.ky || 0) } : { x: 0, y: 0 };
     const l = rd(leftKnob.current), r = rd(rightKnob.current);
-    f.lx = l.x; f.ly = -l.y;
-    f.rx = r.x; f.ry = -r.y;
-    const climb = tiltRef.current?.climbValue() ?? 0; // +up climb, −down dip
-    f.rt = climb > 0 ? climb : 0;
-    f.lt = climb < 0 ? -climb : 0;
-    frame.current = f; push();
-  }, [push]);
+    const axes = { lx: l.x, ly: -l.y, rx: r.x, ry: -r.y };
+    if (oneHandRef.current) {
+      tiltRef.current?.setStickAxes(axes);
+    } else {
+      const f: PadFrame = { ...NEUTRAL, ...axes };
+      frame.current = f; pushTouchFrame(f);
+    }
+  }, []);
 
   const setKnob = useCallback((side: 'left' | 'right', nx: number, ny: number) => {
     const k = side === 'left' ? leftKnob.current : rightKnob.current;
     if (!k) return;
     k.dataset.kx = String(nx); k.dataset.ky = String(ny);
     k.style.transform = `translate(${(nx * KNOB_RANGE).toFixed(1)}px, ${(-ny * KNOB_RANGE).toFixed(1)}px)`;
-    recompute();
-  }, [recompute]);
-
-  // While ANY thumb is on a stick, tilt-climb is ARMED and re-evaluated every
-  // frame (climb comes from the sensor, not pointer moves), so the frame stays
-  // fresh even when the thumb is still. When all thumbs lift, disarm + settle.
-  useEffect(() => {
-    let raf = 0;
-    const loop = () => {
-      const anyDown = grabs.current.size > 0;
-      tiltRef.current?.setArmed(anyDown);
-      if (anyDown) recompute();
-      raf = requestAnimationFrame(loop);
-    };
-    raf = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(raf);
-  }, [recompute]);
+    publish();
+  }, [publish]);
 
   useEffect(() => {
     const el = root.current; if (!el) return;
@@ -97,9 +81,11 @@ function StickPanel({ tilt }: { tilt?: TiltFly }) {
       const r = base.getBoundingClientRect();
       return { cx: r.left + r.width / 2, cy: r.top + r.height / 2, r };
     };
-    // Hit-test: whichever base the pointer is within → its knob.
+    // Hit-test: whichever base the pointer is within → its knob. (In one-hand
+    // mode only the left base exists.)
     const hit = (x: number, y: number) => {
-      for (const side of ['left', 'right'] as const) {
+      const sides = oneHandRef.current ? (['left'] as const) : (['left', 'right'] as const);
+      for (const side of sides) {
         const c = centerOf(side === 'left' ? leftBase.current : rightBase.current);
         if (!c) continue;
         if (Math.hypot(x - c.cx, y - c.cy) <= c.r.width / 2 + 12)
@@ -112,19 +98,12 @@ function StickPanel({ tilt }: { tilt?: TiltFly }) {
       grabs.current.set(e.pointerId, g);
       try { el.setPointerCapture(e.pointerId); } catch { /* ignore */ }
       setKnob(g.side, clamp((e.clientX - g.cx) / KNOB_RANGE), clamp(-(e.clientY - g.cy) / KNOB_RANGE));
-      // Tilt calibration: DOUBLE-TAP a knob re-calibrates; the very FIRST
-      // touch of the session calibrates once. Neutral never moves otherwise.
-      const now = e.timeStamp || performance.now();
-      const t = tiltRef.current;
-      if (t?.supported) {
-        if (now - lastTapAt.current < DOUBLE_TAP_MS) {
-          void t.calibrate();
-        } else if (!firstTouchDone.current) {
-          firstTouchDone.current = true;
-          void t.calibrate();
-        }
+      // DOUBLE-TAP a knob → (re)calibrate tilt (one-hand mode).
+      if (oneHandRef.current && tiltRef.current?.supported) {
+        const now = e.timeStamp || performance.now();
+        if (now - lastTapAt.current < DOUBLE_TAP_MS) void tiltRef.current.calibrate();
+        lastTapAt.current = now;
       }
-      lastTapAt.current = now;
       e.preventDefault();
     };
     const onMove = (e: PointerEvent) => {
@@ -136,13 +115,6 @@ function StickPanel({ tilt }: { tilt?: TiltFly }) {
       const g = grabs.current.get(e.pointerId); if (!g) return;
       grabs.current.delete(e.pointerId);
       setKnob(g.side, 0, 0);
-      // If that was the last thumb, disarm tilt NOW so climb zeroes this frame
-      // (don't wait for the RAF tick) — the knob recompute above already
-      // re-read climb, so with armed=false it writes rt/lt = 0.
-      if (grabs.current.size === 0) {
-        tiltRef.current?.setArmed(false);
-        setKnob(g.side, 0, 0);
-      }
       e.preventDefault();
     };
     el.addEventListener('pointerdown', onDown, { passive: false });
@@ -157,17 +129,15 @@ function StickPanel({ tilt }: { tilt?: TiltFly }) {
     };
   }, [setKnob]);
 
-  const climbHint = tilt?.supported
-    ? (tilt.calibrated ? '· tilt climbs' : '· 2-tap to set tilt')
+  const hint = oneHand
+    ? (tilt?.calibrated ? '· tilt = climb + turn' : '· 2-tap to set tilt')
     : '';
 
   return (
-    <div ref={root} className="fc-sticks">
-      {/* PAN. Drag the knob to strafe/forward. CLIMB = tilt the phone
-          forward/back while a thumb is on a stick (calibrate: first touch or
-          double-tap a knob). */}
+    <div ref={root} className={`fc-sticks ${oneHand ? 'fc-sticks--one' : ''}`}>
+      {/* PAN (always present) */}
       <div className="fc-stick">
-        <div className="fc-stick__label">PAN <span className="fc-stick__sub">{climbHint}</span></div>
+        <div className="fc-stick__label">PAN <span className="fc-stick__sub">{hint}</span></div>
         <div ref={leftBase} className="fc-base">
           <MaterialIcon icon="keyboard_arrow_up" className="fc-arrow fc-arrow--up" />
           <MaterialIcon icon="keyboard_arrow_down" className="fc-arrow fc-arrow--down" />
@@ -177,23 +147,26 @@ function StickPanel({ tilt }: { tilt?: TiltFly }) {
         </div>
       </div>
 
-      {/* LOOK */}
-      <div className="fc-stick">
-        <div className="fc-stick__label">LOOK</div>
-        <div ref={rightBase} className="fc-base">
-          <MaterialIcon icon="keyboard_arrow_up" className="fc-arrow fc-arrow--up" />
-          <MaterialIcon icon="keyboard_arrow_down" className="fc-arrow fc-arrow--down" />
-          <MaterialIcon icon="keyboard_arrow_left" className="fc-arrow fc-arrow--left" />
-          <MaterialIcon icon="keyboard_arrow_right" className="fc-arrow fc-arrow--right" />
-          <div ref={rightKnob} className="fc-knob" data-kx="0" data-ky="0" />
+      {/* LOOK — only in two-stick mode */}
+      {!oneHand && (
+        <div className="fc-stick">
+          <div className="fc-stick__label">LOOK</div>
+          <div ref={rightBase} className="fc-base">
+            <MaterialIcon icon="keyboard_arrow_up" className="fc-arrow fc-arrow--up" />
+            <MaterialIcon icon="keyboard_arrow_down" className="fc-arrow fc-arrow--down" />
+            <MaterialIcon icon="keyboard_arrow_left" className="fc-arrow fc-arrow--left" />
+            <MaterialIcon icon="keyboard_arrow_right" className="fc-arrow fc-arrow--right" />
+            <div ref={rightKnob} className="fc-knob" data-kx="0" data-ky="0" />
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
 
 const clamp = (v: number) => Math.max(-1, Math.min(1, v));
 
-export default function FlightControls({ style, tilt }: Props) {
-  return style === 'sticks' ? <StickPanel tilt={tilt} /> : <TouchZonePad />;
+export default function FlightControls({ flightStyle, tilt }: Props) {
+  if (flightStyle === 'zones') return <TouchZonePad />;
+  return <StickPanel oneHand={flightStyle === 'one-hand'} tilt={tilt} />;
 }

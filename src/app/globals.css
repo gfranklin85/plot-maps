@@ -2231,6 +2231,17 @@ gmp-popover-3d-element[plot-card-popover],
 .mtb-menu__item:active { background: rgba(19,73,212,0.08); }
 .mtb-menu__item .material-symbols-rounded, .mtb-menu__item .material-icons { color: #1349d4; }
 
+/* flight-style picker inside the menu */
+.mtb-menu__section {
+  margin: 10px 12px 4px; font-size: 11px; font-weight: 800; letter-spacing: 1.5px;
+  text-transform: uppercase; color: rgba(19,73,212,0.5);
+}
+.mtb-menu__style { width: 100%; text-align: left; }
+.mtb-menu__style.is-on { background: rgba(19,73,212,0.08); }
+.mtb-menu__style-txt { display: flex; flex-direction: column; gap: 1px; flex: 1; }
+.mtb-menu__style-sub { font-size: 12px; font-weight: 600; color: rgba(19,73,212,0.55); }
+.mtb-menu__check { color: #1349d4; margin-left: auto; }
+
 /* ── Bottom controls (.mfh) — TRANSPARENT; the map shows through ───────
    Greg 2026-07-11: "make the control panel transparent, we should see the
    map behind it." Only a whisper of tint + a soft top fade so the sticks
@@ -2271,6 +2282,9 @@ gmp-popover-3d-element[plot-card-popover],
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
   padding: 6px 20px 14px;
 }
+/* one-hand style: a single PAN stick, off to one side (thumb-reachable),
+   tilt does climb + turn. Left-anchored for right thumb; the rest is map. */
+.fc-sticks--one { justify-content: flex-start; padding-left: 24px; }
 .fc-stick { display: flex; flex-direction: column; align-items: center; gap: 8px; }
 .fc-stick__label { font-size: 11px; font-weight: 800; letter-spacing: 2px; color: rgba(19,73,212,0.75); }
 .fc-stick__sub { font-weight: 700; letter-spacing: 1px; color: rgba(19,73,212,0.45); }

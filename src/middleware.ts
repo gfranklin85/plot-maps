@@ -39,6 +39,10 @@ const PUBLIC_PATHS = [
   '/join', // shared recruit landing (empty-search growth loop) → routes to /post
   '/seed', // seed-your-area postcards; self-gates its own Google sign-in
   '/deal/', // the buyer's home base hub (make an offer)
+  '/sky', // the Floating Plots motion demo (brand theme test bed)
+  '/lobby/', // the deal room front door — the listing side opens it COLD from a
+             // shared link, no account. The comp-ack gate lives here; it must be
+             // publicly reachable or the wedge can't work. memory: project_deal_room
   '/b/', // shared bullpen link view — openable by anyone (lenders, family, friends)
 ];
 

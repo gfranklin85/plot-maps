@@ -10,7 +10,7 @@ import { Lead, LeadStatus, Priority } from "@/types";
 import MapDynamic from "@/components/map/MapDynamic";
 import type { PinMode } from "@/components/map/MapView";
 import StreetViewProspecting from "@/components/map/StreetViewProspecting";
-import MobileFlightHUD, { type SelectMode } from "@/components/map/MobileFlightHUD";
+import MobileFlightHUD from "@/components/map/MobileFlightHUD";
 import { installTouchPad } from "@/lib/touchPadBridge";
 import ProspectSearch from "@/components/dashboard/ProspectSearch";
 import { PRIORITIES } from "@/lib/constants";
@@ -152,18 +152,6 @@ export default function MapPage() {
   // ZONE PAD. Portrait layout: condensed landscape map on top, zone pad
   // below. memory/project_phone_as_controller, project_2d_work_mode
   const [touchFly, setTouchFly] = useState(false);
-  // Mobile select mode: 'tap' (tap the map → trusted gmp-click) or 'laser'
-  // (fixed reticle + shoot button → fireOpenParcel). Persisted per device.
-  const [selectMode, setSelectMode] = useState<SelectMode>('tap');
-  useEffect(() => {
-    try {
-      const s = localStorage.getItem('plotmaps.mobileSelectMode');
-      if (s === 'tap' || s === 'laser') setSelectMode(s);
-    } catch { /* ignore */ }
-  }, []);
-  useEffect(() => {
-    try { localStorage.setItem('plotmaps.mobileSelectMode', selectMode); } catch { /* ignore */ }
-  }, [selectMode]);
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const coarse = window.matchMedia('(pointer: coarse)').matches;
@@ -2059,7 +2047,7 @@ export default function MapPage() {
               }
             }}
             gamepadEnabled={flightMode === 'airplane' && !debugUnmountController}
-            reticleVisible={!touchFly || selectMode === 'laser'}
+            reticleVisible={!touchFly}
             gamepadActions={gamepadActions}
             gamepadMode={flightMode}
             gamepadDebugSuspendMoveCamera={debugSuspendMoveCamera}
@@ -2171,7 +2159,7 @@ export default function MapPage() {
           card. memory/project_phone_as_controller */}
       {touchFly && (
         <div className="map-touchpad">
-          <MobileFlightHUD selectMode={selectMode} onSelectMode={setSelectMode} />
+          <MobileFlightHUD />
         </div>
       )}
 

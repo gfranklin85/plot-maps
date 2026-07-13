@@ -12,6 +12,7 @@ import type { PinMode } from "@/components/map/MapView";
 import StreetViewProspecting from "@/components/map/StreetViewProspecting";
 import MobileFlightHUD from "@/components/map/MobileFlightHUD";
 import { installTouchPad } from "@/lib/touchPadBridge";
+import { useGestureFlight } from "@/lib/useGestureFlight";
 import ProspectSearch from "@/components/dashboard/ProspectSearch";
 import { PRIORITIES } from "@/lib/constants";
 import { useProfile } from "@/lib/profile-context";
@@ -166,6 +167,7 @@ export default function MapPage() {
     installTouchPad();          // fires gamepadconnected → airplane flight
     setTouchFly(true);
   }, [has3DSupport]);
+
 
   function dismiss3DCoach() {
     setShow3DCoach(false);
@@ -444,6 +446,25 @@ export default function MapPage() {
       alert('3D flight requires NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID with Photorealistic 3D Tiles enabled.');
     },
   });
+
+  // NO-BUTTON gesture flight: own the gesture pad's touch (1=pan · 2=pan+look ·
+  // 3=pan+climb) → synthetic pad. memory/project_tilt_to_fly. The pad element
+  // (.mfh-gesture, rendered by MobileFlightHUD) mounts after this, so poll for
+  // it by id until it exists.
+  const gestureFlight = useGestureFlight(touchFly && !walkMode);
+  const gestureAttach = gestureFlight.attach;
+  useEffect(() => {
+    const on = touchFly && !walkMode;
+    if (!on) { gestureAttach(null); return; }
+    let raf = 0;
+    const tryAttach = () => {
+      const padEl = document.getElementById('mfh-gesture');
+      if (padEl) { gestureAttach(padEl); return; }
+      raf = requestAnimationFrame(tryAttach);
+    };
+    tryAttach();
+    return () => { cancelAnimationFrame(raf); gestureAttach(null); };
+  }, [gestureAttach, touchFly, walkMode]);
 
   // Apply pending "enter 3D" intents raised before the machine existed
   // (mobile default, URL/destination arrivals).

@@ -2292,25 +2292,19 @@ gmp-popover-3d-element[plot-card-popover],
 .mfh-grip__bar { width: 42px; height: 5px; border-radius: 999px; background: rgba(19,73,212,0.5); }
 @media (orientation: landscape) and (max-height: 500px) { .mfh-grip { display: none; } }
 
-/* ── DragLookControls (.dlc) — DEFAULT: two small blue balls only ───────
-   PAN + CLIMB balls. No ring, no label, no slot. LOOK is Google's native map
-   control, so the container passes touches THROUGH (pointer-events:none) and
-   only the balls capture. memory/project_tilt_to_fly */
-.dlc { position: absolute; inset: 0; pointer-events: none; user-select: none; -webkit-user-select: none; }
-.dlc-ball {
-  /* sit in the MEAT of the control zone, clear of the very bottom edge */
-  position: absolute; bottom: 15%; width: 52px; height: 52px; border-radius: 50%;
-  pointer-events: auto; touch-action: none;
-  background: radial-gradient(circle at 50% 36%, rgba(77,132,234,0.95), rgba(19,73,212,0.95));
-  border: 2px solid rgba(255,255,255,0.92); box-shadow: 0 6px 16px -4px rgba(19,73,212,0.6);
-  will-change: transform; transition: box-shadow .1s;
+/* ── GESTURE PAD (.mfh-gesture) — NO BUTTONS; the touches are the control ──
+   The invisible control surface below the letterbox map. We own all touch here
+   (touch-action:none): 1 finger = pan · 2 = pan+look · 3 = pan+climb. A faint
+   legend fades on first touch. memory/project_tilt_to_fly */
+.mfh-gesture { touch-action: none; }
+.mfh-hint {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 8px; pointer-events: none;
+  color: rgba(19,73,212,0.6); font-size: 14px; font-weight: 600; text-align: center;
+  animation: mfhHintFade .5s ease 6s forwards;
 }
-.dlc-ball:active { box-shadow: 0 0 18px -2px rgba(19,73,212,0.85); }
-/* PAN on the handedness side; CLIMB on the opposite side */
-.dlc--right .dlc-ball--pan   { right: 28px; }
-.dlc--right .dlc-ball--climb { left: 28px; }
-.dlc--left  .dlc-ball--pan   { left: 28px; }
-.dlc--left  .dlc-ball--climb { right: 28px; }
+.mfh-hint b { color: #1349d4; font-weight: 800; }
+@keyframes mfhHintFade { to { opacity: 0; visibility: hidden; } }
 
 /* ── TiltEdgeIndicator (.tei) — "liquid border" tilt feedback ───────────
    Thin edge lines that grow from center to show live climb/turn. Nearly

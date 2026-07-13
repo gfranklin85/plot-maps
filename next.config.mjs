@@ -1,5 +1,13 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Dev-only: disable webpack's persistent cache. On Windows, Next 14.2's
+  // dev cache repeatedly drops the app/layout.css chunk after HMR cycles
+  // (page renders with browser-default Times — recurred 3x on 2026-07-12).
+  // Rebuilds are a bit slower; chunk manifests stay consistent.
+  webpack: (config, { dev }) => {
+    if (dev) config.cache = false;
+    return config;
+  },
   async rewrites() {
     // PostHog now points directly at its cloud host (see src/lib/posthog.ts),
     // so the /ingest reverse-proxy rewrites are no longer needed. Kept empty.

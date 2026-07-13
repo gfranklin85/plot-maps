@@ -14,6 +14,7 @@
 //   2. CARDS — close-up asset encapsulating a message (want vs active)
 
 import MaterialIcon from '@/components/ui/MaterialIcon';
+import PlotMark from '@/components/ui/PlotMark';
 
 // the move-arc: a quadratic bezier in viewport-% space, home → destination.
 // Routed HIGH so the arc flies over the copy, never through it.
@@ -64,7 +65,7 @@ export default function SkyPage() {
         {/* the message — the REAL /post copy, word for word */}
         <div className="sky-copy">
           <span className="sky-badge">
-            <MaterialIcon icon="hub" className="text-[14px]" /> Real Estate Interconnector
+            <PlotMark size={15} /> Real Estate Interconnector
           </span>
           <h1 className="font-headline sky-h1">Post your move.</h1>
           <p className="sky-sub">
@@ -157,8 +158,10 @@ export default function SkyPage() {
         .sky-cloud.c1 { left: 6%; top: 8%; width: clamp(110px, 14vw, 220px); animation: sway 26s ease-in-out infinite; }
         .sky-cloud.c2 { right: 14%; top: 44%; width: clamp(80px, 10vw, 150px); opacity: 0.75; animation: sway 34s ease-in-out 4s infinite reverse; }
         .sky-cloud.mid.c3 {
-          left: 40%; bottom: 16%;
-          width: clamp(200px, 23vw, 380px);
+          /* open air low-right, below the destination island — clear of the
+             copy, the cards, and (crucially) not "weather over the house" */
+          right: 6%; bottom: 7%;
+          width: clamp(170px, 19vw, 320px);
           opacity: 0.9;
           animation: sway 44s ease-in-out 8s infinite;
         }
@@ -236,7 +239,7 @@ export default function SkyPage() {
           backdrop-filter: blur(6px);
           box-shadow: 0 20px 48px -32px rgba(20,50,120,0.45);
         }
-        .sky-card-img { width: 170px; margin: -66px auto 4px; display: block; }
+        .sky-card-img { width: 150px; margin: 0 auto 6px; display: block; }
         .bob-a { animation: bob 6s ease-in-out infinite; }
         .bob-b { animation: bob 7s ease-in-out 0.8s infinite; }
         .sky-card-h { font-size: 1.35rem; font-weight: 800; color: var(--plot-ink, #0c1322); }
@@ -267,7 +270,7 @@ export default function SkyPage() {
           .sky-island.home { left: -4%; bottom: 22%; width: 46vw; }
           .sky-island.dest { right: -6%; top: 10%; width: 34vw; }
           .sky-copy { padding-top: 38svh; }
-          .sky-card-img { width: 140px; margin-top: -56px; }
+          .sky-card-img { width: 124px; }
         }
       `}</style>
     </div>

@@ -2165,13 +2165,12 @@ gmp-popover-3d-element[plot-card-popover],
 
 /* ── MOBILE TOUCH FLIGHT — portrait: condensed landscape map on top,
       zone pad below (the YouTube-video-over-controls layout Greg locked) ── */
-:root { --tzp-h: 42vh; }
-/* LANDSCAPE: the viewport is short + wide. The control band can't eat 42% of
-   a ~390px height, so slim it and let the sticks sit in the bottom corners
-   with the map filling the width. The edge indicator + burger reflow for
-   free (they're viewport-anchored). Greg 2026-07-12. */
+:root { --map-h: 35vh; }
+/* LANDSCAPE: the viewport is short + wide. The map fills most of it; the
+   controls sit in a slim strip at the bottom. --map-h grows so the letterbox
+   doesn't dominate. Greg 2026-07-12. */
 @media (orientation: landscape) and (max-height: 500px) {
-  :root { --tzp-h: 168px; }
+  :root { --map-h: calc(100vh - 168px); }
   .fc-sticks { align-items: flex-end; padding: 4px 26px 10px; }
   .fc-sticks--one.fc-sticks--right { padding: 4px 30px 10px 0; }
   .fc-sticks--one.fc-sticks--left { padding: 4px 0 10px 30px; }
@@ -2186,17 +2185,18 @@ gmp-popover-3d-element[plot-card-popover],
    tall (a fully-loaded 3D map, 1012 tiles, invisible). The pad band must be
    carved out ONCE — on the outermost body — and the inner region/frame fill
    their parent (inset:0). */
-/* FULL-BLEED map (Greg 2026-07-11: "I want to see this whole thing"). The
-   map now fills the ENTIRE viewport; the transparent control band floats
-   OVER the bottom of it, so terrain shows through behind the sticks. No
-   bottom carve-out, no letterbox matte. */
-.map-shell--touchfly .map-shell__body { inset: 0; }
+/* PORTRAIT LETTERBOX (Greg 2026-07-12): the map is a YouTube-style landscape
+   box pinned at the TOP (~35vh default — the whole wide shot fits), and the
+   control zone fills the rest BELOW it. The divider sets the split: drag DOWN
+   → --map-h grows → the map opens up bigger; drag up → back toward letterbox.
+   --map-h is the map's height from the top. */
+.map-shell--touchfly .map-shell__body { inset: 0 0 auto 0; height: var(--map-h); }
 .map-shell--touchfly .map-shell__region { inset: 0; }
-.map-shell--touchfly .map-frame { inset: 0; }
+.map-shell--touchfly .map-frame { inset: 0; background: #0a1020; }
 
-/* the control sheet band — now a TRANSLUCENT GLASS sheet (Greg's mockup) */
+/* the control zone fills BELOW the map, to the bottom of the viewport. */
 .map-touchpad {
-  position: absolute; left: 0; right: 0; bottom: 0; height: var(--tzp-h);
+  position: absolute; left: 0; right: 0; top: var(--map-h); bottom: 0;
   z-index: 40;
   touch-action: none; /* we own all touch — no browser scroll/zoom hijack */
   user-select: none; -webkit-user-select: none;
@@ -2271,8 +2271,9 @@ gmp-popover-3d-element[plot-card-popover],
    read against bright terrain; the map is fully visible underneath. */
 .mfh {
   position: absolute; inset: 0; display: flex; flex-direction: column;
-  background: linear-gradient(180deg, rgba(226,238,253,0) 0%, rgba(214,230,250,0.14) 55%, rgba(200,220,248,0.22) 100%);
-  border-top: none;
+  /* the control zone below the map — a soft light panel (not over the map now) */
+  background: linear-gradient(180deg, rgba(232,242,254,0.96) 0%, rgba(216,230,250,0.98) 100%);
+  border-top: 1.5px solid rgba(255,255,255,0.8);
 }
 /* the controls region fills the sheet */
 .mfh-controls { position: relative; flex: 1; padding-top: 12px; }
@@ -2297,7 +2298,8 @@ gmp-popover-3d-element[plot-card-popover],
    only the balls capture. memory/project_tilt_to_fly */
 .dlc { position: absolute; inset: 0; pointer-events: none; user-select: none; -webkit-user-select: none; }
 .dlc-ball {
-  position: absolute; bottom: 20px; width: 46px; height: 46px; border-radius: 50%;
+  /* sit in the MEAT of the control zone, clear of the very bottom edge */
+  position: absolute; bottom: 15%; width: 52px; height: 52px; border-radius: 50%;
   pointer-events: auto; touch-action: none;
   background: radial-gradient(circle at 50% 36%, rgba(77,132,234,0.95), rgba(19,73,212,0.95));
   border: 2px solid rgba(255,255,255,0.92); box-shadow: 0 6px 16px -4px rgba(19,73,212,0.6);

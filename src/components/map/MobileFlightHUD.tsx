@@ -49,10 +49,10 @@ const LS_HAND = 'plotmaps.mobileHand';
 const LS_MAPFRAC = 'plotmaps.mobileMapFrac2';
 type Hand = 'right' | 'left';
 
-// portrait size divider: control-band height as a fraction of viewport.
-// Default is SMALL — the band hugs the bottom, the grip sits low, and you
-// drag it UP to shrink the map into a wider landscape letterbox.
-const MIN_FRAC = 0.18, MAX_FRAC = 0.6, DEFAULT_FRAC = 0.22;
+// portrait size divider: the MAP's height as a fraction of viewport (from the
+// top). Default 0.35 = a YouTube-style landscape letterbox; drag the divider
+// DOWN to open the map bigger, up to shrink back. Controls fill below it.
+const MIN_FRAC = 0.28, MAX_FRAC = 0.75, DEFAULT_FRAC = 0.35;
 
 export default function MobileFlightHUD() {
   const [menu, setMenu] = useState(false);
@@ -71,9 +71,9 @@ export default function MobileFlightHUD() {
     } catch { /* ignore */ }
   }, []);
 
-  // push the size split to the shell so the map re-flows (--tzp-h drives it).
+  // push the split to the shell so the map re-flows (--map-h = map height).
   useEffect(() => {
-    document.documentElement.style.setProperty('--tzp-h', `${(frac * 100).toFixed(1)}vh`);
+    document.documentElement.style.setProperty('--map-h', `${(frac * 100).toFixed(1)}vh`);
     try { localStorage.setItem(LS_MAPFRAC, String(frac)); } catch { /* ignore */ }
   }, [frac]);
 
@@ -92,7 +92,7 @@ export default function MobileFlightHUD() {
   // Google's native control (we don't touch the map's finger gestures).
   const dragLook = useDragLook(flightStyle === 'drag-look');
 
-  // ── portrait size divider (drag up = shrink map to landscape letterbox) ──
+  // ── size divider: drag DOWN → map grows; up → back toward letterbox ──
   const dragging = useRef(false);
   const startY = useRef(0);
   const startFrac = useRef(DEFAULT_FRAC);
@@ -102,7 +102,7 @@ export default function MobileFlightHUD() {
   };
   const onGripMove = (e: React.PointerEvent) => {
     if (!dragging.current) return;
-    const dy = startY.current - e.clientY; // up = grow controls / shrink map
+    const dy = e.clientY - startY.current; // DOWN (dy>0) = grow the map
     setFrac(Math.min(MAX_FRAC, Math.max(MIN_FRAC, startFrac.current + dy / window.innerHeight)));
     e.preventDefault();
   };

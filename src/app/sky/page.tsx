@@ -13,7 +13,7 @@
 //   1. HERO — the common background world (usable across bare pages)
 //   2. CARDS — close-up asset encapsulating a message (want vs active)
 
-import { useEffect, useRef } from 'react';
+import MaterialIcon from '@/components/ui/MaterialIcon';
 
 // the move-arc: a quadratic bezier in viewport-% space, home → destination.
 // Routed HIGH so the arc flies over the copy, never through it.
@@ -28,42 +28,23 @@ function arcDots(n: number) {
 }
 
 export default function SkyPage() {
-  const worldRef = useRef<HTMLDivElement>(null);
-
-  // pointer parallax (desktop) — sets CSS vars the layers read
-  useEffect(() => {
-    const el = worldRef.current;
-    if (!el || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    const onMove = (e: MouseEvent) => {
-      const mx = (e.clientX / window.innerWidth - 0.5) * 2;
-      const my = (e.clientY / window.innerHeight - 0.5) * 2;
-      el.style.setProperty('--mx', mx.toFixed(3));
-      el.style.setProperty('--my', my.toFixed(3));
-    };
-    window.addEventListener('mousemove', onMove);
-    return () => window.removeEventListener('mousemove', onMove);
-  }, []);
-
   const dots = arcDots(11);
 
   return (
     <div className="sky-page">
-      {/* ════ 1. HERO — the world, alive ════ */}
-      <section className="sky-hero" ref={worldRef}>
+      {/* ════ 1. HERO — the world, alive (ambient motion only) ════ */}
+      <section className="sky-hero">
         {/* sunlight */}
         <div className="sky-sun" />
 
-        {/* far clouds — slow sway, each a different shape */}
+        {/* clouds — different shapes, gentle sway; ALL behind the islands */}
         <img src="/sky/cloud.png" alt="" className="sky-cloud far c1" />
         <img src="/sky/cloud-chunky.png" alt="" className="sky-cloud far c2" />
+        <img src="/sky/cloud-long.png" alt="" className="sky-cloud mid c3" />
 
         {/* the two plots */}
-        <div className="sky-par" style={{ ['--depth' as string]: '14' }}>
-          <img src="/sky/island-home.png" alt="" className="sky-island home" />
-        </div>
-        <div className="sky-par" style={{ ['--depth' as string]: '26' }}>
-          <img src="/sky/island-pin.png" alt="" className="sky-island dest" />
-        </div>
+        <img src="/sky/island-home.png" alt="" className="sky-island home" />
+        <img src="/sky/island-pin.png" alt="" className="sky-island dest" />
 
         {/* the move-arc — pulse travels home → destination */}
         {dots.map((d, i) => (
@@ -80,18 +61,27 @@ export default function SkyPage() {
           />
         ))}
 
-        {/* near cloud — crosses the scene */}
-        <img src="/sky/cloud-long.png" alt="" className="sky-cloud near c3" />
-
-        {/* the message */}
+        {/* the message — the REAL /post copy, word for word */}
         <div className="sky-copy">
-          <div className="sky-eyebrow">Real estate interconnector</div>
+          <span className="sky-badge">
+            <MaterialIcon icon="hub" className="text-[14px]" /> Real Estate Interconnector
+          </span>
           <h1 className="font-headline sky-h1">Post your move.</h1>
           <p className="sky-sub">
-            Tell us where you&apos;d go and what you&apos;ve got. We&apos;ll work
-            the map for a real connection.
+            For owners ready to make a move: tell us where you&apos;d go and what
+            you&apos;ve got, and we&apos;ll work the map for a real connection — a direct
+            match or a multi-home move path. Private until you say otherwise.
           </p>
-          <a href="/post" className="sky-cta">Get started</a>
+          <a href="/post" className="sky-cta">
+            <MaterialIcon icon="login" className="text-[18px]" /> Continue with Google
+          </a>
+          <p className="sky-fine">
+            <MaterialIcon icon="lock" className="text-[13px]" />
+            We ask you to sign in so every request is real — no spam, no selling your info.
+          </p>
+          <p className="sky-buyer">
+            Looking to buy but don&apos;t own yet? <a href="/position">That&apos;s the buyers path →</a>
+          </p>
         </div>
       </section>
 
@@ -138,19 +128,11 @@ export default function SkyPage() {
           pointer-events: none;
         }
 
-        /* parallax wrapper: outer moves with pointer, inner floats */
-        .sky-par {
-          position: absolute; inset: 0;
-          transform: translate(calc(var(--mx) * var(--depth) * 1px),
-                               calc(var(--my) * var(--depth) * 0.6px));
-          transition: transform 0.25s ease-out;
-          pointer-events: none;
-        }
-
-        .sky-island { position: absolute; }
+        .sky-island { position: absolute; pointer-events: none; }
         .sky-island.home {
-          left: -4%; bottom: -2%;
-          width: clamp(280px, 42vw, 620px);
+          left: 2%; bottom: 16%;
+          width: clamp(190px, 24vw, 360px);
+          opacity: 0.96;
           animation: bob 7s ease-in-out infinite;
         }
         .sky-island.dest {
@@ -174,10 +156,11 @@ export default function SkyPage() {
         .sky-cloud.far { opacity: 0.85; }
         .sky-cloud.c1 { left: 6%; top: 8%; width: clamp(110px, 14vw, 220px); animation: sway 26s ease-in-out infinite; }
         .sky-cloud.c2 { right: 14%; top: 44%; width: clamp(80px, 10vw, 150px); opacity: 0.75; animation: sway 34s ease-in-out 4s infinite reverse; }
-        .sky-cloud.near {
-          bottom: 10%; width: clamp(220px, 26vw, 420px);
-          filter: blur(0.6px); opacity: 0.95;
-          animation: cross 110s linear infinite;
+        .sky-cloud.mid.c3 {
+          left: 40%; bottom: 16%;
+          width: clamp(200px, 23vw, 380px);
+          opacity: 0.9;
+          animation: sway 44s ease-in-out 8s infinite;
         }
 
         /* ── the message ── */
@@ -185,13 +168,18 @@ export default function SkyPage() {
           position: relative; z-index: 5;
           max-width: 560px;
           margin: 0 auto;
-          padding: max(24svh, 180px) 24px 0;
+          padding: max(16svh, 140px) 24px 0;
           text-align: center;
         }
-        .sky-eyebrow {
-          font-size: 11px; font-weight: 800;
-          letter-spacing: 0.35em; text-transform: uppercase;
+        .sky-badge {
+          display: inline-flex; align-items: center; gap: 7px;
+          padding: 8px 18px; border-radius: 999px;
+          background: rgba(255,255,255,0.7);
+          border: 1px solid rgba(19,73,212,0.22);
+          font-size: 11.5px; font-weight: 800;
+          letter-spacing: 0.12em; text-transform: uppercase;
           color: var(--plot-brand, #1349d4);
+          backdrop-filter: blur(4px);
         }
         .sky-h1 {
           margin-top: 10px;
@@ -205,21 +193,39 @@ export default function SkyPage() {
           line-height: 1.6; color: #46536b;
         }
         .sky-cta {
-          display: inline-block; margin-top: 26px;
-          padding: 14px 34px; border-radius: 999px;
+          display: inline-flex; align-items: center; gap: 9px;
+          margin-top: 26px;
+          padding: 15px 34px; border-radius: 14px;
           background: var(--plot-brand, #1349d4); color: #fff;
           font-weight: 700; font-size: 15px; text-decoration: none;
           box-shadow: 0 14px 30px -12px rgba(19,73,212,0.65);
-          transition: transform 0.15s ease, box-shadow 0.15s ease;
+          transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
         }
-        .sky-cta:hover { transform: translateY(-2px); box-shadow: 0 18px 34px -12px rgba(19,73,212,0.7); }
+        .sky-cta:hover {
+          transform: translateY(-2px);
+          background: var(--plot-brand-deep, #122d8d);
+          box-shadow: 0 18px 34px -12px rgba(19,73,212,0.7);
+        }
+        .sky-fine {
+          display: flex; align-items: flex-start; justify-content: center; gap: 6px;
+          margin-top: 18px;
+          font-size: 12.5px; line-height: 1.55; color: #7a86a0;
+          max-width: 400px; margin-left: auto; margin-right: auto;
+        }
+        .sky-buyer { margin-top: 16px; font-size: 13.5px; color: #46536b; }
+        .sky-buyer a { color: var(--plot-brand, #1349d4); font-weight: 700; text-decoration: none; }
+        .sky-buyer a:hover { text-decoration: underline; }
 
         /* ── cards ── */
         .sky-cards {
           display: grid; gap: 22px;
           grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
-          max-width: 860px; margin: 0 auto;
-          padding: 26px 24px 96px;
+          max-width: 860px;
+          /* ride up into the hero so the cards sit right under the CTA,
+             inside the first viewport */
+          margin: clamp(-240px, -19svh, -100px) auto 0;
+          position: relative; z-index: 6;
+          padding: 0 24px 96px;
         }
         .sky-card {
           background: rgba(255,255,255,0.75);
@@ -245,10 +251,6 @@ export default function SkyPage() {
           0%, 100% { transform: translateX(0); }
           50%      { transform: translateX(3.5vw); }
         }
-        @keyframes cross {
-          from { left: -26vw; }
-          to   { left: 110vw; }
-        }
         @keyframes travel {
           0%, 100% { opacity: 0.45; transform: translate(-50%,-50%) scale(0.7); }
           18%      { opacity: 1;    transform: translate(-50%,-50%) scale(1.1); }
@@ -257,14 +259,13 @@ export default function SkyPage() {
 
         @media (prefers-reduced-motion: reduce) {
           .sky-island, .sky-cloud, .sky-dot, .sky-card-img { animation: none !important; }
-          .sky-par { transform: none !important; }
           .sky-dot { opacity: 0.8; transform: translate(-50%,-50%) scale(1); }
         }
 
         /* mobile: let the world breathe around the copy */
         @media (max-width: 640px) {
-          .sky-island.home { left: -18%; bottom: -4%; width: 78vw; }
-          .sky-island.dest { right: -8%; top: 10%; width: 44vw; }
+          .sky-island.home { left: -4%; bottom: 22%; width: 46vw; }
+          .sky-island.dest { right: -6%; top: 10%; width: 34vw; }
           .sky-copy { padding-top: 38svh; }
           .sky-card-img { width: 140px; margin-top: -56px; }
         }

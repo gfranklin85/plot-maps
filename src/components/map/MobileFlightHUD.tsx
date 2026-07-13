@@ -44,7 +44,9 @@ const VALID_STYLES = new Set(STYLES.map((s) => s.id));
 
 const LS_STYLE = 'plotmaps.mobileFlightStyle';
 const LS_HAND = 'plotmaps.mobileHand';
-const LS_MAPFRAC = 'plotmaps.mobileMapFrac';
+// v2 key — the old frac saved big values that pushed the grip mid-screen.
+// Bumping the key resets everyone to the new small default (grip at bottom).
+const LS_MAPFRAC = 'plotmaps.mobileMapFrac2';
 type Hand = 'right' | 'left';
 
 // portrait size divider: control-band height as a fraction of viewport.

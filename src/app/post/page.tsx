@@ -36,15 +36,28 @@ export default function PostMoveRequestPage() {
   }
   if (user) {
     return (
-      <div className="dsh min-h-screen">
+      <div className="post-gate">
         <APIProvider apiKey={GOOGLE_MAPS_API_KEY} libraries={GOOGLE_MAPS_LIBRARIES}>
-          <div className="sp-page"><SellerIntake /></div>
+          <SkyWorld quiet>
+            <SellerIntake />
+          </SkyWorld>
         </APIProvider>
+        <PostGateStyles />
       </div>
     );
   }
   // Signed-OUT: the beautiful sky-framed sign-in gate.
   return <SignInGate />;
+}
+
+// shared frame styles for both the gate and the signed-in intake
+function PostGateStyles() {
+  return (
+    <style>{`
+      .post-gate { height: 100svh; display: flex; flex-direction: column;
+        background: linear-gradient(180deg, #cfe0f6 0%, #dbe8fa 50%, #eaf2fd 100%); overflow: hidden; }
+    `}</style>
+  );
 }
 
 // ── the seller-framed sign-in gate — wears the SkyWorld ──
@@ -76,9 +89,8 @@ function SignInGate() {
         </p>
       </SkyWorld>
 
+      <PostGateStyles />
       <style>{`
-        .post-gate { height: 100svh; display: flex; flex-direction: column;
-          background: linear-gradient(180deg, #cfe0f6 0%, #dbe8fa 50%, #eaf2fd 100%); overflow: hidden; }
         .post-gate__eyebrow { display: inline-flex; align-items: center; gap: 7px;
           font-size: 11.5px; font-weight: 800; letter-spacing: 0.22em; text-transform: uppercase;
           color: var(--plot-brand-deep, #122d8d); }

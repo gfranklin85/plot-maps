@@ -24,8 +24,8 @@ export interface NavItem {
  *  brand system live on). memory: the_tasks. */
 export const NAV_PUBLIC: NavItem[] = [
   { label: 'The map',        href: '/map' },
+  { label: 'Listings',       href: '/listings', note: 'Homes posted free by owners and agents.' },
   { label: 'Post your move', href: '/#intent' },
-  { label: 'Orbit',          href: '/#orbit' },
   { label: 'The Bullpen',    href: '/bullpen' },
   { label: 'Position',       href: '/position' },
 ];
@@ -33,6 +33,7 @@ export const NAV_PUBLIC: NavItem[] = [
 /** Logged-in shared spine — the tools every mover uses. */
 export const NAV_APP: NavItem[] = [
   { label: 'Map',         href: '/map?view=3d' },
+  { label: 'Listings',    href: '/listings' },
   { label: 'Post a Move', href: '/post' },
   { label: 'Connections', href: '/connections' },
   { label: 'Documents',   href: '/documents' },

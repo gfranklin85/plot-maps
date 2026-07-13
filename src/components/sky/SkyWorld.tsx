@@ -12,9 +12,11 @@
 import type { ReactNode } from 'react';
 import MaterialIcon from '@/components/ui/MaterialIcon';
 
-export default function SkyWorld({ children }: { children: ReactNode }) {
+// `quiet` dims the world (fainter islands, no labels) so it reads as a calm
+// backdrop behind dense interactive content (forms/maps) instead of competing.
+export default function SkyWorld({ children, quiet = false }: { children: ReactNode; quiet?: boolean }) {
   return (
-    <div className="sky-world">
+    <div className={`sky-world ${quiet ? 'is-quiet' : ''}`}>
       <div className="sky-world__sun" />
 
       <img src="/sky/cloud.png" alt="" className="sky-world__cloud c1" />
@@ -93,6 +95,18 @@ export default function SkyWorld({ children }: { children: ReactNode }) {
         .sky-world__cloud.c3 { left: 4%; bottom: 6%; width: clamp(150px, 17vw, 290px); opacity: 0.9; animation: skySway 46s ease-in-out 8s infinite; }
 
         .sky-world__stage { position: relative; z-index: 5; max-width: 560px; padding: 0 24px; text-align: center; }
+
+        /* quiet mode: world recedes so forms/maps take focus */
+        .sky-world.is-quiet .sky-world__island { opacity: 0.42; }
+        .sky-world.is-quiet .sky-world__label { display: none; }
+        .sky-world.is-quiet .sky-world__path { opacity: 0.5; }
+        .sky-world.is-quiet .sky-world__cloud { opacity: 0.5; }
+        .sky-world.is-quiet .sky-world__stage {
+          max-width: 660px; width: 100%; text-align: left;
+          max-height: 100%; overflow-y: auto;
+          padding-top: clamp(16px, 4vh, 40px); padding-bottom: 32px;
+        }
+        .sky-world.is-quiet { justify-content: flex-start; }
 
         @keyframes skyBob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-13px); } }
         @keyframes skySway { 0%,100% { transform: translateX(0); } 50% { transform: translateX(3vw); } }

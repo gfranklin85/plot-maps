@@ -226,7 +226,7 @@ export default function SellerIntake() {
         {step === 1 && <button className="sp-next" onClick={() => setStep(2)}>Next <MaterialIcon icon="arrow_forward" className="text-[16px]" /></button>}
         {step === 2 && door === 'have' && <button className="sp-next" onClick={() => setStep(3)}>Next <MaterialIcon icon="arrow_forward" className="text-[16px]" /></button>}
         {step === 2 && door === 'lender' && <a className="sp-next" href="/bullpen">Qualify with a lender <MaterialIcon icon="arrow_forward" className="text-[16px]" /></a>}
-        {step === 3 && <button className="sp-next" disabled={posting} onClick={post}>{posting ? 'Posting…' : 'Post my move request'} <MaterialIcon icon="send" className="text-[15px]" /></button>}
+        {step === 3 && <button className="sp-next" disabled={posting} onClick={post}>{posting ? 'Posting…' : <>Post my move request <MaterialIcon icon="send" className="text-[15px]" /></>}</button>}
       </div>
     </div>
   );

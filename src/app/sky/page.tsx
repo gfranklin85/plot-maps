@@ -88,41 +88,50 @@ export default function SkyPage() {
             Looking to buy but don&apos;t own yet? <a href="/position">That&apos;s the buyers path →</a>
           </p>
         </div>
-      </section>
 
-      {/* ════ 2. CARDS — asset encapsulates the message ════ */}
-      <section className="sky-cards">
-        <div className="sky-card">
-          <img src="/sky/pin-want.png" alt="" className="sky-card-img bob-a" />
-          <h2 className="font-headline sky-card-h">A move, declared.</h2>
-          <p className="sky-card-p">
-            The blue pin is a person&apos;s posted intention — someone real wants
-            to be here. Not a listing. A want.
-          </p>
-        </div>
-        <div className="sky-card">
-          <img src="/sky/pin-active.png" alt="" className="sky-card-img bob-b" />
-          <h2 className="font-headline sky-card-h">A home, live.</h2>
-          <p className="sky-card-p">
-            The house-pin is an Active — a property its agent put on the map,
-            offers welcome, deal room attached.
-          </p>
+        {/* the pin-grammar cards — pinned to the bottom of the SAME viewport
+            (one screen, no scroll) as compact strips */}
+        <div className="sky-cards">
+          <div className="sky-card">
+            <img src="/sky/pin-want.png" alt="" className="sky-card-img bob-a" />
+            <div className="sky-card-txt">
+              <h2 className="font-headline sky-card-h">A move, declared.</h2>
+              <p className="sky-card-p">
+                The blue pin is a posted intention — someone real wants to be
+                here. Not a listing. A want.
+              </p>
+            </div>
+          </div>
+          <div className="sky-card">
+            <img src="/sky/pin-active.png" alt="" className="sky-card-img bob-b" />
+            <div className="sky-card-txt">
+              <h2 className="font-headline sky-card-h">A home, live.</h2>
+              <p className="sky-card-p">
+                The house-pin is an Active — posted by its agent, offers
+                welcome, deal room attached.
+              </p>
+            </div>
+          </div>
         </div>
       </section>
 
       <style>{`
+        /* ONE VIEWPORT, NO SCROLL — the whole page is a single held frame:
+           header + world + cards locked to 100svh. */
         .sky-page {
-          min-height: 100vh;
+          height: 100svh;
+          display: flex;
+          flex-direction: column;
           background: linear-gradient(180deg, #bfd4f2 0%, #d4e3f9 46%, #e9f1fc 100%);
-          overflow-x: hidden;
+          overflow: hidden;
         }
 
-        /* ── hero world ── */
+        /* ── hero world — fills everything under the header ── */
         .sky-hero {
           --mx: 0; --my: 0;
           position: relative;
-          /* 86svh, not 100 — the cards PEEK above the fold and invite the scroll */
-          height: max(86svh, 540px);
+          flex: 1;
+          min-height: 0;
           overflow: hidden;
         }
         .sky-sun {
@@ -175,7 +184,7 @@ export default function SkyPage() {
           position: relative; z-index: 5;
           max-width: 560px;
           margin: 0 auto;
-          padding: max(16svh, 140px) 24px 0;
+          padding: max(7svh, 48px) 24px 0;
           text-align: center;
         }
         .sky-badge {
@@ -224,30 +233,32 @@ export default function SkyPage() {
         .sky-buyer a:hover { text-decoration: underline; }
 
         /* ── cards ── */
+        /* cards: compact strips pinned to the bottom of the same frame */
         .sky-cards {
-          display: grid; gap: 22px;
-          grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
-          max-width: 860px;
-          /* ride up into the hero so the cards sit right under the CTA,
-             inside the first viewport */
-          margin: clamp(-240px, -19svh, -100px) auto 0;
-          position: relative; z-index: 6;
-          padding: 0 24px 96px;
+          position: absolute;
+          left: 50%; transform: translateX(-50%);
+          bottom: max(16px, 2.5svh);
+          width: min(880px, calc(100% - 32px));
+          display: grid; gap: 14px;
+          grid-template-columns: 1fr 1fr;
+          z-index: 6;
         }
         .sky-card {
-          background: rgba(255,255,255,0.75);
+          display: flex; align-items: center; gap: 14px;
+          background: rgba(255,255,255,0.78);
           border: 1px solid rgba(19,73,212,0.10);
-          border-radius: 28px;
-          padding: 30px 28px 34px;
-          text-align: center;
+          border-radius: 18px;
+          padding: 12px 18px;
+          text-align: left;
           backdrop-filter: blur(6px);
-          box-shadow: 0 20px 48px -32px rgba(20,50,120,0.45);
+          box-shadow: 0 18px 40px -30px rgba(20,50,120,0.45);
         }
-        .sky-card-img { width: 150px; margin: 0 auto 6px; display: block; }
+        .sky-card-img { width: 62px; flex: none; display: block; }
         .bob-a { animation: bob 6s ease-in-out infinite; }
         .bob-b { animation: bob 7s ease-in-out 0.8s infinite; }
-        .sky-card-h { font-size: 1.35rem; font-weight: 800; color: var(--plot-ink, #0c1322); }
-        .sky-card-p { margin-top: 8px; font-size: 0.92rem; line-height: 1.55; color: #46536b; }
+        .sky-card-txt { min-width: 0; }
+        .sky-card-h { font-size: 1.02rem; font-weight: 800; color: var(--plot-ink, #0c1322); }
+        .sky-card-p { margin-top: 2px; font-size: 0.8rem; line-height: 1.45; color: #46536b; }
 
         /* ── motion ── */
         @keyframes bob {
@@ -269,12 +280,16 @@ export default function SkyPage() {
           .sky-dot { opacity: 0.8; transform: translate(-50%,-50%) scale(1); }
         }
 
-        /* mobile: let the world breathe around the copy */
+        /* mobile: same single frame — compact copy, title-only cards */
         @media (max-width: 640px) {
-          .sky-island.home { left: -4%; bottom: 22%; width: 46vw; }
-          .sky-island.dest { right: -6%; top: 10%; width: 34vw; }
-          .sky-copy { padding-top: 38svh; }
-          .sky-card-img { width: 124px; }
+          .sky-island.home { left: -4%; bottom: 26%; width: 44vw; }
+          .sky-island.dest { right: -6%; top: 8%; width: 32vw; }
+          .sky-copy { padding-top: max(5svh, 32px); }
+          .sky-h1 { font-size: 2.1rem; }
+          .sky-card { padding: 10px 12px; gap: 10px; }
+          .sky-card-img { width: 40px; }
+          .sky-card-h { font-size: 0.88rem; }
+          .sky-card-p { display: none; }
         }
       `}</style>
     </div>

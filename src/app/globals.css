@@ -4331,3 +4331,45 @@ gmp-popover-3d-element[plot-card-popover],
   background: linear-gradient(160deg, var(--plot-brand), var(--plot-brand-deep)); color: #fff;
 }
 .fp-quote__seal .material-symbols-outlined { font-size: 22px; }
+
+/* ═══ ONE-VIEWPORT PAGES (memory: feedback_one_viewport_pages) ═════════
+   Every page except the landing holds ONE frame — no page scroll. Lists
+   that outgrow the frame scroll INSIDE their panel; chrome never moves.
+   Reference: /sky. Below: the dashboard + documents reflows (desktop). */
+
+@media (min-width: 980px) {
+  /* ── /home dashboard: top / move strip / tools+panels side-by-side ── */
+  .dsh { height: calc(100svh - 65px); overflow: hidden; }
+  .dsh__wrap {
+    height: 100%;
+    max-width: 1500px;
+    display: grid;
+    grid-template-columns: 1.45fr 1fr;
+    grid-template-rows: auto auto 1fr;
+    grid-template-areas: "top top" "mine mine" "tools panels";
+    gap: 14px 22px;
+    padding: 16px 28px 18px;
+    overflow: hidden;
+  }
+  .dsh-top { grid-area: top; }
+  .dsh-map { height: 168px; min-height: 0; overflow: hidden; }
+  .dsh-mine { grid-area: mine; margin-top: 0; }
+  .dsh-panels { grid-area: panels; margin-top: 0; display: flex; flex-direction: column; gap: 12px; min-height: 0; overflow-y: auto; }
+
+  /* tools become icon-left strips — title carries the meaning, subs hide */
+  .dash-grid { grid-area: tools; margin-top: 0; align-content: start; grid-template-columns: 1fr 1fr; gap: 12px; min-height: 0; overflow: hidden; }
+  .dash-card { display: flex; align-items: center; gap: 12px; padding: 12px 46px 12px 14px; }
+  .dash-card__icon { width: 44px; height: 44px; margin-bottom: 0; flex: none; border-radius: 12px; }
+  .dash-card__icon .material-symbols-rounded, .dash-card__icon span { font-size: 22px; }
+  .dash-card__h { font-size: 14.5px; }
+  .dash-card__p { display: none; }
+  .dash-card__arrow { top: 50%; transform: translateY(-50%); bottom: auto; width: 28px; height: 28px; }
+
+  /* ── /documents: checklist + rail scroll inside the frame ── */
+  .cdoc__wrap { height: calc(100svh - 65px); display: flex; flex-direction: column; overflow: hidden; padding-top: 18px; padding-bottom: 14px; }
+  .cdoc__head { flex: none; }
+  .cdoc__body { flex: 1; min-height: 0; overflow: hidden; }
+  .cdoc__list { overflow-y: auto; min-height: 0; max-height: 100%; }
+  .cdoc__rail { overflow-y: auto; min-height: 0; max-height: 100%; }
+  .cdoc__secure { flex: none; margin-top: 12px; }
+}

@@ -35,6 +35,8 @@ const PUBLIC_PATHS = [
   '/statement', // the live pre-close Buyer's Statement (offer builder)
   '/post', // "Post your move" — seller intake; reachable signed-out so the page
            // can show its own Google sign-in gate (auth required before intake).
+  '/listings', // free listings: /listings browse is public; /listings/new
+               // self-gates its own Google sign-in before the post form.
   '/my-request', // the poster's command room (uuid is the bearer credential)
   '/join', // shared recruit landing (empty-search growth loop) → routes to /post
   '/seed', // seed-your-area postcards; self-gates its own Google sign-in
@@ -54,6 +56,17 @@ const BETA_BYPASS_PATHS = ['/waitlist', '/auth', '/login'];
 
 export async function middleware(request: NextRequest) {
   const { pathname, searchParams } = request.nextUrl;
+
+  // ── Dev-only auth bypass ───────────────────────────────────────────
+  // Pairs with the client bypass in auth-context. When on (dev + flag),
+  // let EVERY request through so gated pages render locally without a real
+  // session. Double-guarded by NODE_ENV so it can't affect production.
+  if (
+    process.env.NODE_ENV === 'development' &&
+    process.env.NEXT_PUBLIC_DEV_BYPASS_AUTH === '1'
+  ) {
+    return NextResponse.next();
+  }
 
   // ── /auth/callback bypass ──────────────────────────────────────────
   // The auth-callback route handler is the ONLY place that should

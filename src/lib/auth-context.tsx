@@ -18,12 +18,37 @@ const AuthContext = createContext<AuthContextValue>({
   signOut: async () => {},
 });
 
+// ── Dev-only auth bypass ──────────────────────────────────────────────
+// Set NEXT_PUBLIC_DEV_BYPASS_AUTH=1 in .env.local (gitignored, never ships)
+// to render gated pages as a fake signed-in user during local dev — no
+// Google round-trip. DOUBLE-GUARDED: the NODE_ENV check means this is
+// physically inert in any production build even if the flag leaked into
+// Vercel. Bundlers dead-code-eliminate the whole branch in prod.
+const DEV_BYPASS_AUTH =
+  process.env.NODE_ENV === 'development' &&
+  process.env.NEXT_PUBLIC_DEV_BYPASS_AUTH === '1';
+
+const FAKE_USER = {
+  id: '00000000-0000-0000-0000-000000000dev',
+  email: 'dev@plot.local',
+  user_metadata: { full_name: 'Dev User' },
+  app_metadata: {},
+  aud: 'authenticated',
+  created_at: new Date(0).toISOString(),
+} as unknown as User;
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<User | null>(DEV_BYPASS_AUTH ? FAKE_USER : null);
   const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!DEV_BYPASS_AUTH);
 
   useEffect(() => {
+    if (DEV_BYPASS_AUTH) {
+      // eslint-disable-next-line no-console
+      console.warn('[auth] DEV BYPASS ACTIVE — signed in as a fake user. Never in prod.');
+      return; // skip the real Supabase session flow entirely
+    }
+
     // Get initial session. A stale/half-expired session (a leftover token
     // whose refresh token is dead) makes getSession() attempt a refresh that
     // fails with "Invalid Refresh Token: Refresh Token Not Found" (400).

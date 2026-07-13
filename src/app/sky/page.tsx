@@ -34,8 +34,11 @@ export default function SkyPage() {
 
   return (
     <div className="sky-page">
-      {/* the shared marketing chrome — same header as every public surface */}
-      <AppHeader variant="public" />
+      {/* the shared marketing chrome — wrapped in .fp so the header's own
+          styles (Log in button etc.) resolve; without it they render blank */}
+      <div className="fp" style={{ flex: 'none' }}>
+        <AppHeader variant="public" />
+      </div>
 
       {/* ════ 1. HERO — the world, alive (ambient motion only) ════ */}
       <section className="sky-hero">
@@ -68,8 +71,11 @@ export default function SkyPage() {
 
         {/* the message — the REAL /post copy, word for word */}
         <div className="sky-copy">
-          <span className="sky-badge">
-            <PlotMark size={15} /> Real Estate Interconnector
+          {/* bare eyebrow — the pill-chip costume is AI-generic; the words
+              stay because they NAME the product line. memory:
+              feedback_brand_fidelity */}
+          <span className="sky-eyebrow">
+            <PlotMark size={14} /> Real Estate Interconnector
           </span>
           <h1 className="font-headline sky-h1">Post your move.</h1>
           <p className="sky-sub">
@@ -187,15 +193,11 @@ export default function SkyPage() {
           padding: max(7svh, 48px) 24px 0;
           text-align: center;
         }
-        .sky-badge {
+        .sky-eyebrow {
           display: inline-flex; align-items: center; gap: 7px;
-          padding: 8px 18px; border-radius: 999px;
-          background: rgba(255,255,255,0.7);
-          border: 1px solid rgba(19,73,212,0.22);
           font-size: 11.5px; font-weight: 800;
-          letter-spacing: 0.12em; text-transform: uppercase;
+          letter-spacing: 0.22em; text-transform: uppercase;
           color: var(--plot-brand, #1349d4);
-          backdrop-filter: blur(4px);
         }
         .sky-h1 {
           margin-top: 10px;
@@ -244,21 +246,21 @@ export default function SkyPage() {
           z-index: 6;
         }
         .sky-card {
-          display: flex; align-items: center; gap: 14px;
+          display: flex; align-items: center; gap: 18px;
           background: rgba(255,255,255,0.78);
           border: 1px solid rgba(19,73,212,0.10);
-          border-radius: 18px;
-          padding: 12px 18px;
+          border-radius: 22px;
+          padding: 18px 24px;
           text-align: left;
           backdrop-filter: blur(6px);
           box-shadow: 0 18px 40px -30px rgba(20,50,120,0.45);
         }
-        .sky-card-img { width: 62px; flex: none; display: block; }
+        .sky-card-img { width: 96px; flex: none; display: block; }
         .bob-a { animation: bob 6s ease-in-out infinite; }
         .bob-b { animation: bob 7s ease-in-out 0.8s infinite; }
         .sky-card-txt { min-width: 0; }
-        .sky-card-h { font-size: 1.02rem; font-weight: 800; color: var(--plot-ink, #0c1322); }
-        .sky-card-p { margin-top: 2px; font-size: 0.8rem; line-height: 1.45; color: #46536b; }
+        .sky-card-h { font-size: 1.15rem; font-weight: 800; color: var(--plot-ink, #0c1322); }
+        .sky-card-p { margin-top: 3px; font-size: 0.88rem; line-height: 1.5; color: #46536b; }
 
         /* ── motion ── */
         @keyframes bob {

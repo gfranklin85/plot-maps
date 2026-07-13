@@ -52,33 +52,39 @@ export function useGestureFlight(enabled: boolean) {
       const f: PadFrame = { ...NEUTRAL };
       const list = pts.current;
 
+      // AXIS MAP — matches the LIVE flight loop (MapView3D ~line 1181):
+      //   lx = strafe · ly = forward/reverse (throttle) · rx = yaw
+      //   ry = pitch (look up/down) · rt = ascend · lt = descend
+      // (The old comment there was stale; verified against the real code.)
+
       // ── PAN (first finger) = throttle from its neutral press point ──
       if (list[0]) {
         const p = list[0];
         const nx = shapePan(p.x - p.x0);      // + = right
         const ny = shapePan(p.y - p.y0);      // + = down (screen)
         f.lx = nx;                            // strafe
-        // forward = drag UP (screen −y) → gas; drag DOWN → reverse
-        const fwd = -ny;
-        f.rt = fwd > 0 ? fwd : 0;
-        f.lt = fwd < 0 ? -fwd : 0;
+        // forward = drag UP (screen −y). Throttle is `ly` with `air.throttle
+        // += -ly`, so drag UP must give ly NEGATIVE → forward. ny is + when
+        // dragging down, so ly = ny (down → +ly → reverse; up → −ly → fwd).
+        f.ly = ny;
       }
 
       // ── extra fingers ──
       const extra = list.slice(1);
       if (extra.length === 1) {
-        // LOOK — swipe-style: apply this frame's accumulated look, then decay.
-        f.rx = clamp(look.current.yaw);   // yaw
-        f.ly = clamp(look.current.pitch); // pitch
+        // LOOK — swipe-style: yaw = rx, pitch = ry. Apply, then decay.
+        f.rx = clamp(look.current.yaw);
+        f.ry = clamp(look.current.pitch);
         look.current.yaw *= LOOK_DECAY;
         look.current.pitch *= LOOK_DECAY;
         if (Math.abs(look.current.yaw) < 0.002) look.current.yaw = 0;
         if (Math.abs(look.current.pitch) < 0.002) look.current.pitch = 0;
       } else if (extra.length >= 2) {
-        // CLIMB — 2 fingers dragged vertically from where they landed (held).
+        // CLIMB — 2 fingers dragged vertically. Ascend = rt, descend = lt.
         const avgDy = (extra[0].y - extra[0].y0 + (extra[1].y - extra[1].y0)) / 2;
         const climb = clamp(-avgDy * CLIMB_GAIN); // drag up = climb
-        f.ry = climb;
+        f.rt = climb > 0 ? climb : 0;
+        f.lt = climb < 0 ? -climb : 0;
         look.current.yaw = 0; look.current.pitch = 0;
       } else {
         look.current.yaw = 0; look.current.pitch = 0;

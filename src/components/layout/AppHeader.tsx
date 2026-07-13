@@ -42,6 +42,7 @@ export default function AppHeader({ variant = 'public' }: { variant?: 'public' |
             // surface so nothing orphans. memory/feedback_reveal_facts_not_hype_voice
             <div className="fp-navlinks">
               <a className="fp-navlink" href="/map">The map</a>
+              <a className="fp-navlink" href="/sky">Post your move</a>
               <a className="fp-navlink" href="/#intent">The Network</a>
               <a className="fp-navlink" href="/#orbit">Orbit</a>
               <a className="fp-navlink" href="/bullpen">The Bullpen</a>

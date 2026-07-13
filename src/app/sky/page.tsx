@@ -15,6 +15,7 @@
 
 import MaterialIcon from '@/components/ui/MaterialIcon';
 import PlotMark from '@/components/ui/PlotMark';
+import AppHeader from '@/components/layout/AppHeader';
 
 // the move-arc: a quadratic bezier in viewport-% space, home → destination.
 // Routed HIGH so the arc flies over the copy, never through it.
@@ -33,6 +34,9 @@ export default function SkyPage() {
 
   return (
     <div className="sky-page">
+      {/* the shared marketing chrome — same header as every public surface */}
+      <AppHeader variant="public" />
+
       {/* ════ 1. HERO — the world, alive (ambient motion only) ════ */}
       <section className="sky-hero">
         {/* sunlight */}

@@ -1,6 +1,6 @@
 'use client';
 
-// ── MarketSidebar — the right rail (Greg's mockup) ────────────────────
+// ── MarketSidebar — the right rail (Greg's mockup, polished) ──────────
 //
 // Market Snapshot (computed live from sold_comps) · How this listing compares
 // (per-selected $/sqft + DOM vs market) · Payment Fit (target vs estimate +
@@ -66,7 +66,7 @@ export default function MarketSidebar({ city, settings, selected }: {
     <div className="ms">
       {/* Market Snapshot */}
       <div className="ms__card">
-        <div className="ms__h"><MaterialIcon icon="monitoring" className="text-[18px]" /> {city} Market Snapshot</div>
+        <div className="ms__h"><MaterialIcon icon="monitoring" className="text-[16px]" /> {city} Market Snapshot</div>
         {loading ? <div className="ms__loading">Loading…</div> : !snap || snap.counts.sold + snap.counts.active === 0 ? (
           <div className="ms__loading">No market data for {city} yet.</div>
         ) : (
@@ -85,7 +85,7 @@ export default function MarketSidebar({ city, settings, selected }: {
       {/* How this listing compares */}
       {selected && selPpsf != null && soldPpsf != null && (
         <div className="ms__card">
-          <div className="ms__h"><MaterialIcon icon="insights" className="text-[18px]" /> How this listing compares</div>
+          <div className="ms__h"><MaterialIcon icon="insights" className="text-[16px]" /> How this listing compares</div>
           <ul className="ms__compare">
             <li><b className="dot dot--b" />This home is listed at <b>${Math.round(selPpsf)}/sqft</b></li>
             <li><b className="dot dot--l" />Recent sold median is <b>${Math.round(soldPpsf)}/sqft</b></li>
@@ -101,7 +101,7 @@ export default function MarketSidebar({ city, settings, selected }: {
 
       {/* Payment Fit */}
       <div className="ms__card">
-        <div className="ms__h"><MaterialIcon icon="track_changes" className="text-[18px]" /> Payment Fit</div>
+        <div className="ms__h"><MaterialIcon icon="track_changes" className="text-[16px]" /> Payment Fit</div>
         <div className="ms__fit"><span>Target</span><b>{fmtMo(settings.targetMonthly)}</b></div>
         {pay ? (
           <>
@@ -122,29 +122,31 @@ export default function MarketSidebar({ city, settings, selected }: {
 
       <style>{`
         .ms { display: flex; flex-direction: column; gap: 16px; }
-        .ms__card { background: #fff; border: 1px solid rgba(19,73,212,0.08); border-radius: 18px; padding: 16px;
-          box-shadow: 0 8px 26px -18px rgba(20,50,120,0.4); }
-        .ms__h { display: flex; align-items: center; gap: 7px; font-weight: 800; color: #0d1b3e; font-size: 14.5px; }
-        .ms__h .material-symbols-rounded, .ms__h .material-icons { color: #1349d4; }
+        .ms__card { background: #fff; border: 1px solid rgba(19,73,212,0.10); border-radius: 18px; padding: 17px;
+          box-shadow: 0 1px 2px rgba(13,27,62,0.04), 0 14px 34px -24px rgba(19,73,212,0.35); }
+        .ms__h { display: flex; align-items: center; gap: 7px; font-size: 11.5px; font-weight: 800;
+          letter-spacing: 0.12em; text-transform: uppercase; color: #23366e; }
+        .ms__h .material-symbols-rounded, .ms__h .material-icons { color: var(--plot-brand, #1349d4); }
         .ms__loading { padding: 14px 2px; color: #9aa4bc; font-size: 13px; }
-        .ms__stat { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; }
+        .ms__stat { display: flex; align-items: center; justify-content: space-between; margin-top: 13px; }
         .ms__stat-l { display: flex; align-items: center; gap: 8px; color: #5a6a8c; font-size: 13px; }
-        .ms__stat-l .material-symbols-rounded, .ms__stat-l .material-icons { color: rgba(19,73,212,0.55); font-size: 18px !important; }
-        .ms__stat-v { font-weight: 800; color: #1a2333; font-size: 14px; }
+        .ms__stat-l .material-symbols-rounded, .ms__stat-l .material-icons { color: rgba(19,73,212,0.5); font-size: 17px !important; }
+        .ms__stat-v { font-weight: 800; color: #1a2333; font-size: 14px; font-variant-numeric: tabular-nums; }
         .ms__stat-v small { font-weight: 600; color: #9aa4bc; margin-left: 4px; }
-        .ms__sep { height: 1px; background: rgba(19,73,212,0.08); margin: 14px 0 2px; }
-        .ms__compare { list-style: none; margin-top: 10px; display: flex; flex-direction: column; gap: 9px; }
-        .ms__compare li { display: flex; align-items: baseline; gap: 8px; font-size: 13px; color: #3a4a72; line-height: 1.4; }
-        .ms__compare b { color: #1a2333; font-weight: 700; }
+        .ms__sep { height: 1px; background: rgba(19,73,212,0.09); margin: 15px 0 2px; }
+        .ms__compare { list-style: none; margin-top: 11px; display: flex; flex-direction: column; gap: 9px; }
+        .ms__compare li { display: flex; align-items: baseline; gap: 8px; font-size: 13px; color: #3a4a72; line-height: 1.45; }
+        .ms__compare b { color: #1a2333; font-weight: 700; font-variant-numeric: tabular-nums; }
         .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; margin-top: 5px; }
-        .dot--b { background: #1349d4; } .dot--l { background: #7aa3ea; } .dot--o { background: #e0821b; } .dot--g { background: #1a8f4c; }
+        .dot--b { background: var(--plot-brand, #1349d4); } .dot--l { background: #7aa3ea; }
+        .dot--o { background: #d98a20; } .dot--g { background: #157a43; }
         .ms__fit { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; font-size: 14px; color: #3a4a72; }
-        .ms__fit b { color: #0d1b3e; }
-        .ms__fit-est { color: #1349d4 !important; }
-        .ms__over { color: #c0721a !important; } .ms__under { color: #1a8f4c !important; }
-        .ms__guide { display: flex; align-items: flex-start; gap: 7px; margin-top: 14px; padding: 12px; border-radius: 11px;
-          background: rgba(19,73,212,0.06); font-size: 12.5px; color: #3a4a72; line-height: 1.45; }
-        .ms__guide .material-symbols-rounded, .ms__guide .material-icons { color: #1349d4; }
+        .ms__fit b { color: #0d1b3e; font-variant-numeric: tabular-nums; }
+        .ms__fit-est { color: var(--plot-brand, #1349d4) !important; }
+        .ms__over { color: #a96410 !important; } .ms__under { color: #157a43 !important; }
+        .ms__guide { display: flex; align-items: flex-start; gap: 7px; margin-top: 14px; padding: 12px; border-radius: 12px;
+          background: rgba(19,73,212,0.055); border: 1px solid rgba(19,73,212,0.09); font-size: 12.5px; color: #3a4a72; line-height: 1.5; }
+        .ms__guide .material-symbols-rounded, .ms__guide .material-icons { color: var(--plot-brand, #1349d4); }
         .ms__guide b { color: #0d1b3e; }
       `}</style>
     </div>

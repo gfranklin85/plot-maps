@@ -77,7 +77,42 @@ export async function GET(req: Request) {
 
   const { data, error } = await query;
   if (error) return NextResponse.json({ error: 'could not load' }, { status: 500 });
-  return NextResponse.json({ listings: data ?? [] });
+
+  let listings = (data ?? []) as unknown as Record<string, unknown>[];
+
+  // includeComps=1 — also surface ACTIVE MLS comps as listing rows so the
+  // buyer board isn't empty while the free-post marketplace seeds. These are
+  // read-only comps (id prefixed `comp:`), shaped to the same card contract.
+  if (url.searchParams.get('includeComps') === '1') {
+    let cq = supabaseAdmin
+      .from('sold_comps')
+      .select('id, address, city, state, zip, list_price, sqft, lot_acres, year_built, dom, status')
+      .eq('status', 'A')
+      .order('list_date', { ascending: false })
+      .limit(200);
+    if (q) cq = cq.or(`address.ilike.%${q}%,city.ilike.%${q}%`);
+    const minN2 = min ? parseFloat(min) : null;
+    const maxN2 = max ? parseFloat(max) : null;
+    if (minN2 != null && Number.isFinite(minN2)) cq = cq.gte('list_price', minN2);
+    if (maxN2 != null && Number.isFinite(maxN2)) cq = cq.lte('list_price', maxN2);
+    const { data: comps } = await cq;
+    const compRows = (comps ?? []).map((c) => ({
+      id: `comp:${c.id}`,
+      address: c.address, city: c.city, state: c.state, zip: c.zip,
+      lat: null, lng: null, apn: null,
+      status: 'active',
+      price: c.list_price, beds: null, baths: null,
+      sqft: c.sqft, lot_sqft: c.lot_acres ? Math.round((c.lot_acres as number) * 43560) : null,
+      year_built: c.year_built, property_type: 'single-family',
+      description: null, photos: [] as string[],
+      contact_name: null, contact_email: null, contact_phone: null,
+      posted_by: 'agent', created_at: new Date(0).toISOString(),
+      dom: c.dom,
+    }));
+    listings = [...listings, ...compRows];
+  }
+
+  return NextResponse.json({ listings });
 }
 
 export async function POST(req: Request) {

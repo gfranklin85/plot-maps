@@ -2159,7 +2159,7 @@ export default function MapPage() {
           card. memory/project_phone_as_controller */}
       {touchFly && (
         <div className="map-touchpad">
-          <MobileFlightHUD mapElRef={map3DElRef} />
+          <MobileFlightHUD />
         </div>
       )}
 

@@ -48,9 +48,11 @@ const LS_MAPFRAC = 'plotmaps.mobileMapFrac';
 type Hand = 'right' | 'left';
 
 // portrait size divider: control-band height as a fraction of viewport.
-const MIN_FRAC = 0.28, MAX_FRAC = 0.6, DEFAULT_FRAC = 0.42;
+// Default is SMALL — the band hugs the bottom, the grip sits low, and you
+// drag it UP to shrink the map into a wider landscape letterbox.
+const MIN_FRAC = 0.18, MAX_FRAC = 0.6, DEFAULT_FRAC = 0.22;
 
-export default function MobileFlightHUD({ mapElRef }: { mapElRef?: React.MutableRefObject<HTMLElement | null> }) {
+export default function MobileFlightHUD() {
   const [menu, setMenu] = useState(false);
   const [flightStyle, setFlightStyle] = useState<FlightStyle>('drag-look');
   const [hand, setHand] = useState<Hand>('right');
@@ -84,12 +86,9 @@ export default function MobileFlightHUD({ mapElRef }: { mapElRef?: React.Mutable
 
   // Tilt-fly is active only in one-hand style; its RAF owns the pad frame then.
   const tilt = useTiltFly(flightStyle === 'one-hand');
-  // Drag-look is active in the default style; it attaches to the map element
-  // (one-finger drag = look; pinch = native zoom) and owns the pad frame then.
+  // Default style: pan ball + climb ball drive the flight loop; LOOK is
+  // Google's native control (we don't touch the map's finger gestures).
   const dragLook = useDragLook(flightStyle === 'drag-look');
-  useEffect(() => {
-    dragLook.attach(flightStyle === 'drag-look' ? (mapElRef?.current ?? null) : null);
-  }, [dragLook, flightStyle, mapElRef]);
 
   // ── portrait size divider (drag up = shrink map to landscape letterbox) ──
   const dragging = useRef(false);

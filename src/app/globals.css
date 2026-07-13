@@ -2277,50 +2277,38 @@ gmp-popover-3d-element[plot-card-popover],
 /* the controls region fills the sheet */
 .mfh-controls { position: relative; flex: 1; padding-top: 12px; }
 
-/* SIZE DIVIDER — the drag grip at the top of the control band. Drag up to
-   shrink the map into a wider landscape letterbox; down for a bigger map. */
+/* SIZE DIVIDER — grip at the TOP EDGE of the control band. With the band
+   hugging the BOTTOM (small default height), the grip sits low; drag it UP to
+   grow the band + shrink the map into a wider landscape letterbox; down for a
+   bigger map. It rides up the screen as you drag. */
 .mfh-grip {
-  position: absolute; top: -20px; left: 50%; transform: translateX(-50%);
-  z-index: 3; width: 96px; height: 30px; display: grid; place-items: center;
-  border-radius: 16px 16px 0 0; cursor: ns-resize; touch-action: none;
-  background: rgba(255,255,255,0.5); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-  border: 1.5px solid rgba(255,255,255,0.7); border-bottom: none;
+  position: absolute; top: -18px; left: 50%; transform: translateX(-50%);
+  z-index: 3; width: 104px; height: 26px; display: grid; place-items: center;
+  border-radius: 14px 14px 0 0; cursor: ns-resize; touch-action: none;
+  background: rgba(255,255,255,0.55); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  border: 1.5px solid rgba(255,255,255,0.75); border-bottom: none;
 }
-.mfh-grip__bar { width: 40px; height: 5px; border-radius: 999px; background: rgba(19,73,212,0.45); }
+.mfh-grip__bar { width: 42px; height: 5px; border-radius: 999px; background: rgba(19,73,212,0.5); }
 @media (orientation: landscape) and (max-height: 500px) { .mfh-grip { display: none; } }
 
-/* ── DragLookControls (.dlc) — DEFAULT flight: PAN stick + climb ball ───
-   LOOK is the whole map (one-finger drag). memory/project_phone_as_controller */
-.dlc { position: absolute; inset: 0; touch-action: none; user-select: none; -webkit-user-select: none; }
-.dlc-pan { position: absolute; bottom: 16px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
-.dlc--right .dlc-pan { right: 24px; }
-.dlc--left  .dlc-pan { left: 24px; }
-/* climb ball sits on the OPPOSITE side from the pan stick, thumb-adjacent */
-.dlc-climb { position: absolute; bottom: 16px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
-.dlc--right .dlc-climb { left: 30px; }
-.dlc--left  .dlc-climb { right: 30px; }
-.dlc-climb__track {
-  position: relative; width: 44px; height: 118px; border-radius: 999px;
-  background: rgba(255,255,255,0.28); border: 1.5px solid rgba(255,255,255,0.6);
-  display: grid; place-items: center;
+/* ── DragLookControls (.dlc) — DEFAULT: two small blue balls only ───────
+   PAN + CLIMB balls. No ring, no label, no slot. LOOK is Google's native map
+   control, so the container passes touches THROUGH (pointer-events:none) and
+   only the balls capture. memory/project_tilt_to_fly */
+.dlc { position: absolute; inset: 0; pointer-events: none; user-select: none; -webkit-user-select: none; }
+.dlc-ball {
+  position: absolute; bottom: 20px; width: 46px; height: 46px; border-radius: 50%;
+  pointer-events: auto; touch-action: none;
+  background: radial-gradient(circle at 50% 36%, rgba(77,132,234,0.95), rgba(19,73,212,0.95));
+  border: 2px solid rgba(255,255,255,0.92); box-shadow: 0 6px 16px -4px rgba(19,73,212,0.6);
+  will-change: transform; transition: box-shadow .1s;
 }
-.dlc-climb__cap { position: absolute; color: rgba(19,73,212,0.5); font-size: 18px !important; pointer-events: none; }
-.dlc-climb__cap--up { top: 4px; } .dlc-climb__cap--dn { bottom: 4px; }
-.dlc-climb__ball {
-  width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; color: #fff;
-  background: radial-gradient(circle at 50% 36%, rgba(77,132,234,0.92), rgba(19,73,212,0.92));
-  border: 2px solid rgba(255,255,255,0.9); box-shadow: 0 5px 14px -4px rgba(19,73,212,0.6);
-  will-change: transform; transition: transform .05s linear;
-}
-.dlc-climb__ball.is-active { box-shadow: 0 0 16px -2px rgba(19,73,212,0.8); }
-.dlc-hint {
-  position: absolute; top: -34px; left: 50%; transform: translateX(-50%);
-  font-size: 12px; font-weight: 700; color: rgba(19,73,212,0.55);
-  background: rgba(255,255,255,0.6); padding: 4px 12px; border-radius: 999px;
-  backdrop-filter: blur(6px); pointer-events: none; white-space: nowrap;
-  animation: dlcHintFade 4s ease forwards; animation-delay: 3s;
-}
-@keyframes dlcHintFade { to { opacity: 0; visibility: hidden; } }
+.dlc-ball:active { box-shadow: 0 0 18px -2px rgba(19,73,212,0.85); }
+/* PAN on the handedness side; CLIMB on the opposite side */
+.dlc--right .dlc-ball--pan   { right: 28px; }
+.dlc--right .dlc-ball--climb { left: 28px; }
+.dlc--left  .dlc-ball--pan   { left: 28px; }
+.dlc--left  .dlc-ball--climb { right: 28px; }
 
 /* ── TiltEdgeIndicator (.tei) — "liquid border" tilt feedback ───────────
    Thin edge lines that grow from center to show live climb/turn. Nearly

@@ -53,9 +53,9 @@ export default function SkyPage() {
         {/* sunlight */}
         <div className="sky-sun" />
 
-        {/* far clouds — slow sway */}
+        {/* far clouds — slow sway, each a different shape */}
         <img src="/sky/cloud.png" alt="" className="sky-cloud far c1" />
-        <img src="/sky/cloud.png" alt="" className="sky-cloud far c2" />
+        <img src="/sky/cloud-chunky.png" alt="" className="sky-cloud far c2" />
 
         {/* the two plots */}
         <div className="sky-par" style={{ ['--depth' as string]: '14' }}>
@@ -81,7 +81,7 @@ export default function SkyPage() {
         ))}
 
         {/* near cloud — crosses the scene */}
-        <img src="/sky/cloud.png" alt="" className="sky-cloud near c3" />
+        <img src="/sky/cloud-long.png" alt="" className="sky-cloud near c3" />
 
         {/* the message */}
         <div className="sky-copy">
@@ -173,11 +173,11 @@ export default function SkyPage() {
         .sky-cloud { position: absolute; pointer-events: none; }
         .sky-cloud.far { opacity: 0.85; }
         .sky-cloud.c1 { left: 6%; top: 8%; width: clamp(110px, 14vw, 220px); animation: sway 26s ease-in-out infinite; }
-        .sky-cloud.c2 { right: 18%; top: 40%; width: clamp(90px, 11vw, 170px); animation: sway 34s ease-in-out 4s infinite reverse; }
+        .sky-cloud.c2 { right: 14%; top: 44%; width: clamp(80px, 10vw, 150px); opacity: 0.75; animation: sway 34s ease-in-out 4s infinite reverse; }
         .sky-cloud.near {
-          bottom: 6%; width: clamp(180px, 22vw, 340px);
-          filter: blur(2px); opacity: 0.9;
-          animation: cross 90s linear infinite;
+          bottom: 10%; width: clamp(220px, 26vw, 420px);
+          filter: blur(0.6px); opacity: 0.95;
+          animation: cross 110s linear infinite;
         }
 
         /* ── the message ── */

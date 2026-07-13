@@ -10,9 +10,10 @@
 import { useMemo, useState } from 'react';
 import MaterialIcon from '@/components/ui/MaterialIcon';
 import ShareBullpen from './ShareBullpen';
+import AffordabilityCalc from './AffordabilityCalc';
 import type { AgentInvite } from '@/lib/bullpen/invite';
 
-type Kind = 'text' | 'choice' | 'money' | 'optional-upload' | 'multi';
+type Kind = 'text' | 'choice' | 'money' | 'optional-upload' | 'multi' | 'affordability';
 
 interface Step {
   id: string;
@@ -39,7 +40,7 @@ const STEPS: Step[] = [
   {
     id: 'occupation',
     q: 'What do you do, and where?',
-    help: 'This is the one that matters most. A lender who knows your area can read your line and already know you’re real — “Correctional Officer, Corcoran” or “LT at NAS Lemoore” tells them plenty.',
+    help: 'This is the one that matters most — it says the most about you in the fewest words. If you’re military, put your base and rank right here (“LT at NAS Lemoore”): a lender reads your pay grade and BAH straight off it.',
     kind: 'text',
     placeholder: 'e.g. Correctional Officer, Corcoran · LT at NAS Lemoore · Nurse, Adventist Health',
   },
@@ -50,26 +51,6 @@ const STEPS: Step[] = [
     kind: 'text',
     placeholder: 'Lemoore, CA · Hanford · Kings County',
   },
-  {
-    id: 'military',
-    q: 'Are you military?',
-    help: 'If you are, we’ll factor your housing allowance (BAH) — it’s real income lenders count.',
-    kind: 'choice',
-    choices: [
-      { id: 'active', label: 'Yes — active duty', note: 'Branch, rank + base help lenders read your pay.' },
-      { id: 'veteran', label: 'Veteran', note: 'You may have VA loan options.' },
-      { id: 'no', label: 'No' },
-    ],
-  },
-  {
-    id: 'military_detail',
-    q: 'Branch, rank, and base?',
-    help: 'e.g. “Navy, LT, NAS Lemoore.” This alone tells a lender your pay grade and BAH.',
-    kind: 'text',
-    placeholder: 'Navy · LT · NAS Lemoore',
-    showWhen: (a) => a.military === 'active' || a.military === 'veteran',
-  },
-
   // ── the light basics: what you're after ──
   {
     id: 'headline',
@@ -79,66 +60,15 @@ const STEPS: Step[] = [
     placeholder: 'Looking for a 3bd in Lemoore, move-in by fall',
     optional: true,
   },
+  // ── the money — ONE calculator, monthly-first (replaces the old 5 Qs:
+  //    price, monthly, down, income, debts). Play-and-learn; the buyer
+  //    anchors on a monthly they can judge and discovers the price.
+  //    (loanType + timeline cut — not their wheelhouse / dead weight.) ──
   {
-    id: 'price',
-    q: 'What are you looking to spend on a home?',
-    help: 'A range is fine — you’re not locked in.',
-    kind: 'text',
-    placeholder: '$380,000 – $420,000',
-  },
-  {
-    id: 'monthly',
-    q: 'A monthly payment you’d be comfortable with? (optional)',
-    help: 'Roughly what you’d want your house payment to be. It helps lenders bring you options that actually fit.',
-    kind: 'text',
-    placeholder: '~$2,200/mo',
-    optional: true,
-  },
-  {
-    id: 'down',
-    q: 'How much do you have for a down payment?',
-    help: 'A dollar amount or a percent — whatever you know.',
-    kind: 'text',
-    placeholder: '$80,000 · or 20%',
-  },
-  {
-    id: 'loanType',
-    q: 'What kind of loan are you thinking?',
-    kind: 'choice',
-    choices: [
-      { id: 'conventional', label: 'Conventional', note: 'The most common.' },
-      { id: 'fha', label: 'FHA', note: 'Lower down, a few extra rules.' },
-      { id: 'va', label: 'VA', note: 'For those who served.' },
-      { id: 'unsure', label: 'Not sure yet', note: 'Lenders can walk you through it.' },
-    ],
-  },
-  {
-    id: 'timeline',
-    q: 'When are you hoping to buy?',
-    kind: 'choice',
-    choices: [
-      { id: 'now', label: 'Ready now — the next month or two' },
-      { id: 'soon', label: 'Soon — the next few months' },
-      { id: 'exploring', label: 'Exploring — getting my footing first' },
-    ],
-  },
-
-  // ── optional depth (the more you share, the more they can bring you) ──
-  {
-    id: 'income',
-    q: 'What’s your income? (optional)',
-    help: 'Skip it if you like — your work line already says a lot. Sharing it just lets a lender be more precise.',
-    kind: 'text',
-    placeholder: '$95,000 / year',
-    optional: true,
-  },
-  {
-    id: 'debts',
-    q: 'Any monthly debts? (optional)',
-    help: 'Car payment, cards, student loans — the rough total. It helps a lender picture your budget. Skip if you’d rather not.',
-    kind: 'text',
-    placeholder: '$650 / month',
-    optional: true,
+    id: 'afford',
+    q: 'What feels right, month to month?',
+    help: 'Slide to a payment you’d be comfortable with — that’s the number people actually know. We’ll show what home that reaches. Play with it; lenders bring the real numbers.',
+    kind: 'affordability',
   },
   {
     id: 'credit',
@@ -372,6 +302,19 @@ export default function StatePosition({ agentPrefill }: { agentPrefill?: AgentIn
                 </button>
               ))}
             </div>
+          )}
+          {step.kind === 'affordability' && (
+            <AffordabilityCalc
+              onChange={(v) => setAnswers((p) => ({
+                ...p,
+                afford: '1', // marks the step complete for canNext
+                monthly: v.monthly,
+                price: v.price,
+                down: v.down,
+                income: v.income,
+                debts: v.debts,
+              }))}
+            />
           )}
           {step.kind === 'multi' && (
             <div className="sp-choices">

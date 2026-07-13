@@ -451,6 +451,9 @@ export default function MapPage() {
   // 3=pan+climb) → synthetic pad. memory/project_tilt_to_fly. The pad element
   // (.mfh-gesture, rendered by MobileFlightHUD) mounts after this, so poll for
   // it by id until it exists.
+  // Attach to the MAP element itself (not an overlay) so a plain TAP reaches
+  // Google's gmp-click for parcel select, while a DRAG drives flight (the hook
+  // only preventDefaults on move). The map mounts async (forwarded ref), poll.
   const gestureFlight = useGestureFlight(touchFly && !walkMode);
   const gestureAttach = gestureFlight.attach;
   useEffect(() => {
@@ -458,8 +461,8 @@ export default function MapPage() {
     if (!on) { gestureAttach(null); return; }
     let raf = 0;
     const tryAttach = () => {
-      const padEl = document.getElementById('mfh-gesture');
-      if (padEl) { gestureAttach(padEl); return; }
+      const el = map3DElRef.current;
+      if (el) { gestureAttach(el); return; }
       raf = requestAnimationFrame(tryAttach);
     };
     tryAttach();

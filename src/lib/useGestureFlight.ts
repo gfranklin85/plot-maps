@@ -111,7 +111,10 @@ export function useGestureFlight(enabled: boolean) {
       }
     };
 
-    const onStart = (e: TouchEvent) => { sync(e); e.preventDefault(); };
+    // Don't preventDefault the START — a stationary touch stays a TAP so
+    // Google's gmp-click fires and selects a parcel. We only take over (and
+    // preventDefault) once the finger actually MOVES (a gesture).
+    const onStart = (e: TouchEvent) => { sync(e); };
     const onMove = (e: TouchEvent) => {
       // accumulate LOOK delta on the 2nd finger BEFORE updating stored pos
       const list = pts.current;
@@ -130,7 +133,7 @@ export function useGestureFlight(enabled: boolean) {
       }
       e.preventDefault();
     };
-    const onEnd = (e: TouchEvent) => { sync(e); if (e.touches.length === 0) { pts.current = []; look.current = { yaw: 0, pitch: 0 }; } e.preventDefault(); };
+    const onEnd = (e: TouchEvent) => { sync(e); if (e.touches.length === 0) { pts.current = []; look.current = { yaw: 0, pitch: 0 }; } };
 
     el.addEventListener('touchstart', onStart, { passive: false });
     el.addEventListener('touchmove', onMove, { passive: false });

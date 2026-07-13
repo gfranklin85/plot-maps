@@ -2190,15 +2190,18 @@ gmp-popover-3d-element[plot-card-popover],
    control zone fills the rest BELOW it. The divider sets the split: drag DOWN
    → --map-h grows → the map opens up bigger; drag up → back toward letterbox.
    --map-h is the map's height from the top. */
-.map-shell--touchfly .map-shell__body { inset: 0 0 auto 0; height: var(--map-h); }
+/* FULL-PAGE map (Greg 2026-07-12) — no letterbox, no divider. The map fills
+   the whole viewport; the gesture pad is a transparent full-screen overlay. */
+.map-shell--touchfly .map-shell__body { inset: 0; }
 .map-shell--touchfly .map-shell__region { inset: 0; }
-.map-shell--touchfly .map-frame { inset: 0; background: #0a1020; }
+/* we own flight gestures on the map — stop the browser hijacking multi-touch */
+.map-shell--touchfly .map-frame { inset: 0; touch-action: none; }
 
-/* the control zone fills BELOW the map, to the bottom of the viewport. */
+/* the gesture pad is now pointer-events:none (visual/hint only) — the flight
+   touch listeners live on the MAP element itself, so a plain tap still reaches
+   gmp-click for parcel select. */
 .map-touchpad {
-  position: absolute; left: 0; right: 0; top: var(--map-h); bottom: 0;
-  z-index: 40;
-  touch-action: none; /* we own all touch — no browser scroll/zoom hijack */
+  position: absolute; inset: 0; z-index: 30; pointer-events: none;
   user-select: none; -webkit-user-select: none;
 }
 
@@ -2270,10 +2273,9 @@ gmp-popover-3d-element[plot-card-popover],
    map behind it." Only a whisper of tint + a soft top fade so the sticks
    read against bright terrain; the map is fully visible underneath. */
 .mfh {
+  /* transparent full-screen gesture overlay over the map (no panel now) */
   position: absolute; inset: 0; display: flex; flex-direction: column;
-  /* the control zone below the map — a soft light panel (not over the map now) */
-  background: linear-gradient(180deg, rgba(232,242,254,0.96) 0%, rgba(216,230,250,0.98) 100%);
-  border-top: 1.5px solid rgba(255,255,255,0.8);
+  background: transparent;
 }
 /* the controls region fills the sheet */
 .mfh-controls { position: relative; flex: 1; padding-top: 12px; }

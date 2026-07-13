@@ -1,297 +1,214 @@
 'use client';
 
-// ── /sky — the Floating Plots world, in motion ────────────────────────
+// ── /sky — the Floating Plots hero (the "Post your move" gate) ────────
 //
-// Demo surface for the brand theme built in Blender (scratchpad
-// pin_family.blend): floating plot-islands, the want-pin / active-pin
-// family, and the move-arc. Composed from transparent renders in
-// /public/sky so each layer can MOVE — bobbing islands, drifting clouds,
-// a traveling pulse along the dotted path, pointer parallax on desktop,
-// golden sunlight as a soft glow. memory: project_pin_grammar.
-//
-// Two patterns shown:
-//   1. HERO — the common background world (usable across bare pages)
-//   2. CARDS — close-up asset encapsulating a message (want vs active)
+// Two floating plot-islands — your CURRENT home (left) and your NEXT move
+// (right) — LINKED by a flowing beaded path (the interconnector, drawn).
+// Each island carries a floating label chip. One centered CTA + a buyer
+// door beneath. Composed from Blender renders in /public/sky; every layer
+// moves (islands bob, clouds sway, path beads travel). One viewport, no
+// scroll. memory: project_pin_grammar, feedback_one_viewport_pages,
+// feedback_brand_fidelity (coordinated blues: ink #122d8d, interactive #1349d4).
 
+import PlotMarkLive from '@/components/ui/PlotMarkLive';
 import MaterialIcon from '@/components/ui/MaterialIcon';
-import PlotMark from '@/components/ui/PlotMark';
 import AppHeader from '@/components/layout/AppHeader';
 
-// the move-arc: a quadratic bezier in viewport-% space, home → destination.
-// Routed HIGH so the arc flies over the copy, never through it.
-function arcDots(n: number) {
-  const p0 = { x: 13, y: 48 }, p1 = { x: 48, y: -8 }, p2 = { x: 87, y: 20 };
-  return Array.from({ length: n }, (_, i) => {
-    const t = (i + 0.5) / n;
-    const x = (1 - t) ** 2 * p0.x + 2 * (1 - t) * t * p1.x + t * t * p2.x;
-    const y = (1 - t) ** 2 * p0.y + 2 * (1 - t) * t * p1.y + t * t * p2.y;
-    return { x, y, t };
-  });
-}
-
 export default function SkyPage() {
-  const dots = arcDots(11);
-
   return (
     <div className="sky-page">
-      {/* the shared marketing chrome — wrapped in .fp so the header's own
-          styles (Log in button etc.) resolve; without it they render blank */}
       <div className="fp" style={{ flex: 'none' }}>
         <AppHeader variant="public" />
       </div>
 
-      {/* ════ 1. HERO — the world, alive (ambient motion only) ════ */}
       <section className="sky-hero">
-        {/* sunlight */}
         <div className="sky-sun" />
 
-        {/* clouds — different shapes, gentle sway; ALL behind the islands */}
-        <img src="/sky/cloud.png" alt="" className="sky-cloud far c1" />
-        <img src="/sky/cloud-chunky.png" alt="" className="sky-cloud far c2" />
-        <img src="/sky/cloud-long.png" alt="" className="sky-cloud mid c3" />
+        {/* clouds — behind everything */}
+        <img src="/sky/cloud.png" alt="" className="sky-cloud c1" />
+        <img src="/sky/cloud-chunky.png" alt="" className="sky-cloud c2" />
+        <img src="/sky/cloud-long.png" alt="" className="sky-cloud c3" />
 
-        {/* the two plots */}
-        <img src="/sky/island-home.png" alt="" className="sky-island home" />
-        <img src="/sky/island-pin.png" alt="" className="sky-island dest" />
-
-        {/* the move-arc — pulse travels home → destination */}
-        {dots.map((d, i) => (
-          <span
-            key={i}
-            className="sky-dot"
-            style={{
-              left: `${d.x}%`,
-              top: `${d.y}%`,
-              width: 7 + 4 * Math.sin(d.t * Math.PI),
-              height: 7 + 4 * Math.sin(d.t * Math.PI),
-              animationDelay: `${i * 0.22}s`,
-            }}
+        {/* the connecting path — home → destination, beads travel it */}
+        <svg className="sky-path" viewBox="0 0 1000 300" preserveAspectRatio="none" aria-hidden>
+          <path
+            id="movePath"
+            d="M 55 180 C 250 130, 360 250, 500 225 S 770 130, 945 120"
+            fill="none" stroke="#ffffff" strokeWidth="3" strokeLinecap="round" opacity="0.85"
           />
-        ))}
+          {[0, 1, 2, 3].map((i) => (
+            <circle key={i} r="6" fill="#ffffff">
+              <animateMotion dur="7s" begin={`${i * 1.75}s`} repeatCount="indefinite" rotate="auto">
+                <mpath href="#movePath" />
+              </animateMotion>
+            </circle>
+          ))}
+        </svg>
 
-        {/* the message — the REAL /post copy, word for word */}
+        {/* LEFT island — current home, with its floating label */}
+        <div className="sky-side left">
+          <span className="sky-label">
+            <span className="sky-label__ic"><MaterialIcon icon="home" className="text-[16px]" /></span>
+            <span className="sky-label__txt"><b>Current home</b>Your current position</span>
+          </span>
+          <img src="/sky/island-home.png" alt="" className="sky-island home" />
+        </div>
+
+        {/* RIGHT island — next move, with its floating label */}
+        <div className="sky-side right">
+          <span className="sky-label">
+            <span className="sky-label__ic"><MaterialIcon icon="location_on" className="text-[16px]" /></span>
+            <span className="sky-label__txt"><b>Next move</b>Your destination</span>
+          </span>
+          <img src="/sky/island-pin.png" alt="" className="sky-island dest" />
+        </div>
+
+        {/* the message — centered */}
         <div className="sky-copy">
-          {/* bare eyebrow — the pill-chip costume is AI-generic; the words
-              stay because they NAME the product line. memory:
-              feedback_brand_fidelity */}
           <span className="sky-eyebrow">
-            <PlotMark size={14} /> Real Estate Interconnector
+            <PlotMarkLive size={17} /> Real Estate Interconnector
           </span>
           <h1 className="font-headline sky-h1">Post your move.</h1>
           <p className="sky-sub">
-            For owners ready to make a move: tell us where you&apos;d go and what
-            you&apos;ve got, and we&apos;ll work the map for a real connection — a direct
-            match or a multi-home move path. Private until you say otherwise.
+            Tell us what you have and where you want to go. We&apos;ll work the
+            map to uncover direct matches and multi-home move paths.
           </p>
-          <a href="/post" className="sky-cta">
-            <MaterialIcon icon="login" className="text-[18px]" /> Continue with Google
-          </a>
-          <p className="sky-fine">
-            <MaterialIcon icon="lock" className="text-[13px]" />
-            We ask you to sign in so every request is real — no spam, no selling your info.
-          </p>
-          <p className="sky-buyer">
-            Looking to buy but don&apos;t own yet? <a href="/position">That&apos;s the buyers path →</a>
-          </p>
-        </div>
 
-        {/* the pin-grammar cards — pinned to the bottom of the SAME viewport
-            (one screen, no scroll) as compact strips */}
-        <div className="sky-cards">
-          <div className="sky-card">
-            <img src="/sky/pin-want.png" alt="" className="sky-card-img bob-a" />
-            <div className="sky-card-txt">
-              <h2 className="font-headline sky-card-h">A move, declared.</h2>
-              <p className="sky-card-p">
-                The blue pin is a posted intention — someone real wants to be
-                here. Not a listing. A want.
-              </p>
-            </div>
-          </div>
-          <div className="sky-card">
-            <img src="/sky/pin-active.png" alt="" className="sky-card-img bob-b" />
-            <div className="sky-card-txt">
-              <h2 className="font-headline sky-card-h">A home, live.</h2>
-              <p className="sky-card-p">
-                The house-pin is an Active — posted by its agent, offers
-                welcome, deal room attached.
-              </p>
-            </div>
-          </div>
+          {/* single CTA (routes to /post → sign-in gate) + buyer door */}
+          <a href="/post" className="sky-cta">
+            Post your move <span aria-hidden>→</span>
+          </a>
+          <a href="/position" className="sky-buyer">
+            Looking to buy without selling? Start here →
+          </a>
         </div>
       </section>
 
       <style>{`
-        /* ONE VIEWPORT, NO SCROLL — the whole page is a single held frame:
-           header + world + cards locked to 100svh. */
         .sky-page {
           height: 100svh;
-          display: flex;
-          flex-direction: column;
-          background: linear-gradient(180deg, #bfd4f2 0%, #d4e3f9 46%, #e9f1fc 100%);
+          display: flex; flex-direction: column;
+          background: linear-gradient(180deg, #cfe0f6 0%, #dbe8fa 50%, #eaf2fd 100%);
           overflow: hidden;
         }
 
-        /* ── hero world — fills everything under the header ── */
         .sky-hero {
-          --mx: 0; --my: 0;
           position: relative;
-          flex: 1;
-          min-height: 0;
+          flex: 1; min-height: 0;
           overflow: hidden;
+          display: flex; flex-direction: column;
+          align-items: center; justify-content: center;
         }
         .sky-sun {
-          position: absolute; inset: 0;
+          position: absolute; inset: 0; pointer-events: none;
           background:
-            radial-gradient(26vw 26vw at 86% 6%, rgba(255,240,210,0.42), rgba(255,240,210,0) 68%),
-            radial-gradient(60vw 36vh at 84% 0%, rgba(255,248,232,0.22), rgba(255,248,232,0) 58%);
-          pointer-events: none;
+            radial-gradient(24vw 24vw at 88% 4%, rgba(255,243,218,0.4), rgba(255,243,218,0) 68%);
         }
 
-        .sky-island { position: absolute; pointer-events: none; }
-        .sky-island.home {
-          left: 2%; bottom: 16%;
-          width: clamp(190px, 24vw, 360px);
-          opacity: 0.96;
+        /* the linking path spans the mid-band behind the copy */
+        .sky-path {
+          position: absolute; left: 0; right: 0; top: 42%;
+          width: 100%; height: 40%;
+          pointer-events: none; z-index: 1;
+        }
+
+        /* island sides — anchored to the edges, vertically centered-ish */
+        .sky-side { position: absolute; pointer-events: none; z-index: 2; }
+        .sky-side.left  { left: 0;  top: 30%; }
+        .sky-side.right { right: 0; top: 34%; }
+        .sky-island { display: block; }
+        .sky-island.home { width: clamp(230px, 27vw, 430px); margin-left: -5%; animation: bob 7s ease-in-out infinite; }
+        .sky-island.dest { width: clamp(190px, 22vw, 350px); margin-right: -4%; margin-left: auto; animation: bob 9s ease-in-out 1.2s infinite; }
+
+        /* floating label chips — shadow falls DOWN-LEFT to match the
+           islands' upper-right sun (negative x = leftward). */
+        .sky-label {
+          position: absolute; z-index: 3;
+          display: inline-flex; align-items: center; gap: 10px;
+          padding: 9px 14px 9px 10px; border-radius: 14px;
+          background: rgba(255,255,255,0.92);
+          box-shadow: -8px 16px 30px -16px rgba(20,50,120,0.5);
+          backdrop-filter: blur(4px);
+          white-space: nowrap;
           animation: bob 7s ease-in-out infinite;
         }
-        .sky-island.dest {
-          right: -1%; top: 14%;
-          width: clamp(170px, 24vw, 360px);
-          animation: bob 9s ease-in-out 1.2s infinite;
+        /* labels hug their islands — just above the top surface */
+        .sky-side.left  .sky-label { top: 14%; left: 20%; }
+        .sky-side.right .sky-label { top: 6%; right: 10%; }
+        .sky-label__ic {
+          width: 30px; height: 30px; border-radius: 9px; flex: none;
+          display: flex; align-items: center; justify-content: center;
+          background: var(--plot-brand-soft, #e0e7fb); color: var(--plot-brand, #1349d4);
         }
+        .sky-label__txt { display: flex; flex-direction: column; line-height: 1.2; }
+        .sky-label__txt b { font-size: 12.5px; color: var(--plot-brand-deep, #122d8d); font-weight: 800; }
+        .sky-label__txt { font-size: 11px; color: #6b7699; }
 
-        .sky-dot {
-          position: absolute;
-          border-radius: 50%;
-          background: #3565e0;
-          box-shadow: 0 2px 8px rgba(19,73,212,0.28);
-          transform: translate(-50%, -50%) scale(0.7);
-          opacity: 0.45;
-          animation: travel 2.6s ease-in-out infinite;
-          pointer-events: none;
-        }
-
-        .sky-cloud { position: absolute; pointer-events: none; }
-        .sky-cloud.far { opacity: 0.85; }
-        .sky-cloud.c1 { left: 6%; top: 8%; width: clamp(110px, 14vw, 220px); animation: sway 26s ease-in-out infinite; }
-        .sky-cloud.c2 { right: 14%; top: 44%; width: clamp(80px, 10vw, 150px); opacity: 0.75; animation: sway 34s ease-in-out 4s infinite reverse; }
-        .sky-cloud.mid.c3 {
-          /* open air low-right, below the destination island — clear of the
-             copy, the cards, and (crucially) not "weather over the house" */
-          right: 6%; bottom: 7%;
-          width: clamp(170px, 19vw, 320px);
-          opacity: 0.9;
-          animation: sway 44s ease-in-out 8s infinite;
-        }
-
-        /* ── the message ── */
+        /* ── the message (coordinated blues: ink=deep navy, interactive=brand) ── */
         .sky-copy {
           position: relative; z-index: 5;
-          max-width: 560px;
-          margin: 0 auto;
-          padding: max(7svh, 48px) 24px 0;
-          text-align: center;
+          max-width: 560px; padding: 0 24px; text-align: center;
         }
         .sky-eyebrow {
           display: inline-flex; align-items: center; gap: 7px;
           font-size: 11.5px; font-weight: 800;
           letter-spacing: 0.22em; text-transform: uppercase;
-          color: var(--plot-brand, #1349d4);
+          color: var(--plot-brand-deep, #122d8d);
         }
         .sky-h1 {
           margin-top: 10px;
-          font-size: clamp(2.4rem, 6vw, 4rem);
-          font-weight: 800; line-height: 1.05;
-          color: var(--plot-ink, #0c1322);
+          font-size: clamp(2.6rem, 6.5vw, 4.4rem);
+          font-weight: 800; line-height: 1.02; letter-spacing: -0.02em;
+          color: var(--plot-brand-deep, #122d8d);
         }
         .sky-sub {
-          margin-top: 14px;
-          font-size: clamp(0.95rem, 1.6vw, 1.1rem);
-          line-height: 1.6; color: #46536b;
+          margin: 16px auto 0; max-width: 460px;
+          font-size: clamp(0.98rem, 1.5vw, 1.15rem);
+          line-height: 1.55; color: #3a4a72;
         }
         .sky-cta {
-          display: inline-flex; align-items: center; gap: 9px;
-          margin-top: 26px;
-          padding: 15px 34px; border-radius: 14px;
+          display: inline-flex; align-items: center; gap: 10px;
+          margin-top: 30px;
+          padding: 16px 38px; border-radius: 14px;
           background: var(--plot-brand, #1349d4); color: #fff;
-          font-weight: 700; font-size: 15px; text-decoration: none;
-          box-shadow: 0 14px 30px -12px rgba(19,73,212,0.65);
+          font-weight: 700; font-size: 16px; text-decoration: none;
+          box-shadow: 0 16px 32px -12px rgba(19,73,212,0.6);
           transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
         }
         .sky-cta:hover {
           transform: translateY(-2px);
           background: var(--plot-brand-deep, #122d8d);
-          box-shadow: 0 18px 34px -12px rgba(19,73,212,0.7);
+          box-shadow: 0 20px 38px -12px rgba(19,73,212,0.65);
         }
-        .sky-fine {
-          display: flex; align-items: flex-start; justify-content: center; gap: 6px;
-          margin-top: 18px;
-          font-size: 12.5px; line-height: 1.55; color: #7a86a0;
-          max-width: 400px; margin-left: auto; margin-right: auto;
+        .sky-buyer {
+          display: block; margin-top: 20px;
+          font-size: 14px; font-weight: 700; text-decoration: none;
+          color: var(--plot-brand, #1349d4);
         }
-        .sky-buyer { margin-top: 16px; font-size: 13.5px; color: #46536b; }
-        .sky-buyer a { color: var(--plot-brand, #1349d4); font-weight: 700; text-decoration: none; }
-        .sky-buyer a:hover { text-decoration: underline; }
+        .sky-buyer:hover { color: var(--plot-brand-deep, #122d8d); }
 
-        /* ── cards ── */
-        /* cards: compact strips pinned to the bottom of the same frame */
-        .sky-cards {
-          position: absolute;
-          left: 50%; transform: translateX(-50%);
-          bottom: max(16px, 2.5svh);
-          width: min(880px, calc(100% - 32px));
-          display: grid; gap: 14px;
-          grid-template-columns: 1fr 1fr;
-          z-index: 6;
-        }
-        .sky-card {
-          display: flex; align-items: center; gap: 18px;
-          background: rgba(255,255,255,0.78);
-          border: 1px solid rgba(19,73,212,0.10);
-          border-radius: 22px;
-          padding: 18px 24px;
-          text-align: left;
-          backdrop-filter: blur(6px);
-          box-shadow: 0 18px 40px -30px rgba(20,50,120,0.45);
-        }
-        .sky-card-img { width: 96px; flex: none; display: block; }
-        .bob-a { animation: bob 6s ease-in-out infinite; }
-        .bob-b { animation: bob 7s ease-in-out 0.8s infinite; }
-        .sky-card-txt { min-width: 0; }
-        .sky-card-h { font-size: 1.15rem; font-weight: 800; color: var(--plot-ink, #0c1322); }
-        .sky-card-p { margin-top: 3px; font-size: 0.88rem; line-height: 1.5; color: #46536b; }
+        .sky-cloud { position: absolute; pointer-events: none; z-index: 0; }
+        .sky-cloud.c1 { left: 18%; top: 14%; width: clamp(90px, 11vw, 170px); opacity: 0.85; animation: sway 30s ease-in-out infinite; }
+        .sky-cloud.c2 { right: 24%; top: 10%; width: clamp(70px, 8vw, 130px); opacity: 0.7; animation: sway 38s ease-in-out 5s infinite reverse; }
+        .sky-cloud.c3 { left: 4%; bottom: 6%; width: clamp(150px, 17vw, 290px); opacity: 0.9; animation: sway 46s ease-in-out 8s infinite; }
 
-        /* ── motion ── */
-        @keyframes bob {
-          0%, 100% { transform: translateY(0); }
-          50%      { transform: translateY(-14px); }
-        }
-        @keyframes sway {
-          0%, 100% { transform: translateX(0); }
-          50%      { transform: translateX(3.5vw); }
-        }
-        @keyframes travel {
-          0%, 100% { opacity: 0.45; transform: translate(-50%,-50%) scale(0.7); }
-          18%      { opacity: 1;    transform: translate(-50%,-50%) scale(1.1); }
-          40%      { opacity: 0.55; transform: translate(-50%,-50%) scale(0.8); }
-        }
+        @keyframes bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-13px); } }
+        @keyframes sway { 0%,100% { transform: translateX(0); } 50% { transform: translateX(3vw); } }
 
         @media (prefers-reduced-motion: reduce) {
-          .sky-island, .sky-cloud, .sky-dot, .sky-card-img { animation: none !important; }
-          .sky-dot { opacity: 0.8; transform: translate(-50%,-50%) scale(1); }
+          .sky-island, .sky-cloud, .sky-label { animation: none !important; }
+          .sky-path circle { display: none; }
         }
 
-        /* mobile: same single frame — compact copy, title-only cards */
-        @media (max-width: 640px) {
-          .sky-island.home { left: -4%; bottom: 26%; width: 44vw; }
-          .sky-island.dest { right: -6%; top: 8%; width: 32vw; }
-          .sky-copy { padding-top: max(5svh, 32px); }
-          .sky-h1 { font-size: 2.1rem; }
-          .sky-card { padding: 10px 12px; gap: 10px; }
-          .sky-card-img { width: 40px; }
-          .sky-card-h { font-size: 0.88rem; }
-          .sky-card-p { display: none; }
+        /* mobile: islands shrink to the edges, path + labels simplify */
+        @media (max-width: 720px) {
+          .sky-side.left  { top: auto; bottom: 4%; }
+          .sky-side.right { top: 9%; }
+          .sky-island.home { width: 52vw; margin-left: -14%; }
+          .sky-island.dest { width: 40vw; margin-right: -10%; }
+          .sky-label { display: none; }
+          .sky-path { top: 46%; }
+          .sky-h1 { font-size: 2.3rem; }
         }
       `}</style>
     </div>

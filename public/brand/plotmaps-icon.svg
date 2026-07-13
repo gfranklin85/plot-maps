@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- PlotMaps icon — the reticle mark from the wordmark: a heavy location
+     ring crossed by fine hairlines. Ring:crosshair weight matches the logo
+     (thick ring, delicate cross). currentColor → inherits ink/brand. -->
+<svg width="256" height="256" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round">
+  <circle cx="128" cy="128" r="74" stroke-width="39"/>
+  <path d="M128 20 L128 236" stroke-width="6"/>
+  <path d="M20 128 L236 128" stroke-width="6"/>
+</svg>

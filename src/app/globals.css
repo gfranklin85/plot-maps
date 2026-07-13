@@ -2299,14 +2299,6 @@ gmp-popover-3d-element[plot-card-popover],
    (touch-action:none): 1 finger = pan · 2 = pan+look · 3 = pan+climb. A faint
    legend fades on first touch. memory/project_tilt_to_fly */
 .mfh-gesture { touch-action: none; }
-.mfh-hint {
-  position: absolute; inset: 0; display: flex; flex-direction: column;
-  align-items: center; justify-content: center; gap: 8px; pointer-events: none;
-  color: rgba(19,73,212,0.6); font-size: 14px; font-weight: 600; text-align: center;
-  animation: mfhHintFade .5s ease 6s forwards;
-}
-.mfh-hint b { color: #1349d4; font-weight: 800; }
-@keyframes mfhHintFade { to { opacity: 0; visibility: hidden; } }
 
 /* ── TiltEdgeIndicator (.tei) — "liquid border" tilt feedback ───────────
    Thin edge lines that grow from center to show live climb/turn. Nearly

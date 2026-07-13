@@ -27,7 +27,6 @@ const NAV = [
 
 export default function MobileFlightHUD() {
   const [menu, setMenu] = useState(false);
-  const [hintGone, setHintGone] = useState(false);
 
   return (
     <>
@@ -64,15 +63,7 @@ export default function MobileFlightHUD() {
       {/* ── GESTURE PAD — transparent full-screen overlay over the map.
            useGestureFlight (map page) owns its touch:
            1 finger = pan · 2 = pan+look · 3 = pan+climb. ── */}
-      <div className="mfh mfh-gesture" id="mfh-gesture" onPointerDown={() => setHintGone(true)}>
-        {!hintGone && (
-          <div className="mfh-hint">
-            <span><b>1 finger</b> — fly &amp; strafe</span>
-            <span><b>2 fingers</b> — look around</span>
-            <span><b>3 fingers</b> — climb / descend</span>
-          </div>
-        )}
-      </div>
+      <div className="mfh mfh-gesture" id="mfh-gesture" />
     </>
   );
 }

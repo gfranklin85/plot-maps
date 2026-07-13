@@ -15,9 +15,10 @@
 
 import { useEffect, useRef } from 'react';
 
-// the move-arc: a quadratic bezier in viewport-% space, home → destination
+// the move-arc: a quadratic bezier in viewport-% space, home → destination.
+// Routed HIGH so the arc flies over the copy, never through it.
 function arcDots(n: number) {
-  const p0 = { x: 20, y: 62 }, p1 = { x: 50, y: 6 }, p2 = { x: 80, y: 26 };
+  const p0 = { x: 13, y: 48 }, p1 = { x: 48, y: -8 }, p2 = { x: 87, y: 20 };
   return Array.from({ length: n }, (_, i) => {
     const t = (i + 0.5) / n;
     const x = (1 - t) ** 2 * p0.x + 2 * (1 - t) * t * p1.x + t * t * p2.x;
@@ -72,8 +73,8 @@ export default function SkyPage() {
             style={{
               left: `${d.x}%`,
               top: `${d.y}%`,
-              width: 8 + 6 * Math.sin(d.t * Math.PI),
-              height: 8 + 6 * Math.sin(d.t * Math.PI),
+              width: 7 + 4 * Math.sin(d.t * Math.PI),
+              height: 7 + 4 * Math.sin(d.t * Math.PI),
               animationDelay: `${i * 0.22}s`,
             }}
           />
@@ -117,7 +118,7 @@ export default function SkyPage() {
       <style>{`
         .sky-page {
           min-height: 100vh;
-          background: linear-gradient(180deg, #cfdef7 0%, #dde9fa 46%, #eef4fd 100%);
+          background: linear-gradient(180deg, #bfd4f2 0%, #d4e3f9 46%, #e9f1fc 100%);
           overflow-x: hidden;
         }
 
@@ -125,15 +126,15 @@ export default function SkyPage() {
         .sky-hero {
           --mx: 0; --my: 0;
           position: relative;
-          height: 100svh;
-          min-height: 560px;
+          /* 86svh, not 100 — the cards PEEK above the fold and invite the scroll */
+          height: max(86svh, 540px);
           overflow: hidden;
         }
         .sky-sun {
           position: absolute; inset: 0;
           background:
-            radial-gradient(38vw 38vw at 84% 10%, rgba(255,214,150,0.55), rgba(255,214,150,0) 70%),
-            radial-gradient(70vw 50vh at 80% 0%, rgba(255,240,214,0.35), rgba(255,240,214,0) 60%);
+            radial-gradient(26vw 26vw at 86% 6%, rgba(255,240,210,0.42), rgba(255,240,210,0) 68%),
+            radial-gradient(60vw 36vh at 84% 0%, rgba(255,248,232,0.22), rgba(255,248,232,0) 58%);
           pointer-events: none;
         }
 
@@ -161,11 +162,11 @@ export default function SkyPage() {
         .sky-dot {
           position: absolute;
           border-radius: 50%;
-          background: var(--plot-brand, #1349d4);
-          box-shadow: 0 2px 10px rgba(19,73,212,0.35);
-          transform: translate(-50%, -50%) scale(0.55);
-          opacity: 0.3;
-          animation: travel 2.4s ease-in-out infinite;
+          background: #3565e0;
+          box-shadow: 0 2px 8px rgba(19,73,212,0.28);
+          transform: translate(-50%, -50%) scale(0.7);
+          opacity: 0.45;
+          animation: travel 2.6s ease-in-out infinite;
           pointer-events: none;
         }
 
@@ -218,7 +219,7 @@ export default function SkyPage() {
           display: grid; gap: 22px;
           grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
           max-width: 860px; margin: 0 auto;
-          padding: 48px 24px 96px;
+          padding: 26px 24px 96px;
         }
         .sky-card {
           background: rgba(255,255,255,0.75);
@@ -249,9 +250,9 @@ export default function SkyPage() {
           to   { left: 110vw; }
         }
         @keyframes travel {
-          0%, 100% { opacity: 0.30; transform: translate(-50%,-50%) scale(0.55); }
-          18%      { opacity: 1;    transform: translate(-50%,-50%) scale(1.15); }
-          40%      { opacity: 0.45; transform: translate(-50%,-50%) scale(0.7); }
+          0%, 100% { opacity: 0.45; transform: translate(-50%,-50%) scale(0.7); }
+          18%      { opacity: 1;    transform: translate(-50%,-50%) scale(1.1); }
+          40%      { opacity: 0.55; transform: translate(-50%,-50%) scale(0.8); }
         }
 
         @media (prefers-reduced-motion: reduce) {

@@ -28,7 +28,7 @@ import TouchZonePad from './TouchZonePad';
 const KNOB_RANGE = 42;      // px knob deflection = full stick
 const DOUBLE_TAP_MS = 320;  // knob double-tap window → (re)calibrate tilt
 
-export type FlightStyle = 'two-stick' | 'one-hand' | 'zones';
+export type FlightStyle = 'drag-look' | 'two-stick' | 'one-hand' | 'zones';
 export type Hand = 'right' | 'left';
 
 interface Props {

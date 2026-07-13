@@ -16,11 +16,13 @@
 // parcel awakens, the blue polygon draws, the card opens.
 // memory/project_phone_as_controller, project_tilt_to_fly
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import MaterialIcon from '@/components/ui/MaterialIcon';
 import FlightControls, { type FlightStyle } from './FlightControls';
+import DragLookControls from './DragLookControls';
 import TiltEdgeIndicator from './TiltEdgeIndicator';
 import { useTiltFly } from '@/lib/useTiltFly';
+import { useDragLook } from '@/lib/useDragLook';
 
 const NAV = [
   { href: '/home', icon: 'home', label: 'Home' },
@@ -33,28 +35,44 @@ const NAV = [
 ];
 
 const STYLES: { id: FlightStyle; icon: string; label: string; sub: string }[] = [
+  { id: 'drag-look', icon: 'pan_tool_alt', label: 'Move to look', sub: 'Pan stick + swipe to look around' },
   { id: 'two-stick', icon: 'sports_esports', label: 'Two sticks', sub: 'Pan + Look' },
   { id: 'one-hand', icon: 'front_hand', label: 'One hand', sub: 'Pan + tilt to climb & turn' },
   { id: 'zones', icon: 'grid_view', label: 'Zone pad', sub: 'Full-width strips' },
 ];
+const VALID_STYLES = new Set(STYLES.map((s) => s.id));
 
 const LS_STYLE = 'plotmaps.mobileFlightStyle';
 const LS_HAND = 'plotmaps.mobileHand';
+const LS_MAPFRAC = 'plotmaps.mobileMapFrac';
 type Hand = 'right' | 'left';
 
-export default function MobileFlightHUD() {
+// portrait size divider: control-band height as a fraction of viewport.
+const MIN_FRAC = 0.28, MAX_FRAC = 0.6, DEFAULT_FRAC = 0.42;
+
+export default function MobileFlightHUD({ mapElRef }: { mapElRef?: React.MutableRefObject<HTMLElement | null> }) {
   const [menu, setMenu] = useState(false);
-  const [flightStyle, setFlightStyle] = useState<FlightStyle>('two-stick');
+  const [flightStyle, setFlightStyle] = useState<FlightStyle>('drag-look');
   const [hand, setHand] = useState<Hand>('right');
+  const [frac, setFrac] = useState(DEFAULT_FRAC);
 
   useEffect(() => {
     try {
       const s = localStorage.getItem(LS_STYLE);
-      if (s === 'two-stick' || s === 'one-hand' || s === 'zones') setFlightStyle(s);
+      if (s && VALID_STYLES.has(s as FlightStyle)) setFlightStyle(s as FlightStyle);
       const h = localStorage.getItem(LS_HAND);
       if (h === 'right' || h === 'left') setHand(h);
+      const f = parseFloat(localStorage.getItem(LS_MAPFRAC) || '');
+      if (Number.isFinite(f)) setFrac(Math.min(MAX_FRAC, Math.max(MIN_FRAC, f)));
     } catch { /* ignore */ }
   }, []);
+
+  // push the size split to the shell so the map re-flows (--tzp-h drives it).
+  useEffect(() => {
+    document.documentElement.style.setProperty('--tzp-h', `${(frac * 100).toFixed(1)}vh`);
+    try { localStorage.setItem(LS_MAPFRAC, String(frac)); } catch { /* ignore */ }
+  }, [frac]);
+
   const chooseStyle = (s: FlightStyle) => {
     setFlightStyle(s);
     try { localStorage.setItem(LS_STYLE, s); } catch { /* ignore */ }
@@ -66,6 +84,28 @@ export default function MobileFlightHUD() {
 
   // Tilt-fly is active only in one-hand style; its RAF owns the pad frame then.
   const tilt = useTiltFly(flightStyle === 'one-hand');
+  // Drag-look is active in the default style; it attaches to the map element
+  // (one-finger drag = look; pinch = native zoom) and owns the pad frame then.
+  const dragLook = useDragLook(flightStyle === 'drag-look');
+  useEffect(() => {
+    dragLook.attach(flightStyle === 'drag-look' ? (mapElRef?.current ?? null) : null);
+  }, [dragLook, flightStyle, mapElRef]);
+
+  // ── portrait size divider (drag up = shrink map to landscape letterbox) ──
+  const dragging = useRef(false);
+  const startY = useRef(0);
+  const startFrac = useRef(DEFAULT_FRAC);
+  const onGripDown = (e: React.PointerEvent) => {
+    dragging.current = true; startY.current = e.clientY; startFrac.current = frac;
+    (e.target as HTMLElement).setPointerCapture?.(e.pointerId); e.preventDefault();
+  };
+  const onGripMove = (e: React.PointerEvent) => {
+    if (!dragging.current) return;
+    const dy = startY.current - e.clientY; // up = grow controls / shrink map
+    setFrac(Math.min(MAX_FRAC, Math.max(MIN_FRAC, startFrac.current + dy / window.innerHeight)));
+    e.preventDefault();
+  };
+  const onGripUp = () => { dragging.current = false; };
 
   return (
     <>
@@ -115,8 +155,8 @@ export default function MobileFlightHUD() {
               </button>
             ))}
 
-            {/* Handedness — which side the one-hand stick sits on */}
-            {flightStyle === 'one-hand' && (
+            {/* Handedness — which side the PAN stick sits on (tilt + drag-look) */}
+            {(flightStyle === 'one-hand' || flightStyle === 'drag-look') && (
               <>
                 <div className="mtb-menu__section">Stick side</div>
                 <div className="mtb-menu__hand">
@@ -142,10 +182,26 @@ export default function MobileFlightHUD() {
       {/* ── edge-line tilt feedback (one-hand only) ── */}
       {flightStyle === 'one-hand' && tilt.calibrated && <TiltEdgeIndicator tilt={tilt} />}
 
+      {/* ── SIZE DIVIDER (portrait) — drag up to shrink the map into a wider
+           landscape letterbox; drag down for a bigger map. Hidden in landscape
+           (the band is already slim there). ── */}
+      <div
+        className="mfh-grip"
+        onPointerDown={onGripDown}
+        onPointerMove={onGripMove}
+        onPointerUp={onGripUp}
+        onPointerCancel={onGripUp}
+        aria-label="Resize map"
+      >
+        <div className="mfh-grip__bar" />
+      </div>
+
       {/* ── BOTTOM CONTROLS (transparent over the full-bleed map) ── */}
       <div className="mfh">
         <div className="mfh-controls">
-          <FlightControls flightStyle={flightStyle} tilt={tilt} hand={hand} />
+          {flightStyle === 'drag-look'
+            ? <DragLookControls dragLook={dragLook} hand={hand} />
+            : <FlightControls flightStyle={flightStyle} tilt={tilt} hand={hand} />}
         </div>
       </div>
 

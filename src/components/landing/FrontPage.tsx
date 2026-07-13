@@ -183,7 +183,7 @@ export default function FrontPage() {
                 <li><span className="chk" aria-hidden>✓</span> Your request joins the map&apos;s move paths — verified before anything goes public.</li>
                 <li><span className="chk" aria-hidden>✓</span> Fly your own neighborhood — and anywhere in the world.</li>
               </ul>
-              <a href="/sky" className="fp-cta fp-cta--primary fp-intent__btn">
+              <a href="/post" className="fp-cta fp-cta--primary fp-intent__btn">
                 Claim your home <span aria-hidden>→</span>
               </a>
             </div>
@@ -210,7 +210,7 @@ export default function FrontPage() {
                 <li><span className="chk" aria-hidden>✓</span> Reach homes that aren&apos;t even listed yet.</li>
                 <li><span className="chk" aria-hidden>✓</span> Direct connection or 3-person move path — either way, you move.</li>
               </ul>
-              <a href="/sky" className="fp-cta fp-cta--primary fp-intent__btn">
+              <a href="/position" className="fp-cta fp-cta--primary fp-intent__btn">
                 Find your next place <span aria-hidden>→</span>
               </a>
             </div>
@@ -218,7 +218,7 @@ export default function FrontPage() {
 
           <p className="fp-intent__note">
             Free to post. No account needed. Private until you say otherwise —
-            <a href="/sky" style={{ fontWeight: 700, marginLeft: 4 }}>post a move request →</a>
+            <a href="/post" style={{ fontWeight: 700, marginLeft: 4 }}>post a move request →</a>
           </p>
         </div>
       </section>

@@ -13,8 +13,6 @@
 // Inherits color via currentColor. Respects reduced-motion (holds the
 // house frame — the payoff — instead of animating). memory: project_pin_grammar.
 
-const STATES = ['want', 'yours', 'active'] as const;
-
 export default function PlotMarkLive({ size = 18, className }: { size?: number; className?: string }) {
   return (
     <span

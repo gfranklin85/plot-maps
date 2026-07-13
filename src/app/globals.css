@@ -1302,8 +1302,10 @@ gmp-popover-3d-element[plot-card-popover],
   --fp-green: var(--plot-brand);
   --fp-green-deep: var(--plot-brand-deep);
   --fp-green-soft: var(--plot-brand-soft);
-  --fp-ink: #0c1322;
-  --fp-body: #4a5568;
+  /* COLOR LAW: ink is the DEEP BRAND NAVY, not near-black — reads correct
+     over the blue hero band AND fine on white. memory: feedback_brand_fidelity */
+  --fp-ink: #122d8d;
+  --fp-body: #3a4a72;
   background: #ffffff;
   color: var(--fp-ink);
   font-family: var(--font-geist-sans), Inter, sans-serif;

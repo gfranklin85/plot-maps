@@ -18,69 +18,85 @@ import { GOOGLE_MAPS_API_KEY, GOOGLE_MAPS_LIBRARIES } from '@/lib/googleMapsConf
 import { signInWithGoogle } from '@/lib/signIn';
 import { useAuth } from '@/lib/auth-context';
 import MaterialIcon from '@/components/ui/MaterialIcon';
+import PlotMarkLive from '@/components/ui/PlotMarkLive';
+import PlotLoader from '@/components/ui/PlotLoader';
+import AppHeader from '@/components/layout/AppHeader';
+import SkyWorld from '@/components/sky/SkyWorld';
 
 export default function PostMoveRequestPage() {
   const { user, loading } = useAuth();
 
-  return (
-    <div className="dsh min-h-screen">
-      {/* Signed-IN sellers get the unified AppHeader from AppShell. Only the
-          signed-OUT visitor (who falls through AppShell raw) needs this
-          lightweight marketing header on the sign-in gate. */}
-      {!user && (
-        <header className="mrq-chrome">
-          <a href="/" className="mrq-chrome__logo">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/brand/plotmaps-logo.svg" alt="PlotMaps" />
-            <span>by{/* eslint-disable-next-line @next/next/no-img-element */}<img src="/brand/position-logo.svg" alt="Position" /></span>
-          </a>
-          <nav className="mrq-chrome__nav">
-            <a className="mrq-chrome__link" href="/position">For Agents</a>
-            <a className="mrq-chrome__link" href="/position">About Position</a>
-          </nav>
-          <div className="mrq-chrome__auth">
-            <button type="button" className="mrq-chrome__login" onClick={() => signInWithGoogle('/post')}>Log in</button>
-          </div>
-        </header>
-      )}
-
-      {loading ? (
-        <div className="mrq-gate"><div className="mrq-gate__spin" /></div>
-      ) : user ? (
+  // Signed-IN: the actual intake (AppShell provides the app header).
+  if (loading) {
+    return (
+      <div className="dsh min-h-screen" style={{ display: 'grid', placeItems: 'center' }}>
+        <PlotLoader size={80} label="Getting your workspace ready…" />
+      </div>
+    );
+  }
+  if (user) {
+    return (
+      <div className="dsh min-h-screen">
         <APIProvider apiKey={GOOGLE_MAPS_API_KEY} libraries={GOOGLE_MAPS_LIBRARIES}>
           <div className="sp-page"><SellerIntake /></div>
         </APIProvider>
-      ) : (
-        <SignInGate />
-      )}
-    </div>
-  );
+      </div>
+    );
+  }
+  // Signed-OUT: the beautiful sky-framed sign-in gate.
+  return <SignInGate />;
 }
 
-// ── the seller-framed sign-in gate ──
-// Auth before the intake. Framed for the audience: you own, you want to move,
-// post it. Sets the expectation (this is for sellers with a property) and
-// filters daydreamers before a single AI token is spent.
+// ── the seller-framed sign-in gate — wears the SkyWorld ──
+// Auth before the intake (locked: no anonymous daydreamers, every post tied to
+// a real account, no AI spend on tire-kickers). Now beautiful: the Floating
+// Plots world, coordinated blues, living mark. One viewport, no scroll.
 function SignInGate() {
   return (
-    <div className="mrq-gate">
-      <span className="mrq-badge"><MaterialIcon icon="hub" className="text-[14px]" /> Real Estate Interconnector</span>
-      <h1 className="mrq-gate__h">Post your move.</h1>
-      <p className="mrq-gate__sub">
-        For owners ready to make a move: tell us where you&apos;d go and what
-        you&apos;ve got, and we&apos;ll work the map for a real connection — a direct
-        match or a multi-home move path. Private until you say otherwise.
-      </p>
-      <button className="mrq-btn mrq-btn--primary mrq-gate__btn" onClick={() => signInWithGoogle('/post')}>
-        <MaterialIcon icon="login" className="text-[18px]" /> Continue with Google
-      </button>
-      <p className="mrq-gate__fine">
-        <MaterialIcon icon="lock" className="text-[13px]" />
-        We ask you to sign in so every request is real — no spam, no selling your info.
-      </p>
-      <p className="mrq-gate__buyer">
-        Looking to buy but don&apos;t own yet? <a href="/position">That&apos;s the buyers path →</a>
-      </p>
+    <div className="post-gate">
+      <div className="fp" style={{ flex: 'none' }}>
+        <AppHeader variant="public" />
+      </div>
+      <SkyWorld>
+        <span className="post-gate__eyebrow">
+          <PlotMarkLive size={17} /> Real Estate Interconnector
+        </span>
+        <h1 className="font-headline post-gate__h">Post your move.</h1>
+        <p className="post-gate__sub">
+          Tell us what you have and where you want to go. We&apos;ll work the map
+          to uncover direct matches and multi-home move paths. Private until you
+          say otherwise.
+        </p>
+        <button className="post-gate__cta" onClick={() => signInWithGoogle('/post')}>
+          Post your move <span aria-hidden>→</span>
+        </button>
+        <p className="post-gate__fine">
+          <MaterialIcon icon="lock" className="text-[13px]" />
+          Sign in with Google so every request is real — no spam, no selling your info.
+        </p>
+      </SkyWorld>
+
+      <style>{`
+        .post-gate { height: 100svh; display: flex; flex-direction: column;
+          background: linear-gradient(180deg, #cfe0f6 0%, #dbe8fa 50%, #eaf2fd 100%); overflow: hidden; }
+        .post-gate__eyebrow { display: inline-flex; align-items: center; gap: 7px;
+          font-size: 11.5px; font-weight: 800; letter-spacing: 0.22em; text-transform: uppercase;
+          color: var(--plot-brand-deep, #122d8d); }
+        .post-gate__h { margin-top: 10px; font-size: clamp(2.6rem, 6.5vw, 4.4rem); font-weight: 800;
+          line-height: 1.02; letter-spacing: -0.02em; color: var(--plot-brand-deep, #122d8d); }
+        .post-gate__sub { margin: 16px auto 0; max-width: 460px; font-size: clamp(0.98rem, 1.5vw, 1.15rem);
+          line-height: 1.55; color: #3a4a72; }
+        .post-gate__cta { display: inline-flex; align-items: center; gap: 10px; margin-top: 30px;
+          padding: 16px 38px; border-radius: 14px; border: none; cursor: pointer;
+          background: var(--plot-brand, #1349d4); color: #fff; font-weight: 700; font-size: 16px;
+          box-shadow: 0 16px 32px -12px rgba(19,73,212,0.6);
+          transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease; }
+        .post-gate__cta:hover { transform: translateY(-2px); background: var(--plot-brand-deep, #122d8d);
+          box-shadow: 0 20px 38px -12px rgba(19,73,212,0.65); }
+        .post-gate__fine { display: flex; align-items: center; justify-content: center; gap: 6px;
+          margin: 18px auto 0; max-width: 380px; font-size: 12.5px; color: #6b7699; }
+        @media (max-width: 720px) { .post-gate__h { font-size: 2.3rem; } }
+      `}</style>
     </div>
   );
 }

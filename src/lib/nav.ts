@@ -18,10 +18,13 @@ export interface NavItem {
   note?: string;
 }
 
-/** Public (logged-out) marketing spine. */
+/** Public (logged-out) marketing spine. "Post your move" points at the
+ *  #intent section on the front page (the owner/buyer doors) — that IS the
+ *  entry. /sky is ON ICE (an extra gate the funnel didn't need; its assets +
+ *  brand system live on). memory: the_tasks. */
 export const NAV_PUBLIC: NavItem[] = [
   { label: 'The map',        href: '/map' },
-  { label: 'Post your move', href: '/sky' },
+  { label: 'Post your move', href: '/#intent' },
   { label: 'Orbit',          href: '/#orbit' },
   { label: 'The Bullpen',    href: '/bullpen' },
   { label: 'Position',       href: '/position' },

@@ -161,7 +161,16 @@ export default function FrontPage() {
           <div className="fp-intent__paths">
             {/* OWNER side */}
             <div className="fp-intent__card fp-intent__card--owner">
-              <span className="fp-intent__icon"><MaterialIcon icon="home" /></span>
+              {/* the HAVE — your home on its floating plot (the sky world's
+                  own render; same asset family as /sky). */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/sky/island-home.png"
+                alt=""
+                aria-hidden
+                style={{ width: 110, height: 110, objectFit: 'contain', display: 'block', marginBottom: 2 }}
+                draggable={false}
+              />
               <div className="fp-intent__kicker">I own a home</div>
               <h3 className="fp-intent__card-h">Claim your house. Set your status.</h3>
               <p className="fp-intent__card-p">
@@ -174,14 +183,22 @@ export default function FrontPage() {
                 <li><span className="chk" aria-hidden>✓</span> Your request joins the map&apos;s move paths — verified before anything goes public.</li>
                 <li><span className="chk" aria-hidden>✓</span> Fly your own neighborhood — and anywhere in the world.</li>
               </ul>
-              <a href="/post" className="fp-cta fp-cta--primary fp-intent__btn">
+              <a href="/sky" className="fp-cta fp-cta--primary fp-intent__btn">
                 Claim your home <span aria-hidden>→</span>
               </a>
             </div>
 
             {/* BUYER side */}
             <div className="fp-intent__card fp-intent__card--buyer">
-              <span className="fp-intent__icon"><MaterialIcon icon="travel_explore" /></span>
+              {/* the WANT — the posted-intention pin from the sky world */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/sky/pin-want.png"
+                alt=""
+                aria-hidden
+                style={{ width: 110, height: 110, objectFit: 'contain', display: 'block', marginBottom: 2 }}
+                draggable={false}
+              />
               <div className="fp-intent__kicker">I&apos;m looking to buy</div>
               <h3 className="fp-intent__card-h">Put the whole map to work.</h3>
               <p className="fp-intent__card-p">
@@ -193,7 +210,7 @@ export default function FrontPage() {
                 <li><span className="chk" aria-hidden>✓</span> Reach homes that aren&apos;t even listed yet.</li>
                 <li><span className="chk" aria-hidden>✓</span> Direct connection or 3-person move path — either way, you move.</li>
               </ul>
-              <a href="/post" className="fp-cta fp-cta--primary fp-intent__btn">
+              <a href="/sky" className="fp-cta fp-cta--primary fp-intent__btn">
                 Find your next place <span aria-hidden>→</span>
               </a>
             </div>
@@ -201,7 +218,7 @@ export default function FrontPage() {
 
           <p className="fp-intent__note">
             Free to post. No account needed. Private until you say otherwise —
-            <a href="/post" style={{ fontWeight: 700, marginLeft: 4 }}>post a move request →</a>
+            <a href="/sky" style={{ fontWeight: 700, marginLeft: 4 }}>post a move request →</a>
           </p>
         </div>
       </section>

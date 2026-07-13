@@ -17,6 +17,7 @@ import { useAuth } from '@/lib/auth-context';
 import { useProfile } from '@/lib/profile-context';
 import { signInWithGoogle } from '@/lib/signIn';
 import MaterialIcon from '@/components/ui/MaterialIcon';
+import { NAV_PUBLIC, NAV_APP, NAV_AGENT } from '@/lib/nav';
 
 export default function AppHeader({ variant = 'public' }: { variant?: 'public' | 'app' }) {
   const { user, signOut } = useAuth();
@@ -38,26 +39,21 @@ export default function AppHeader({ variant = 'public' }: { variant?: 'public' |
           </a>
 
           {variant === 'public' ? (
-            // The shared marketing nav spine — same links on every public
-            // surface so nothing orphans. memory/feedback_reveal_facts_not_hype_voice
+            // The shared marketing spine — rendered FROM the nav registry
+            // (src/lib/nav.ts), the single source of truth for the header IA.
             <div className="fp-navlinks">
-              <a className="fp-navlink" href="/map">The map</a>
-              <a className="fp-navlink" href="/sky">Post your move</a>
-              <a className="fp-navlink" href="/#intent">The Network</a>
-              <a className="fp-navlink" href="/#orbit">Orbit</a>
-              <a className="fp-navlink" href="/bullpen">The Bullpen</a>
-              <a className="fp-navlink" href="/essays">Essays</a>
-              <a className="fp-navlink" href="/position">Position</a>
+              {NAV_PUBLIC.map((item) => (
+                <a key={item.href} className="fp-navlink" href={item.href}>{item.label}</a>
+              ))}
             </div>
           ) : (
-            // The logo IS the home button — no redundant "Home" text link.
-            // These are the shared destinations every role reaches; personal
-            // stuff (My Requests, Settings) lives in the account menu.
+            // Signed-in: the buyer-shared spine + the agent deal-machine
+            // grouped under ONE menu (role-gated once profiles carry roles).
             <div className="fp-navlinks">
-              <a className="fp-navlink" href="/map?view=3d">Map</a>
-              <a className="fp-navlink" href="/post">Post a Move</a>
-              <a className="fp-navlink" href="/connections">Connections</a>
-              <a className="fp-navlink" href="/documents">Documents</a>
+              {NAV_APP.map((item) => (
+                <a key={item.href} className="fp-navlink" href={item.href}>{item.label}</a>
+              ))}
+              <AgentToolsMenu />
             </div>
           )}
 
@@ -82,6 +78,65 @@ export default function AppHeader({ variant = 'public' }: { variant?: 'public' |
         </nav>
       </div>
     </header>
+  );
+}
+
+// ── Agent tools menu — the deal-machine, grouped ──────────────────────
+// One nav item opens the whole agent toolset (from the registry) instead
+// of spraying seven links across the bar. Same open/close manners as the
+// account menu. Role-gates itself once profiles carry a role flag.
+function AgentToolsMenu() {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', onDoc);
+    document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('mousedown', onDoc); document.removeEventListener('keydown', onKey); };
+  }, [open]);
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <button
+        type="button"
+        className="fp-navlink"
+        onClick={() => setOpen((o) => !o)}
+        style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 3 }}
+      >
+        Agent tools
+        <MaterialIcon icon="expand_more" className="text-[16px]" />
+      </button>
+      {open && (
+        <div
+          style={{
+            position: 'absolute', top: 'calc(100% + 10px)', left: 0, zIndex: 60,
+            minWidth: 300, padding: 8, borderRadius: 16,
+            background: '#fff', border: '1px solid rgba(19,73,212,0.12)',
+            boxShadow: '0 24px 56px -24px rgba(20,50,120,0.45)',
+          }}
+        >
+          {NAV_AGENT.map((item) => (
+            <a
+              key={item.href}
+              href={item.href}
+              style={{ display: 'block', padding: '9px 12px', borderRadius: 10, textDecoration: 'none' }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(19,73,212,0.06)')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+            >
+              <span style={{ display: 'block', fontWeight: 700, fontSize: 14, color: 'var(--plot-ink, #0c1322)' }}>{item.label}</span>
+              {item.note && (
+                <span style={{ display: 'block', fontSize: 12, marginTop: 1, color: '#6b7689' }}>{item.note}</span>
+              )}
+            </a>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 

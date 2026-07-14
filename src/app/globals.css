@@ -1353,15 +1353,19 @@ gmp-popover-3d-element[plot-card-popover],
 .fp-hero__grid { position: relative; z-index: 2; display: flex; flex-direction: column; gap: 8px; padding-top: 40px; padding-bottom: 16px; }
 @media (min-width: 980px) { .fp-hero__grid { flex-direction: row; align-items: flex-start; min-height: 0; gap: 32px; padding-top: 30px; } }
 
+/* CTA test 2026-07-14 (Greg): headline BLACK, pill WHITE (clean, like the
+   mobile mock) — the accent line keeps its brand-blue pop. */
 .fp-pill {
   display: inline-flex; align-items: center; gap: 7px;
   font-size: 12px; font-weight: 700; letter-spacing: 0.06em;
-  color: var(--fp-green-deep); background: var(--fp-green-soft);
+  color: var(--fp-green-deep); background: #fff;
+  border: 1px solid rgba(19,73,212,0.16);
+  box-shadow: 0 6px 18px -12px rgba(20,50,120,0.4);
   padding: 6px 13px; border-radius: 999px; margin-bottom: 22px;
 }
 .fp-head {
   font-weight: 800; letter-spacing: -0.025em; line-height: 1.02;
-  font-size: clamp(34px, 4vw, 54px); color: var(--fp-ink);
+  font-size: clamp(34px, 4vw, 54px); color: #0c1322;
 }
 .fp-head .accent { color: var(--fp-green); display: block; }
 .fp-sub { margin-top: 16px; max-width: 30em; font-size: clamp(14.5px, 1.3vw, 17px); line-height: 1.5; color: var(--fp-body); }

@@ -42,7 +42,7 @@ import type { RitualTetherHandle } from "@/components/map/RitualTether";
 import ProspectListPanel from "@/components/map/ProspectListPanel";
 import OnboardingTooltips from "@/components/ui/OnboardingTooltips";
 import ProspectCoachOverlay from "@/components/map/ProspectCoachOverlay";
-import Mobile3DCoachOverlay from "@/components/map/Mobile3DCoachOverlay";
+import PanTrail from "@/components/map/PanTrail";
 import GamepadStatusChip from "@/components/map/GamepadStatusChip";
 import MapSidebar from "@/components/map/MapSidebar";
 import BuyingPanel from "@/components/map/BuyingPanel";
@@ -110,7 +110,6 @@ export default function MapPage() {
   const [showParcels, setShowParcels] = useState(false);
   const parcelColorMode: import('@/components/map/ParcelOverlay').ParcelColorMode = 'land_use';
   const has3DSupport = !!process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID;
-  const [show3DCoach, setShow3DCoach] = useState(false);
   // view3D / flightMode / walkMode are now DERIVED from the single mapMode
   // state machine (declared below, after dispatchFlight). They used to be
   // three independent booleans that desynced and trapped the user in 3D.
@@ -130,11 +129,6 @@ export default function MapPage() {
     const isMobile = window.matchMedia('(max-width: 767px)').matches;
     if (!isMobile || !has3DSupport) return;
     requestEnter3D();
-    const dismissed = window.localStorage.getItem('plotmaps.coachDismissed.mobile3D') === '1';
-    if (!dismissed) {
-      const t = setTimeout(() => setShow3DCoach(true), 600);
-      return () => clearTimeout(t);
-    }
   }, [has3DSupport, requestEnter3D]);
 
   // Distinct document title so Plot Pad can tell the MAP apart from the rest
@@ -170,12 +164,6 @@ export default function MapPage() {
   }, [has3DSupport]);
 
 
-  function dismiss3DCoach() {
-    setShow3DCoach(false);
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem('plotmaps.coachDismissed.mobile3D', '1');
-    }
-  }
   // Initial map center prefers a URL-resolved destination over the
   // profile default. This is what prevents the "flash of Lemoore"
   // when a visitor arrives via /map?destination=acapulco — the map
@@ -2350,9 +2338,9 @@ export default function MapPage() {
         <ProspectCoachOverlay onDismiss={dismissCoach} />
       )}
 
-      {show3DCoach && !walkMode && !showCoach && (
-        <Mobile3DCoachOverlay onDismiss={dismiss3DCoach} />
-      )}
+      {/* Pan-throttle trail — shows where the left-thumb pan began (neutral)
+          and where it's slid to. touch-fly only. */}
+      {touchFly && !walkMode && <PanTrail trail={gestureFlight.panTrail} />}
 
       {/* Expand map — hides mobile browser chrome. Hidden in touch-fly: the
           map is already full-bleed and the button would sit on the LOOK

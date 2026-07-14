@@ -23,17 +23,27 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { NEUTRAL, pushTouchFrame, type PadFrame } from '@/lib/touchPadBridge';
 
-const PAN_RANGE = 70;    // px offset from neutral = full throttle/strafe
+const PAN_RANGE = 78;    // px offset from neutral = full-speed pan
 const PAN_DEAD = 5;      // px dead-zone so a still finger doesn't creep
+const PAN_CURVE = 1.5;   // >1 = slide farther, accelerate MORE (Greg 2026-07-14)
 const LOOK_GAIN = 1 / 12;   // px of look-swipe per frame → look axis
 const LOOK_DECAY = 0.6;     // look rate decays when the finger stops
 const CLIMB_GAIN = 1 / 90;  // px of 2-finger vertical drag → climb axis (held)
 const clamp = (v: number) => Math.max(-1, Math.min(1, v));
 
-function shapePan(px: number): number {
-  const a = Math.abs(px);
-  if (a <= PAN_DEAD) return 0;
-  return clamp(((a - PAN_DEAD) / (PAN_RANGE - PAN_DEAD)) * Math.sign(px));
+// PAN as a VECTOR, not two clamped axes (Greg's CD/cross insight, 2026-07-14):
+// the finger doesn't sit on X or Y — it sits at an ANGLE + DISTANCE from
+// neutral (the full 360° plane). So we shape the MAGNITUDE (dead-zone → curve
+// → cap) and keep the exact direction. Fixes diagonal over-speed (two clamped
+// axes maxed a corner drag at 1.41×) and makes "slide more = faster in THAT
+// direction" true. Returns {x,y} = the pan vector components, each −1..1.
+function panVector(dx: number, dy: number): { x: number; y: number } {
+  const dist = Math.hypot(dx, dy);
+  if (dist <= PAN_DEAD) return { x: 0, y: 0 };
+  const n = Math.min(1, (dist - PAN_DEAD) / (PAN_RANGE - PAN_DEAD));
+  const speed = Math.pow(n, PAN_CURVE);   // accelerate more the farther you slide
+  const ux = dx / dist, uy = dy / dist;   // unit direction (preserves the angle)
+  return { x: ux * speed, y: uy * speed };
 }
 
 interface Pt { id: number; x0: number; y0: number; x: number; y: number; }
@@ -43,6 +53,9 @@ export function useGestureFlight(enabled: boolean) {
   // active touches in the order they landed. [0] = pan, [1..] = look/climb.
   const pts = useRef<Pt[]>([]);
   const look = useRef<{ yaw: number; pitch: number }>({ yaw: 0, pitch: 0 });
+  // live pan trail (neutral origin → current), for the on-screen indicator.
+  const panTrail = useRef<{ active: boolean; x0: number; y0: number; x: number; y: number }>(
+    { active: false, x0: 0, y0: 0, x: 0, y: 0 });
   const attach = useCallback((node: HTMLElement | null) => setEl(node), []);
 
   useEffect(() => {
@@ -57,16 +70,18 @@ export function useGestureFlight(enabled: boolean) {
       //   ry = pitch (look up/down) · rt = ascend · lt = descend
       // (The old comment there was stale; verified against the real code.)
 
-      // ── PAN (first finger) = throttle from its neutral press point ──
+      // ── PAN (first finger) = a throttle VECTOR from its neutral press point.
       if (list[0]) {
         const p = list[0];
-        const nx = shapePan(p.x - p.x0);      // + = right
-        const ny = shapePan(p.y - p.y0);      // + = down (screen)
-        f.lx = nx;                            // strafe
+        const v = panVector(p.x - p.x0, p.y - p.y0); // −1..1 each, direction kept
+        f.lx = v.x;                           // strafe (+ = right)
         // forward = drag UP (screen −y). Throttle is `ly` with `air.throttle
-        // += -ly`, so drag UP must give ly NEGATIVE → forward. ny is + when
-        // dragging down, so ly = ny (down → +ly → reverse; up → −ly → fwd).
-        f.ly = ny;
+        // += -ly`, so drag UP must give ly NEGATIVE → forward. v.y is + when
+        // dragging down, so ly = v.y (down → +ly → reverse; up → −ly → fwd).
+        f.ly = v.y;
+        panTrail.current = { active: true, x0: p.x0, y0: p.y0, x: p.x, y: p.y };
+      } else if (panTrail.current.active) {
+        panTrail.current.active = false;
       }
 
       // ── extra fingers ──
@@ -128,8 +143,11 @@ export function useGestureFlight(enabled: boolean) {
         const lookPt = list[1];
         const t = Array.from(e.touches).find((x) => x.identifier === lookPt.id);
         if (t) {
-          look.current.yaw += (t.clientX - lookPt.x) * LOOK_GAIN;
-          look.current.pitch += -(t.clientY - lookPt.y) * LOOK_GAIN; // drag up = pitch up
+          // "grab the ground and slide it" — BOTH axes negate the finger delta,
+          // so drag-right spins the world right and drag-up pitches up, matching
+          // the vertical feel (Greg 2026-07-14: horizontal was inverted).
+          look.current.yaw += -(t.clientX - lookPt.x) * LOOK_GAIN;
+          look.current.pitch += -(t.clientY - lookPt.y) * LOOK_GAIN;
         }
       }
       // update all stored positions
@@ -153,5 +171,7 @@ export function useGestureFlight(enabled: boolean) {
     };
   }, [enabled, el]);
 
-  return { attach };
+  // the live pan trail ref (neutral origin → current finger), read per-frame
+  // by the on-screen indicator. Stable across renders.
+  return { attach, panTrail };
 }

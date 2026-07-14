@@ -45,6 +45,7 @@ import ProspectCoachOverlay from "@/components/map/ProspectCoachOverlay";
 import Mobile3DCoachOverlay from "@/components/map/Mobile3DCoachOverlay";
 import GamepadStatusChip from "@/components/map/GamepadStatusChip";
 import MapSidebar from "@/components/map/MapSidebar";
+import BuyingPanel from "@/components/map/BuyingPanel";
 import SidebarPropertyCard from "@/components/map/SidebarPropertyCard";
 import { useMapMode } from "@/lib/useMapMode";
 import FlightTuningPanel from "@/components/map/FlightTuningPanel";
@@ -1907,6 +1908,13 @@ export default function MapPage() {
             <span className="mssn-hud__ask">Ask: staying for good? what would have to be true to move?</span>
           </div>
         )}
+        {/* BUYING RAIL — settings + live market snapshot + payment fit,
+            docked left, OPEN on load ("the map needs to come out like this",
+            Greg 2026-07-14 mockup). Shares the listings build's settings
+            store + market API. Hidden while a property card holds the left
+            column, in walk mode, or during the spike back-out. */}
+        {!walkMode && !spikeZoom && !cardOpen && <BuyingPanel />}
+
         {/* CARD COLUMN — lives in the freed LEFT matte when a card is open.
             Never crosses the map glass; the map shrank to make room. */}
         {cardOpen && (

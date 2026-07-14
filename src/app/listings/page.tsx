@@ -24,16 +24,19 @@ import PlotMarkLive from '@/components/ui/PlotMarkLive';
 import BuyerSettingsPanel from '@/components/listings/BuyerSettingsPanel';
 import MarketSidebar from '@/components/listings/MarketSidebar';
 import PlatTile from '@/components/listings/PlatTile';
+import ListingsMap from '@/components/listings/ListingsMap';
 import { loadSettings, paymentFor, type BuyerSettings, DEFAULT_SETTINGS } from '@/lib/listings/buyerSettings';
 
 interface Listing {
-  id: string; address: string; city: string | null; state: string | null;
+  id: string; address: string; city: string | null; state: string | null; zip?: string | null;
   price: number | null; beds: number | null; baths: number | null; sqft: number | null;
   lot_sqft?: number | null; year_built?: number | null; dom?: number | null;
   property_type: string | null; photos: string[]; status: string;
+  lat?: number | null; lng?: number | null;
 }
 
 type Sort = 'pay' | 'priceAsc' | 'priceDesc' | 'sqft';
+type View = 'list' | 'map';
 
 export default function ListingsPage() {
   const [listings, setListings] = useState<Listing[]>([]);
@@ -43,6 +46,7 @@ export default function ListingsPage() {
   const [settings, setSettings] = useState<BuyerSettings>(DEFAULT_SETTINGS);
   const [selected, setSelected] = useState<Listing | null>(null);
   const [mobileSettings, setMobileSettings] = useState(false);
+  const [view, setView] = useState<View>('list');
 
   useEffect(() => { setSettings(loadSettings()); }, []);
 
@@ -82,6 +86,136 @@ export default function ListingsPage() {
     counts.forEach((v, k) => { if (v > n) { n = v; best = k; } });
     return best ?? 'Lemoore';
   }, [selected, listings]);
+
+  // one card row, shared by the list view and the map view's side column
+  const renderRow = (l: Listing) => {
+    const price = l.price ?? 0;
+    const pay = price > 0 ? paymentFor(settings, price) : null;
+    const overUnder = pay ? pay.total - settings.targetMonthly : 0;
+    const ppsf = price > 0 && l.sqft ? Math.round(price / l.sqft) : null;
+    const isComp = l.id.startsWith('comp:');
+    return (
+      <button key={l.id} className={`lrow ${selected?.id === l.id ? 'is-sel' : ''}`} onClick={() => setSelected(l)}>
+        <div className="lrow__photo">
+          {l.photos?.[0]
+            // eslint-disable-next-line @next/next/no-img-element
+            ? <img src={l.photos[0]} alt={l.address} />
+            : <PlatTile seed={l.id} />}
+        </div>
+        <div className="lrow__body">
+          <div className="lrow__paylabel">Estimated monthly payment</div>
+          <div className="lrow__pay">
+            {pay
+              ? <><i>~</i>${Math.round(pay.total).toLocaleString()}<em>/mo</em></>
+              : 'Contact for price'}
+          </div>
+          <div className="lrow__addr">{l.address}</div>
+          <div className="lrow__facts">
+            {price > 0 && <span className="lrow__price">${price.toLocaleString()}</span>}
+            {price > 0 && <span className="lrow__est"> · estimated with your settings</span>}
+          </div>
+          <div className="lrow__specs">
+            {l.beds != null && <span>{l.beds} bd</span>}
+            {l.baths != null && <span>{l.baths} ba</span>}
+            {l.sqft != null && <span>{l.sqft.toLocaleString()} sqft</span>}
+            {ppsf != null && <span>${ppsf}/sqft</span>}
+            {l.year_built != null && <span>built {l.year_built}</span>}
+            {l.dom != null && l.dom > 0 && <span>{l.dom}d on market</span>}
+          </div>
+          {pay && (
+            <div className="lrow__tags">
+              {overUnder <= 0
+                ? <span className="ltag ltag--ok"><MaterialIcon icon="check_circle" className="text-[13px]" /> {Math.abs(overUnder) < 1 ? 'Fits target' : `$${Math.abs(Math.round(overUnder)).toLocaleString()}/mo under target`}</span>
+                : <span className="ltag ltag--over"><MaterialIcon icon="north_east" className="text-[13px]" /> ${Math.round(overUnder).toLocaleString()}/mo over target</span>}
+              {settings.loanType === 'va' && <span className="ltag">VA-friendly</span>}
+            </div>
+          )}
+        </div>
+        <div className="lrow__cta">
+          {isComp
+            ? <span className="lrow__hint">Select to compare</span>
+            : <Link href={`/listings/${l.id}`} className="lrow__view" onClick={(e) => e.stopPropagation()}>View details</Link>}
+        </div>
+      </button>
+    );
+  };
+
+  // ═══ MAP VIEW — the inventory ON the map (Greg 2026-07-14 mockup):
+  // our map + $X/mo pins beside the cards; click a home → mini card with
+  // SEND POSTCARD. Settings edit via the drawer overlay. ═══
+  if (view === 'map') {
+    return (
+      <div className="lb">
+        <div className="fp" style={{ flex: 'none' }}>
+          <AppHeader variant="public" />
+        </div>
+
+        <div className="lb__mapwrap">
+          <div className="lb__maphead">
+            <div className="lb__search lb__search--map">
+              <MaterialIcon icon="search" className="text-[20px] lb__search-ic" />
+              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search by address, neighborhood, or keyword" />
+            </div>
+            <button className="lb__setstrip" onClick={() => setMobileSettings(true)}>
+              <MaterialIcon icon="tune" className="text-[16px]" />
+              <b>Buyer settings</b>
+              <span>
+                {settings.ratePct.toFixed(2)}% ·{' '}
+                {settings.downType === 'percent' ? `${settings.downPercent}% down` : `$${settings.downDollar.toLocaleString()} down`} ·{' '}
+                target ${settings.targetMonthly.toLocaleString()}/mo
+              </span>
+              <em>Edit</em>
+            </button>
+            <ViewToggle view={view} onView={setView} />
+          </div>
+
+          <div className="lmv">
+            <div className="lmv__map">
+              <ListingsMap
+                listings={sorted}
+                settings={settings}
+                selected={selected}
+                onSelect={(l) => setSelected(l as Listing | null)}
+              />
+            </div>
+            <div className="lmv__side">
+              <div className="lb__count-row" style={{ margin: '0 2px 10px' }}>
+                <span className="lb__count">{loading ? 'Loading…' : `${sorted.length} home${sorted.length === 1 ? '' : 's'}`}</span>
+                <label className="lb__sort">
+                  Sort
+                  <select value={sort} onChange={(e) => setSort(e.target.value as Sort)}>
+                    <option value="pay">Payment (low → high)</option>
+                    <option value="priceAsc">Price (low → high)</option>
+                    <option value="priceDesc">Price (high → low)</option>
+                    <option value="sqft">Square feet</option>
+                  </select>
+                </label>
+              </div>
+              <div className="lmv__cards">{sorted.map(renderRow)}</div>
+            </div>
+          </div>
+        </div>
+
+        {/* settings drawer — overlay at every width in map view */}
+        <aside
+          className={`lb__left lb__left--overlay ${mobileSettings ? 'is-open' : ''}`}
+          onClick={(e) => { if (e.target === e.currentTarget) setMobileSettings(false); }}
+        >
+          <div className="lb__left-inner">
+            <div className="lb__drawer-bar" style={{ display: 'flex' }}>
+              <span>Your buying settings</span>
+              <button onClick={() => setMobileSettings(false)} aria-label="Close settings">
+                <MaterialIcon icon="close" className="text-[20px]" />
+              </button>
+            </div>
+            <BuyerSettingsPanel settings={settings} onChange={setSettings} />
+          </div>
+        </aside>
+
+        <ListingsStyles />
+      </div>
+    );
+  }
 
   return (
     <div className="lb">
@@ -126,69 +260,22 @@ export default function ListingsPage() {
 
           <div className="lb__count-row">
             <span className="lb__count">{loading ? 'Loading…' : `${sorted.length} home${sorted.length === 1 ? '' : 's'}`}</span>
-            <label className="lb__sort">
-              Sort
-              <select value={sort} onChange={(e) => setSort(e.target.value as Sort)}>
-                <option value="pay">Payment (low → high)</option>
-                <option value="priceAsc">Price (low → high)</option>
-                <option value="priceDesc">Price (high → low)</option>
-                <option value="sqft">Square feet</option>
-              </select>
-            </label>
+            <div className="lb__count-tools">
+              <ViewToggle view={view} onView={setView} />
+              <label className="lb__sort">
+                Sort
+                <select value={sort} onChange={(e) => setSort(e.target.value as Sort)}>
+                  <option value="pay">Payment (low → high)</option>
+                  <option value="priceAsc">Price (low → high)</option>
+                  <option value="priceDesc">Price (high → low)</option>
+                  <option value="sqft">Square feet</option>
+                </select>
+              </label>
+            </div>
           </div>
 
           <div className="lb__list">
-            {sorted.map((l) => {
-              const price = l.price ?? 0;
-              const pay = price > 0 ? paymentFor(settings, price) : null;
-              const overUnder = pay ? pay.total - settings.targetMonthly : 0;
-              const ppsf = price > 0 && l.sqft ? Math.round(price / l.sqft) : null;
-              const isComp = l.id.startsWith('comp:');
-              return (
-                <button key={l.id} className={`lrow ${selected?.id === l.id ? 'is-sel' : ''}`} onClick={() => setSelected(l)}>
-                  <div className="lrow__photo">
-                    {l.photos?.[0]
-                      // eslint-disable-next-line @next/next/no-img-element
-                      ? <img src={l.photos[0]} alt={l.address} />
-                      : <PlatTile seed={l.id} />}
-                  </div>
-                  <div className="lrow__body">
-                    <div className="lrow__paylabel">Estimated monthly payment</div>
-                    <div className="lrow__pay">
-                      {pay
-                        ? <><i>~</i>${Math.round(pay.total).toLocaleString()}<em>/mo</em></>
-                        : 'Contact for price'}
-                    </div>
-                    <div className="lrow__addr">{l.address}</div>
-                    <div className="lrow__facts">
-                      {price > 0 && <span className="lrow__price">${price.toLocaleString()}</span>}
-                      {price > 0 && <span className="lrow__est"> · estimated with your settings</span>}
-                    </div>
-                    <div className="lrow__specs">
-                      {l.beds != null && <span>{l.beds} bd</span>}
-                      {l.baths != null && <span>{l.baths} ba</span>}
-                      {l.sqft != null && <span>{l.sqft.toLocaleString()} sqft</span>}
-                      {ppsf != null && <span>${ppsf}/sqft</span>}
-                      {l.year_built != null && <span>built {l.year_built}</span>}
-                      {l.dom != null && l.dom > 0 && <span>{l.dom}d on market</span>}
-                    </div>
-                    {pay && (
-                      <div className="lrow__tags">
-                        {overUnder <= 0
-                          ? <span className="ltag ltag--ok"><MaterialIcon icon="check_circle" className="text-[13px]" /> {Math.abs(overUnder) < 1 ? 'Fits target' : `$${Math.abs(Math.round(overUnder)).toLocaleString()}/mo under target`}</span>
-                          : <span className="ltag ltag--over"><MaterialIcon icon="north_east" className="text-[13px]" /> ${Math.round(overUnder).toLocaleString()}/mo over target</span>}
-                        {settings.loanType === 'va' && <span className="ltag">VA-friendly</span>}
-                      </div>
-                    )}
-                  </div>
-                  <div className="lrow__cta">
-                    {isComp
-                      ? <span className="lrow__hint">Select to compare</span>
-                      : <Link href={`/listings/${l.id}`} className="lrow__view" onClick={(e) => e.stopPropagation()}>View details</Link>}
-                  </div>
-                </button>
-              );
-            })}
+            {sorted.map(renderRow)}
             {!loading && sorted.length === 0 && (
               <div className="lb__empty">
                 <MaterialIcon icon="home" className="text-[40px] opacity-40" />
@@ -210,6 +297,20 @@ export default function ListingsPage() {
       </div>
 
       <ListingsStyles />
+    </div>
+  );
+}
+
+// List | Map — the two ways of seeing the inventory
+function ViewToggle({ view, onView }: { view: View; onView: (v: View) => void }) {
+  return (
+    <div className="lb__viewtog">
+      <button className={view === 'list' ? 'is-on' : ''} onClick={() => onView('list')}>
+        <MaterialIcon icon="view_agenda" className="text-[15px]" /> List
+      </button>
+      <button className={view === 'map' ? 'is-on' : ''} onClick={() => onView('map')}>
+        <MaterialIcon icon="map" className="text-[15px]" /> Map
+      </button>
     </div>
   );
 }
@@ -303,6 +404,46 @@ function ListingsStyles() {
       .lrow__hint { font-size: 12px; font-weight: 700; color: #8a96b5; white-space: nowrap; }
       .lb__empty { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 70px 20px;
         color: #6b7699; text-align: center; }
+
+      /* ── MAP VIEW ── */
+      .lb__viewtog { display: inline-flex; border: 1px solid rgba(19,73,212,0.16); border-radius: 10px; overflow: hidden; background: #fff; }
+      .lb__viewtog button { display: inline-flex; align-items: center; gap: 5px; padding: 6px 13px;
+        font-size: 12.5px; font-weight: 800; color: #6b7699; background: none; border: none; cursor: pointer; }
+      .lb__viewtog button.is-on { background: var(--plot-brand, #1349d4); color: #fff; }
+      .lb__count-tools { display: inline-flex; align-items: center; gap: 12px; }
+
+      .lb__mapwrap { max-width: 1560px; margin: 0 auto; padding: 16px 20px 20px;
+        height: calc(100svh - 70px); display: flex; flex-direction: column; }
+      .lb__maphead { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+      .lb__search--map { flex: 1; min-width: 260px; margin-top: 0; }
+      .lb__setstrip { display: inline-flex; align-items: center; gap: 8px; padding: 10px 14px; border-radius: 12px;
+        background: #fff; border: 1px solid rgba(19,73,212,0.14); cursor: pointer; font-size: 12.5px; color: #4d5d82;
+        box-shadow: 0 1px 2px rgba(13,27,62,0.04); white-space: nowrap; }
+      .lb__setstrip .material-symbols-rounded, .lb__setstrip .material-symbols-outlined { color: var(--plot-brand, #1349d4); }
+      .lb__setstrip b { color: var(--plot-brand-deep, #122d8d); font-weight: 800; }
+      .lb__setstrip em { font-style: normal; font-weight: 800; color: var(--plot-brand, #1349d4); }
+
+      .lmv { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(360px, 1fr);
+        gap: 16px; margin-top: 14px; }
+      .lmv__map { min-height: 0; }
+      .lmv__map > * { height: 100%; }
+      .lmv__side { min-height: 0; display: flex; flex-direction: column; }
+      .lmv__cards { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 12px;
+        padding-right: 4px; padding-bottom: 10px; }
+      .lmv .lrow { grid-template-columns: 150px 1fr; }
+      .lmv .lrow__cta { display: none; }
+
+      /* the settings drawer as an overlay at every width (map view) */
+      .lb__left--overlay { display: none; position: fixed; inset: 0; z-index: 90;
+        background: rgba(13,27,62,0.42); overflow: auto; padding: 16px; }
+      .lb__left--overlay.is-open { display: block; }
+      .lb__left--overlay .lb__left-inner { max-width: 380px; margin: 8px auto 40px; }
+
+      @media (max-width: 900px) {
+        .lmv { grid-template-columns: 1fr; }
+        .lmv__side { display: none; } /* mobile map view: map + mini card only */
+        .lb__mapwrap { height: calc(100svh - 64px); padding: 10px 12px 12px; }
+      }
 
       /* responsive: settings become a drawer, right rail drops */
       @media (max-width: 1200px) {

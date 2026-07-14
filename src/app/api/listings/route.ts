@@ -86,7 +86,7 @@ export async function GET(req: Request) {
   if (url.searchParams.get('includeComps') === '1') {
     let cq = supabaseAdmin
       .from('sold_comps')
-      .select('id, address, city, state, zip, list_price, sqft, lot_acres, year_built, dom, status')
+      .select('id, address, city, state, zip, list_price, sqft, lot_acres, year_built, dom, status, lat, lng')
       .eq('status', 'A')
       .order('list_date', { ascending: false })
       .limit(200);
@@ -99,7 +99,9 @@ export async function GET(req: Request) {
     const compRows = (comps ?? []).map((c) => ({
       id: `comp:${c.id}`,
       address: c.address, city: c.city, state: c.state, zip: c.zip,
-      lat: null, lng: null, apn: null,
+      // geocoded 2026-07-14 against OUR OWN addresses table (152/165 matched
+      // by street number + zip5 + street-name token — no external geocoder)
+      lat: c.lat ?? null, lng: c.lng ?? null, apn: null,
       status: 'active',
       price: c.list_price, beds: null, baths: null,
       sqft: c.sqft, lot_sqft: c.lot_acres ? Math.round((c.lot_acres as number) * 43560) : null,

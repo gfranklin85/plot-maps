@@ -9,11 +9,26 @@
 //   3 fingers = PAN + CLIMB
 // (Handled by useGestureFlight in the map page, attached to #mfh-gesture.)
 //
-// This HUD is just the top-left HAMBURGER (nav) + the gesture pad + a fading
-// legend. memory/project_tilt_to_fly
+// This HUD is just the top-left HAMBURGER (nav + flight controls) + the
+// transparent gesture pad. NOTHING on the map surface. memory/project_tilt_to_fly
 
 import { useState } from 'react';
+import type { CSSProperties } from 'react';
 import MaterialIcon from '@/components/ui/MaterialIcon';
+
+// Flight-speed slider range (mirrors useFlightTuning AXIS_RANGES.multiplier:
+// 0.52..11 — top end ≈ 1000 mph ground speed, altitude-scaled).
+const SPEED_MIN = 0.52;
+const SPEED_MAX = 11;
+
+export type FlightControlMode = 'gesture' | 'google';
+
+interface Props {
+  flightControlMode: FlightControlMode;
+  onFlightControlMode: (m: FlightControlMode) => void;
+  speedMultiplier: number;
+  onSpeedMultiplier: (v: number) => void;
+}
 
 const NAV = [
   { href: '/home', icon: 'home', label: 'Home' },
@@ -25,8 +40,13 @@ const NAV = [
   { href: '/settings', icon: 'settings', label: 'Settings' },
 ];
 
-export default function MobileFlightHUD() {
+export default function MobileFlightHUD({
+  flightControlMode, onFlightControlMode, speedMultiplier, onSpeedMultiplier,
+}: Props) {
   const [menu, setMenu] = useState(false);
+  const speedFill = { '--fill': `${((speedMultiplier - SPEED_MIN) / (SPEED_MAX - SPEED_MIN)) * 100}%` } as CSSProperties;
+  // a friendly speed label: multiplier → rough "top ground speed" feel
+  const speedLabel = speedMultiplier < 1 ? 'Slow' : speedMultiplier < 2.5 ? 'Cruise' : speedMultiplier < 6 ? 'Fast' : 'Warp';
 
   return (
     <>
@@ -56,6 +76,39 @@ export default function MobileFlightHUD() {
                 <span>{n.label}</span>
               </a>
             ))}
+
+            {/* ── FLIGHT CONTROLS ── */}
+            <div className="mtb-menu__section">Flying</div>
+            <div className="mtb-menu__seg">
+              <button
+                className={`mtb-menu__segbtn ${flightControlMode === 'gesture' ? 'is-on' : ''}`}
+                onClick={() => onFlightControlMode('gesture')}
+              >
+                <MaterialIcon icon="flight" className="text-[17px]" /> Gesture flight
+              </button>
+              <button
+                className={`mtb-menu__segbtn ${flightControlMode === 'google' ? 'is-on' : ''}`}
+                onClick={() => onFlightControlMode('google')}
+              >
+                <MaterialIcon icon="map" className="text-[17px]" /> Google controls
+              </button>
+            </div>
+
+            {flightControlMode === 'gesture' && (
+              <div className="mtb-menu__speed">
+                <div className="mtb-menu__speed-row">
+                  <span>Flight speed</span>
+                  <span className="mtb-menu__speed-val">{speedLabel}</span>
+                </div>
+                <input
+                  className="mtb-menu__slider" type="range"
+                  min={SPEED_MIN} max={SPEED_MAX} step={0.05}
+                  value={speedMultiplier} style={speedFill}
+                  onChange={(e) => onSpeedMultiplier(+e.target.value)}
+                />
+                <div className="mtb-menu__speed-ticks"><span>Slow</span><span>Cruise</span><span>Warp</span></div>
+              </div>
+            )}
           </div>
         </div>
       )}

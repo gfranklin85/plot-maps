@@ -163,6 +163,21 @@ export default function MapPage() {
     setTouchFly(true);
   }, [has3DSupport]);
 
+  // Mobile flight-control mode: 'gesture' (our 1/2/3-finger flight) or
+  // 'google' (native Google map controls — no synthetic pad, no gesture
+  // handler). Remembered per device (Greg 2026-07-14).
+  const [flightControlMode, setFlightControlMode] = useState<'gesture' | 'google'>('gesture');
+  useEffect(() => {
+    try {
+      const m = localStorage.getItem('plotmaps.flightControlMode');
+      if (m === 'gesture' || m === 'google') setFlightControlMode(m);
+    } catch { /* ignore */ }
+  }, []);
+  const chooseFlightControl = (m: 'gesture' | 'google') => {
+    setFlightControlMode(m);
+    try { localStorage.setItem('plotmaps.flightControlMode', m); } catch { /* ignore */ }
+  };
+
 
   // Initial map center prefers a URL-resolved destination over the
   // profile default. This is what prevents the "flash of Lemoore"
@@ -443,10 +458,13 @@ export default function MapPage() {
   // Attach to the MAP element itself (not an overlay) so a plain TAP reaches
   // Google's gmp-click for parcel select, while a DRAG drives flight (the hook
   // only preventDefaults on move). The map mounts async (forwarded ref), poll.
-  const gestureFlight = useGestureFlight(touchFly && !walkMode);
+  // Gesture flight runs only in our 'gesture' control mode. In 'google' mode
+  // we leave the map's touch to Google's native controls entirely.
+  const gestureOn = touchFly && !walkMode && flightControlMode === 'gesture';
+  const gestureFlight = useGestureFlight(gestureOn);
   const gestureAttach = gestureFlight.attach;
   useEffect(() => {
-    const on = touchFly && !walkMode;
+    const on = gestureOn;
     if (!on) { gestureAttach(null); return; }
     let raf = 0;
     const tryAttach = () => {
@@ -456,7 +474,7 @@ export default function MapPage() {
     };
     tryAttach();
     return () => { cancelAnimationFrame(raf); gestureAttach(null); };
-  }, [gestureAttach, touchFly, walkMode]);
+  }, [gestureAttach, gestureOn]);
 
   // Apply pending "enter 3D" intents raised before the machine existed
   // (mobile default, URL/destination arrivals).
@@ -506,12 +524,20 @@ export default function MapPage() {
   // flightMode stays 'overhead' and MapView3D's pad loop is DISABLED
   // (gamepadEnabled = flightMode==='airplane') — the on-screen sticks moved
   // NOTHING. Force it true so the loop reads the touch pad and the camera flies.
+  // Only force airplane mode in GESTURE control mode. In 'google' mode we keep
+  // the pad disconnected so flightMode stays 'overhead' and Google's own touch
+  // controls drive the map (Greg 2026-07-14).
   useEffect(() => {
-    if (touchFly) setPageGamepadConnected(true);
-  }, [touchFly]);
+    setPageGamepadConnected(touchFly && flightControlMode === 'gesture');
+  }, [touchFly, flightControlMode]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    // On mobile touch-fly the synthetic pad's connection is managed EXPLICITLY
+    // above (gated by flightControlMode). Skip this desktop Steam-gamepad poll
+    // so it can't see the synthetic pad and force airplane mode in 'google'
+    // control mode. Greg 2026-07-14.
+    if (touchFly) return;
 
     // ── Why this is more elaborate than a plain gamepadconnected listener ──
     // Per docs/controller-setup.md, Steam Input is configured to consume
@@ -604,7 +630,8 @@ export default function MapPage() {
       window.removeEventListener('gamepadconnected', onConnect);
       window.removeEventListener('gamepaddisconnected', onDisconnect);
     };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [touchFly]);
 
   // (Gamepad → mode is now handled by the mapMode machine effect above.)
 
@@ -2179,7 +2206,12 @@ export default function MapPage() {
           card. memory/project_phone_as_controller */}
       {touchFly && (
         <div className="map-touchpad">
-          <MobileFlightHUD />
+          <MobileFlightHUD
+            flightControlMode={flightControlMode}
+            onFlightControlMode={chooseFlightControl}
+            speedMultiplier={flightTuning.multiplier}
+            onSpeedMultiplier={setFlightMultiplier}
+          />
         </div>
       )}
 
@@ -2340,7 +2372,7 @@ export default function MapPage() {
 
       {/* Pan-throttle trail — shows where the left-thumb pan began (neutral)
           and where it's slid to. touch-fly only. */}
-      {touchFly && !walkMode && <PanTrail trail={gestureFlight.panTrail} />}
+      {gestureOn && <PanTrail trail={gestureFlight.panTrail} />}
 
       {/* Expand map — hides mobile browser chrome. Hidden in touch-fly: the
           map is already full-bleed and the button would sit on the LOOK

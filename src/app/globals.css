@@ -2202,7 +2202,10 @@ gmp-popover-3d-element[plot-card-popover],
 .map-shell--touchfly .map-shell__body { inset: 0; }
 .map-shell--touchfly .map-shell__region { inset: 0; }
 /* we own flight gestures on the map — stop the browser hijacking multi-touch */
-.map-shell--touchfly .map-frame { inset: 0; touch-action: none; }
+/* Google owns the map touches now (native look/pan/rotate/zoom); the tether
+   squares capture only their own pointer. So NO touch-action:none here — that
+   would kill Google's gestures. Greg 2026-07-14. */
+.map-shell--touchfly .map-frame { inset: 0; }
 
 /* the gesture pad is now pointer-events:none (visual/hint only) — the flight
    touch listeners live on the MAP element itself, so a plain tap still reaches
@@ -2320,11 +2323,37 @@ gmp-popover-3d-element[plot-card-popover],
 .mfh-grip__bar { width: 42px; height: 5px; border-radius: 999px; background: rgba(19,73,212,0.5); }
 @media (orientation: landscape) and (max-height: 500px) { .mfh-grip { display: none; } }
 
-/* ── GESTURE PAD (.mfh-gesture) — NO BUTTONS; the touches are the control ──
-   The invisible control surface below the letterbox map. We own all touch here
-   (touch-action:none): 1 finger = pan · 2 = pan+look · 3 = pan+climb. A faint
-   legend fades on first touch. memory/project_tilt_to_fly */
-.mfh-gesture { touch-action: none; }
+/* ── TETHER SQUARES (.tsq) — the only flight controls on the map ────────
+   Bungee sticks over Google's native controls. PAN (2D) + CLIMB (vertical).
+   Fixed, translucent, thumb-reachable; capture only their own pointer (the
+   .map-touchpad wrapper is pointer-events:none, these re-enable). Greg
+   2026-07-14. memory/project_tilt_to_fly */
+.tsq {
+  position: fixed; z-index: 50; pointer-events: auto; touch-action: none;
+  display: flex; flex-direction: column; align-items: center; gap: 5px;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 26px);
+  user-select: none; -webkit-user-select: none;
+}
+.tsq--pan   { left: 24px; }
+.tsq--climb { right: 24px; }
+.tsq__label { font-size: 10px; font-weight: 800; letter-spacing: 1.5px; color: rgba(19,73,212,0.75); }
+.tsq__pad {
+  position: relative; width: 56px; height: 56px; border-radius: 16px;
+  background: rgba(255,255,255,0.30); border: 1.5px solid rgba(255,255,255,0.7);
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  box-shadow: 0 8px 22px -10px rgba(20,50,120,0.4);
+  display: grid; place-items: center; transition: background .12s;
+}
+.tsq.is-pulling .tsq__pad { background: rgba(19,73,212,0.10); }
+.tsq__tether { position: absolute; inset: 0; width: 56px; height: 56px; overflow: visible; pointer-events: none; }
+.tsq__tether line { stroke: rgba(19,73,212,0.45); stroke-width: 3; stroke-linecap: round; }
+.tsq__knob {
+  position: relative; z-index: 2; width: 40px; height: 40px; border-radius: 12px;
+  display: grid; place-items: center; color: #fff;
+  background: radial-gradient(circle at 50% 36%, #4d84ea, #1349d4);
+  border: 2px solid rgba(255,255,255,0.9); box-shadow: 0 4px 12px -3px rgba(19,73,212,0.6);
+  will-change: transform;
+}
 
 /* ── TiltEdgeIndicator (.tei) — "liquid border" tilt feedback ───────────
    Thin edge lines that grow from center to show live climb/turn. Nearly

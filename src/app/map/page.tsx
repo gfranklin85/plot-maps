@@ -12,7 +12,7 @@ import type { PinMode } from "@/components/map/MapView";
 import StreetViewProspecting from "@/components/map/StreetViewProspecting";
 import MobileFlightHUD from "@/components/map/MobileFlightHUD";
 import { installTouchPad } from "@/lib/touchPadBridge";
-import { useGestureFlight } from "@/lib/useGestureFlight";
+import { useTetherFlight } from "@/lib/useTetherFlight";
 import ProspectSearch from "@/components/dashboard/ProspectSearch";
 import { PRIORITIES } from "@/lib/constants";
 import { useProfile } from "@/lib/profile-context";
@@ -42,7 +42,6 @@ import type { RitualTetherHandle } from "@/components/map/RitualTether";
 import ProspectListPanel from "@/components/map/ProspectListPanel";
 import OnboardingTooltips from "@/components/ui/OnboardingTooltips";
 import ProspectCoachOverlay from "@/components/map/ProspectCoachOverlay";
-import PanTrail from "@/components/map/PanTrail";
 import GamepadStatusChip from "@/components/map/GamepadStatusChip";
 import MapSidebar from "@/components/map/MapSidebar";
 import BuyingPanel from "@/components/map/BuyingPanel";
@@ -163,20 +162,6 @@ export default function MapPage() {
     setTouchFly(true);
   }, [has3DSupport]);
 
-  // Mobile flight-control mode: 'gesture' (our 1/2/3-finger flight) or
-  // 'google' (native Google map controls — no synthetic pad, no gesture
-  // handler). Remembered per device (Greg 2026-07-14).
-  const [flightControlMode, setFlightControlMode] = useState<'gesture' | 'google'>('gesture');
-  useEffect(() => {
-    try {
-      const m = localStorage.getItem('plotmaps.flightControlMode');
-      if (m === 'gesture' || m === 'google') setFlightControlMode(m);
-    } catch { /* ignore */ }
-  }, []);
-  const chooseFlightControl = (m: 'gesture' | 'google') => {
-    setFlightControlMode(m);
-    try { localStorage.setItem('plotmaps.flightControlMode', m); } catch { /* ignore */ }
-  };
 
 
   // Initial map center prefers a URL-resolved destination over the
@@ -458,23 +443,11 @@ export default function MapPage() {
   // Attach to the MAP element itself (not an overlay) so a plain TAP reaches
   // Google's gmp-click for parcel select, while a DRAG drives flight (the hook
   // only preventDefaults on move). The map mounts async (forwarded ref), poll.
-  // Gesture flight runs only in our 'gesture' control mode. In 'google' mode
-  // we leave the map's touch to Google's native controls entirely.
-  const gestureOn = touchFly && !walkMode && flightControlMode === 'gesture';
-  const gestureFlight = useGestureFlight(gestureOn);
-  const gestureAttach = gestureFlight.attach;
-  useEffect(() => {
-    const on = gestureOn;
-    if (!on) { gestureAttach(null); return; }
-    let raf = 0;
-    const tryAttach = () => {
-      const el = map3DElRef.current;
-      if (el) { gestureAttach(el); return; }
-      raf = requestAnimationFrame(tryAttach);
-    };
-    tryAttach();
-    return () => { cancelAnimationFrame(raf); gestureAttach(null); };
-  }, [gestureAttach, gestureOn]);
+  // Mobile flight = Google native controls on the whole screen + two overlay
+  // TETHER SQUARES (pan + climb). The squares write lx/ly/rt/lt; look (rx/ry)
+  // stays Google's. When both squares are neutral the flight loop idle-returns
+  // and Google's native gestures move the camera. memory/project_tilt_to_fly
+  const tetherFlight = useTetherFlight(touchFly && !walkMode);
 
   // Apply pending "enter 3D" intents raised before the machine existed
   // (mobile default, URL/destination arrivals).
@@ -524,12 +497,12 @@ export default function MapPage() {
   // flightMode stays 'overhead' and MapView3D's pad loop is DISABLED
   // (gamepadEnabled = flightMode==='airplane') — the on-screen sticks moved
   // NOTHING. Force it true so the loop reads the touch pad and the camera flies.
-  // Only force airplane mode in GESTURE control mode. In 'google' mode we keep
-  // the pad disconnected so flightMode stays 'overhead' and Google's own touch
-  // controls drive the map (Greg 2026-07-14).
+  // Touch-fly present → force airplane mode so the flight loop reads the
+  // synthetic pad (the tether squares feed it). The loop idle-returns when the
+  // squares are neutral, so Google's native gestures still move the camera.
   useEffect(() => {
-    setPageGamepadConnected(touchFly && flightControlMode === 'gesture');
-  }, [touchFly, flightControlMode]);
+    if (touchFly) setPageGamepadConnected(true);
+  }, [touchFly]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -2207,10 +2180,10 @@ export default function MapPage() {
       {touchFly && (
         <div className="map-touchpad">
           <MobileFlightHUD
-            flightControlMode={flightControlMode}
-            onFlightControlMode={chooseFlightControl}
             speedMultiplier={flightTuning.multiplier}
             onSpeedMultiplier={setFlightMultiplier}
+            onPan={tetherFlight.setPan}
+            onClimb={tetherFlight.setClimb}
           />
         </div>
       )}
@@ -2370,9 +2343,6 @@ export default function MapPage() {
         <ProspectCoachOverlay onDismiss={dismissCoach} />
       )}
 
-      {/* Pan-throttle trail — shows where the left-thumb pan began (neutral)
-          and where it's slid to. touch-fly only. */}
-      {gestureOn && <PanTrail trail={gestureFlight.panTrail} />}
 
       {/* Expand map — hides mobile browser chrome. Hidden in touch-fly: the
           map is already full-bleed and the button would sit on the LOOK

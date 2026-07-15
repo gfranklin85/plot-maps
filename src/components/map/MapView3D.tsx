@@ -842,6 +842,38 @@ function Inner({
     containerRef.current.appendChild(el);
     elRef.current = el;
     if (mapElForwardRef) mapElForwardRef.current = el;
+
+    // ── Kill Google's "Use two fingers to move the map" cooperative-gesture
+    // hint. CSS can miss it (it may render in the element's shadow DOM), so we
+    // also watch the map subtree and strip any node whose text/aria says
+    // "two finger…" / "move the map". We drive the map, so it's never wanted.
+    // Greg 2026-07-14.
+    const killGestureHint = (root: ParentNode) => {
+      const nodes = root.querySelectorAll('*');
+      nodes.forEach((n) => {
+        const txt = (n.textContent || '').toLowerCase();
+        const aria = (n.getAttribute?.('aria-label') || '').toLowerCase();
+        if (
+          (txt.includes('two finger') || aria.includes('two finger')) &&
+          txt.length < 60 // only the tiny hint element, not a big container
+        ) {
+          (n as HTMLElement).style.setProperty('display', 'none', 'important');
+        }
+      });
+    };
+    const sweep = () => {
+      killGestureHint(el);
+      // reach into an open shadow root if present
+      const sr = (el as unknown as { shadowRoot?: ShadowRoot }).shadowRoot;
+      if (sr) killGestureHint(sr);
+    };
+    sweep();
+    const hintObserver = new MutationObserver(sweep);
+    hintObserver.observe(el, { childList: true, subtree: true });
+    const sr = (el as unknown as { shadowRoot?: ShadowRoot }).shadowRoot;
+    if (sr) hintObserver.observe(sr, { childList: true, subtree: true });
+    // stash so cleanup can disconnect it
+    (el as unknown as { __plotHintObserver?: MutationObserver }).__plotHintObserver = hintObserver;
     // Map3D fires gmp-click on the map element itself with two payload
     // types: PlaceClickEvent (user clicked a labeled POI / business
     // icon — has placeId) and LocationClickEvent (user clicked ground
@@ -1033,6 +1065,7 @@ function Inner({
       el.removeEventListener('gmp-click', onMapClick);
       lastParcelLookupAcRef.current?.abort();
       lastParcelLookupAcRef.current = null;
+      (el as unknown as { __plotHintObserver?: MutationObserver }).__plotHintObserver?.disconnect();
       el.remove();
       elRef.current = null;
       if (mapElForwardRef) mapElForwardRef.current = null;

@@ -636,6 +636,21 @@ gmp-map-3d [class*="poi-info-window"] {
   visibility: hidden !important;
 }
 
+/* ─── Kill Google's "Use two fingers to move the map" cooperative-gesture
+   hint. It's a Google-injected overlay inside gmp-map-3d (the .dgc container +
+   its darkening scrim). We drive the map ourselves, so it's never wanted.
+   Broad class-substring match so it survives Google's minified class churn.
+   Greg 2026-07-14. ─── */
+gmp-map-3d [class*="dgc"],
+gmp-map-3d [class*="cooperative"],
+gmp-map-3d [class*="gesture"],
+gmp-map-3d [aria-label*="two finger" i] {
+  display: none !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+}
+
 /* ─── GroundGlow popover chrome suppression. The gmp-popover that
        hosts the glow disc needs ZERO visible container — only the
        child disc should render. Without this, Google renders its

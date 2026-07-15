@@ -2202,10 +2202,13 @@ gmp-popover-3d-element[plot-card-popover],
 .map-shell--touchfly .map-shell__body { inset: 0; }
 .map-shell--touchfly .map-shell__region { inset: 0; }
 /* we own flight gestures on the map — stop the browser hijacking multi-touch */
-/* Google owns the map touches now (native look/pan/rotate/zoom); the tether
-   squares capture only their own pointer. So NO touch-action:none here — that
-   would kill Google's gestures. Greg 2026-07-14. */
-.map-shell--touchfly .map-frame { inset: 0; }
+/* Google owns the map touches (native look/pan/rotate/zoom). touch-action:none
+   hands ALL raw touches to Google's own handlers — which ENABLES one-finger
+   control AND kills Google's "use two fingers to move the map" cooperative
+   hint (that hint only appears when the browser might page-scroll). The tether
+   squares capture only their own pointer on top. Greg 2026-07-14. */
+.map-shell--touchfly .map-frame { inset: 0; touch-action: none; }
+.map-shell--touchfly gmp-map-3d { touch-action: none; }
 
 /* the gesture pad is now pointer-events:none (visual/hint only) — the flight
    touch listeners live on the MAP element itself, so a plain tap still reaches
@@ -2329,7 +2332,7 @@ gmp-popover-3d-element[plot-card-popover],
    .map-touchpad wrapper is pointer-events:none, these re-enable). Greg
    2026-07-14. memory/project_tilt_to_fly */
 .tsq {
-  position: fixed; z-index: 50; pointer-events: auto; touch-action: none;
+  position: fixed; z-index: 58; pointer-events: auto; touch-action: none;
   display: flex; flex-direction: column; align-items: center; gap: 5px;
   bottom: calc(env(safe-area-inset-bottom, 0px) + 26px);
   user-select: none; -webkit-user-select: none;

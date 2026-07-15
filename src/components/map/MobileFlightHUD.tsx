@@ -21,6 +21,7 @@ const SPEED_MIN = 0.52;
 const SPEED_MAX = 11;
 
 interface Props {
+  hideControls?: boolean;   // bare-Google baseline: show only the hamburger
   speedMultiplier: number;
   onSpeedMultiplier: (v: number) => void;
   onPan: (active: boolean, dx: number, dy: number) => void;
@@ -37,7 +38,7 @@ const NAV = [
   { href: '/settings', icon: 'settings', label: 'Settings' },
 ];
 
-export default function MobileFlightHUD({ speedMultiplier, onSpeedMultiplier, onPan, onClimb }: Props) {
+export default function MobileFlightHUD({ hideControls, speedMultiplier, onSpeedMultiplier, onPan, onClimb }: Props) {
   const [menu, setMenu] = useState(false);
   const speedFill = { '--fill': `${((speedMultiplier - SPEED_MIN) / (SPEED_MAX - SPEED_MIN)) * 100}%` } as CSSProperties;
   const speedLabel = speedMultiplier < 1 ? 'Slow' : speedMultiplier < 2.5 ? 'Cruise' : speedMultiplier < 6 ? 'Fast' : 'Warp';
@@ -90,11 +91,15 @@ export default function MobileFlightHUD({ speedMultiplier, onSpeedMultiplier, on
         </div>
       )}
 
-      {/* ── TETHER SQUARES — the only flight controls on the map ── */}
-      <TetherSquare axis="both" label="PAN" icon="open_with" className="tsq--pan"
-        onChange={(a, dx, dy) => onPan(a, dx, dy)} />
-      <TetherSquare axis="vertical" label="CLIMB" icon="height" className="tsq--climb"
-        onChange={(a, _dx, dy) => onClimb(a, dy)} />
+      {/* ── TETHER SQUARES — hidden in the bare-Google baseline ── */}
+      {!hideControls && (
+        <>
+          <TetherSquare axis="both" label="PAN" icon="open_with" className="tsq--pan"
+            onChange={(a, dx, dy) => onPan(a, dx, dy)} />
+          <TetherSquare axis="vertical" label="CLIMB" icon="height" className="tsq--climb"
+            onChange={(a, _dx, dy) => onClimb(a, dy)} />
+        </>
+      )}
     </>
   );
 }

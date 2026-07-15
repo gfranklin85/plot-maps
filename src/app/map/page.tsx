@@ -68,6 +68,11 @@ import { cancelAutoPan } from "@/lib/cancelAutoPan";
 import SplatHUDLayer from "@/components/splat/SplatHUDLayer";
 import MapCompanionLayer from "@/components/map/MapCompanionLayer";
 
+// RESET (Greg 2026-07-14): on mobile, show BARE Google native 3D controls —
+// no synthetic pad, no airplane flight loop, no tether squares. This is the
+// clean baseline to feel; our flight controls get rebuilt on top of it later.
+const MOBILE_NATIVE_GOOGLE = true;
+
 const FILTER_TABS: { label: string; key: string; statuses: LeadStatus[] }[] = [
   { label: "All", key: "all", statuses: [] },
   { label: "New", key: "new", statuses: ["New"] },
@@ -158,7 +163,11 @@ export default function MapPage() {
     const narrow = window.matchMedia('(max-width: 900px)').matches;
     const hasRealPad = (navigator.getGamepads?.() ?? []).some((p) => p && p.connected);
     if (!coarse || !noHover || !narrow || hasRealPad || !has3DSupport) return;
-    installTouchPad();          // fires gamepadconnected → airplane flight
+    // RESET 2026-07-14: bare Google native controls on mobile. Do NOT install
+    // the synthetic pad / force airplane flight — that was suppressing Google's
+    // own touch controls. Just mark this as the mobile map (for chrome/layout);
+    // our flight controls get rebuilt ON TOP of the native baseline later.
+    if (!MOBILE_NATIVE_GOOGLE) installTouchPad();
     setTouchFly(true);
   }, [has3DSupport]);
 
@@ -447,7 +456,7 @@ export default function MapPage() {
   // TETHER SQUARES (pan + climb). The squares write lx/ly/rt/lt; look (rx/ry)
   // stays Google's. When both squares are neutral the flight loop idle-returns
   // and Google's native gestures move the camera. memory/project_tilt_to_fly
-  const tetherFlight = useTetherFlight(touchFly && !walkMode);
+  const tetherFlight = useTetherFlight(touchFly && !walkMode && !MOBILE_NATIVE_GOOGLE);
 
   // Apply pending "enter 3D" intents raised before the machine existed
   // (mobile default, URL/destination arrivals).
@@ -501,7 +510,7 @@ export default function MapPage() {
   // synthetic pad (the tether squares feed it). The loop idle-returns when the
   // squares are neutral, so Google's native gestures still move the camera.
   useEffect(() => {
-    if (touchFly) setPageGamepadConnected(true);
+    if (touchFly && !MOBILE_NATIVE_GOOGLE) setPageGamepadConnected(true);
   }, [touchFly]);
 
   useEffect(() => {
@@ -2180,6 +2189,7 @@ export default function MapPage() {
       {touchFly && (
         <div className="map-touchpad">
           <MobileFlightHUD
+            hideControls={MOBILE_NATIVE_GOOGLE}
             speedMultiplier={flightTuning.multiplier}
             onSpeedMultiplier={setFlightMultiplier}
             onPan={tetherFlight.setPan}

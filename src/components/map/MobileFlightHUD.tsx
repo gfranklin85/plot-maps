@@ -7,9 +7,9 @@
 // modes, picked here:
 //   • 'google' — bare Google native controls (one-finger look/pan/rotate,
 //     pinch-zoom). THE main method.
-//   • 'cruise' — invisible bottom thumb-zones (rendered by FlightZones in
-//     page.tsx) fly ON TOP of Google's native look.
-// Nothing else on the map. memory/project_mobile_map_google_native
+//   • 'flight' — the two-joystick + center climb-lever pad (TwoStickPad,
+//     rendered in page.tsx) flying the same loop as a desktop controller.
+// memory/project_mobile_map_google_native
 
 import { useState } from 'react';
 import type { CSSProperties } from 'react';
@@ -21,8 +21,8 @@ const SPEED_MIN = 0.52;
 const SPEED_MAX = 11;
 
 interface Props {
-  mode: 'google' | 'cruise';            // which flight mode is active
-  onSelectMode: (m: 'google' | 'cruise') => void;
+  mode: 'google' | 'flight';            // which flight mode is active
+  onSelectMode: (m: 'google' | 'flight') => void;
   isFullscreen?: boolean;
   onFullscreen?: () => void;
   speedMultiplier: number;
@@ -74,7 +74,7 @@ export default function MobileFlightHUD({ mode, onSelectMode, isFullscreen, onFu
               </a>
             ))}
 
-            {/* ── FLIGHT MODE ── Google native (main method) + Cruise flight. ── */}
+            {/* ── FLIGHT MODE ── Google native (main method) + two-stick flight. ── */}
             <div className="mtb-menu__section">Flight mode</div>
             <button
               className={`mtb-menu__item mtb-menu__mode ${nativeGoogle ? 'is-on' : ''}`}
@@ -89,12 +89,12 @@ export default function MobileFlightHUD({ mode, onSelectMode, isFullscreen, onFu
             </button>
             <button
               className={`mtb-menu__item mtb-menu__mode ${!nativeGoogle ? 'is-on' : ''}`}
-              onClick={() => { onSelectMode('cruise'); setMenu(false); }}
+              onClick={() => { onSelectMode('flight'); setMenu(false); }}
             >
               <MaterialIcon icon="flight" className="text-[20px]" />
               <span className="mtb-menu__mode-txt">
-                <span>Cruise (Plot flight)</span>
-                <span className="mtb-menu__mode-sub">Press bottom-left to fly · bottom-right to climb</span>
+                <span>Fly (Plot flight)</span>
+                <span className="mtb-menu__mode-sub">Two sticks · left moves · right looks · center climbs</span>
               </span>
               {!nativeGoogle && <MaterialIcon icon="check" className="text-[18px] mtb-menu__check" />}
             </button>
@@ -128,8 +128,8 @@ export default function MobileFlightHUD({ mode, onSelectMode, isFullscreen, onFu
           </div>
         </div>
       )}
-      {/* The Cruise flight controls are INVISIBLE bottom thumb-zones, rendered
-          by <FlightZones> in page.tsx — nothing on-screen here. */}
+      {/* The flight controls (two sticks + climb lever) are the TwoStickPad,
+          rendered in page.tsx — not here. */}
     </>
   );
 }

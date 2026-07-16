@@ -248,7 +248,6 @@ function Inner({
   tiltRateMultiplier = 1.0,
   flyToTarget,
   onAltitudeChange,
-  mobileCruise = false,
   isIdle = false,
   poisVisible = false,
   showParcelOverlay = false,
@@ -286,9 +285,6 @@ function Inner({
    *  deltas in viewport fractions. The page applies them via setPosition. */
   onMoveReticle?: (dxFrac: number, dyFrac: number) => void;
   onAltitudeChange?: (meters: number) => void;
-  /** Mobile "Cruise" mode: read Google's live look each frame, write only
-   *  position/altitude (never heading/tilt) so native look coexists. */
-  mobileCruise?: boolean;
   /** True when no input for >threshold. Stops camera writes + hover
    *  wave + altitude reporting until next input. Pure GPU savings;
    *  resumes instantly on input. */
@@ -1100,27 +1096,6 @@ function Inner({
 
       elapsedMsRef.current = elapsedMs;
 
-      // ── MOBILE CRUISE: nudge Google's OWN center, don't re-project ────────
-      // In Cruise mode Google OWNS look (native drag turns/tilts) and zoom
-      // (pinch → range). We must not fight it. The SIMPLE, robust model (the
-      // eye-inversion tried first dove into the ground on touch): take Google's
-      // live el.center/heading/range as the truth, move THAT center forward
-      // along the heading (cruise) + sideways (strafe), change altitude for
-      // climb, and write el.center DIRECTLY below — never through fpToMap3D and
-      // never touching el.heading/el.tilt/el.range. So look/zoom stay 100%
-      // Google's and there's no focal↔eye round-trip to blow up.
-      if (mobileCruise) {
-        const gc = el.center as { lat: number; lng: number; altitude?: number } | undefined;
-        if (gc && Number.isFinite(gc.lat) && Number.isFinite(gc.lng)) {
-          cam.lat = gc.lat;
-          cam.lng = gc.lng;
-          // Track Google's center altitude as our base; climb nudges it below.
-          cam.altitude = typeof gc.altitude === 'number' ? gc.altitude : cam.altitude;
-        }
-        if (typeof el.heading === 'number') cam.heading = el.heading;
-        if (typeof el.range === 'number' && el.range > 0) cam.range = el.range;
-      }
-
       // Idle: user walked away (no input >8s). Skip the entire per-
       // frame work — no camera writes, no hover wave math, no
       // altitude reports. Map3D stops re-rendering because nothing
@@ -1334,8 +1309,7 @@ function Inner({
       // put, view direction changes). For Map3D this is naturally
       // first-person because we re-derive focal point from current
       // eye position + view direction every frame in fpToMap3D.
-      // In Cruise mode heading is Google's (adopted above); don't add our yaw.
-      if (!mobileCruise) cam.heading = (cam.heading + vel.heading * dt + 360) % 360;
+      cam.heading = (cam.heading + vel.heading * dt + 360) % 360;
       // Pitch convention: stick-up (ry<0) pitches view UP toward sky;
       // negative pitch = looking down, positive = looking up.
       //
@@ -1349,8 +1323,7 @@ function Inner({
       // "stuck looking up, can't look back down" dead zone. Clamping kills
       // the overshoot so look-down responds instantly. Tiny epsilon above
       // −5 so a held look-up doesn't hard-stick exactly at the ceiling.
-      // In Cruise mode pitch is Google's (adopted above); don't add our tilt.
-      if (!mobileCruise) cam.pitch += vel.tilt * dt;
+      cam.pitch += vel.tilt * dt;
       cam.pitch = clamp(cam.pitch, -90, -5);
       // Kill upward tilt velocity once pinned at the horizon ceiling, so we
       // don't keep trying to integrate into a wall.
@@ -1365,19 +1338,10 @@ function Inner({
       });
 
       // ── Write to element ──────────────────────────────────────────
-      if (mobileCruise) {
-        // Cruise: move Google's OWN center DIRECTLY (cam.lat/lng were seeded
-        // from el.center above, then nudged forward/strafe/climb). Do NOT run
-        // fpToMap3D — that projects a focal point hundreds of meters ahead and
-        // would teleport the map on the first frame. Leave heading/tilt/range
-        // to Google (native look + pinch-zoom own them).
-        el.center = { lat: cam.lat, lng: cam.lng, altitude: cam.altitude };
-      } else {
-        el.center  = map3d.center;
-        el.heading = map3d.heading;
-        el.tilt    = map3d.tilt;
-        el.range   = map3d.range;
-      }
+      el.center  = map3d.center;
+      el.heading = map3d.heading;
+      el.tilt    = map3d.tilt;
+      el.range   = map3d.range;
 
       // World moved under the cursor — wake Google's hover hit-test so
       // the POI now under the parked cursor lights up. See pokeCursor
@@ -1499,7 +1463,6 @@ export default function MapView3D(props: MapViewProps) {
         tiltRateMultiplier={props.tiltRateMultiplier}
         flyToTarget={props.flyToTarget}
         onAltitudeChange={props.onAltitudeChange}
-        mobileCruise={props.mobileCruise}
         isIdle={props.isIdle}
         poisVisible={props.poisVisible}
         showParcelOverlay={props.showParcelOverlay}

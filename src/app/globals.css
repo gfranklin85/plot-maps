@@ -2369,25 +2369,6 @@ gmp-popover-3d-element[plot-card-popover],
 .mfh-grip__bar { width: 42px; height: 5px; border-radius: 999px; background: rgba(19,73,212,0.5); }
 @media (orientation: landscape) and (max-height: 500px) { .mfh-grip { display: none; } }
 
-/* ── FLIGHT ZONES (.fz) — INVISIBLE Cruise-mode thumb-zones ─────────────
-   Greg 2026-07-15: the "Cruise" flight mode has NO visible controls. Two
-   transparent bottom hit-zones — bottom-LEFT = pan/cruise, bottom-RIGHT =
-   climb — overlay Google's native look. The wrapper is pointer-events:none
-   so Google gets look everywhere EXCEPT the two bottom corners (which opt
-   back in). Below the hamburger (z:60) + menu (z:70); above .map-touchpad
-   (z:30). memory/project_mobile_map_google_native */
-.fz {
-  position: absolute; inset: 0; z-index: 32; pointer-events: none;
-  user-select: none; -webkit-user-select: none;
-}
-.fz-pan, .fz-climb {
-  position: absolute; bottom: 0; height: 34%; width: 46%;
-  pointer-events: auto; touch-action: none;
-  background: transparent;
-}
-.fz-pan   { left: 0; }
-.fz-climb { right: 0; }
-
 /* ── TETHER SQUARES (.tsq) — the only flight controls on the map ────────
    Bungee sticks over Google's native controls. PAN (2D) + CLIMB (vertical).
    Fixed, translucent, thumb-reachable; capture only their own pointer (the

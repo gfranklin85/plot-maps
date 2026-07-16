@@ -178,13 +178,6 @@ export interface MapViewProps {
    *  HUD readout. 2D path doesn't fire this (altitude isn't a
    *  meaningful concept on the tilted 2D surface). */
   onAltitudeChange?: (meters: number) => void;
-  /** Mobile "Cruise" flight mode (Greg 2026-07-15). When true, the 3D
-   *  per-frame loop READS Google's live look (heading/tilt/range) as the
-   *  baseline each frame and writes ONLY position (center) + altitude — it
-   *  never writes heading/tilt, so Google's native look coexists with our
-   *  invisible-zone cruise/climb. Default false = the existing loop that
-   *  fully owns the camera (desktop gamepad / tether). 3D path only. */
-  mobileCruise?: boolean;
   /** Idle flag from useIdleDetection. When true, 3D path pauses its
    *  per-frame writes (saves GPU when the user walks away). 2D path
    *  ignores — its render is event-driven, not loop-driven. */

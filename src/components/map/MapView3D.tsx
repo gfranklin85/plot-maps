@@ -836,6 +836,14 @@ function Inner({
     el.style.width = '100%';
     el.style.height = '100%';
     el.setAttribute('mode', 'hybrid');
+    // GREEDY gesture handling: one finger controls the map directly, so Google
+    // never shows the "Use two fingers to move the map" cooperative hint (that
+    // hint lives in the element's CLOSED shadow root — unreachable by CSS/JS,
+    // so killing it at the source via this attr is the only real fix). Set both
+    // the attribute and the property since the element reads whichever it has.
+    // Greg 2026-07-14.
+    el.setAttribute('gesture-handling', 'greedy');
+    try { (el as unknown as { gestureHandling?: string }).gestureHandling = 'greedy'; } catch { /* ignore */ }
     // POI labels: default-labels-disabled inverts our prop.
     // poisVisible=true → labels visible → attribute = 'false'.
     el.setAttribute('default-labels-disabled', poisVisible ? 'false' : 'true');
@@ -843,45 +851,10 @@ function Inner({
     elRef.current = el;
     if (mapElForwardRef) mapElForwardRef.current = el;
 
-    // ── Kill Google's "Use two fingers to move the map" cooperative-gesture
-    // hint. It's rendered by Google somewhere in the tree (often a sibling /
-    // portal, sometimes a CLOSED shadow root that CSS + .shadowRoot can't
-    // reach), so scoping to gmp-map-3d missed it. Sweep the ENTIRE document +
-    // any open shadow roots, and strip any small node whose text/aria contains
-    // "two finger". We drive the map, so it's never wanted. Greg 2026-07-14.
-    const killGestureHint = (root: ParentNode) => {
-      let nodes: NodeListOf<Element>;
-      try { nodes = root.querySelectorAll('*'); } catch { return; }
-      nodes.forEach((n) => {
-        const el2 = n as HTMLElement;
-        const txt = (el2.textContent || '').toLowerCase();
-        const aria = (el2.getAttribute?.('aria-label') || '').toLowerCase();
-        if ((txt.includes('two finger') || aria.includes('two finger')) && txt.length < 80) {
-          el2.style.setProperty('display', 'none', 'important');
-          el2.style.setProperty('visibility', 'hidden', 'important');
-          el2.style.setProperty('opacity', '0', 'important');
-        }
-        // dive into any OPEN shadow root this node exposes
-        const sr = (el2 as unknown as { shadowRoot?: ShadowRoot }).shadowRoot;
-        if (sr) killGestureHint(sr);
-      });
-    };
-    const sweep = () => killGestureHint(document.body);
-    sweep();
-    // sweep again shortly after — the hint often appears a beat after load
-    const t1 = window.setTimeout(sweep, 400);
-    const t2 = window.setTimeout(sweep, 1500);
-    // debounce the observer sweep so a busy map subtree can't thrash it
-    let sweepScheduled = 0;
-    const scheduleSweep = () => {
-      if (sweepScheduled) return;
-      sweepScheduled = window.setTimeout(() => { sweepScheduled = 0; sweep(); }, 120);
-    };
-    const hintObserver = new MutationObserver(scheduleSweep);
-    hintObserver.observe(document.body, { childList: true, subtree: true, characterData: true });
-    // stash so cleanup can disconnect it
-    (el as unknown as { __plotHintObserver?: MutationObserver; __plotHintTimers?: number[] }).__plotHintObserver = hintObserver;
-    (el as unknown as { __plotHintTimers?: number[] }).__plotHintTimers = [t1, t2];
+    // (The old text-sweep hint killer was removed: verified live via CDP that
+    // the "two fingers" hint lives in gmp-map-3d's CLOSED shadow root —
+    // unreachable by CSS, querySelectorAll, or MutationObservers. The
+    // gesture-handling="greedy" attribute above is the real fix.)
     // Map3D fires gmp-click on the map element itself with two payload
     // types: PlaceClickEvent (user clicked a labeled POI / business
     // icon — has placeId) and LocationClickEvent (user clicked ground
@@ -1073,9 +1046,6 @@ function Inner({
       el.removeEventListener('gmp-click', onMapClick);
       lastParcelLookupAcRef.current?.abort();
       lastParcelLookupAcRef.current = null;
-      const holder = el as unknown as { __plotHintObserver?: MutationObserver; __plotHintTimers?: number[] };
-      holder.__plotHintObserver?.disconnect();
-      holder.__plotHintTimers?.forEach((t) => window.clearTimeout(t));
       el.remove();
       elRef.current = null;
       if (mapElForwardRef) mapElForwardRef.current = null;

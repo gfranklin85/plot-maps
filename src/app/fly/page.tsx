@@ -61,13 +61,26 @@ export default function FlyPage() {
   const [state, setState] = useState<LinkState>('idle');
   const linkRef = useRef<FlyLinkReceiver | null>(null);
 
-  // Install the synthetic pad once, before the flight loop polls.
-  useEffect(() => {
-    installFlyPad();
-  }, []);
+  // LOCAL mode (PlotFly native app, 2026-07-16): the phone loads THIS page in
+  // its OWN in-app WebView and injects its gamepad bridge (gamepadBridge.ts →
+  // window.__plotPad + navigator.getGamepads override) DIRECTLY. No pairing, no
+  // relay, no network hop — the map's flight loop reads the injected pad on the
+  // same device. This is the flight-first native client: Google's photoreal
+  // renderer + our tuned flight loop, driven by native touch/gyro/controller.
+  const isLocal =
+    typeof window !== 'undefined' &&
+    new URL(window.location.href).searchParams.get('local') === '1';
 
-  // Open the link and wire phone frames → the synthetic pad.
+  // Relay mode only: install the synthetic pad before the flight loop polls.
+  // (Local mode: PlotFly injects its OWN pad, so we must NOT install a second.)
   useEffect(() => {
+    if (isLocal) return;
+    installFlyPad();
+  }, [isLocal]);
+
+  // Relay mode only: open the link and wire phone frames → the synthetic pad.
+  useEffect(() => {
+    if (isLocal) return;
     const link = new FlyLinkReceiver(code, {
       onFrame: (f) => applyPadFrame(f),
       onState: (s) => {
@@ -78,7 +91,7 @@ export default function FlyPage() {
     linkRef.current = link;
     link.start().catch(() => {});
     return () => link.close();
-  }, [code]);
+  }, [code, isLocal]);
 
   const connected = state === 'p2p' || state === 'relay';
 
@@ -103,8 +116,9 @@ export default function FlyPage() {
         />
       </div>
 
-      {/* Pairing overlay — shown until a phone connects. */}
-      {!connected && (
+      {/* Pairing overlay — shown until a phone connects. Never in local mode
+          (the phone IS the client; there's nothing to pair). */}
+      {!connected && !isLocal && (
         <div style={styles.overlay}>
           <div style={styles.card}>
             <div style={styles.brand}>Plot · Fly</div>
@@ -128,7 +142,7 @@ export default function FlyPage() {
       )}
 
       {/* Tiny connected indicator (so you know P2P vs relay). */}
-      {connected && (
+      {connected && !isLocal && (
         <div style={styles.connBadge}>
           {state === 'p2p' ? '● Linked (direct)' : '● Linked (relay)'} · {code}
         </div>

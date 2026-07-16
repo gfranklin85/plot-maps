@@ -2288,6 +2288,31 @@ gmp-popover-3d-element[plot-card-popover],
 .mtb-menu__style-txt { display: flex; flex-direction: column; gap: 1px; flex: 1; }
 .mtb-menu__style-sub { font-size: 12px; font-weight: 600; color: rgba(19,73,212,0.55); }
 .mtb-menu__check { color: #1349d4; margin-left: auto; }
+/* flight-mode item (same language as the style picker) */
+.mtb-menu__mode { width: 100%; text-align: left; }
+.mtb-menu__mode.is-on { background: rgba(19,73,212,0.08); }
+.mtb-menu__mode-txt { display: flex; flex-direction: column; gap: 1px; flex: 1; }
+.mtb-menu__mode-sub { font-size: 12px; font-weight: 600; color: rgba(19,73,212,0.55); }
+
+/* one-time "go fullscreen" prompt on the mobile map (Greg 2026-07-14) */
+.fsprompt {
+  position: fixed; z-index: 62; pointer-events: auto; left: 12px; right: 12px;
+  top: calc(env(safe-area-inset-top, 0px) + 64px);
+  display: flex; align-items: center; gap: 11px; padding: 12px 12px 12px 14px;
+  border-radius: 16px; background: rgba(255,255,255,0.92);
+  backdrop-filter: saturate(160%) blur(16px); -webkit-backdrop-filter: saturate(160%) blur(16px);
+  border: 1.5px solid rgba(255,255,255,0.95); box-shadow: 0 14px 34px -14px rgba(20,50,120,0.5);
+  animation: fspromptIn .28s cubic-bezier(0.22,1,0.36,1);
+}
+@keyframes fspromptIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: none; } }
+.fsprompt__ic { width: 38px; height: 38px; flex: none; border-radius: 12px; display: grid; place-items: center;
+  color: #1349d4; background: rgba(19,73,212,0.10); }
+.fsprompt__body { flex: 1; min-width: 0; }
+.fsprompt__title { font-size: 14px; font-weight: 800; color: #0d1b3e; }
+.fsprompt__sub { font-size: 12px; color: #5a6a8c; margin-top: 1px; }
+.fsprompt__go { flex: none; padding: 9px 16px; border-radius: 11px; background: var(--plot-brand, #1349d4);
+  color: #fff; font-weight: 700; font-size: 13.5px; }
+.fsprompt__x { flex: none; width: 30px; height: 30px; display: grid; place-items: center; color: #8a96b5; }
 
 /* flight-control mode toggle (Gesture ⇄ Google) */
 .mtb-menu__seg { display: flex; gap: 6px; margin: 4px 12px 0; background: #eaf1fc; padding: 4px; border-radius: 12px; }

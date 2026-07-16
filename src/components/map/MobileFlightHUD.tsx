@@ -22,6 +22,9 @@ const SPEED_MAX = 11;
 
 interface Props {
   hideControls?: boolean;   // bare-Google baseline: show only the hamburger
+  nativeGoogle?: boolean;   // which flight mode is active (for the picker)
+  isFullscreen?: boolean;
+  onFullscreen?: () => void;
   speedMultiplier: number;
   onSpeedMultiplier: (v: number) => void;
   onPan: (active: boolean, dx: number, dy: number) => void;
@@ -38,7 +41,7 @@ const NAV = [
   { href: '/settings', icon: 'settings', label: 'Settings' },
 ];
 
-export default function MobileFlightHUD({ hideControls, speedMultiplier, onSpeedMultiplier, onPan, onClimb }: Props) {
+export default function MobileFlightHUD({ hideControls, nativeGoogle, isFullscreen, onFullscreen, speedMultiplier, onSpeedMultiplier, onPan, onClimb }: Props) {
   const [menu, setMenu] = useState(false);
   const speedFill = { '--fill': `${((speedMultiplier - SPEED_MIN) / (SPEED_MAX - SPEED_MIN)) * 100}%` } as CSSProperties;
   const speedLabel = speedMultiplier < 1 ? 'Slow' : speedMultiplier < 2.5 ? 'Cruise' : speedMultiplier < 6 ? 'Fast' : 'Warp';
@@ -72,21 +75,44 @@ export default function MobileFlightHUD({ hideControls, speedMultiplier, onSpeed
               </a>
             ))}
 
-            {/* flight speed */}
-            <div className="mtb-menu__section">Flight speed</div>
-            <div className="mtb-menu__speed">
-              <div className="mtb-menu__speed-row">
-                <span>Slow → Warp</span>
-                <span className="mtb-menu__speed-val">{speedLabel}</span>
-              </div>
-              <input
-                className="mtb-menu__slider" type="range"
-                min={SPEED_MIN} max={SPEED_MAX} step={0.05}
-                value={speedMultiplier} style={speedFill}
-                onChange={(e) => onSpeedMultiplier(+e.target.value)}
-              />
-              <div className="mtb-menu__speed-ticks"><span>Slow</span><span>Cruise</span><span>Warp</span></div>
-            </div>
+            {/* ── FLIGHT MODE ── the saved exploration mode. Google native is
+                the main method; more modes get added here on top. ── */}
+            <div className="mtb-menu__section">Flight mode</div>
+            <button className={`mtb-menu__item mtb-menu__mode ${nativeGoogle ? 'is-on' : ''}`}>
+              <MaterialIcon icon="explore" className="text-[20px]" />
+              <span className="mtb-menu__mode-txt">
+                <span>Explore (Google)</span>
+                <span className="mtb-menu__mode-sub">One finger to look &amp; move · pinch to zoom</span>
+              </span>
+              {nativeGoogle && <MaterialIcon icon="check" className="text-[18px] mtb-menu__check" />}
+            </button>
+
+            {/* ── VIEW ── fullscreen lives here after the one-time prompt ── */}
+            <div className="mtb-menu__section">View</div>
+            <button className="mtb-menu__item" onClick={() => { onFullscreen?.(); setMenu(false); }}>
+              <MaterialIcon icon={isFullscreen ? 'fullscreen_exit' : 'fullscreen'} className="text-[20px]" />
+              <span>{isFullscreen ? 'Exit fullscreen' : 'Go fullscreen'}</span>
+            </button>
+
+            {/* flight speed — only relevant to OUR flight loop, not Google's */}
+            {!nativeGoogle && (
+              <>
+                <div className="mtb-menu__section">Flight speed</div>
+                <div className="mtb-menu__speed">
+                  <div className="mtb-menu__speed-row">
+                    <span>Slow → Warp</span>
+                    <span className="mtb-menu__speed-val">{speedLabel}</span>
+                  </div>
+                  <input
+                    className="mtb-menu__slider" type="range"
+                    min={SPEED_MIN} max={SPEED_MAX} step={0.05}
+                    value={speedMultiplier} style={speedFill}
+                    onChange={(e) => onSpeedMultiplier(+e.target.value)}
+                  />
+                  <div className="mtb-menu__speed-ticks"><span>Slow</span><span>Cruise</span><span>Warp</span></div>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

@@ -884,11 +884,36 @@ export default function MapPage() {
   // 2026-05-17 in the toolbar strip-down. The listingFilters state
   // remains for the filtered-leads query (default empty Set = show all).
 
-  // Expand map — nudge mobile browser chrome away
+  // Expand map — go fullscreen (must be from a user gesture; browsers block
+  // auto-fullscreen). Also nudges mobile browser chrome away.
   function expandMap() {
     window.scrollTo(0, 1);
     try { document.documentElement.requestFullscreen?.(); } catch { /* not supported on all browsers */ }
   }
+
+  // Track fullscreen so the one-time prompt hides once they're in.
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  useEffect(() => {
+    const onFs = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', onFs);
+    return () => document.removeEventListener('fullscreenchange', onFs);
+  }, []);
+
+  // One-time "go fullscreen" prompt on first mobile-map arrival. After they
+  // act OR dismiss, never nag again (fullscreen stays in the hamburger).
+  const [showFsPrompt, setShowFsPrompt] = useState(false);
+  useEffect(() => {
+    if (!touchFly) return;
+    try {
+      if (localStorage.getItem('plotmaps.fsPromptSeen') === '1') return;
+    } catch { /* ignore */ }
+    const t = setTimeout(() => setShowFsPrompt(true), 900);
+    return () => clearTimeout(t);
+  }, [touchFly]);
+  const dismissFsPrompt = () => {
+    setShowFsPrompt(false);
+    try { localStorage.setItem('plotmaps.fsPromptSeen', '1'); } catch { /* ignore */ }
+  };
 
   useEffect(() => {
     async function fetchLeads() {
@@ -2190,11 +2215,30 @@ export default function MapPage() {
         <div className="map-touchpad">
           <MobileFlightHUD
             hideControls={MOBILE_NATIVE_GOOGLE}
+            nativeGoogle={MOBILE_NATIVE_GOOGLE}
+            isFullscreen={isFullscreen}
+            onFullscreen={expandMap}
             speedMultiplier={flightTuning.multiplier}
             onSpeedMultiplier={setFlightMultiplier}
             onPan={tetherFlight.setPan}
             onClimb={tetherFlight.setClimb}
           />
+        </div>
+      )}
+
+      {/* ═══ ONE-TIME FULLSCREEN PROMPT (mobile) — teach once, then it lives in
+          the hamburger. Browsers block auto-fullscreen, so this needs a tap. ═══ */}
+      {touchFly && showFsPrompt && !isFullscreen && (
+        <div className="fsprompt">
+          <div className="fsprompt__ic"><MaterialIcon icon="fullscreen" className="text-[22px]" /></div>
+          <div className="fsprompt__body">
+            <div className="fsprompt__title">Go fullscreen to explore</div>
+            <div className="fsprompt__sub">Hide the browser bars for the full map.</div>
+          </div>
+          <button className="fsprompt__go" onClick={() => { expandMap(); dismissFsPrompt(); }}>Expand</button>
+          <button className="fsprompt__x" aria-label="Dismiss" onClick={dismissFsPrompt}>
+            <MaterialIcon icon="close" className="text-[18px]" />
+          </button>
         </div>
       )}
 

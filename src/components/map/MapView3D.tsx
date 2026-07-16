@@ -844,36 +844,44 @@ function Inner({
     if (mapElForwardRef) mapElForwardRef.current = el;
 
     // ── Kill Google's "Use two fingers to move the map" cooperative-gesture
-    // hint. CSS can miss it (it may render in the element's shadow DOM), so we
-    // also watch the map subtree and strip any node whose text/aria says
-    // "two finger…" / "move the map". We drive the map, so it's never wanted.
-    // Greg 2026-07-14.
+    // hint. It's rendered by Google somewhere in the tree (often a sibling /
+    // portal, sometimes a CLOSED shadow root that CSS + .shadowRoot can't
+    // reach), so scoping to gmp-map-3d missed it. Sweep the ENTIRE document +
+    // any open shadow roots, and strip any small node whose text/aria contains
+    // "two finger". We drive the map, so it's never wanted. Greg 2026-07-14.
     const killGestureHint = (root: ParentNode) => {
-      const nodes = root.querySelectorAll('*');
+      let nodes: NodeListOf<Element>;
+      try { nodes = root.querySelectorAll('*'); } catch { return; }
       nodes.forEach((n) => {
-        const txt = (n.textContent || '').toLowerCase();
-        const aria = (n.getAttribute?.('aria-label') || '').toLowerCase();
-        if (
-          (txt.includes('two finger') || aria.includes('two finger')) &&
-          txt.length < 60 // only the tiny hint element, not a big container
-        ) {
-          (n as HTMLElement).style.setProperty('display', 'none', 'important');
+        const el2 = n as HTMLElement;
+        const txt = (el2.textContent || '').toLowerCase();
+        const aria = (el2.getAttribute?.('aria-label') || '').toLowerCase();
+        if ((txt.includes('two finger') || aria.includes('two finger')) && txt.length < 80) {
+          el2.style.setProperty('display', 'none', 'important');
+          el2.style.setProperty('visibility', 'hidden', 'important');
+          el2.style.setProperty('opacity', '0', 'important');
         }
+        // dive into any OPEN shadow root this node exposes
+        const sr = (el2 as unknown as { shadowRoot?: ShadowRoot }).shadowRoot;
+        if (sr) killGestureHint(sr);
       });
     };
-    const sweep = () => {
-      killGestureHint(el);
-      // reach into an open shadow root if present
-      const sr = (el as unknown as { shadowRoot?: ShadowRoot }).shadowRoot;
-      if (sr) killGestureHint(sr);
-    };
+    const sweep = () => killGestureHint(document.body);
     sweep();
-    const hintObserver = new MutationObserver(sweep);
-    hintObserver.observe(el, { childList: true, subtree: true });
-    const sr = (el as unknown as { shadowRoot?: ShadowRoot }).shadowRoot;
-    if (sr) hintObserver.observe(sr, { childList: true, subtree: true });
+    // sweep again shortly after — the hint often appears a beat after load
+    const t1 = window.setTimeout(sweep, 400);
+    const t2 = window.setTimeout(sweep, 1500);
+    // debounce the observer sweep so a busy map subtree can't thrash it
+    let sweepScheduled = 0;
+    const scheduleSweep = () => {
+      if (sweepScheduled) return;
+      sweepScheduled = window.setTimeout(() => { sweepScheduled = 0; sweep(); }, 120);
+    };
+    const hintObserver = new MutationObserver(scheduleSweep);
+    hintObserver.observe(document.body, { childList: true, subtree: true, characterData: true });
     // stash so cleanup can disconnect it
-    (el as unknown as { __plotHintObserver?: MutationObserver }).__plotHintObserver = hintObserver;
+    (el as unknown as { __plotHintObserver?: MutationObserver; __plotHintTimers?: number[] }).__plotHintObserver = hintObserver;
+    (el as unknown as { __plotHintTimers?: number[] }).__plotHintTimers = [t1, t2];
     // Map3D fires gmp-click on the map element itself with two payload
     // types: PlaceClickEvent (user clicked a labeled POI / business
     // icon — has placeId) and LocationClickEvent (user clicked ground
@@ -1065,7 +1073,9 @@ function Inner({
       el.removeEventListener('gmp-click', onMapClick);
       lastParcelLookupAcRef.current?.abort();
       lastParcelLookupAcRef.current = null;
-      (el as unknown as { __plotHintObserver?: MutationObserver }).__plotHintObserver?.disconnect();
+      const holder = el as unknown as { __plotHintObserver?: MutationObserver; __plotHintTimers?: number[] };
+      holder.__plotHintObserver?.disconnect();
+      holder.__plotHintTimers?.forEach((t) => window.clearTimeout(t));
       el.remove();
       elRef.current = null;
       if (mapElForwardRef) mapElForwardRef.current = null;

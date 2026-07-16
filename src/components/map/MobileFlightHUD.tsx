@@ -2,18 +2,18 @@
 
 // ── MobileFlightHUD ───────────────────────────────────────────────────
 //
-// THE mobile flight surface (Greg, 2026-07-14): GOOGLE'S native controls own
-// the whole screen (one-finger look/pan/rotate, pinch-zoom). We overlay only:
-//   • the top-left HAMBURGER (nav + a flight-speed slider), and
-//   • two BUNGEE-TETHER squares — PAN (2D: fwd/back + strafe) and CLIMB
-//     (vertical) — that pull like rubber bands and snap home.
-// Nothing else on the map. The squares capture only their own touch, so the
-// hamburger and Google get everything else. memory/project_tilt_to_fly
+// THE mobile flight HUD (Greg, 2026-07-15): the top-left HAMBURGER (nav +
+// flight-mode picker + fullscreen + speed slider). The map itself has TWO
+// modes, picked here:
+//   • 'google' — bare Google native controls (one-finger look/pan/rotate,
+//     pinch-zoom). THE main method.
+//   • 'cruise' — invisible bottom thumb-zones (rendered by FlightZones in
+//     page.tsx) fly ON TOP of Google's native look.
+// Nothing else on the map. memory/project_mobile_map_google_native
 
 import { useState } from 'react';
 import type { CSSProperties } from 'react';
 import MaterialIcon from '@/components/ui/MaterialIcon';
-import TetherSquare from './TetherSquare';
 
 // Flight-speed slider range (mirrors useFlightTuning AXIS_RANGES.multiplier:
 // 0.52..11 — top end ≈ 1000 mph ground speed, altitude-scaled).
@@ -21,14 +21,12 @@ const SPEED_MIN = 0.52;
 const SPEED_MAX = 11;
 
 interface Props {
-  hideControls?: boolean;   // bare-Google baseline: show only the hamburger
-  nativeGoogle?: boolean;   // which flight mode is active (for the picker)
+  mode: 'google' | 'cruise';            // which flight mode is active
+  onSelectMode: (m: 'google' | 'cruise') => void;
   isFullscreen?: boolean;
   onFullscreen?: () => void;
   speedMultiplier: number;
   onSpeedMultiplier: (v: number) => void;
-  onPan: (active: boolean, dx: number, dy: number) => void;
-  onClimb: (active: boolean, dy: number) => void;
 }
 
 const NAV = [
@@ -41,8 +39,9 @@ const NAV = [
   { href: '/settings', icon: 'settings', label: 'Settings' },
 ];
 
-export default function MobileFlightHUD({ hideControls, nativeGoogle, isFullscreen, onFullscreen, speedMultiplier, onSpeedMultiplier, onPan, onClimb }: Props) {
+export default function MobileFlightHUD({ mode, onSelectMode, isFullscreen, onFullscreen, speedMultiplier, onSpeedMultiplier }: Props) {
   const [menu, setMenu] = useState(false);
+  const nativeGoogle = mode === 'google';
   const speedFill = { '--fill': `${((speedMultiplier - SPEED_MIN) / (SPEED_MAX - SPEED_MIN)) * 100}%` } as CSSProperties;
   const speedLabel = speedMultiplier < 1 ? 'Slow' : speedMultiplier < 2.5 ? 'Cruise' : speedMultiplier < 6 ? 'Fast' : 'Warp';
 
@@ -75,16 +74,29 @@ export default function MobileFlightHUD({ hideControls, nativeGoogle, isFullscre
               </a>
             ))}
 
-            {/* ── FLIGHT MODE ── the saved exploration mode. Google native is
-                the main method; more modes get added here on top. ── */}
+            {/* ── FLIGHT MODE ── Google native (main method) + Cruise flight. ── */}
             <div className="mtb-menu__section">Flight mode</div>
-            <button className={`mtb-menu__item mtb-menu__mode ${nativeGoogle ? 'is-on' : ''}`}>
+            <button
+              className={`mtb-menu__item mtb-menu__mode ${nativeGoogle ? 'is-on' : ''}`}
+              onClick={() => { onSelectMode('google'); setMenu(false); }}
+            >
               <MaterialIcon icon="explore" className="text-[20px]" />
               <span className="mtb-menu__mode-txt">
                 <span>Explore (Google)</span>
                 <span className="mtb-menu__mode-sub">One finger to look &amp; move · pinch to zoom</span>
               </span>
               {nativeGoogle && <MaterialIcon icon="check" className="text-[18px] mtb-menu__check" />}
+            </button>
+            <button
+              className={`mtb-menu__item mtb-menu__mode ${!nativeGoogle ? 'is-on' : ''}`}
+              onClick={() => { onSelectMode('cruise'); setMenu(false); }}
+            >
+              <MaterialIcon icon="flight" className="text-[20px]" />
+              <span className="mtb-menu__mode-txt">
+                <span>Cruise (Plot flight)</span>
+                <span className="mtb-menu__mode-sub">Press bottom-left to fly · bottom-right to climb</span>
+              </span>
+              {!nativeGoogle && <MaterialIcon icon="check" className="text-[18px] mtb-menu__check" />}
             </button>
 
             {/* ── VIEW ── fullscreen lives here after the one-time prompt ── */}
@@ -116,16 +128,8 @@ export default function MobileFlightHUD({ hideControls, nativeGoogle, isFullscre
           </div>
         </div>
       )}
-
-      {/* ── TETHER SQUARES — hidden in the bare-Google baseline ── */}
-      {!hideControls && (
-        <>
-          <TetherSquare axis="both" label="PAN" icon="open_with" className="tsq--pan"
-            onChange={(a, dx, dy) => onPan(a, dx, dy)} />
-          <TetherSquare axis="vertical" label="CLIMB" icon="height" className="tsq--climb"
-            onChange={(a, _dx, dy) => onClimb(a, dy)} />
-        </>
-      )}
+      {/* The Cruise flight controls are INVISIBLE bottom thumb-zones, rendered
+          by <FlightZones> in page.tsx — nothing on-screen here. */}
     </>
   );
 }

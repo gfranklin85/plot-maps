@@ -12,7 +12,8 @@ import type { PinMode } from "@/components/map/MapView";
 import StreetViewProspecting from "@/components/map/StreetViewProspecting";
 import MobileFlightHUD from "@/components/map/MobileFlightHUD";
 import { installTouchPad } from "@/lib/touchPadBridge";
-import { useTetherFlight } from "@/lib/useTetherFlight";
+import { useZoneFlight } from "@/lib/useZoneFlight";
+import FlightZones from "@/components/map/FlightZones";
 import ProspectSearch from "@/components/dashboard/ProspectSearch";
 import { PRIORITIES } from "@/lib/constants";
 import { useProfile } from "@/lib/profile-context";
@@ -68,10 +69,11 @@ import { cancelAutoPan } from "@/lib/cancelAutoPan";
 import SplatHUDLayer from "@/components/splat/SplatHUDLayer";
 import MapCompanionLayer from "@/components/map/MapCompanionLayer";
 
-// RESET (Greg 2026-07-14): on mobile, show BARE Google native 3D controls —
-// no synthetic pad, no airplane flight loop, no tether squares. This is the
-// clean baseline to feel; our flight controls get rebuilt on top of it later.
-const MOBILE_NATIVE_GOOGLE = true;
+// Mobile map flight (Greg 2026-07-15): TWO modes, picked in the hamburger.
+//   • 'google' (default) — BARE Google native 3D controls (THE main method).
+//   • 'cruise' — our invisible-zone flight (pan/cruise + climb) ON TOP of
+//     native look. See mobileFlightMode state below.
+// memory/project_mobile_map_google_native
 
 const FILTER_TABS: { label: string; key: string; statuses: LeadStatus[] }[] = [
   { label: "All", key: "all", statuses: [] },
@@ -152,6 +154,21 @@ export default function MapPage() {
   // ZONE PAD. Portrait layout: condensed landscape map on top, zone pad
   // below. memory/project_phone_as_controller, project_2d_work_mode
   const [touchFly, setTouchFly] = useState(false);
+  // Mobile flight mode picker (Greg 2026-07-15): 'google' = bare native controls
+  // (THE main method), 'cruise' = our invisible-zone flight ON TOP of native
+  // look. Persisted per device. memory/project_mobile_map_google_native
+  const [mobileFlightMode, setMobileFlightModeRaw] = useState<'google' | 'cruise'>('google');
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const saved = localStorage.getItem('plotmaps.mobileFlightMode');
+      if (saved === 'cruise' || saved === 'google') setMobileFlightModeRaw(saved);
+    } catch { /* ignore */ }
+  }, []);
+  const setMobileFlightMode = useCallback((m: 'google' | 'cruise') => {
+    setMobileFlightModeRaw(m);
+    try { localStorage.setItem('plotmaps.mobileFlightMode', m); } catch { /* ignore */ }
+  }, []);
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const coarse = window.matchMedia('(pointer: coarse)').matches;
@@ -163,13 +180,18 @@ export default function MapPage() {
     const narrow = window.matchMedia('(max-width: 900px)').matches;
     const hasRealPad = (navigator.getGamepads?.() ?? []).some((p) => p && p.connected);
     if (!coarse || !noHover || !narrow || hasRealPad || !has3DSupport) return;
-    // RESET 2026-07-14: bare Google native controls on mobile. Do NOT install
-    // the synthetic pad / force airplane flight — that was suppressing Google's
-    // own touch controls. Just mark this as the mobile map (for chrome/layout);
-    // our flight controls get rebuilt ON TOP of the native baseline later.
-    if (!MOBILE_NATIVE_GOOGLE) installTouchPad();
+    // Bare Google native is the default (THE main method). The synthetic pad +
+    // airplane loop are installed lazily only when the user selects Cruise mode
+    // (effect below) — Google's native controls run untouched in 'google' mode.
     setTouchFly(true);
   }, [has3DSupport]);
+
+  // Cruise mode: install the synthetic pad once the user is on the mobile map
+  // AND has picked 'cruise'. installTouchPad is idempotent (guarded); a real
+  // pad always wins inside the bridge, so this can't shadow desktop flight.
+  useEffect(() => {
+    if (touchFly && mobileFlightMode === 'cruise') installTouchPad();
+  }, [touchFly, mobileFlightMode]);
 
 
 
@@ -452,11 +474,12 @@ export default function MapPage() {
   // Attach to the MAP element itself (not an overlay) so a plain TAP reaches
   // Google's gmp-click for parcel select, while a DRAG drives flight (the hook
   // only preventDefaults on move). The map mounts async (forwarded ref), poll.
-  // Mobile flight = Google native controls on the whole screen + two overlay
-  // TETHER SQUARES (pan + climb). The squares write lx/ly/rt/lt; look (rx/ry)
-  // stays Google's. When both squares are neutral the flight loop idle-returns
-  // and Google's native gestures move the camera. memory/project_tilt_to_fly
-  const tetherFlight = useTetherFlight(touchFly && !walkMode && !MOBILE_NATIVE_GOOGLE);
+  // Mobile CRUISE flight = Google native look on the whole screen + two INVISIBLE
+  // bottom thumb-zones (pan/cruise + climb). The zones write lx/ly/rt/lt; look
+  // (rx/ry) stays Google's. When both zones are released the flight loop idle-
+  // returns and Google's native gestures own the camera. Only active in 'cruise'
+  // mode. memory/project_mobile_map_google_native
+  const zoneFlight = useZoneFlight(touchFly && !walkMode && mobileFlightMode === 'cruise');
 
   // Apply pending "enter 3D" intents raised before the machine existed
   // (mobile default, URL/destination arrivals).
@@ -506,12 +529,14 @@ export default function MapPage() {
   // flightMode stays 'overhead' and MapView3D's pad loop is DISABLED
   // (gamepadEnabled = flightMode==='airplane') — the on-screen sticks moved
   // NOTHING. Force it true so the loop reads the touch pad and the camera flies.
-  // Touch-fly present → force airplane mode so the flight loop reads the
-  // synthetic pad (the tether squares feed it). The loop idle-returns when the
-  // squares are neutral, so Google's native gestures still move the camera.
+  // Cruise mode → force airplane mode so the flight loop reads the synthetic
+  // pad (the zones feed it). The loop idle-returns when the zones are released,
+  // so Google's native look still moves the camera. Switching back to 'google'
+  // disables the loop so the baseline is byte-for-byte native.
   useEffect(() => {
-    if (touchFly && !MOBILE_NATIVE_GOOGLE) setPageGamepadConnected(true);
-  }, [touchFly]);
+    if (touchFly && mobileFlightMode === 'cruise') setPageGamepadConnected(true);
+    else if (touchFly && mobileFlightMode === 'google') setPageGamepadConnected(false);
+  }, [touchFly, mobileFlightMode]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -2115,6 +2140,7 @@ export default function MapPage() {
             onGamepadParcelHoverChange={handleParcelHoverChange}
             onGamepadStatusChange={handleGamepadStatus}
             flightSpeedMultiplier={flightTuning.multiplier}
+            mobileCruise={touchFly && mobileFlightMode === 'cruise'}
             climbRateMultiplier={flightTuning.climbRate}
             turnRateMultiplier={flightTuning.turnRate}
             tiltRateMultiplier={flightTuning.tiltRate}
@@ -2214,15 +2240,18 @@ export default function MapPage() {
       {touchFly && (
         <div className="map-touchpad">
           <MobileFlightHUD
-            hideControls={MOBILE_NATIVE_GOOGLE}
-            nativeGoogle={MOBILE_NATIVE_GOOGLE}
+            mode={mobileFlightMode}
+            onSelectMode={setMobileFlightMode}
             isFullscreen={isFullscreen}
             onFullscreen={expandMap}
             speedMultiplier={flightTuning.multiplier}
             onSpeedMultiplier={setFlightMultiplier}
-            onPan={tetherFlight.setPan}
-            onClimb={tetherFlight.setClimb}
           />
+          {/* CRUISE mode: two invisible bottom thumb-zones (pan/cruise + climb)
+              overlay Google's native look. Only mounted in 'cruise'. */}
+          {mobileFlightMode === 'cruise' && (
+            <FlightZones onPan={zoneFlight.setPan} onClimb={zoneFlight.setClimb} />
+          )}
         </div>
       )}
 

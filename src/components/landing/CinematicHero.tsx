@@ -324,9 +324,9 @@ function CinematicHeroInner() {
         <HeroCard icon="home" title="Find a home"
           body="Search listings by monthly payment, location, features, and real-time market context."
           cta="View homes" onClick={goHomes} />
-        {/* BUYER — the buyer's platform (lenders/vendors compete FOR you) */}
+        {/* BUYER — the buyer's platform (the pros come to YOU and introduce themselves) */}
         <HeroCard icon="groups" title="Build your buyer team"
-          body="Lenders, inspectors, escrow, and local pros compete for you — honest numbers, side by side."
+          body="Lenders, inspectors, escrow, and local pros come to you and introduce themselves — numbers, terms, and how they work."
           cta="Build your team" onClick={goTeam} />
         {/* OWNER — the Interconnector */}
         <HeroCard icon="route" title="Post your move"
@@ -336,28 +336,28 @@ function CinematicHeroInner() {
 
       {/* ── BUYER ADVANTAGE band — the buyer reservoir the lead-selling portals
            structurally can't touch. We're a brokerage, so we give EVERY buyer
-           real tools + a team that competes FOR them (even if we're not your
+           real tools + a team that comes TO them (even if we're not your
            broker). "No lead fees" is the whole indirect shade — names no one,
            indicts the model everyone knows. Echoes the old /buyers copy. ── */}
       <section className="chero__buyerband">
         <div className="chero__buyerband-copy">
           <div className="chero__buyerband-eyebrow">The buyer&apos;s platform · free</div>
-          <h2>The whole market comes to you.</h2>
-          <p>Stop chasing quotes across a dozen websites. Say what you need once — and every lender and vendor comes to you with their estimate. Honest numbers, side by side, on your ground. You compare, you choose, you keep your own agent.</p>
-          <p className="chero__buyerband-agents"><MaterialIcon icon="badge" className="text-[16px]" /> Agents: give your buyer a place where the whole market competes to earn them.</p>
+          <h2>The people you need, on your ground.</h2>
+          <p>Say what you need once — and the right lenders and pros come to you to introduce themselves. Their estimate, their terms, and how they actually work — including how they protect you. You see each one as a whole, and you choose who fits.</p>
+          <p className="chero__buyerband-agents"><MaterialIcon icon="badge" className="text-[16px]" /> Agents: a clean place for your buyer to meet the right professionals — you stay their guide.</p>
           <ul className="chero__buyerband-list">
-            <li><MaterialIcon icon="check_circle" className="text-[17px]" /> Every lender and vendor, competing to earn you.</li>
-            <li><MaterialIcon icon="check_circle" className="text-[17px]" /> Their real estimates, side by side — you compare on your terms.</li>
-            <li><MaterialIcon icon="check_circle" className="text-[17px]" /> Bring your own agent. This works for your whole team.</li>
+            <li><MaterialIcon icon="check_circle" className="text-[17px]" /> Real numbers, terms, and fees — in the open, side by side.</li>
+            <li><MaterialIcon icon="check_circle" className="text-[17px]" /> How each one operates — their process and the checks that protect you.</li>
+            <li><MaterialIcon icon="check_circle" className="text-[17px]" /> Bring your own agent. You see the whole person, then choose.</li>
           </ul>
           <button className="chero__buyerband-cta" onClick={goTeam}>
             Build your team <MaterialIcon icon="arrow_forward" className="text-[16px]" />
           </button>
         </div>
         <div className="chero__buyerband-art" aria-hidden>
-          <div className="chero__offercard chero__offercard--1"><span>Lender A</span><b>6.24%</b><i>$2,140/mo</i></div>
-          <div className="chero__offercard chero__offercard--2"><span>Lender B</span><b>6.11%</b><i>$2,096/mo</i></div>
-          <div className="chero__offercard chero__offercard--3"><span>Lender C</span><b>6.30%</b><i>$2,160/mo</i></div>
+          <div className="chero__offercard chero__offercard--1"><span>Lender · Maria</span><b>6.24%</b><i>$2,140/mo</i></div>
+          <div className="chero__offercard chero__offercard--2"><span>Lender · David</span><b>6.11%</b><i>$2,096/mo</i></div>
+          <div className="chero__offercard chero__offercard--3"><span>Inspector · Rey</span><b>Licensed</b><i>2-day turnaround</i></div>
         </div>
       </section>
 
@@ -602,7 +602,7 @@ function CinematicHeroInner() {
         .chero__sellerband-cta:hover { background: #eaf1ff; transform: translateY(-2px); }
 
         /* BUYER ADVANTAGE band — the buyer reservoir. Two columns:
-           the promise + a live-feeling stack of competing lender offers. */
+           the promise + a live-feeling stack of pros introducing themselves. */
         .chero__buyerband { position: relative; z-index: 4; display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 40px; align-items: center;
           width: 100%; max-width: 1240px; margin: 0 auto; padding: clamp(28px, 5vh, 56px) clamp(20px, 4vw, 52px); }
         .chero__buyerband-copy { text-align: left; }
@@ -620,7 +620,7 @@ function CinematicHeroInner() {
           border-radius: 12px; background: #1349d4; color: #fff; border: none; font-size: 14.5px; font-weight: 700; cursor: pointer;
           transition: background .15s, transform .15s; }
         .chero__buyerband-cta:hover { background: #0f3cb0; transform: translateY(-2px); }
-        /* the competing-offers art (echoes the real buyer board) */
+        /* the introductions art (pros presenting themselves — echoes the board) */
         .chero__buyerband-art { position: relative; height: 220px; }
         .chero__offercard { position: absolute; display: flex; align-items: center; gap: 14px; padding: 16px 20px; border-radius: 14px;
           background: rgba(16,24,46,0.92); border: 1px solid rgba(255,255,255,0.14); backdrop-filter: blur(10px);

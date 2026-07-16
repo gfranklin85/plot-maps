@@ -15,11 +15,15 @@
 // marquee sit in the quiet zone and never fight the video (that composition
 // is baked into the Veo prompt).
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { APIProvider } from '@vis.gl/react-google-maps';
 import { useAuth } from '@/lib/auth-context';
 import { signInWithGoogle } from '@/lib/signIn';
+import { GOOGLE_MAPS_API_KEY, GOOGLE_MAPS_LIBRARIES } from '@/lib/googleMapsConfig';
 import MaterialIcon from '@/components/ui/MaterialIcon';
+import PlotPadModal from '@/components/landing/PlotPadModal';
+import { usePlotPadStatus } from '@/lib/usePlotPadStatus';
 import { DESTINATIONS } from '@/lib/destinations';
 
 // INTERLEAVE wonders + cities so the marquee wows with variety immediately
@@ -38,24 +42,114 @@ const MARQUEE = (() => {
   return out.map((d) => ({ slug: d.slug, name: d.name, region: d.region }));
 })();
 
+// The Google Places loader is per-surface (no app-level provider). The hero
+// wraps its Places-powered search in an APIProvider so "Where do you want to
+// go?" can fly ANYWHERE on Earth, not just our curated catalog.
 export default function CinematicHero() {
+  return (
+    <APIProvider apiKey={GOOGLE_MAPS_API_KEY} libraries={GOOGLE_MAPS_LIBRARIES}>
+      <CinematicHeroInner />
+    </APIProvider>
+  );
+}
+
+// A global-place suggestion from Google Places (anything on Earth).
+interface PlaceHit { placeId: string; label: string; }
+
+function CinematicHeroInner() {
   const router = useRouter();
   const { user } = useAuth();
   const [q, setQ] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
+  const [padOpen, setPadOpen] = useState(false);
+  const { status: padStatus } = usePlotPadStatus();
+  const [places, setPlaces] = useState<PlaceHit[]>([]);
+  // The search bar is a DUAL door — explore a place OR list yours. The
+  // placeholder alternates to signal both (pauses once the user types).
+  const PLACEHOLDERS = ['Where do you want to go?', 'List your property…'];
+  const [phIdx, setPhIdx] = useState(0);
+  useEffect(() => {
+    if (q.length > 0) return; // don't cycle while they're typing
+    const t = setInterval(() => setPhIdx((i) => (i + 1) % PLACEHOLDERS.length), 3200);
+    return () => clearInterval(t);
+  }, [q.length, PLACEHOLDERS.length]);
+  const autoRef = useRef<google.maps.places.AutocompleteService | null>(null);
+  const detailsRef = useRef<google.maps.places.PlacesService | null>(null);
+
+  // Build the Places services once the ambient loader (APIProvider) has
+  // populated window.google.maps.places. Poll briefly like ProspectSearch does
+  // — the library can arrive a beat after the provider mounts.
+  useEffect(() => {
+    let cancelled = false;
+    const build = () => {
+      if (cancelled) return true;
+      const p = window.google?.maps?.places;
+      if (!p?.AutocompleteService) return false;
+      autoRef.current = new p.AutocompleteService();
+      detailsRef.current = new p.PlacesService(document.createElement('div'));
+      return true;
+    };
+    if (build()) return;
+    const id = window.setInterval(() => { if (build()) window.clearInterval(id); }, 250);
+    return () => { cancelled = true; window.clearInterval(id); };
+  }, []);
 
   const fly = (slug: string) => {
     const path = `/map?destination=${slug}&view=3d`;
     if (user) router.push(path); else signInWithGoogle(path);
   };
+  const flyCoords = (lat: number, lng: number, address: string) => {
+    const p = new URLSearchParams({ lat: String(lat), lng: String(lng), view: '3d', address });
+    const path = `/map?${p.toString()}`;
+    if (user) router.push(path); else signInWithGoogle(path);
+  };
   const goPost = () => {
     if (user) router.push('/post'); else signInWithGoogle('/post');
   };
+  const goListing = () => {
+    if (user) router.push('/listings/new'); else signInWithGoogle('/listings/new');
+  };
+  // Buyer doors (browse homes is public — no auth wall to look).
+  const goHomes = () => router.push('/listings');
+  const goTeam = () => {
+    if (user) router.push('/bullpen'); else signInWithGoogle('/bullpen');
+  };
+
+  // Curated catalog matches FIRST (fast, branded), then global Places.
   const searchMatches = q.trim().length > 0
     ? DESTINATIONS.filter((d) =>
         d.name.toLowerCase().includes(q.toLowerCase()) || d.region.toLowerCase().includes(q.toLowerCase()),
-      ).slice(0, 6)
+      ).slice(0, 5)
     : [];
+
+  // Global Places fallthrough — NO country restriction (fly ANYWHERE: Petra,
+  // Reykjavik, an address). Debounced; only fires once the service is built.
+  useEffect(() => {
+    const query = q.trim();
+    if (query.length < 3 || !autoRef.current) { setPlaces([]); return; }
+    const t = setTimeout(() => {
+      autoRef.current!.getPlacePredictions({ input: query }, (preds) => {
+        setPlaces((preds || []).slice(0, 5).map((p) => ({ placeId: p.place_id, label: p.description })));
+      });
+    }, 220);
+    return () => clearTimeout(t);
+  }, [q]);
+
+  // Resolve a Places prediction → lat/lng, then fly there.
+  const flyPlace = (hit: PlaceHit) => {
+    const svc = detailsRef.current;
+    if (!svc) return;
+    svc.getDetails({ placeId: hit.placeId, fields: ['geometry', 'name', 'formatted_address'] }, (res) => {
+      const loc = res?.geometry?.location;
+      if (!loc) return;
+      flyCoords(loc.lat(), loc.lng(), res?.formatted_address || res?.name || hit.label);
+    });
+  };
+
+  // Drop catalog names we already show so the two lists don't duplicate.
+  const catalogNames = new Set(searchMatches.map((d) => d.name.toLowerCase()));
+  const placeHits = places.filter((p) => !catalogNames.has(p.label.split(',')[0].trim().toLowerCase()));
+  const hasResults = searchMatches.length > 0 || placeHits.length > 0;
 
   return (
     <div className="chero">
@@ -142,48 +236,160 @@ export default function CinematicHero() {
           <MaterialIcon icon="search" className="text-[20px] chero__search-ic" />
           <input
             value={q} onChange={(e) => setQ(e.target.value)}
-            placeholder="Where do you want to go?"
-            onKeyDown={(e) => { if (e.key === 'Enter' && searchMatches[0]) fly(searchMatches[0].slug); }}
+            placeholder={PLACEHOLDERS[phIdx]}
+            onKeyDown={(e) => {
+              if (e.key !== 'Enter') return;
+              if (searchMatches[0]) fly(searchMatches[0].slug);
+              else if (placeHits[0]) flyPlace(placeHits[0]);
+            }}
           />
           <span className="chero__search-go"><MaterialIcon icon="explore" className="text-[18px]" /></span>
-          {searchMatches.length > 0 && (
+          {hasResults && (
             <div className="chero__search-menu">
               {searchMatches.map((m) => (
                 <button key={m.slug} onClick={() => fly(m.slug)}>
                   <b>{m.name}</b><span>{m.region}</span>
                 </button>
               ))}
+              {placeHits.map((p) => (
+                <button key={p.placeId} onClick={() => flyPlace(p)}>
+                  <MaterialIcon icon="public" className="text-[15px] chero__search-globe" />
+                  <b>{p.label}</b>
+                </button>
+              ))}
             </div>
           )}
         </div>
 
-        {/* CTAs */}
+        {/* CTAs — three doors. Start flying is the gamepad DEFAULT focus
+            (data-gamepad-primary): pad in → highlight lands here (the white
+            one), cycle right → Find a home → Post your move, A activates. */}
         <div className="chero__ctas">
-          <button className="chero__cta chero__cta--primary" onClick={() => fly('lemoore')}>
-            Start flying <MaterialIcon icon="north_east" className="text-[17px]" />
+          <button className="chero__cta chero__cta--primary" onClick={() => fly('lemoore')}
+            data-gamepad-focusable data-gamepad-primary>
+            <MaterialIcon icon="flight_takeoff" className="text-[18px]" /> Start flying
           </button>
-          <button className="chero__cta chero__cta--ghost" onClick={goPost}>
-            Post your move <MaterialIcon icon="deployed_code" className="text-[17px]" />
+          <button className="chero__cta chero__cta--ghost" onClick={goHomes} data-gamepad-focusable>
+            <MaterialIcon icon="home" className="text-[18px]" /> Find a home
+          </button>
+          <button className="chero__cta chero__cta--ghost" onClick={goPost} data-gamepad-focusable>
+            <MaterialIcon icon="deployed_code" className="text-[17px]" /> Post your move
           </button>
         </div>
 
         <p className="chero__tag">
-          <MaterialIcon icon="public" className="text-[14px]" /> Explore the world. Find your place. Begin your move.
+          <MaterialIcon icon="public" className="text-[14px]" /> Fly anywhere. Find homes. Move freely.
         </p>
+
+        {/* controller chip — plug in a gamepad and fly the map for real. Live
+            status from usePlotPadStatus; click opens the Plot Pad download. */}
+        <button
+          type="button"
+          className={`chero__pad chero__pad--${padStatus}`}
+          onClick={() => setPadOpen(true)}
+        >
+          <MaterialIcon icon="stadia_controller" className="text-[18px]" />
+          <span className="chero__pad-dot" aria-hidden />
+          <span className="chero__pad-text">
+            {padStatus === 'active'
+              ? 'Plot Pad active — flight-ready'
+              : padStatus === 'connected'
+                ? 'Controller connected — get Plot Pad'
+                : 'Plug in your controller — fly the map for real'}
+          </span>
+          <MaterialIcon icon="download" className="text-[15px] chero__pad-dl" />
+        </button>
+
+        {/* scroll cue — the fold is the hook; the doors + homes + team are the
+            descent below. Signal there's more (no false floor). */}
+        <a href="#doors" className="chero__more" aria-label="See what you can do">
+          <span>What you can do here</span>
+          <MaterialIcon icon="keyboard_arrow_down" className="text-[22px] chero__more-arrow" />
+        </a>
       </div>
 
-      {/* ── three cards below the hero ── */}
+      {/* ══ THE DESCENT (memory/plotmaps_thesis fold doctrine): below the awe,
+           each reservoir gets its moment — the doors, the buyer advantage, the
+           free listing on-ramp, the weld. A sequence, not a museum. ══ */}
+      <div id="doors" className="chero__descent">
+
+      {/* ── FOUR DOORS — one for whoever arrives (explorer/buyer/buyer/owner).
+           A two-sided marketplace: buyers are welcomed as loudly as sellers. ── */}
       <section className="chero__cards">
-        <HeroCard eyebrow="Fly the world" title="Explore without limits"
-          body="Spin the globe, discover iconic places, and uncover new possibilities everywhere."
-          onClick={() => fly('lemoore')} />
-        <HeroCard eyebrow="Build your position" title="Post your move"
-          body="Share your move, tell your story, and let the right opportunities find you."
-          onClick={goPost} />
-        <HeroCard eyebrow="Real estate. Reimagined." title="Tools for every move"
-          body="From searching to closing, Position gives you the platform to move smarter."
-          onClick={() => router.push('/listings')} />
+        {/* EXPLORER */}
+        <HeroCard icon="public" title="Fly the world"
+          body="Explore cities, coastlines, landmarks, and neighborhoods in stunning photoreal 3D."
+          cta="Start flying" onClick={() => fly('lemoore')} />
+        {/* BUYER — browse the homes */}
+        <HeroCard icon="home" title="Find a home"
+          body="Search listings by monthly payment, location, features, and real-time market context."
+          cta="View homes" onClick={goHomes} />
+        {/* BUYER — the buyer's platform (lenders/vendors compete FOR you) */}
+        <HeroCard icon="groups" title="Build your buyer team"
+          body="Lenders, inspectors, escrow, and local pros compete for you — honest numbers, side by side."
+          cta="Build your team" onClick={goTeam} />
+        {/* OWNER — the Interconnector */}
+        <HeroCard icon="route" title="Post your move"
+          body="Tell the map what would make a move work. Find direct connections and multi-step move paths."
+          cta="Post your move" onClick={goPost} />
       </section>
+
+      {/* ── BUYER ADVANTAGE band — the buyer reservoir the lead-selling portals
+           structurally can't touch. We're a brokerage, so we give EVERY buyer
+           real tools + a team that competes FOR them (even if we're not your
+           broker). "No lead fees" is the whole indirect shade — names no one,
+           indicts the model everyone knows. Echoes the old /buyers copy. ── */}
+      <section className="chero__buyerband">
+        <div className="chero__buyerband-copy">
+          <div className="chero__buyerband-eyebrow">The buyer&apos;s platform · free</div>
+          <h2>The whole market comes to you.</h2>
+          <p>Stop chasing quotes across a dozen websites. Say what you need once — and every lender and vendor comes to you with their estimate. Honest numbers, side by side, on your ground. You compare, you choose, you keep your own agent.</p>
+          <p className="chero__buyerband-agents"><MaterialIcon icon="badge" className="text-[16px]" /> Agents: give your buyer a place where the whole market competes to earn them.</p>
+          <ul className="chero__buyerband-list">
+            <li><MaterialIcon icon="check_circle" className="text-[17px]" /> Every lender and vendor, competing to earn you.</li>
+            <li><MaterialIcon icon="check_circle" className="text-[17px]" /> Their real estimates, side by side — you compare on your terms.</li>
+            <li><MaterialIcon icon="check_circle" className="text-[17px]" /> Bring your own agent. This works for your whole team.</li>
+          </ul>
+          <button className="chero__buyerband-cta" onClick={goTeam}>
+            Build your team <MaterialIcon icon="arrow_forward" className="text-[16px]" />
+          </button>
+        </div>
+        <div className="chero__buyerband-art" aria-hidden>
+          <div className="chero__offercard chero__offercard--1"><span>Lender A</span><b>6.24%</b><i>$2,140/mo</i></div>
+          <div className="chero__offercard chero__offercard--2"><span>Lender B</span><b>6.11%</b><i>$2,096/mo</i></div>
+          <div className="chero__offercard chero__offercard--3"><span>Lender C</span><b>6.30%</b><i>$2,160/mo</i></div>
+        </div>
+      </section>
+
+      {/* ── seller band: put your property on the map, free (improvements,
+           condition, timing intake). The open on-ramp — indirect shade only. ── */}
+      <section className="chero__sellerband">
+        <div className="chero__sellerband-media" aria-hidden />
+        <div className="chero__sellerband-copy">
+          <h2>Have a property? Put it on the map for free.</h2>
+          <p>Owners and agents can post listings, add photos, improvements, condition, and timing. Get discovered by motivated buyers around the world.</p>
+        </div>
+        <button className="chero__sellerband-cta" onClick={goListing}>
+          List a property <MaterialIcon icon="arrow_forward" className="text-[16px]" />
+        </button>
+      </section>
+
+      {/* ── the weld: PlotMaps (platform) + Position (brokerage engine) as ONE
+           assemblage, stated plainly + trust chips. ── */}
+      <footer className="chero__weld">
+        <span className="chero__weld-by">
+          <span className="chero__weld-by-label">Built by</span>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/brand/position-wordmark.svg" alt="Position Realty" className="chero__weld-mark" />
+        </span>
+        <p className="chero__weld-line">PlotMaps is the platform. Position is the brokerage and operating engine behind it.</p>
+        <div className="chero__weld-chips">
+          <span><MaterialIcon icon="verified_user" className="text-[16px]" /> Real expertise</span>
+          <span><MaterialIcon icon="lock" className="text-[16px]" /> Private by design</span>
+          <span><MaterialIcon icon="handshake" className="text-[16px]" /> Aligned, not automated</span>
+        </div>
+      </footer>
+      </div>{/* /chero__descent */}
 
       {/* ── mobile bottom tab bar ── */}
       <nav className="chero__tabbar">
@@ -193,16 +399,22 @@ export default function CinematicHero() {
         <button onClick={goPost}><MaterialIcon icon="deployed_code" className="text-[22px]" /><span>Post</span></button>
       </nav>
 
+      {/* Plot Pad download / trust modal (shared with the rest of the app) */}
+      <PlotPadModal open={padOpen} onClose={() => setPadOpen(false)} />
+
       <style>{`
-        /* the hero holds ONE viewport — nav+brand+marquee+search+CTAs+Earth */
-        .chero { position: relative; width: 100%; background: #000; color: #fff; overflow: hidden;
+        /* THE FOLD DOCTRINE (memory/plotmaps_thesis): the fold is awe-first —
+           the hook that gets a "reservoir" visitor over the dam. The doors +
+           buyer band + seller band + weld are a DELIBERATE descent below, each
+           reservoir its own moment. A reasoned scroll, not a crammed viewport.
+           The Earth video is a FIXED backdrop behind the whole descent. */
+        .chero { position: relative; width: 100%; background: #000; color: #fff; overflow-x: hidden;
           min-height: 100svh; display: flex; flex-direction: column;
           font-family: var(--font-geist-sans), Inter, system-ui, sans-serif; }
         .chero button, .chero input, .chero a { font-family: inherit; }
-        .chero__video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; }
-        /* darker + easier on the eyes: a global dim over the whole video + the
-           top/bottom scrims for text legibility. */
-        .chero__scrim { position: absolute; inset: 0; z-index: 1; pointer-events: none;
+        /* FIXED backdrop — the Earth stays put as the descent scrolls over it. */
+        .chero__video { position: fixed; inset: 0; width: 100vw; height: 100svh; object-fit: cover; z-index: 0; }
+        .chero__scrim { position: fixed; inset: 0; height: 100svh; z-index: 1; pointer-events: none;
           background:
             linear-gradient(180deg, rgba(2,4,10,0.82) 0%, rgba(2,4,10,0.35) 24%, rgba(2,4,10,0.12) 44%, rgba(2,4,10,0.1) 58%),
             linear-gradient(180deg, rgba(0,0,0,0) 60%, rgba(0,0,0,0.6) 82%, #000 100%),
@@ -252,25 +464,32 @@ export default function CinematicHero() {
           .chero__navright { margin-left: auto; }
           .chero__join { display: none; }               /* Join lives in the drawer on mobile */
           .chero__tabbar { display: flex; }
-          .chero__stage { padding: 8px 16px 84px; justify-content: flex-start; padding-top: clamp(12px, 3vh, 28px); }
-          .chero__wordmark { width: min(78vw, 360px); }
+          .chero__stage { min-height: calc(100svh - 64px); padding: 12px 16px 28px; }
+          .chero__wordmark { width: min(76vw, 340px); }
           /* chips: a horizontal swipe carousel (no auto-scroll on mobile) */
           .chero__marquee { width: 100%; overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch;
             border-radius: 20px; padding: 8px 12px; mask-image: none; scrollbar-width: none; }
           .chero__marquee::-webkit-scrollbar { display: none; }
           .chero__marquee-track { animation: none; gap: 6px; }
-          .chero__ctas { flex-direction: column; width: min(360px, 90vw); }
-          .chero__cta { justify-content: center; width: 100%; }
-          .chero__cards { grid-template-columns: 1fr; margin-top: 0; padding-bottom: 100px; }
+          .chero__ctas { flex-direction: column; width: min(360px, 90vw); gap: 10px; }
+          .chero__cta { justify-content: center; width: 100%; padding: 12px 22px; }
+          .chero__buyerband { text-align: center; }
+          .chero__buyerband-copy { text-align: center; }
+          .chero__buyerband-copy p { margin-left: auto; margin-right: auto; }
+          .chero__buyerband-list { align-items: flex-start; width: max-content; max-width: 100%; margin-inline: auto; }
+          .chero__sellerband { flex-direction: column; text-align: center; align-items: stretch; }
+          .chero__sellerband-media { height: 140px; width: 100%; }
+          .chero__weld { padding-bottom: calc(84px + env(safe-area-inset-bottom)); } /* clear the tab bar */
         }
 
-        /* the title stage — grows to fill the viewport under the nav so the
-           whole hero is ONE screen; cards sit below the fold. */
-        .chero__stage { position: relative; z-index: 4; flex: 1; min-height: 0;
+        /* THE FOLD — fills the first viewport (minus nav), awe-first, breathing.
+           Just wordmark + marquee + search + 3 doors + chip + a scroll cue. */
+        .chero__stage { position: relative; z-index: 4; flex: none;
+          min-height: calc(100svh - 92px);
           display: flex; flex-direction: column; align-items: center; justify-content: center;
-          text-align: center; padding: 0 20px clamp(16px, 5vh, 56px); }
+          text-align: center; padding: clamp(8px, 2vh, 24px) 20px clamp(16px, 3vh, 32px); }
         .chero__brand { display: flex; flex-direction: column; align-items: center; }
-        .chero__wordmark { display: block; width: clamp(320px, 52vw, 680px); height: auto; filter: brightness(0) invert(1) drop-shadow(0 6px 44px rgba(120,170,255,0.4)); }
+        .chero__wordmark { display: block; width: clamp(260px, 34vw, 460px); height: auto; filter: brightness(0) invert(1) drop-shadow(0 6px 44px rgba(120,170,255,0.4)); }
         .chero__by { display: inline-flex; align-items: center; gap: 8px; margin-top: 8px; }
         .chero__by-label { color: rgba(255,255,255,0.72); font-size: clamp(15px, 1.8vw, 20px); line-height: 1; }
         /* Position Black.svg: fill #000 → invert to white. The viewBox has
@@ -281,7 +500,7 @@ export default function CinematicHero() {
           filter: brightness(0) invert(1) drop-shadow(0 2px 12px rgba(0,0,0,0.5)); }
 
         /* marquee */
-        .chero__marquee { width: min(1000px, 96vw); margin-top: clamp(16px, 3vh, 30px); overflow: hidden;
+        .chero__marquee { width: min(1000px, 96vw); margin-top: clamp(10px, 1.6vh, 18px); overflow: hidden;
           border-radius: 999px; padding: 8px 22px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.14);
           backdrop-filter: blur(10px);
           /* fade only the very edges so no chip label gets clipped mid-word */
@@ -298,7 +517,7 @@ export default function CinematicHero() {
 
         /* search */
         .chero__search { position: relative; display: flex; align-items: center; gap: 12px; width: min(620px, 92vw);
-          margin-top: clamp(16px, 3vh, 26px); padding: 0 8px 0 20px; height: 60px;
+          margin-top: clamp(10px, 1.6vh, 18px); padding: 0 8px 0 20px; height: 54px;
           background: rgba(20,28,50,0.55); border: 1px solid rgba(255,255,255,0.16); border-radius: 16px; backdrop-filter: blur(14px); }
         .chero__search:focus-within { border-color: rgba(140,180,255,0.6); box-shadow: 0 0 0 3px rgba(63,125,255,0.2); }
         .chero__search-ic { color: rgba(255,255,255,0.55); }
@@ -312,30 +531,126 @@ export default function CinematicHero() {
         .chero__search-menu button { display: flex; align-items: baseline; gap: 8px; width: 100%; text-align: left;
           padding: 12px 18px; background: none; border: none; cursor: pointer; color: #fff; }
         .chero__search-menu button:hover { background: rgba(63,125,255,0.25); }
-        .chero__search-menu b { font-size: 14px; } .chero__search-menu span { font-size: 12px; color: #9db4e6; }
+        .chero__search-menu b { font-size: 14px; font-weight: 600; } .chero__search-menu span { font-size: 12px; color: #9db4e6; }
+        .chero__search-globe { color: #7fa8ff; flex: none; }
 
         /* CTAs */
-        .chero__ctas { display: flex; gap: 14px; margin-top: clamp(16px, 3vh, 24px); flex-wrap: wrap; justify-content: center; }
-        .chero__cta { display: inline-flex; align-items: center; gap: 8px; padding: 14px 28px; border-radius: 14px;
-          font-size: 15.5px; font-weight: 700; cursor: pointer; border: 1px solid transparent; transition: transform .15s, background .15s; }
+        .chero__ctas { display: flex; gap: 12px; margin-top: clamp(10px, 1.6vh, 18px); flex-wrap: wrap; justify-content: center; }
+        .chero__cta { display: inline-flex; align-items: center; gap: 8px; padding: 12px 24px; border-radius: 14px;
+          font-size: 15px; font-weight: 700; cursor: pointer; border: 1px solid transparent; transition: transform .15s, background .15s; }
         .chero__cta:hover { transform: translateY(-2px); }
         .chero__cta--primary { background: #fff; color: #0a1330; }
         .chero__cta--primary:hover { background: #eaf1ff; }
         .chero__cta--ghost { background: rgba(255,255,255,0.08); color: #fff; border-color: rgba(255,255,255,0.28); backdrop-filter: blur(8px); }
         .chero__cta--ghost:hover { background: rgba(255,255,255,0.16); }
+        /* gamepad focus ring (useGamepadNav adds .gp-focus to the cycled item).
+           Start flying carries data-gamepad-primary so the pad lands there first. */
+        .chero .gp-focus { outline: none; box-shadow: 0 0 0 3px rgba(19,73,212,0.5), 0 0 20px rgba(19,73,212,0.5); border-radius: 14px; }
 
-        .chero__tag { display: inline-flex; align-items: center; gap: 8px; margin-top: clamp(14px, 2.5vh, 22px);
-          color: rgba(255,255,255,0.82); font-size: 14px; font-weight: 500; text-shadow: 0 1px 8px rgba(0,0,0,0.6); }
+        .chero__tag { display: inline-flex; align-items: center; gap: 8px; margin-top: clamp(8px, 1.4vh, 14px);
+          color: rgba(255,255,255,0.82); font-size: 13.5px; font-weight: 500; text-shadow: 0 1px 8px rgba(0,0,0,0.6); }
 
-        /* three cards */
-        .chero__cards { position: relative; z-index: 4; display: grid; gap: 18px;
-          grid-template-columns: repeat(3, 1fr); max-width: 1240px; margin: clamp(40px, 8vh, 90px) auto 0;
-          padding: 0 clamp(20px, 4vw, 52px) clamp(40px, 8vh, 90px); }
-        @media (max-width: 900px) { .chero__cards { grid-template-columns: 1fr; } }
+        /* controller chip — quiet dark affordance under the tagline. The dot
+           reflects live gamepad status (off / connected / active). */
+        .chero__pad { display: inline-flex; align-items: center; gap: 9px; margin-top: clamp(8px, 1.4vh, 14px);
+          padding: 7px 15px; border-radius: 999px; cursor: pointer;
+          background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.16);
+          color: rgba(255,255,255,0.82); font-size: 13px; font-weight: 600; backdrop-filter: blur(8px);
+          transition: background .15s, border-color .15s, color .15s; }
+        .chero__pad:hover { background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.34); color: #fff; }
+        .chero__pad-dot { width: 7px; height: 7px; border-radius: 50%; flex: none;
+          background: rgba(255,255,255,0.35); box-shadow: none; transition: background .2s, box-shadow .2s; }
+        .chero__pad-dl { color: rgba(255,255,255,0.5); }
+        /* connected/active: the dot goes live green + glows */
+        .chero__pad--connected .chero__pad-dot,
+        .chero__pad--active .chero__pad-dot { background: #34d399; box-shadow: 0 0 8px rgba(52,211,153,0.8); }
+        .chero__pad--active { border-color: rgba(52,211,153,0.5); color: #d7f7ea; }
+
+        /* scroll cue — quiet 'more below', gently bobbing (no false floor) */
+        .chero__more { display: inline-flex; flex-direction: column; align-items: center; gap: 0;
+          margin-top: clamp(14px, 3vh, 30px); color: rgba(255,255,255,0.55); text-decoration: none;
+          font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
+        .chero__more:hover { color: #fff; }
+        .chero__more-arrow { animation: chBob 1.8s ease-in-out infinite; }
+        @keyframes chBob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(4px); } }
+
+        /* THE DESCENT — solid dark below the fold so the doors/bands read on
+           black once the fixed Earth scrolls away above. */
+        .chero__descent { position: relative; z-index: 4;
+          background: linear-gradient(180deg, rgba(3,5,12,0) 0%, #03050c 6%, #03050c 100%); }
+
+        /* FOUR doors — one row, part of the single viewport. */
+        .chero__cards { position: relative; z-index: 4; flex: none; display: grid; gap: 12px;
+          grid-template-columns: repeat(4, 1fr); width: 100%; max-width: 1320px; margin: 0 auto;
+          padding: 0 clamp(20px, 4vw, 52px) clamp(8px, 1.4vh, 16px); }
+        @media (max-width: 1080px) { .chero__cards { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 560px) { .chero__cards { grid-template-columns: 1fr; } }
+
+        /* seller band — the free property on-ramp, one full-width row */
+        .chero__sellerband { position: relative; z-index: 4; flex: none; display: flex; align-items: center; gap: 18px;
+          width: 100%; max-width: 1320px; margin: 0 auto; padding: 12px clamp(20px, 4vw, 52px); }
+        .chero__sellerband::before { content: ''; position: absolute; inset: 0 clamp(20px, 4vw, 52px);
+          border-radius: 16px; background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.1); z-index: -1; }
+        .chero__sellerband-media { flex: none; width: 168px; height: 66px; border-radius: 10px;
+          background: url('/assets/destinations/lemoore.jpg') center/cover, #0a1330; opacity: 0.9; }
+        .chero__sellerband-copy { flex: 1; min-width: 0; text-align: left; }
+        .chero__sellerband-copy h2 { font-family: var(--font-headline, inherit); font-size: 1.15rem; font-weight: 800; color: #fff; }
+        .chero__sellerband-copy p { font-size: 12.5px; line-height: 1.45; color: rgba(255,255,255,0.66); margin-top: 3px; }
+        .chero__sellerband-cta { flex: none; display: inline-flex; align-items: center; gap: 8px; padding: 11px 20px;
+          border-radius: 11px; background: #fff; color: #0a1330; border: none; font-size: 13.5px; font-weight: 700; cursor: pointer;
+          transition: background .15s, transform .15s; }
+        .chero__sellerband-cta:hover { background: #eaf1ff; transform: translateY(-2px); }
+
+        /* BUYER ADVANTAGE band — the buyer reservoir. Two columns:
+           the promise + a live-feeling stack of competing lender offers. */
+        .chero__buyerband { position: relative; z-index: 4; display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 40px; align-items: center;
+          width: 100%; max-width: 1240px; margin: 0 auto; padding: clamp(28px, 5vh, 56px) clamp(20px, 4vw, 52px); }
+        .chero__buyerband-copy { text-align: left; }
+        .chero__buyerband-eyebrow { font-size: 11px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #7fa8ff; }
+        .chero__buyerband-copy h2 { font-family: var(--font-headline, inherit); font-size: clamp(1.5rem, 3vw, 2.1rem); font-weight: 800; color: #fff; margin-top: 8px; line-height: 1.1; }
+        .chero__buyerband-copy p { font-size: 14px; line-height: 1.6; color: rgba(255,255,255,0.7); margin-top: 12px; max-width: 520px; }
+        .chero__buyerband-agents { display: inline-flex; align-items: center; gap: 8px; margin-top: 12px !important;
+          padding: 9px 14px; border-radius: 10px; background: rgba(19,73,212,0.14); border: 1px solid rgba(19,73,212,0.4);
+          color: #cfe0ff !important; font-size: 13px !important; font-weight: 600; max-width: none !important; }
+        .chero__buyerband-agents .material-symbols-outlined { color: #7fa8ff; flex: none; }
+        .chero__buyerband-list { list-style: none; margin: 18px 0 0; padding: 0; display: flex; flex-direction: column; gap: 9px; }
+        .chero__buyerband-list li { display: flex; align-items: center; gap: 10px; font-size: 13.5px; color: rgba(255,255,255,0.82); }
+        .chero__buyerband-list .material-symbols-outlined { color: #34d399; flex: none; }
+        .chero__buyerband-cta { display: inline-flex; align-items: center; gap: 8px; margin-top: 22px; padding: 13px 24px;
+          border-radius: 12px; background: #1349d4; color: #fff; border: none; font-size: 14.5px; font-weight: 700; cursor: pointer;
+          transition: background .15s, transform .15s; }
+        .chero__buyerband-cta:hover { background: #0f3cb0; transform: translateY(-2px); }
+        /* the competing-offers art (echoes the real buyer board) */
+        .chero__buyerband-art { position: relative; height: 220px; }
+        .chero__offercard { position: absolute; display: flex; align-items: center; gap: 14px; padding: 16px 20px; border-radius: 14px;
+          background: rgba(16,24,46,0.92); border: 1px solid rgba(255,255,255,0.14); backdrop-filter: blur(10px);
+          box-shadow: 0 20px 50px -20px rgba(0,0,0,0.7); width: 300px; }
+        .chero__offercard span { font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.7); flex: 1; }
+        .chero__offercard b { font-size: 17px; font-weight: 800; color: #fff; }
+        .chero__offercard i { font-size: 12.5px; font-style: normal; color: #9dc0ff; }
+        .chero__offercard--1 { top: 8px; left: 0; transform: rotate(-3deg); }
+        .chero__offercard--2 { top: 78px; left: 40px; transform: rotate(1deg); z-index: 2; border-color: rgba(52,211,153,0.5); }
+        .chero__offercard--3 { top: 150px; left: 8px; transform: rotate(-1.5deg); }
+        @media (max-width: 900px) {
+          .chero__buyerband { grid-template-columns: 1fr; gap: 28px; }
+          .chero__buyerband-art { height: 210px; max-width: 340px; margin: 0 auto; }
+        }
+
+        /* the weld — PlotMaps (platform) + Position (engine) as one assemblage */
+        .chero__weld { position: relative; z-index: 4; flex: none; display: flex; flex-direction: column; align-items: center; gap: 7px;
+          text-align: center; padding: clamp(10px, 1.6vh, 18px) 24px clamp(12px, 2vh, 20px); }
+        .chero__weld-by { display: inline-flex; align-items: center; gap: 8px; }
+        .chero__weld-by-label { font-size: 10px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(255,255,255,0.5); }
+        .chero__weld-mark { height: 20px; width: auto; filter: brightness(0) invert(1); opacity: 0.9; }
+        .chero__weld-line { font-size: 12.5px; color: rgba(255,255,255,0.6); max-width: 640px; }
+        .chero__weld-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 18px; margin-top: 2px; }
+        .chero__weld-chips span { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.55); }
+        .chero__weld-chips span .material-symbols-outlined { color: #7fa8ff; }
 
         @media (prefers-reduced-motion: reduce) {
           .chero__video { display: none; }
-          .chero { background: #05070f url('/hero/earth-space-poster.jpg') center/cover no-repeat; }
+          .chero__scrim { background: linear-gradient(180deg, rgba(2,4,10,0.7), rgba(2,4,10,0.9)),
+            url('/hero/earth-space-poster.jpg') center/cover no-repeat; }
           .chero__marquee-track { animation: none; }
         }
       `}</style>
@@ -343,26 +658,31 @@ export default function CinematicHero() {
   );
 }
 
-function HeroCard({ eyebrow, title, body, onClick }: {
-  eyebrow: string; title: string; body: string; onClick: () => void;
+function HeroCard({ icon, title, body, cta, onClick }: {
+  icon: string; title: string; body: string; cta: string; onClick: () => void;
 }) {
   return (
-    <button className="hcard" onClick={onClick}>
-      <span className="hcard__eyebrow">{eyebrow}</span>
+    <button className="hcard" onClick={onClick} data-gamepad-focusable>
+      <span className="hcard__icon"><MaterialIcon icon={icon} className="text-[24px]" /></span>
       <span className="hcard__title">{title}</span>
       <span className="hcard__body">{body}</span>
-      <span className="hcard__go"><MaterialIcon icon="arrow_forward" className="text-[18px]" /></span>
+      <span className="hcard__go">{cta} <MaterialIcon icon="arrow_forward" className="text-[16px]" /></span>
       <style>{`
-        .hcard { position: relative; text-align: left; display: flex; flex-direction: column; gap: 8px;
-          padding: 26px 26px 64px; border-radius: 20px; cursor: pointer;
-          background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1);
+        .hcard { position: relative; text-align: left; display: flex; flex-direction: column; gap: 7px;
+          padding: 16px 18px 16px; border-radius: 16px; cursor: pointer;
+          background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.1);
           backdrop-filter: blur(8px); transition: background .15s, border-color .15s, transform .15s; }
-        .hcard:hover { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.24); transform: translateY(-3px); }
-        .hcard__eyebrow { font-size: 11px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #7fa8ff; }
-        .hcard__title { font-family: var(--font-headline, inherit); font-size: 1.5rem; font-weight: 800; color: #fff; }
-        .hcard__body { font-size: 14px; line-height: 1.55; color: rgba(255,255,255,0.68); }
-        .hcard__go { position: absolute; left: 26px; bottom: 22px; width: 40px; height: 40px; border-radius: 999px;
-          display: grid; place-items: center; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.16); color: #fff; }
+        .hcard:hover { background: rgba(255,255,255,0.07); border-color: rgba(19,73,212,0.55); transform: translateY(-3px); }
+        /* outline icon tile, monochrome + ONE coordinated brand-blue accent (no
+           four-hue AI-generic tiles). memory/feedback_brand_fidelity */
+        .hcard__icon { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 11px;
+          border: 1px solid rgba(255,255,255,0.18); background: rgba(19,73,212,0.10); color: #9dc0ff; }
+        .hcard:hover .hcard__icon { border-color: rgba(19,73,212,0.7); color: #cfe0ff; }
+        .hcard__title { font-family: var(--font-headline, inherit); font-size: 1.12rem; font-weight: 800; color: #fff; line-height: 1.1; }
+        .hcard__body { font-size: 12.5px; line-height: 1.45; color: rgba(255,255,255,0.66); flex: 1; }
+        .hcard__go { display: inline-flex; align-items: center; gap: 6px; margin-top: 4px; padding: 7px 14px; align-self: flex-start;
+          border-radius: 999px; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.16);
+          color: #fff; font-size: 12.5px; font-weight: 700; }
         .hcard:hover .hcard__go { background: #fff; color: #0a1330; }
       `}</style>
     </button>

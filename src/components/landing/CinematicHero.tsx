@@ -354,11 +354,65 @@ function CinematicHeroInner() {
             Build your team <MaterialIcon icon="arrow_forward" className="text-[16px]" />
           </button>
         </div>
-        <div className="chero__buyerband-art" aria-hidden>
-          <div className="chero__offercard chero__offercard--1"><span>Lender · Maria</span><b>6.24%</b><i>$2,140/mo</i></div>
-          <div className="chero__offercard chero__offercard--2"><span>Lender · David</span><b>6.11%</b><i>$2,096/mo</i></div>
-          <div className="chero__offercard chero__offercard--3"><span>Inspector · Rey</span><b>Licensed</b><i>2-day turnaround</i></div>
+        {/* the CONSTELLATION — the home-ground inversion, drawn: the buyer is
+            the center; the professionals ORBIT and come inward to introduce
+            themselves (arrows point AT the buyer). Ghost blueprint house behind
+            = the goal you're building a team to reach. All CSS/SVG. Geometry:
+            hub centered; 4 pros at the 4 corners, arrows drawn corner→center. */}
+        <div className="chero__constel" aria-hidden>
+          {/* inward arrows — from each corner card toward the hub center (280,230) */}
+          <svg className="chero__constel-lines" viewBox="0 0 560 460" preserveAspectRatio="none">
+            <defs>
+              <marker id="chArrow" markerWidth="7" markerHeight="7" refX="5.5" refY="3.5" orient="auto">
+                <path d="M0,0 L6,3.5 L0,7 Z" fill="rgba(159,192,255,0.7)" />
+              </marker>
+            </defs>
+            <g fill="none" stroke="rgba(159,192,255,0.32)" strokeWidth="1.4" strokeDasharray="4 5" markerEnd="url(#chArrow)">
+              <path d="M120,70 C170,120 190,140 218,168" />
+              <path d="M440,70 C390,120 370,140 342,168" />
+              <path d="M120,390 C170,340 190,320 218,292" />
+              <path d="M440,390 C390,340 370,320 342,292" />
+            </g>
+          </svg>
+
+          {/* the professionals, at the four corners */}
+          <div className="chero__pcard chero__pcard--tl">
+            <span className="chero__pcard-ic"><MaterialIcon icon="account_balance" className="text-[18px]" /></span>
+            <div><em>Lender · Maria</em><b>6.24%</b> <i>$2,140/mo</i><span className="chero__pchip"><MaterialIcon icon="verified" className="text-[12px]" /> Pre-qualified</span></div>
+          </div>
+          <div className="chero__pcard chero__pcard--tr">
+            <span className="chero__pcard-ic"><MaterialIcon icon="shield" className="text-[18px]" /></span>
+            <div><em>Insurance · Taylor</em><b>$85/mo</b> <i>homeowners</i><span className="chero__pchip"><MaterialIcon icon="verified" className="text-[12px]" /> Top rated</span></div>
+          </div>
+          <div className="chero__pcard chero__pcard--bl">
+            <span className="chero__pcard-ic"><MaterialIcon icon="description" className="text-[18px]" /></span>
+            <div><em>Escrow · Jamie</em><b>$900</b> <i>flat fee</i><span className="chero__pchip"><MaterialIcon icon="verified" className="text-[12px]" /> Transparent</span></div>
+          </div>
+          <div className="chero__pcard chero__pcard--br">
+            <span className="chero__pcard-ic"><MaterialIcon icon="account_balance" className="text-[18px]" /></span>
+            <div><em>Lender · David</em><b>6.11%</b> <i>$2,096/mo</i><span className="chero__pchip"><MaterialIcon icon="verified" className="text-[12px]" /> Pre-qualified</span></div>
+          </div>
+
+          {/* YOU — the center, on your ground */}
+          <div className="chero__hub">
+            <span className="chero__hub-badge">You</span>
+            <b>You, the buyer</b>
+            <i>In control. On your ground.</i>
+            <ul>
+              <li><MaterialIcon icon="check_circle" className="text-[14px]" /> Your goals</li>
+              <li><MaterialIcon icon="check_circle" className="text-[14px]" /> Your terms</li>
+              <li><MaterialIcon icon="check_circle" className="text-[14px]" /> Your protection</li>
+            </ul>
+          </div>
         </div>
+      </section>
+
+      {/* trust strip — uplifts everyone; lands the no-pressure/dignity promise */}
+      <section className="chero__truststrip">
+        <span><MaterialIcon icon="verified_user" className="text-[16px]" /> Professionals you can trust</span>
+        <span><MaterialIcon icon="lock" className="text-[16px]" /> Your info stays private</span>
+        <span><MaterialIcon icon="visibility" className="text-[16px]" /> You choose who moves forward</span>
+        <span><MaterialIcon icon="favorite" className="text-[16px]" /> No pressure. Ever.</span>
       </section>
 
       {/* ── seller band: put your property on the map, free (improvements,
@@ -375,7 +429,8 @@ function CinematicHeroInner() {
       </section>
 
       {/* ── the weld: PlotMaps (platform) + Position (brokerage engine) as ONE
-           assemblage, stated plainly + trust chips. ── */}
+           assemblage, stated plainly. (Trust lives in the trust strip above,
+           so no duplicate chip row here.) ── */}
       <footer className="chero__weld">
         <span className="chero__weld-by">
           <span className="chero__weld-by-label">Built by</span>
@@ -383,11 +438,6 @@ function CinematicHeroInner() {
           <img src="/brand/position-wordmark.svg" alt="Position Realty" className="chero__weld-mark" />
         </span>
         <p className="chero__weld-line">PlotMaps is the platform. Position is the brokerage and operating engine behind it.</p>
-        <div className="chero__weld-chips">
-          <span><MaterialIcon icon="verified_user" className="text-[16px]" /> Real expertise</span>
-          <span><MaterialIcon icon="lock" className="text-[16px]" /> Private by design</span>
-          <span><MaterialIcon icon="handshake" className="text-[16px]" /> Aligned, not automated</span>
-        </div>
       </footer>
       </div>{/* /chero__descent */}
 
@@ -591,8 +641,8 @@ function CinematicHeroInner() {
           width: 100%; max-width: 1320px; margin: 0 auto; padding: 12px clamp(20px, 4vw, 52px); }
         .chero__sellerband::before { content: ''; position: absolute; inset: 0 clamp(20px, 4vw, 52px);
           border-radius: 16px; background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.1); z-index: -1; }
-        .chero__sellerband-media { flex: none; width: 168px; height: 66px; border-radius: 10px;
-          background: url('/assets/destinations/lemoore.jpg') center/cover, #0a1330; opacity: 0.9; }
+        .chero__sellerband-media { flex: none; width: 168px; height: 78px; border-radius: 10px;
+          background: url('/assets/landing/home-dusk.jpg') center/cover, #0a1330; }
         .chero__sellerband-copy { flex: 1; min-width: 0; text-align: left; }
         .chero__sellerband-copy h2 { font-family: var(--font-headline, inherit); font-size: 1.15rem; font-weight: 800; color: #fff; }
         .chero__sellerband-copy p { font-size: 12.5px; line-height: 1.45; color: rgba(255,255,255,0.66); margin-top: 3px; }
@@ -620,20 +670,61 @@ function CinematicHeroInner() {
           border-radius: 12px; background: #1349d4; color: #fff; border: none; font-size: 14.5px; font-weight: 700; cursor: pointer;
           transition: background .15s, transform .15s; }
         .chero__buyerband-cta:hover { background: #0f3cb0; transform: translateY(-2px); }
-        /* the introductions art (pros presenting themselves — echoes the board) */
-        .chero__buyerband-art { position: relative; height: 220px; }
-        .chero__offercard { position: absolute; display: flex; align-items: center; gap: 14px; padding: 16px 20px; border-radius: 14px;
-          background: rgba(16,24,46,0.92); border: 1px solid rgba(255,255,255,0.14); backdrop-filter: blur(10px);
-          box-shadow: 0 20px 50px -20px rgba(0,0,0,0.7); width: 300px; }
-        .chero__offercard span { font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.7); flex: 1; }
-        .chero__offercard b { font-size: 17px; font-weight: 800; color: #fff; }
-        .chero__offercard i { font-size: 12.5px; font-style: normal; color: #9dc0ff; }
-        .chero__offercard--1 { top: 8px; left: 0; transform: rotate(-3deg); }
-        .chero__offercard--2 { top: 78px; left: 40px; transform: rotate(1deg); z-index: 2; border-color: rgba(52,211,153,0.5); }
-        .chero__offercard--3 { top: 150px; left: 8px; transform: rotate(-1.5deg); }
+        /* ── the CONSTELLATION — buyer at center, 4 pros at the corners ── */
+        .chero__constel { position: relative; height: 440px; max-width: 560px; margin: 0 auto; width: 100%; }
+        /* ghost blueprint house behind (the goal). line-art-on-black PNG →
+           screen blend lifts only the white lines, drop opacity way down. */
+        .chero__constel::before { content: ''; position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%);
+          width: 96%; height: 260px; z-index: 0; pointer-events: none;
+          background: url('/assets/landing/blueprint-house.png') center/contain no-repeat;
+          mix-blend-mode: screen; opacity: 0.16; }
+        .chero__constel-lines { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; }
+        /* corner professional cards (compact) */
+        .chero__pcard { position: absolute; z-index: 2; display: flex; align-items: flex-start; gap: 10px;
+          padding: 11px 13px; width: 190px; border-radius: 13px;
+          background: rgba(12,18,38,0.95); border: 1px solid rgba(255,255,255,0.12);
+          box-shadow: 0 18px 44px -20px rgba(0,0,0,0.85); backdrop-filter: blur(8px); }
+        .chero__pcard-ic { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 9px; flex: none;
+          background: rgba(19,73,212,0.14); border: 1px solid rgba(255,255,255,0.14); color: #9dc0ff; }
+        .chero__pcard em { display: block; font-style: normal; font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.62); }
+        .chero__pcard b { font-size: 15px; font-weight: 800; color: #fff; }
+        .chero__pcard i { font-size: 11px; font-style: normal; color: #9dc0ff; }
+        .chero__pchip { display: inline-flex; align-items: center; gap: 4px; margin-top: 6px; padding: 3px 8px; border-radius: 999px;
+          background: rgba(52,211,153,0.14); color: #6ee7b7; font-size: 10px; font-weight: 700; }
+        .chero__pchip .material-symbols-outlined { color: #34d399; }
+        /* four corners, well clear of the centered hub */
+        .chero__pcard--tl { top: 0; left: 0; }
+        .chero__pcard--tr { top: 0; right: 0; }
+        .chero__pcard--bl { bottom: 0; left: 0; }
+        .chero__pcard--br { bottom: 0; right: 0; }
+        /* the buyer HUB — the center, on their ground (brand-blue framed) */
+        .chero__hub { position: absolute; z-index: 3; top: 50%; left: 50%; transform: translate(-50%,-50%);
+          width: 196px; padding: 15px 17px; border-radius: 15px; text-align: left;
+          background: rgba(10,16,34,0.97); border: 1px solid rgba(19,73,212,0.7);
+          box-shadow: 0 0 0 4px rgba(19,73,212,0.14), 0 24px 60px -24px rgba(0,0,0,0.85); }
+        .chero__hub-badge { display: inline-grid; place-items: center; width: 34px; height: 34px; border-radius: 50%;
+          background: #1349d4; color: #fff; font-size: 13px; font-weight: 800; margin-bottom: 8px; }
+        .chero__hub b { display: block; font-size: 15px; font-weight: 800; color: #fff; }
+        .chero__hub i { display: block; font-style: normal; font-size: 11.5px; color: #9dc0ff; margin-top: 2px; }
+        .chero__hub ul { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+        .chero__hub li { display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.85); }
+        .chero__hub li .material-symbols-outlined { color: #7fa8ff; }
+
+        /* trust strip */
+        .chero__truststrip { position: relative; z-index: 4; flex: none; display: flex; flex-wrap: wrap; justify-content: center; gap: clamp(18px, 4vw, 48px);
+          width: 100%; max-width: 1120px; margin: 0 auto; padding: 16px clamp(20px, 4vw, 52px);
+          border-top: 1px solid rgba(255,255,255,0.08); border-bottom: 1px solid rgba(255,255,255,0.08); }
+        .chero__truststrip span { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; color: rgba(255,255,255,0.62); }
+        .chero__truststrip span .material-symbols-outlined { color: #7fa8ff; }
+
         @media (max-width: 900px) {
           .chero__buyerband { grid-template-columns: 1fr; gap: 28px; }
-          .chero__buyerband-art { height: 210px; max-width: 340px; margin: 0 auto; }
+          /* on mobile the constellation is fiddly — collapse to a simple stack:
+             hub on top, pro cards flow below in normal order. */
+          .chero__constel { height: auto; display: flex; flex-direction: column; gap: 10px; max-width: 360px; margin: 0 auto; }
+          .chero__constel::before, .chero__constel-lines { display: none; }
+          .chero__pcard, .chero__hub { position: static; transform: none; width: 100%; }
+          .chero__hub { order: -1; }
         }
 
         /* the weld — PlotMaps (platform) + Position (engine) as one assemblage */

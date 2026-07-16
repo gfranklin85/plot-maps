@@ -49,7 +49,7 @@ const entries = Object.entries(SUBJECTS).filter(([s]) => !only || s === only);
 for (const [slug, subject] of entries) {
   const finalPath = path.join(OUT, `${slug}.jpg`);
   if (fs.existsSync(finalPath) && !only) { console.log('skip (exists):', slug); continue; }
-  const prompt = `A photorealistic, cinematic photograph of ${subject}. Square composition, centered subject, vivid but natural color, sharp, high detail, no text, no watermark, no borders.`;
+  const prompt = `A photorealistic, cinematic, edge-to-edge FULL-BLEED photograph of ${subject}. The scene must fill the ENTIRE frame corner to corner — absolutely NO border, NO white or dark matte, NO frame, NO padding, NO passe-partout, not a framed picture. Square composition, vivid but natural color, sharp, high detail, no text, no watermark.`;
   try {
     const r = await ai.models.generateContent({ model: 'gemini-2.5-flash-image', contents: prompt });
     const parts = r.candidates?.[0]?.content?.parts || [];

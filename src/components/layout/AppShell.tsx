@@ -93,7 +93,8 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const ownSurface =
     OWN_SURFACE.includes(pathname) || pathname === '/' || pathname.startsWith('/essays') ||
     pathname.startsWith('/b/') || pathname.startsWith('/deal/') || // link view + buyer hub bring own chrome
-    pathname.startsWith('/listings'); // free listings — self-chromed (browse + post gate)
+    pathname.startsWith('/listings') || // free listings — self-chromed (browse + post gate)
+    pathname.startsWith('/hero') || pathname.startsWith('/globe'); // cinematic hero + globe own their chrome
   if (selfHeadered || ownSurface) {
     return <><GamepadNavMount enabled />{children}</>;
   }

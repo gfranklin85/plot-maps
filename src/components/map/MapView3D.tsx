@@ -1100,36 +1100,25 @@ function Inner({
 
       elapsedMsRef.current = elapsedMs;
 
-      // ── MOBILE CRUISE: adopt Google's live look as this frame's baseline ──
-      // In Cruise mode Google OWNS look (native one-finger drag turns/tilts the
-      // camera every frame) and OWNS zoom (pinch → range). Our loop must not
-      // fight it: read the element's live heading/tilt/range and re-derive our
-      // EYE position from el.center (the focal point) BEFORE we integrate, so
-      // native look/pan becomes the base our cruise adds forward motion onto.
-      // We then write ONLY el.center (+ altitude→range for climb) below — never
-      // el.heading/el.tilt. So look can never be stomped.
+      // ── MOBILE CRUISE: nudge Google's OWN center, don't re-project ────────
+      // In Cruise mode Google OWNS look (native drag turns/tilts) and zoom
+      // (pinch → range). We must not fight it. The SIMPLE, robust model (the
+      // eye-inversion tried first dove into the ground on touch): take Google's
+      // live el.center/heading/range as the truth, move THAT center forward
+      // along the heading (cruise) + sideways (strafe), change altitude for
+      // climb, and write el.center DIRECTLY below — never through fpToMap3D and
+      // never touching el.heading/el.tilt/el.range. So look/zoom stay 100%
+      // Google's and there's no focal↔eye round-trip to blow up.
       if (mobileCruise) {
-        const gHeading = typeof el.heading === 'number' ? el.heading : cam.heading;
-        const gTilt    = typeof el.tilt === 'number' ? el.tilt : (90 + cam.pitch);
-        const gRange   = typeof el.range === 'number' ? el.range : cam.range;
-        const gCenter  = el.center as { lat: number; lng: number; altitude?: number } | undefined;
-        cam.heading = gHeading;
-        cam.pitch   = clamp(gTilt - 90, -90, -5);   // tilt→pitch (fpToMap3D inverse)
-        cam.range   = gRange > 0 ? gRange : cam.range;
-        if (gCenter && Number.isFinite(gCenter.lat) && Number.isFinite(gCenter.lng)) {
-          // el.center is the FOCAL point = eye projected forward by horizDist in
-          // the heading direction. Invert it to recover the eye (cam.lat/lng),
-          // so Google's native PAN (which moves center) is respected.
-          const tiltRadB = (clamp(gTilt, 0, 85) * Math.PI) / 180;
-          const horizDist = cam.range * Math.sin(tiltRadB);
-          const hRad = (cam.heading * Math.PI) / 180;
-          const cosLatB = Math.cos((gCenter.lat * Math.PI) / 180) || 1;
-          cam.lat = gCenter.lat - (horizDist * Math.cos(hRad)) / METERS_PER_DEG_LAT;
-          cam.lng = gCenter.lng - (horizDist * Math.sin(hRad)) / (METERS_PER_DEG_LAT * cosLatB);
-          // Eye altitude = focal altitude + range·cos(tilt) (fpToMap3D inverse).
-          const focalAlt = typeof gCenter.altitude === 'number' ? gCenter.altitude : 0;
-          cam.altitude = Math.max(1, focalAlt + cam.range * Math.cos(tiltRadB));
+        const gc = el.center as { lat: number; lng: number; altitude?: number } | undefined;
+        if (gc && Number.isFinite(gc.lat) && Number.isFinite(gc.lng)) {
+          cam.lat = gc.lat;
+          cam.lng = gc.lng;
+          // Track Google's center altitude as our base; climb nudges it below.
+          cam.altitude = typeof gc.altitude === 'number' ? gc.altitude : cam.altitude;
         }
+        if (typeof el.heading === 'number') cam.heading = el.heading;
+        if (typeof el.range === 'number' && el.range > 0) cam.range = el.range;
       }
 
       // Idle: user walked away (no input >8s). Skip the entire per-
@@ -1376,14 +1365,19 @@ function Inner({
       });
 
       // ── Write to element ──────────────────────────────────────────
-      // Cruise mode: write ONLY position (center) + range. Heading/tilt are
-      // Google's — writing them would stomp the native look we adopted above.
-      el.center  = map3d.center;
-      if (!mobileCruise) {
+      if (mobileCruise) {
+        // Cruise: move Google's OWN center DIRECTLY (cam.lat/lng were seeded
+        // from el.center above, then nudged forward/strafe/climb). Do NOT run
+        // fpToMap3D — that projects a focal point hundreds of meters ahead and
+        // would teleport the map on the first frame. Leave heading/tilt/range
+        // to Google (native look + pinch-zoom own them).
+        el.center = { lat: cam.lat, lng: cam.lng, altitude: cam.altitude };
+      } else {
+        el.center  = map3d.center;
         el.heading = map3d.heading;
         el.tilt    = map3d.tilt;
+        el.range   = map3d.range;
       }
-      el.range   = map3d.range;
 
       // World moved under the cursor — wake Google's hover hit-test so
       // the POI now under the parked cursor lights up. See pokeCursor

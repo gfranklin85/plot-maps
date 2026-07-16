@@ -42,6 +42,8 @@ const PUBLIC_PATHS = [
   '/seed', // seed-your-area postcards; self-gates its own Google sign-in
   '/deal/', // the buyer's home base hub (make an offer)
   '/sky', // the Floating Plots motion demo (brand theme test bed)
+  '/globe', // the flyable-Earth globe hero prototype (front-door candidate)
+  '/hero', // the cinematic video hero (front-page mockup preview)
   '/lobby/', // the deal room front door — the listing side opens it COLD from a
              // shared link, no account. The comp-ack gate lives here; it must be
              // publicly reachable or the wedge can't work. memory: project_deal_room

@@ -1,8 +1,15 @@
 "use client";
 
 import MaterialIcon from "@/components/ui/MaterialIcon";
-import { AXIS_RANGES, type FlightTuning } from "@/lib/useFlightTuning";
-import { effectiveFlightValues, HELI_DEFAULT_TUNING } from "@/lib/flightBaseConstants";
+import {
+  AXIS_RANGES,
+  SPEED_TIERS,
+  CLIMB_TIERS,
+  nearestTier,
+  type FlightTuning,
+  type FlightTier,
+} from "@/lib/useFlightTuning";
+import { effectiveFlightValues } from "@/lib/flightBaseConstants";
 
 interface Props {
   visible: boolean;
@@ -70,15 +77,11 @@ export default function FlightTuningPanel({
         </button>
       </div>
 
-      <Slider
+      <TieredSlider
         label="Flight speed"
+        tiers={SPEED_TIERS}
         value={tuning.multiplier}
-        min={AXIS_RANGES.multiplier.min}
-        max={AXIS_RANGES.multiplier.max}
-        pivot={HELI_DEFAULT_TUNING.multiplier}
-        leftEnd="Slow"
-        rightEnd="Fast"
-        readout={`accel ${eff.throttle.accel.toFixed(0)} · max ${eff.throttle.max.toFixed(0)} px/s (rev ${eff.throttle.reverseMax.toFixed(0)})`}
+        readout={`max ${eff.throttle.max.toFixed(0)} px/s (rev ${eff.throttle.reverseMax.toFixed(0)})`}
         onChange={onMultiplierChange}
       />
       <Slider
@@ -101,15 +104,11 @@ export default function FlightTuningPanel({
         readout={`accel ${eff.tilt.accel.toFixed(0)} · max ${eff.tilt.max.toFixed(1)}°/s`}
         onChange={onTiltRateChange}
       />
-      <Slider
+      <TieredSlider
         label="Climb rate"
+        tiers={CLIMB_TIERS}
         value={tuning.climbRate}
-        min={AXIS_RANGES.climbRate.min}
-        max={AXIS_RANGES.climbRate.max}
-        pivot={HELI_DEFAULT_TUNING.climbRate}
-        leftEnd="Cinematic"
-        rightEnd="Rapid"
-        readout={`accel ${eff.climb.accel.toFixed(0)} · max ${eff.climb.max.toFixed(1)} m/s`}
+        readout={`max ${eff.climb.max.toFixed(1)} m/s`}
         onChange={onClimbRateChange}
       />
 
@@ -124,6 +123,62 @@ export default function FlightTuningPanel({
         >
           Reset
         </button>
+      </div>
+    </div>
+  );
+}
+
+// ── TieredSlider — a slider that snaps through NAMED tiers ─────────────
+// Each tier gets an equal slice of the track (so no tier is a tiny sliver).
+// Dragging snaps to the nearest tier; the active tier's NAME + note + real
+// speed show above/below. Greg 2026-07-16 — identifiable speeds beat abstract
+// multipliers (Drone · Helicopter · Cessna · F-18 · City · Country · Space).
+interface TieredSliderProps {
+  label: string;
+  tiers: FlightTier[];
+  value: number;               // current raw multiplier
+  readout: string;             // live effective numbers (e.g. "max 610 px/s")
+  onChange: (mult: number) => void;
+}
+
+function TieredSlider({ label, tiers, value, readout, onChange }: TieredSliderProps) {
+  const active = nearestTier(tiers, value);
+  const activeIdx = Math.max(0, tiers.findIndex((t) => t.name === active.name));
+  const last = tiers.length - 1;
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <label className="text-[10px] font-bold text-white/60 uppercase tracking-wider">
+          {label}
+        </label>
+        <span className="text-[11px] font-bold text-white tabular-nums">
+          {active.name}
+        </span>
+      </div>
+      <input
+        type="range"
+        min={0}
+        max={last}
+        step={1}
+        value={activeIdx}
+        onChange={(e) => onChange(tiers[parseInt(e.target.value, 10)].mult)}
+        className="w-full accent-primary"
+      />
+      {/* tier tick labels — the ladder, so you can SEE the named steps */}
+      <div className="flex items-center justify-between mt-0.5 text-[8px] text-white/45 leading-tight">
+        {tiers.map((t, i) => (
+          <span
+            key={t.name}
+            className={`${i === activeIdx ? 'text-white font-bold' : ''} text-center`}
+            style={{ flex: 1, textAlign: i === 0 ? 'left' : i === last ? 'right' : 'center' }}
+          >
+            {t.name.split(' ')[0]}
+          </span>
+        ))}
+      </div>
+      <div className="mt-1 text-[9.5px] font-mono text-white/60 tabular-nums leading-tight">
+        {active.note} · {readout}
       </div>
     </div>
   );

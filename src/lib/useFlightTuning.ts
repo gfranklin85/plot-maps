@@ -64,6 +64,46 @@ export const AXIS_RANGES: Record<keyof FlightTuning, AxisRange> = {
   climbRate:  { min: HELI_DEFAULT_TUNING.climbRate  * 0.3, max: 1500 },  // 0.3..1500 — ~45,000 m/s, into space in ~2s
 };
 
+// ── Named tiers (Greg 2026-07-16) ─────────────────────────────────────
+// The abstract multiplier was unreadable ("0.99× vs 78.95×", <1 below the
+// midpoint, extravagant above). Instead, the Flight Speed + Climb Rate sliders
+// snap through IDENTIFIABLE tiers, each a fixed multiplier mapped to a real-
+// world feel. Evenly spaced on the slider so every tier gets equal real-estate
+// (no more lopsided pivot). `mult` feeds effectiveFlightValues exactly like a
+// hand-dragged value; `note` is the human label shown live.
+export interface FlightTier { name: string; mult: number; note: string; }
+
+// SPEED (throttle.max = 85 px/s × mult, altitude-scaled to ground speed).
+export const SPEED_TIERS: FlightTier[] = [
+  { name: 'Drone',         mult: 0.6,  note: 'slow, hover-close' },
+  { name: 'Helicopter',    mult: 1.04, note: 'cruise (default)' },
+  { name: 'Cessna',        mult: 4,    note: 'small-plane pace' },
+  { name: 'F-18',          mult: 20,   note: 'fighter-jet fast' },
+  { name: 'City Travel',   mult: 60,   note: 'cross a city in seconds' },
+  { name: 'Country Travel',mult: 150,  note: 'cross a state in seconds' },
+  { name: 'Space Travel',  mult: 400,  note: 'rip across the globe' },
+];
+
+// CLIMB (climb.max = 30 m/s × mult).
+export const CLIMB_TIERS: FlightTier[] = [
+  { name: 'Cinematic',  mult: 0.5,  note: '~15 m/s — slow rise' },
+  { name: 'Helicopter', mult: 1.0,  note: '~30 m/s — steady climb' },
+  { name: 'Jet',        mult: 5,    note: '~150 m/s — fast ascent' },
+  { name: 'Rocket',     mult: 50,   note: '~1,500 m/s — launch' },
+  { name: 'Space',      mult: 1500, note: '~45,000 m/s — orbit in ~2s' },
+];
+
+/** Nearest tier to a raw multiplier (for showing the active name). */
+export function nearestTier(tiers: FlightTier[], mult: number): FlightTier {
+  let best = tiers[0];
+  let bestD = Infinity;
+  for (const t of tiers) {
+    const d = Math.abs(Math.log(t.mult) - Math.log(Math.max(1e-6, mult)));
+    if (d < bestD) { bestD = d; best = t; }
+  }
+  return best;
+}
+
 function clampAxis(n: number, axis: keyof FlightTuning): number {
   const { min, max } = AXIS_RANGES[axis];
   if (!Number.isFinite(n)) return DEFAULT_TUNING[axis];

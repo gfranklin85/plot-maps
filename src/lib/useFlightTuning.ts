@@ -47,10 +47,21 @@ const DEFAULT_TUNING: FlightTuning = { ...HELI_DEFAULT_TUNING };
 // to allow finer cinematic settings.)
 export interface AxisRange { min: number; max: number; }
 export const AXIS_RANGES: Record<keyof FlightTuning, AxisRange> = {
-  multiplier: { min: HELI_DEFAULT_TUNING.multiplier * 0.5, max: 11 },  // 0.52..11 — top end ~1000 mph ground speed (Greg 2026-05-22)
+  // FLIGHT SPEED + CLIMB RATE tops blown WAY up (Greg 2026-07-16): full slider
+  // = rip across the globe and punch into SPACE in a few seconds, not cruise.
+  //   • Climb max 1500× → climb.max = 30 m/s × 1500 = 45,000 m/s. The Kármán
+  //     line (~100 km) in ~2.2 s — slam the lever, you're in space.
+  //   • Speed max 400× → throttle.max = 85 px/s × 400 = 34,000 px/s of screen
+  //     pan. Ground speed is altitude-scaled (metersPerScreenPixel × range), so
+  //     at altitude full throttle carries you across continents per second.
+  // The `pivot` in FlightTuningPanel anchors each default at the slider MIDPOINT,
+  // so the bottom half stays fine/controllable and this huge headroom lives in
+  // the top half. Ranges only WIDEN → old stored tunings stay valid (no schema
+  // bump). Google's tile loader may lag at these speeds; the camera still flies.
+  multiplier: { min: HELI_DEFAULT_TUNING.multiplier * 0.5, max: 400 },  // 0.52..400 — globe-crossing at altitude
   turnRate:   { min: HELI_DEFAULT_TUNING.turnRate   * 0.5, max: HELI_DEFAULT_TUNING.turnRate   * 1.5 },  // 0.50..1.50
   tiltRate:   { min: HELI_DEFAULT_TUNING.tiltRate   * 0.5, max: HELI_DEFAULT_TUNING.tiltRate   * 1.5 },  // 0.90..2.70
-  climbRate:  { min: HELI_DEFAULT_TUNING.climbRate  * 0.3, max: 15 },  // 0.3..15 — top end ~1000 mph vertical (Greg 2026-05-25)
+  climbRate:  { min: HELI_DEFAULT_TUNING.climbRate  * 0.3, max: 1500 },  // 0.3..1500 — ~45,000 m/s, into space in ~2s
 };
 
 function clampAxis(n: number, axis: keyof FlightTuning): number {

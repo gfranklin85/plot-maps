@@ -25,6 +25,9 @@ const PUBLIC_PATHS = [
   '/position',
   '/join-position',
   '/contact',
+  // Pricing tool — public lead-capture funnel (ported from lemoore-homes).
+  // Has its own in-page lead gate; gating behind OAuth would kill conversions.
+  '/price',
 ];
 
 // Logged-in pages reachable even for users without beta access. The

@@ -92,6 +92,8 @@ export const TOOLS: Tool[] = [
   },
   // Plain-language titles = the action; the industry term lives in the sub.
   { href: '/leads', icon: 'travel_explore', art: 'skip-trace', title: 'See a house, call the owner', sub: "Get any owner's number and reach out — instant skip trace, no MLS needed." },
+  // Pricing tool — ported from lemoore-homes. Market-data-driven; see /price.
+  { href: '/price', icon: 'sell', art: 'price', title: 'Price a home to actually sell', sub: 'Drag the price and watch days-to-offer move — built from real recent local sales.' },
   { href: '/campaigns', icon: 'mail', art: 'mail', title: 'Mail any house — even off-market', sub: "Find owners who aren't on Zillow or the MLS and send a real letter. Buyers, investors, agents." },
   { href: '/campaigns', icon: 'call', art: 'call', title: 'Call from the map', sub: 'Dial any property right from the screen — conversations tracked, nothing lost.' },
 ];

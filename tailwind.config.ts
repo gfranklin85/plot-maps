@@ -99,6 +99,8 @@ const config: Config = {
           cold: "rgb(var(--color-status-cold) / <alpha-value>)",
           neutral: "rgb(var(--color-status-neutral) / <alpha-value>)",
         },
+        // Pricing tool (/price) — dark hero surface. Ported from lemoore-homes.
+        charcoal: "#18181b",
       },
       // ─── Paper-shadow elevation system ───
       // Warm-tinted shadows that suggest paper weight on parchment.

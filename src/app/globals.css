@@ -1916,3 +1916,22 @@ gmp-popover-3d-element[plot-card-popover],
 .fp-agent-card__h { font-weight: 700; font-size: 16px; color: var(--plot-ink); }
 .fp-agent-card__p { font-size: 13.5px; color: #5d6675; line-height: 1.45; margin-top: 4px; }
 .fp-agent-card__arrow { flex: none; color: #334155; margin-left: auto; }
+
+/* ─── Pricing tool (/price) marquee tickers ───────────────────────────────
+   Ported from lemoore-homes. Drives the scrolling "sold" bands on /price. */
+@keyframes marquee {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+.animate-marquee {
+  animation: marquee 20s linear infinite;
+}
+.animate-marquee:hover {
+  animation-play-state: paused;
+}
+.animate-marquee-reverse {
+  animation: marquee 20s linear infinite reverse;
+}
+.animate-marquee-reverse:hover {
+  animation-play-state: paused;
+}

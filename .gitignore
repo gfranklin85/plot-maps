@@ -38,8 +38,13 @@ next-env.d.ts
 .vercel
 .env*.local
 
-# IDE local state
-.claude/
+# IDE local state — ignore personal Claude settings, but SHARE the project
+# law: settings.json (hooks), hooks/, and agents/ travel with the repo.
+.claude/*
+!.claude/settings.json
+!.claude/hooks/
+!.claude/agents/
+.claude/settings.local.json
 
 # Cesium static runtime assets — copied from node_modules at build time
 # by scripts/copy-cesium-assets.mjs. Don't commit them; the script
@@ -75,3 +80,4 @@ public/assets/cards/*.png
 
 # Otanimus pose-generation scratch (not app source)
 otanimus-gen/
+.env*

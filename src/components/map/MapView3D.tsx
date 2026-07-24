@@ -120,6 +120,12 @@ type Map3DElement = HTMLElement & {
   heading: number;
   tilt: number;
   range: number;
+  // Google's maps3d element controls label rendering through this BOOLEAN
+  // PROPERTY (see @types/google.maps: Map3DElement.defaultLabelsDisabled),
+  // NOT through a kebab-case attribute. setAttribute('default-labels-disabled')
+  // writes a dead attribute the element never observes — which is why the POI
+  // toggle silently did nothing. Drive the property. Greg 2026-07-24.
+  defaultLabelsDisabled?: boolean;
 };
 
 // First-person camera state. This is what the user is actually flying.
@@ -844,8 +850,11 @@ function Inner({
     // Greg 2026-07-14.
     el.setAttribute('gesture-handling', 'greedy');
     try { (el as unknown as { gestureHandling?: string }).gestureHandling = 'greedy'; } catch { /* ignore */ }
-    // POI labels: default-labels-disabled inverts our prop.
-    // poisVisible=true → labels visible → attribute = 'false'.
+    // POI labels: Google's maps3d element reads the `defaultLabelsDisabled`
+    // BOOLEAN PROPERTY (not an attribute). poisVisible=true → labels shown →
+    // disabled=false. Setting the property is what actually toggles labels;
+    // the attribute is kept only as a harmless DOM-inspectable mirror.
+    el.defaultLabelsDisabled = !poisVisible;
     el.setAttribute('default-labels-disabled', poisVisible ? 'false' : 'true');
     containerRef.current.appendChild(el);
     elRef.current = el;
@@ -1073,6 +1082,8 @@ function Inner({
   useEffect(() => {
     const el = elRef.current;
     if (!el) return;
+    // Drive the property (what Google actually observes); mirror the attribute.
+    el.defaultLabelsDisabled = !poisVisible;
     el.setAttribute('default-labels-disabled', poisVisible ? 'false' : 'true');
   }, [poisVisible]);
 

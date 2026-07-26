@@ -178,6 +178,13 @@ export interface MapViewProps {
    *  HUD readout. 2D path doesn't fire this (altitude isn't a
    *  meaningful concept on the tilted 2D surface). */
   onAltitudeChange?: (meters: number) => void;
+  /** PlotPad.exe localhost link is connected (the native OS-click helper).
+   *  When true: the reticle is FIXED (its stored fraction is the single
+   *  source of truth the helper clicks) and the A-press JS self-resolve
+   *  fallback stands down — the helper's real OS click drives gmp-click.
+   *  When false: reticle follows the cursor + A self-resolves (fallback).
+   *  memory/project_plot_pad_os_click_helper */
+  plotPadLinkActive?: boolean;
   /** Idle flag from useIdleDetection. When true, 3D path pauses its
    *  per-frame writes (saves GPU when the user walks away). 2D path
    *  ignores — its render is event-driven, not loop-driven. */

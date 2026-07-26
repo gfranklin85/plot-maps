@@ -47,6 +47,13 @@ import GamepadStatusChip from "@/components/map/GamepadStatusChip";
 import MapSidebar from "@/components/map/MapSidebar";
 import BuyingPanel from "@/components/map/BuyingPanel";
 import SidebarPropertyCard from "@/components/map/SidebarPropertyCard";
+import MapPhoneRail from "@/components/map/MapPhoneRail";
+
+// The map's ENTIRE chrome now lives in ONE docked phone rail on the right
+// (memory/project_map_phone_rail). When true, the old bottom dash + left
+// BuyingPanel + left property-card column are suppressed and the phone is the
+// only UI. Flag kept so the previous chrome stays one flip away during rollout.
+const PHONE_RAIL = true;
 import { useMapMode } from "@/lib/useMapMode";
 import FlightTuningPanel from "@/components/map/FlightTuningPanel";
 import { useFlightTuning } from "@/lib/useFlightTuning";
@@ -56,6 +63,7 @@ import DestinationsPanel from "@/components/map/DestinationsPanel";
 import AltitudeGauge from "@/components/map/AltitudeGauge";
 import type { GamepadActions } from "@/components/map/GamepadFlightController";
 import { useReticlePosition } from "@/lib/useReticlePosition";
+import { usePlotPadLink } from "@/lib/usePlotPadLink";
 import { playShotSound, type ShotChannel } from "@/lib/shotSounds";
 import ShotProjectile, { type Shot, type ShotMechanism, SHOT_TOTAL_MS } from "@/components/map/ShotProjectile";
 import SimpleLaser from "@/components/map/SimpleLaser";
@@ -1130,6 +1138,14 @@ export default function MapPage() {
   // and seeds the default. Both the visual MapReticle and the
   // controller's hit-test sample point read from this.
   const { position: reticlePosition, setPosition: setReticlePosition } = useReticlePosition();
+  // Localhost link to PlotPad.exe: reports the reticle pixel so the A-button
+  // does a REAL OS click there (Google's gmp-click needs a trusted click).
+  // linkActive = helper connected → the reticle becomes FIXED (source of truth)
+  // and the JS self-resolve fallback stands down. Only in airplane flight.
+  const { linkActive: plotPadLinkActive } = usePlotPadLink({
+    reticle: reticlePosition,
+    enabled: flightMode === 'airplane',
+  });
   // LB-held + right stick moves the fixed reticle (set-and-forget cursor).
   // The 3D loop hands us per-frame viewport-fraction deltas; we accumulate
   // into the stored position. [[controller-cursor-model]]
@@ -1963,11 +1979,11 @@ export default function MapPage() {
             Greg 2026-07-14 mockup). Shares the listings build's settings
             store + market API. Hidden while a property card holds the left
             column, in walk mode, or during the spike back-out. */}
-        {!walkMode && !spikeZoom && !cardOpen && <BuyingPanel />}
+        {!PHONE_RAIL && !walkMode && !spikeZoom && !cardOpen && <BuyingPanel />}
 
         {/* CARD COLUMN — lives in the freed LEFT matte when a card is open.
             Never crosses the map glass; the map shrank to make room. */}
-        {cardOpen && (
+        {!PHONE_RAIL && cardOpen && (
           <div className="map-card-col">
             <SidebarPropertyCard lead={selectedLead!} onClose={() => setSelectedLead(null)} />
           </div>
@@ -2138,6 +2154,7 @@ export default function MapPage() {
             gamepadAirplaneTargets={airplaneTargets}
             gamepadReticleXFraction={reticlePosition.xFraction}
             gamepadReticleYFraction={reticlePosition.yFraction}
+            plotPadLinkActive={plotPadLinkActive}
             onMoveReticle={handleMoveReticle}
             onGamepadReticleTargetChange={handleReticleTargetChange}
             onGamepadParcelHoverChange={handleParcelHoverChange}
@@ -2233,7 +2250,23 @@ export default function MapPage() {
           MapSidebar and adjusting --map-rail-w / --map-top-h. ═══ */}
       {/* touchFly gets its own lean top bar (.mtb) instead of this desktop
           dock — hide the dock on mobile flight so they don't stack. */}
-      {!walkMode && !touchFly && <div className="map-shell__dock">{dashEl}</div>}
+      {!PHONE_RAIL && !walkMode && !touchFly && <div className="map-shell__dock">{dashEl}</div>}
+
+      {/* ═══ THE PHONE RAIL — the one and only map-screen UI ═══
+          A docked mobile-app screen on the right holding everything: the
+          property card, search, controls, buying, market. The map is clean
+          glass to its left. memory/project_map_phone_rail */}
+      {PHONE_RAIL && !walkMode && !touchFly && (
+        <div className="map-phone-dock">
+          <MapPhoneRail
+            lead={selectedLead}
+            onCloseCard={() => setSelectedLead(null)}
+            city={[selectedLead?.city, selectedLead?.state].filter(Boolean).join(', ') || 'Lemoore, CA'}
+            represented
+            onHome={() => { /* Map tab — already here */ }}
+          />
+        </div>
+      )}
 
       {/* ═══ MOBILE ZONE PAD — on-screen touch flight (portrait) ═══
           Drives the injected touch gamepad → Plot's flight loop. Tap the

@@ -254,6 +254,7 @@ function Inner({
   tiltRateMultiplier = 1.0,
   flyToTarget,
   onAltitudeChange,
+  plotPadLinkActive = false,
   isIdle = false,
   poisVisible = false,
   showParcelOverlay = false,
@@ -291,6 +292,9 @@ function Inner({
    *  deltas in viewport fractions. The page applies them via setPosition. */
   onMoveReticle?: (dxFrac: number, dyFrac: number) => void;
   onAltitudeChange?: (meters: number) => void;
+  /** PlotPad.exe localhost link connected → reticle FIXED + A self-resolve
+   *  fallback off (the real OS click drives gmp-click). See MapView props. */
+  plotPadLinkActive?: boolean;
   /** True when no input for >threshold. Stops camera writes + hover
    *  wave + altitude reporting until next input. Pure GPU savings;
    *  resumes instantly on input. */
@@ -725,6 +729,10 @@ function Inner({
   reticleYFracRef.current = gamepadReticleYFraction ?? 0.42;
   const onMoveReticleRef = useRef(onMoveReticle);
   onMoveReticleRef.current = onMoveReticle;
+  // PlotPad link live? When true, the helper's real OS click drives gmp-click,
+  // so the A-press must NOT also self-resolve (that would double-open).
+  const plotPadLinkRef = useRef(plotPadLinkActive);
+  plotPadLinkRef.current = plotPadLinkActive;
   // True while LB is held (placing the reticle) — drives the placing glow.
   // The ref mirror lets the RAF loop read/compare without a stale closure.
   const [placingReticle, setPlacingReticle] = useState(false);
@@ -1157,9 +1165,14 @@ function Inner({
         // it isn't mounted in 3D, so the laser never fired in flight). 2026-
         // 06-28 fix. onShoot dispatches plot:fire-laser + the projectile +
         // sound; fireOpenParcel resolves the parcel/card at the reticle.
+        //
+        // When the PlotPad link is LIVE, the helper does a REAL OS click at the
+        // reticle → Google's gmp-click opens the card through the trusted path,
+        // so we must NOT also self-resolve here (double-open). Keep onShoot for
+        // feel in both modes; only run the JS fallback when the link is down.
         if (justPressed.has('a')) {
           actionsRef.current?.onShoot?.();
-          fireOpenParcelRef.current();
+          if (!plotPadLinkRef.current) fireOpenParcelRef.current();
         }
         // RB-tap = tether. Forgiveness-zone target acquisition: cursor
         // aim doesn't need pixel precision; Plot queries nearby Places
@@ -1441,10 +1454,13 @@ function Inner({
             parcel opens IDENTICALLY to a mouse click. The cursor is the
             single source of truth; no separate fire-resolve to drift out of
             sync. memory/project_plot_pad_os_click_helper, controller-cursor-model */}
+        {/* PlotPad live → FIXED reticle (the pixel the helper clicks is the
+            single source of truth). No link → follow the OS cursor (legacy
+            fallback so a plain mouse still aims it). */}
         {reticleVisible && (
           <CustomReticle
             hoverActive={hoverActive}
-            followCursor
+            followCursor={!plotPadLinkActive}
             fixedXFraction={gamepadReticleXFraction ?? 0.5}
             fixedYFraction={gamepadReticleYFraction ?? 0.42}
             placing={placingReticle}
@@ -1474,6 +1490,7 @@ export default function MapView3D(props: MapViewProps) {
         tiltRateMultiplier={props.tiltRateMultiplier}
         flyToTarget={props.flyToTarget}
         onAltitudeChange={props.onAltitudeChange}
+        plotPadLinkActive={props.plotPadLinkActive}
         isIdle={props.isIdle}
         poisVisible={props.poisVisible}
         showParcelOverlay={props.showParcelOverlay}

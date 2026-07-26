@@ -1,6 +1,6 @@
 [package]
 name = "plot-pad"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "Plot Pad — full gamepad flight helper for plot.solutions"
 authors = ["Plot Solutions LLC"]
@@ -10,12 +10,16 @@ name = "PlotPad"
 path = "src/main.rs"
 
 [dependencies]
-# Windows API: XInput (gamepad), SendInput (clicks/keys), foreground window.
+# Windows API: XInput (gamepad), SendInput (clicks/keys), foreground window,
+# HiDPI (per-monitor DPI awareness for pixel-exact absolute clicks). The
+# localhost WebSocket server is hand-rolled over std::net (no extra crates).
 windows = { version = "0.58", features = [
     "Win32_Foundation",
     "Win32_UI_Input_XboxController",
     "Win32_UI_Input_KeyboardAndMouse",
     "Win32_UI_WindowsAndMessaging",
+    "Win32_UI_HiDpi",
+    "Win32_Graphics_Gdi",
     "Win32_System_Threading",
 ] }
 
